@@ -1,0 +1,9 @@
+# `output "json" hide=#true` removes the inherited json output: nothing decodes, and the call
+# returns the binary's text, its final newline trimmed as Nushell does.
+{
+    cmd: [quiet],
+    invoke: "rep quiet",
+    argv: [quiet],
+    stdout: "plain",
+    output: "plain",
+}

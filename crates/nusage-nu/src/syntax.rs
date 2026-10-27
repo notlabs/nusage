@@ -76,32 +76,18 @@ impl FlagName {
 }
 
 /// A command name, possibly several words: `main`, `db`, `db migrate`. Quoted when printed
-/// if it needs to be.
+/// if it needs to be. Whether Nushell accepts it as a definition (a parser keyword such as
+/// `run` is not one) is for [`check_module`](crate::check_module) to say.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandName(String);
 
 impl CommandName {
-    /// A name to call: any command's, keywords such as `run` included.
     pub fn new(text: impl Into<String>) -> Result<Self, SyntaxError> {
         let text: String = text.into();
         if text.trim().is_empty() || text.starts_with('-') || text.contains('\n') {
             return Err(SyntaxError(format!("not a command name: {text:?}")));
         }
         Ok(Self(text))
-    }
-
-    /// A name to define: not a parser keyword, since Nushell refuses to define `run` or
-    /// `def`, in a module as anywhere else, and nu-parser is the authority on which names
-    /// those are.
-    pub fn definable(text: impl Into<String>) -> Result<Self, SyntaxError> {
-        let name = Self::new(text)?;
-        if nu_parser::is_parser_keyword(name.0.as_bytes()) {
-            return Err(SyntaxError(format!(
-                "`{}` is a Nushell parser keyword and cannot name a command; rename it",
-                name.0
-            )));
-        }
-        Ok(name)
     }
 
     pub fn as_str(&self) -> &str {
@@ -146,7 +132,9 @@ pub struct Module {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Def(Def),
-    Extern(Extern),
+    /// Nushell source written as given: a fixed block the generator ships, such as helper
+    /// definitions, kept as Nushell rather than modelled.
+    Verbatim(String),
 }
 
 /// A custom command definition.
@@ -164,34 +152,12 @@ pub struct Def {
     pub body: Vec<Stmt>,
 }
 
-/// A known external: a signature for a command Nushell runs from `PATH`. No body.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Extern {
-    pub export: bool,
-    pub doc: Vec<Vec<String>>,
-    pub attrs: Vec<Attr>,
-    pub name: CommandName,
-    pub params: Params,
-    pub io: Option<(Type, Type)>,
-    /// `extern --strict`: an undeclared flag is a parse error.
-    pub strict: bool,
-}
-
-/// An attribute line above a definition: `@name arg arg`.
+/// An attribute line above a definition: `@name 'arg' 'arg'`, each argument a string,
+/// single-quoted so it reads as written, or a raw string when it contains `'`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Attr {
     pub name: FlagName,
-    pub args: Vec<AttrArg>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum AttrArg {
-    /// A string, single-quoted (or a raw string when it contains `'`).
-    Str(String),
-    /// A list of argv words, written bare: `[--format=json]`.
-    Words(Vec<String>),
-    /// A block, written as given: `{ from json }`.
-    Block(String),
+    pub args: Vec<String>,
 }
 
 /// The parameters of a signature, in the order Nushell requires: required positionals,
@@ -291,8 +257,8 @@ pub enum Expr {
     Var(Ident),
     /// A value written as NUON.
     Literal(Value),
-    /// `{k: v ...}`; the printer decides the layout.
-    Record(Vec<(Ident, Expr)>),
+    /// `{k: v ...}`, keys quoted when they need to be; the printer decides the layout.
+    Record(Vec<(String, Expr)>),
     /// `[a b]`
     List(Vec<Expr>),
     /// `name arg arg`, arguments printed as given.
@@ -309,6 +275,18 @@ pub enum Expr {
         op: Infix,
         rhs: Box<Expr>,
     },
+    /// `a | b | c` where an expression is expected: a `let` value, a branch, a closure body.
+    Pipeline(Vec<Expr>),
+    /// `if cond { then } else { otherwise }`
+    If {
+        cond: Box<Expr>,
+        then: Box<Expr>,
+        otherwise: Box<Expr>,
+    },
+    /// `{ body }`: a closure with no parameters, run on its input.
+    Closure(Box<Expr>),
+    /// `...$x` or `...(expr)`: a list spread into a call's arguments.
+    Spread(Box<Expr>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -323,19 +301,5 @@ impl Infix {
             Infix::And => "and",
             Infix::Or => "or",
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parser_keywords_cannot_be_defined_but_can_be_called() {
-        assert!(CommandName::definable("run").is_err());
-        assert!(CommandName::definable("def").is_err());
-        assert!(CommandName::definable("db run").is_ok());
-        assert!(CommandName::definable("exec").is_ok());
-        assert!(CommandName::new("run").is_ok());
     }
 }

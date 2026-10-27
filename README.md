@@ -1,6 +1,7 @@
 # nusage
 
-Typed Nushell commands from usage-annotated scripts, and typed externs from usage specs.
+Typed Nushell commands from usage-annotated scripts, and typed wrappers from usage specs of
+binaries.
 Early development.
 
 - `nusage --help`: the CLI.

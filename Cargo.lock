@@ -3482,6 +3482,7 @@ version = "0.1.0"
 dependencies = [
  "genco",
  "nu-cmd-lang",
+ "nu-command",
  "nu-parser",
  "nu-protocol",
  "nu-utils",

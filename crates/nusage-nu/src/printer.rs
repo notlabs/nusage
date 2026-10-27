@@ -30,7 +30,7 @@ pub fn print(module: &Module) -> String {
         $(if !module.preamble.is_empty() => $['\n'])
         $(for item in &module.items join ($['\n']) => $(match item {
             Item::Def(def) => $(def_tokens(def)),
-            Item::Extern(ext) => $(extern_tokens(ext)),
+            Item::Verbatim(source) => $(verbatim_tokens(source)),
         }))
     };
     tokens
@@ -67,11 +67,10 @@ fn def_tokens(def: &Def) -> Tokens {
     }
 }
 
-fn extern_tokens(ext: &Extern) -> Tokens {
-    quote! {
-        $(head(&ext.doc, &ext.attrs))
-        $(if ext.export => export$[' '])extern $(if ext.strict => --strict$[' '])$(ext.name.printed()) $(signature(&ext.params, &ext.io))
-    }
+/// A verbatim block, line by line, so genco's indentation cannot touch it; a blank line in
+/// it stays one blank line.
+fn verbatim_tokens(source: &str) -> Tokens {
+    quote!($(for line in source.trim_end().lines() => $(if line.is_empty() { $['\n'] } else { $(line.to_string())$['\r'] })))
 }
 
 /// `[` one parameter per line `]`, trailing comments aligned two columns past the longest
@@ -99,24 +98,17 @@ fn signature(params: &Params, io: &Option<(Type, Type)>) -> Tokens {
     }
 }
 
-/// An attribute argument: a string single-quoted so it reads as written, or as a raw string
-/// when it contains `'`; words bare where they can be; a block as given.
-fn attr_arg(arg: &AttrArg) -> String {
-    match arg {
-        AttrArg::Str(text) if !text.contains('\'') => format!("'{text}'"),
-        AttrArg::Str(text) => {
-            let mut hashes = String::from("#");
-            while text.contains(&format!("'{hashes}")) {
-                hashes.push('#');
-            }
-            format!("r{hashes}'{text}'{hashes}")
-        }
-        AttrArg::Words(words) => format!(
-            "[{}]",
-            words.iter().map(|w| word(w)).collect::<Vec<_>>().join(" ")
-        ),
-        AttrArg::Block(text) => format!("{{ {text} }}"),
+/// An attribute argument: single-quoted so it reads as written, or a raw string when it
+/// contains `'`.
+fn attr_arg(text: &str) -> String {
+    if !text.contains('\'') {
+        return format!("'{text}'");
     }
+    let mut hashes = String::from("#");
+    while text.contains(&format!("'{hashes}")) {
+        hashes.push('#');
+    }
+    format!("r{hashes}'{text}'{hashes}")
 }
 
 /// A parameter as written in a signature, without its comment.
@@ -206,7 +198,9 @@ fn stmt_tokens(stmt: &Stmt) -> Tokens {
     }
 }
 
-/// An expression; `statement_value` is a record that is the whole right side of a `let`.
+/// An expression; `statement_value` is a record that is the whole right side of a `let`. A
+/// record goes one field per line when it is that, has more than three fields, or holds a
+/// closure.
 fn expr_tokens(expr: &Expr, statement_value: bool) -> Tokens {
     match expr {
         Expr::Var(name) => quote!($(format!("${}", name.as_str()))),
@@ -215,16 +209,24 @@ fn expr_tokens(expr: &Expr, statement_value: bool) -> Tokens {
         Expr::List(items) => {
             quote!([$(for item in items join ($[' ']) => $(expr_tokens(item, false)))])
         }
-        Expr::Record(fields) if statement_value || fields.len() > 3 => quote! {
-            {
-                $(for (key, value) in fields join ($['\r']) => $(key.as_str()): $(expr_tokens(value, false)))
+        Expr::Record(fields)
+            if statement_value
+                || fields.len() > 3
+                || fields.iter().any(|(_, v)| matches!(v, Expr::Closure(_))) =>
+        {
+            quote! {
+                {
+                    $(for (key, value) in fields join ($['\r']) => $(word(key)): $(expr_tokens(value, false)))
+                }
             }
-        },
-        Expr::Record(fields) => {
-            quote!({$(for (key, value) in fields join (, ) => $(key.as_str()): $(expr_tokens(value, false)))})
         }
+        Expr::Record(fields) => {
+            quote!({$(for (key, value) in fields join (, ) => $(word(key)): $(expr_tokens(value, false)))})
+        }
+        // A call writes a many-word name bare; only a definition or a completer reference
+        // quotes one.
         Expr::Call { name, args } => {
-            quote!($(name.printed())$(for arg in args => $[' ']$(expr_tokens(arg, false))))
+            quote!($(name.as_str())$(for arg in args => $[' ']$(expr_tokens(arg, false))))
         }
         Expr::External { name, args } => {
             quote!(^$(name.as_str())$(for arg in args => $[' ']$(expr_tokens(arg, false))))
@@ -233,6 +235,21 @@ fn expr_tokens(expr: &Expr, statement_value: bool) -> Tokens {
         Expr::Infix { lhs, op, rhs } => {
             quote!($(expr_tokens(lhs, false)) $(op.as_str()) $(expr_tokens(rhs, false)))
         }
+        Expr::Pipeline(stages) => {
+            quote!($(for stage in stages join ( | ) => $(expr_tokens(stage, false))))
+        }
+        Expr::If {
+            cond,
+            then,
+            otherwise,
+        } => quote! {
+            if $(expr_tokens(cond, false)) { $(expr_tokens(then, false)) } else { $(expr_tokens(otherwise, false)) }
+        },
+        Expr::Closure(body) => quote!({ $(expr_tokens(body, false)) }),
+        Expr::Spread(inner) => match inner.as_ref() {
+            Expr::Var(_) => quote!(...$(expr_tokens(inner, false))),
+            _ => quote!(...($(expr_tokens(inner, false)))),
+        },
     }
 }
 
@@ -254,7 +271,7 @@ mod tests {
             ],
             attrs: vec![Attr {
                 name: FlagName::new("usage").unwrap(),
-                args: vec![AttrArg::Str("arg \"<name>\" help=\"Who\"".into())],
+                args: vec!["arg \"<name>\" help=\"Who\"".into()],
             }],
             name: CommandName::new("main").unwrap(),
             params: Params::new(vec![
@@ -281,15 +298,15 @@ mod tests {
                 Stmt::Let {
                     name: ident("usage"),
                     value: Expr::Record(vec![
-                        (ident("cmd"), Expr::List(vec![])),
+                        ("cmd".into(), Expr::List(vec![])),
                         (
-                            ident("args"),
-                            Expr::Record(vec![(ident("name"), Expr::Var(ident("name")))]),
+                            "args".into(),
+                            Expr::Record(vec![("name".into(), Expr::Var(ident("name")))]),
                         ),
                         (
-                            ident("flags"),
+                            "flags".into(),
                             Expr::Record(vec![(
-                                ident("loud"),
+                                "loud".into(),
                                 Expr::Group(Box::new(Expr::Call {
                                     name: CommandName::new("not").unwrap(),
                                     args: vec![Expr::Var(ident("loud"))],
@@ -337,35 +354,11 @@ export def main [
     }
 
     #[test]
-    fn prints_an_extern_with_structured_output_and_a_bare_helper() {
-        let helper = Def {
-            export: false,
-            doc: vec![],
-            attrs: vec![],
-            name: CommandName::new("complete region").unwrap(),
-            params: Params::default(),
-            io: None,
-            body: vec![Stmt::Pipeline(vec![
-                Expr::External {
-                    name: "sh".into(),
-                    args: vec![Expr::Str("-c".into()), Expr::Str("demo regions".into())],
-                },
-                Expr::Call {
-                    name: CommandName::new("lines").unwrap(),
-                    args: vec![],
-                },
-            ])],
-        };
-        let ext = Extern {
+    fn prints_a_wrapper_with_verbatim_helpers() {
+        let wrapper = Def {
             export: true,
             doc: vec![vec!["Show status".into()]],
-            attrs: vec![Attr {
-                name: FlagName::new("structured").unwrap(),
-                args: vec![
-                    AttrArg::Words(vec!["--format=json".into()]),
-                    AttrArg::Block("from json".into()),
-                ],
-            }],
+            attrs: vec![],
             name: CommandName::new("demo status").unwrap(),
             params: Params::new(vec![Param::Flag {
                 long: FlagName::new("format").unwrap(),
@@ -378,23 +371,78 @@ export def main [
             .unwrap(),
             io: Some((
                 Type::new("nothing").unwrap(),
-                Type::new("record<ok: bool>").unwrap(),
+                Type::new("oneof<string, record<ok: bool>>").unwrap(),
             )),
-            strict: true,
+            body: vec![
+                Stmt::Let {
+                    name: ident("output"),
+                    value: Expr::If {
+                        cond: Box::new(Expr::Var(ident("json"))),
+                        then: Box::new(Expr::Literal(Value::test_string("json"))),
+                        otherwise: Box::new(Expr::Pipeline(vec![
+                            Expr::Var(ident("format")),
+                            Expr::Call {
+                                name: CommandName::new("default").unwrap(),
+                                args: vec![Expr::Literal(Value::test_string("human"))],
+                            },
+                        ])),
+                    },
+                },
+                Stmt::Pipeline(vec![
+                    Expr::External {
+                        name: "demo".into(),
+                        args: vec![
+                            Expr::Str("status".into()),
+                            Expr::Spread(Box::new(Expr::Call {
+                                name: CommandName::new("nusage argv").unwrap(),
+                                args: vec![
+                                    Expr::List(vec![Expr::Spread(Box::new(Expr::Var(ident(
+                                        "args",
+                                    ))))]),
+                                    Expr::Record(vec![(
+                                        "--format".into(),
+                                        Expr::Var(ident("format")),
+                                    )]),
+                                ],
+                            })),
+                        ],
+                    },
+                    Expr::Call {
+                        name: CommandName::new("nusage decode").unwrap(),
+                        args: vec![
+                            Expr::Var(ident("output")),
+                            Expr::Record(vec![(
+                                "json".into(),
+                                Expr::Closure(Box::new(Expr::Pipeline(vec![Expr::Call {
+                                    name: CommandName::new("from json").unwrap(),
+                                    args: vec![],
+                                }]))),
+                            )]),
+                        ],
+                    },
+                ]),
+            ],
         };
         let module = Module {
             preamble: vec![],
-            items: vec![Item::Def(helper), Item::Extern(ext)],
+            items: vec![
+                Item::Verbatim("def helper [] {\n    1\n}\n".into()),
+                Item::Def(wrapper),
+            ],
         };
-        let expected = r#"def "complete region" [] {
-    ^sh -c "demo regions" | lines
+        let expected = r#"def helper [] {
+    1
 }
 
 # Show status
-@structured ["--format=json"] { from json }
-export extern --strict "demo status" [
+export def "demo status" [
     --format: string@[human json],  # Output format
-]: nothing -> record<ok: bool>
+]: nothing -> oneof<string, record<ok: bool>> {
+    let output = if $json { "json" } else { $format | default "human" }
+    ^demo status ...(nusage argv [...$args] {--format: $format}) | nusage decode $output {
+        json: { from json }
+    }
+}
 "#;
         assert_eq!(print(&module), expected);
     }

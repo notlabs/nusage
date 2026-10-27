@@ -1,0 +1,10 @@
+# A `complete` declared on the command is that command's own: its helper is named by the
+# command's full name. `descriptions=#true` lines split on the first colon into value and
+# description records, which `commandline complete` reports as values. The call turns a
+# count into repeated switches and a list into repeated pairs.
+{
+    cmd: [run],
+    complete: {line: "demo run ", expect: [build test]},
+    invoke: "demo run build x --set [a b] -v 2",
+    argv: [run, build, x, --verbose, --verbose, --set, a, --set, b],
+}

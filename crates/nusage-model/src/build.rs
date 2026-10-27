@@ -7,8 +7,8 @@ use nusage_spec::{Assembled, CommandPath, Diagnostic, Header, HeaderNode, Source
 use usage::{SpecArg, SpecCommand, SpecComplete, SpecFlag, SpecOutput};
 
 use crate::{
-    Command, CommandTree, Completer, Conversion, Execution, Framing, NuType, Param, ParamKind,
-    Structured, Value,
+    Command, CommandTree, Completer, Conversion, Decoding, Execution, Framing, NuType, Output,
+    Param, ParamKind, Value,
 };
 
 /// Header nodes that have a native place in the module and so do not become attributes.
@@ -132,35 +132,23 @@ impl Context<'_> {
         };
 
         // The outputs usage resolves for this command: the spec's, merged by name with each
-        // command's down the chain, hidden ones removed.
+        // command's down the chain, hidden ones removed. A script's value is what its default
+        // output describes; a binary can be asked for any of its outputs, and the annotation
+        // of each is on its declaration: the deepest command declaring an output by that
+        // name, else the spec's top level.
         let outputs = usage::effective_outputs_ref(&self.assembled.spec, cmds.iter().copied());
-        let select = usage::effective_select_ref(&self.assembled.spec, &cmds);
-        let structured = match execution {
-            Execution::External => structured_output(&outputs, select.as_deref()),
-            Execution::Script(_) => None,
-        };
-        // A script's value is what its default output describes; a binary's is the structured
-        // output Nushell decodes. The annotation is on the declaration of that output: the
-        // deepest command declaring one by that name, else the spec's top level.
-        let described = match &structured {
-            Some((_, _, name)) => Some(name.as_str()),
-            None => default_output(&outputs).map(|output| output.name.as_str()),
-        };
-        let output = described.and_then(|name| output_annotation(&chain, name));
-        let structured = match structured {
-            Some((args, framing, _)) => {
-                let conversions = match &output {
-                    Some(ty) => conversions_for(ty)
-                        .map_err(|message| Diagnostic::new(&header.path, message))?,
-                    None => Vec::new(),
-                };
-                Some(Structured {
-                    args,
-                    framing,
-                    conversions,
-                })
+        let (output, decoding) = match execution {
+            Execution::Script(_) => {
+                let output = default_output(&outputs)
+                    .and_then(|output| output_annotation(&chain, &output.name));
+                (output, None)
             }
-            None => None,
+            Execution::External => {
+                let select = usage::effective_select_ref(&self.assembled.spec, &cmds);
+                let decoding = decoding(&outputs, select.as_deref(), &flags, &chain)
+                    .map_err(|message| Diagnostic::new(&header.path, message))?;
+                (union_type(&decoding), Some(decoding))
+            }
         };
 
         if is_provider {
@@ -205,7 +193,7 @@ impl Context<'_> {
             positionals,
             flags,
             output,
-            structured,
+            decoding,
             attributes,
             execution,
             is_provider,
@@ -530,38 +518,82 @@ fn output_annotation(chain: &[Level<'_>], name: &str) -> Option<NuType> {
         .map(|ty| NuType(ty.to_string()))
 }
 
-/// The structured output a binary can be asked for, and its usage name: the first `json`
-/// output, else the first `jsonl` one, with the arguments that select it. A `select` on the
-/// output is a boolean flag (`--json`); a `select` in effect for the command names a value
-/// flag (`--format=json`). With neither, the output must be the default or the only one, or
-/// there is no way to ask for it.
-fn structured_output(
+/// How a binary's call selects an output and what each decodes to. A `select` on an output
+/// is a switch that picks it; a `select` in effect for the command is a flag whose value is
+/// the output's name. Either names a flag the command has, by its long or short form.
+fn decoding(
     outputs: &[SpecOutput],
     command_select: Option<&str>,
-) -> Option<(Vec<String>, Framing, String)> {
-    let framed = |output: &&SpecOutput| {
-        matches!(output.framing, usage::Framing::Json | usage::Framing::Jsonl)
+    flags: &[Param],
+    chain: &[Level<'_>],
+) -> Result<Decoding, String> {
+    let var_of = |selector: &str| -> Option<String> {
+        let name = selector.trim_start_matches('-');
+        flags
+            .iter()
+            .find(|flag| {
+                flag.long.as_deref() == Some(name)
+                    || (name.chars().count() == 1 && flag.short == name.chars().next())
+            })
+            .map(|flag| flag.var.clone())
     };
-    let chosen = outputs
+    let switches = outputs
         .iter()
-        .filter(framed)
-        .find(|output| output.framing == usage::Framing::Json)
-        .or_else(|| outputs.iter().find(framed))?;
-    let framing = match chosen.framing {
-        usage::Framing::Json => Framing::Json,
-        usage::Framing::Jsonl => Framing::Jsonl,
-        _ => return None,
-    };
-    let args = if let Some(flag) = &chosen.select {
-        vec![flag.clone()]
-    } else if let Some(flag) = command_select {
-        vec![format!("{flag}={}", chosen.name)]
-    } else if chosen.default || outputs.len() == 1 {
-        Vec::new()
-    } else {
-        return None;
-    };
-    Some((args, framing, chosen.name.clone()))
+        .filter_map(|output| {
+            let selector = output.select.as_deref()?;
+            var_of(selector).map(|var| (var, output.name.clone()))
+        })
+        .collect();
+    let value_selector = command_select.and_then(var_of);
+    let default = default_output(outputs).map(|output| output.name.clone());
+    let outputs = outputs
+        .iter()
+        .map(|output| {
+            let framing = match output.framing {
+                usage::Framing::Json => Some(Framing::Json),
+                usage::Framing::Jsonl => Some(Framing::Jsonl),
+                _ => None,
+            };
+            let ty = framing.and_then(|_| output_annotation(chain, &output.name));
+            let conversions = match &ty {
+                Some(ty) => conversions_for(ty)?,
+                None => Vec::new(),
+            };
+            Ok(Output {
+                name: output.name.clone(),
+                framing,
+                ty,
+                conversions,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok(Decoding {
+        switches,
+        value_selector,
+        default,
+        outputs,
+    })
+}
+
+/// What a binary's call can return: text for an unframed output, the annotation for a framed
+/// one; a `oneof` when they differ, nothing when a framed output has no annotation.
+fn union_type(decoding: &Decoding) -> Option<NuType> {
+    let mut types: Vec<String> = Vec::new();
+    for output in &decoding.outputs {
+        let ty = match (&output.framing, &output.ty) {
+            (None, _) => "string".to_string(),
+            (Some(_), Some(ty)) => ty.as_str().to_string(),
+            (Some(_), None) => return None,
+        };
+        if !types.contains(&ty) {
+            types.push(ty);
+        }
+    }
+    match types.len() {
+        0 => None,
+        1 => Some(NuType(types.remove(0))),
+        _ => Some(NuType(format!("oneof<{}>", types.join(", ")))),
+    }
 }
 
 /// What the annotation declares that JSON cannot carry: datetimes, durations, filesizes and

@@ -4,8 +4,8 @@
 //! in [`model`]: which usage argument becomes which parameter kind, what type it gets, how a
 //! repeated or counted flag is spelled, the order of inherited flags, the `$usage` record
 //! shape, which header nodes ride along as attributes, what a completion provider may look
-//! like, and how a declared structured output is selected and decoded. The result is plain
-//! data a target turns into a module; it names no Nushell syntax and performs no I/O.
+//! like, and how a binary's outputs are selected and decoded. The result is plain data a
+//! target turns into a module; it names no Nushell syntax and performs no I/O.
 
 mod build;
 
@@ -35,10 +35,11 @@ pub struct Command {
     pub positionals: Vec<Param>,
     /// Flags: inherited globals outermost first, then the command's own, in declaration order.
     pub flags: Vec<Param>,
-    /// The output type, from the annotation on the command's default `output` node.
+    /// The output type: for a script, the annotation on its default `output`; for a binary,
+    /// the union of what its outputs decode to, when every one is known.
     pub output: Option<NuType>,
-    /// How a binary's structured output is obtained, when the spec declares one.
-    pub structured: Option<Structured>,
+    /// How a binary's outputs are selected and decoded; `None` for a script.
+    pub decoding: Option<Decoding>,
     /// Header nodes carried verbatim, in header order.
     pub attributes: Vec<String>,
     pub execution: Execution,
@@ -55,14 +56,30 @@ pub enum Execution {
     External,
 }
 
-/// A usage `output` with `json` or `jsonl` framing: the arguments that make the binary print
-/// it, and how the text becomes data of the annotated type.
+/// A binary's outputs as usage resolves them for a command, and how a call says which one it
+/// wants: the selector flags are the command's own, so the wrapper reads them and decodes
+/// what the binary printed accordingly.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Structured {
-    /// Arguments added after the command's name: `--format=json`, or nothing when the
-    /// structured output is the default.
-    pub args: Vec<String>,
-    pub framing: Framing,
+pub struct Decoding {
+    /// Switches that each select one output, `output "x" select="--json"`: the flag's
+    /// variable and the output's name, in declaration order.
+    pub switches: Vec<(String, String)>,
+    /// The flag whose value names the output, `select "--format"`: its variable.
+    pub value_selector: Option<String>,
+    /// The output produced when no selector is given.
+    pub default: Option<String>,
+    /// Every output the command can produce, in usage's order.
+    pub outputs: Vec<Output>,
+}
+
+/// One usage `output`: text unless framed, and when framed, what it decodes to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Output {
+    pub name: String,
+    /// `None` is text, passed through as it came.
+    pub framing: Option<Framing>,
+    /// The annotation, when the output has one.
+    pub ty: Option<NuType>,
     /// What JSON cannot carry and the annotation declares: each is converted after decoding,
     /// in this order.
     pub conversions: Vec<Conversion>,

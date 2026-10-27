@@ -1,8 +1,0 @@
-# A command from an `include`: its own json output, decoded through the inherited selector.
-{
-    cmd: [list],
-    invoke: "rep list",
-    argv: [list, --format=json],
-    stdout: "[\"a\", \"b\"]",
-    output: [a, b],
-}

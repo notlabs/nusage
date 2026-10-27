@@ -63,7 +63,7 @@ fn def(command: &Command, base: &Path) -> Result<Def, SyntaxError> {
         export: true,
         doc: doc_of(command),
         attrs: usage_attrs(command)?,
-        name: CommandName::definable(name)?,
+        name: CommandName::new(name)?,
         params: Params::new(params)?,
         io,
         body,
@@ -79,8 +79,8 @@ fn usage_record(command: &Command) -> Result<Expr, SyntaxError> {
             .map(Value::test_string)
             .collect(),
     ));
-    let field = |param: &Param| -> Result<(Ident, Expr), SyntaxError> {
-        Ok((Ident::new(&param.var)?, param_value(param)?))
+    let field = |param: &Param| -> Result<(String, Expr), SyntaxError> {
+        Ok((param.var.clone(), param_value(param)?))
     };
     let args = command
         .positionals
@@ -93,9 +93,9 @@ fn usage_record(command: &Command) -> Result<Expr, SyntaxError> {
         .map(field)
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Expr::Record(vec![
-        (Ident::new("cmd")?, cmd),
-        (Ident::new("args")?, Expr::Record(args)),
-        (Ident::new("flags")?, Expr::Record(flags)),
+        ("cmd".into(), cmd),
+        ("args".into(), Expr::Record(args)),
+        ("flags".into(), Expr::Record(flags)),
     ]))
 }
 

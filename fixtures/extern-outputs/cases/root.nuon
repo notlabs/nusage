@@ -1,9 +1,0 @@
-# The root decodes the CLI-wide json output, selected by the CLI-wide `--format`.
-{
-    cmd: [],
-    complete: {line: "rep --format ", expect: [json text]},
-    invoke: "rep",
-    argv: [--format=json],
-    stdout: "{\"ok\": true}",
-    output: {ok: true},
-}

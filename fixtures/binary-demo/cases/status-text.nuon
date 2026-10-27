@@ -1,0 +1,8 @@
+# Without a selector the default output, human text, comes through as it is.
+{
+    cmd: [status],
+    invoke: "demo status -v 1",
+    argv: [status, --verbose],
+    stdout: "all good",
+    output: "all good",
+}

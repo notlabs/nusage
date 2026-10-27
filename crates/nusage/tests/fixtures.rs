@@ -13,45 +13,15 @@ fn fixtures_dir() -> PathBuf {
 
 /// The source of a fixture: its single `script.nu`, its `<bin>.usage.kdl` spec, or its
 /// `<bin>/` tree, where `<bin>` is the module's name.
-fn source_of(fixture: &Path, module_file: &Path) -> PathBuf {
+fn source_of(fixture: &Path, bin: &str) -> PathBuf {
     let single = fixture.join("script.nu");
+    let spec = fixture.join(format!("{bin}.usage.kdl"));
     if single.is_file() {
-        return single;
-    }
-    match spec_of(fixture) {
-        Some(spec) => spec,
-        None => fixture.join(module_file.file_stem().unwrap()),
-    }
-}
-
-/// The `<bin>.usage.kdl` of an extern fixture, whose module is named apart from the binary.
-fn spec_of(fixture: &Path) -> Option<PathBuf> {
-    fs::read_dir(fixture)
-        .ok()?
-        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-        .find(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name.ends_with(".usage.kdl"))
-        })
-}
-
-/// The binary's name: the spec's for an extern fixture, else the module's.
-fn bin_of(fixture: &Path, module_file: &Path) -> String {
-    match spec_of(fixture) {
-        Some(spec) => spec
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .trim_end_matches(".usage.kdl")
-            .to_string(),
-        None => module_file
-            .file_stem()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string(),
+        single
+    } else if spec.is_file() {
+        spec
+    } else {
+        fixture.join(bin)
     }
 }
 
@@ -72,7 +42,8 @@ fn fixtures_generate_their_expected_modules() {
             .filter_map(|entry| entry.ok().map(|entry| entry.path()))
             .find(|path| path.extension().is_some_and(|ext| ext == "nu"))
             .expect("expected/<bin>.nu");
-        let source = source_of(&fixture, &module_file);
+        let bin = module_file.file_stem().unwrap().to_str().unwrap();
+        let source = source_of(&fixture, bin);
         let expected = fs::read_to_string(&module_file).unwrap();
         match nusage::generate(&source, Some(&module_file)) {
             Ok(actual) if actual == expected => checked += 1,
@@ -107,19 +78,6 @@ fn fixtures_parse_with_nu_parser() {
     fixtures.sort();
     let mut checked = 0;
     for fixture in fixtures {
-        let meta = fixture.join("fixture.nuon");
-        if meta.is_file() {
-            let meta = nuon::from_nuon(&fs::read_to_string(&meta).unwrap(), Some(Span::unknown()))
-                .expect("fixture.nuon is NUON");
-            // A fixture may need syntax this nu-parser lacks; it says which.
-            if let Some(syntax) = meta
-                .get_data_by_key("requires_syntax")
-                .map(|v| v.coerce_string().unwrap())
-                && !parses(&syntax)
-            {
-                continue;
-            }
-        }
         let expected_dir = fixture.join("expected");
         let module_file = fs::read_dir(&expected_dir)
             .expect("expected directory")
@@ -135,9 +93,8 @@ fn fixtures_parse_with_nu_parser() {
             Value::string(expected_dir.to_string_lossy(), Span::unknown()),
         );
         let mut working_set = StateWorkingSet::new(&engine_state);
-        let module_name = module_file.file_stem().unwrap().to_str().unwrap();
-        let bin = bin_of(&fixture, &module_file);
-        let wrapped = format!("module {module_name} {{\n{source}\n}}\n");
+        let bin = module_file.file_stem().unwrap().to_str().unwrap();
+        let wrapped = format!("module {bin} {{\n{source}\n}}\n");
         nu_parser::parse(
             &mut working_set,
             Some(&module_file.to_string_lossy()),
@@ -152,7 +109,7 @@ fn fixtures_parse_with_nu_parser() {
         );
 
         let module_id = working_set
-            .find_module(module_name.as_bytes())
+            .find_module(bin.as_bytes())
             .expect("module parsed");
         let module = working_set.get_module(module_id);
         let names = nuon::from_nuon(
@@ -167,7 +124,7 @@ fn fixtures_parse_with_nu_parser() {
                 .coerce_string()
                 .unwrap();
             // A script module's root is its `main` and its subcommands drop the bin prefix;
-            // an extern module carries the full names.
+            // a binary module carries the full names.
             let inner = full.strip_prefix(&format!("{bin} ")).unwrap_or(&full);
             let defined = (full == bin && module.main.is_some())
                 || module
@@ -186,13 +143,4 @@ fn fixtures_parse_with_nu_parser() {
         checked >= 3,
         "expected at least three fixtures parsed, found {checked}"
     );
-}
-
-/// Whether this nu-parser parses a snippet without errors.
-fn parses(source: &str) -> bool {
-    use nu_protocol::engine::StateWorkingSet;
-    let engine_state = nu_command::add_shell_command_context(nu_cmd_lang::create_default_context());
-    let mut working_set = StateWorkingSet::new(&engine_state);
-    nu_parser::parse(&mut working_set, None, source.as_bytes(), false);
-    working_set.parse_errors.is_empty()
 }

@@ -24,8 +24,8 @@ enum Commands {
 /// its `mod.nu` is the root command, each `x.nu` the subcommand `x`, each subdirectory with
 /// its own `mod.nu` a group. The module defines one typed command per script whose body
 /// hands the script its `$usage` record and `run`s it. A `.kdl` spec file describes a binary
-/// on PATH: the module defines an `extern` per command under its full name, for
-/// `use <file> *`; the file cannot be named `<bin>.nu`.
+/// on PATH: the module defines a command per command of the binary that runs it and decodes
+/// its output; write it as `<bin>.nu` and `use <bin>.nu *`.
 #[derive(Args)]
 struct Generate {
     /// The script, the directory of scripts, or the `.kdl` spec file

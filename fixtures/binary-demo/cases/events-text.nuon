@@ -1,0 +1,8 @@
+# Without `--json` the default output is text, passed through as the binary printed it.
+{
+    cmd: [events],
+    invoke: "demo events",
+    argv: [events],
+    stdout: "12:00 start",
+    output: "12:00 start",
+}

@@ -4,22 +4,21 @@ use std::path::{Component, Path, PathBuf};
 
 use nusage_model::{Command, Completer, Param, ParamKind};
 use nusage_nu::{
-    Attr, AttrArg, CommandName, Completer as NuCompleter, FlagName, Ident, Param as NuParam, Stmt,
+    Attr, CommandName, Completer as NuCompleter, FlagName, Ident, Param as NuParam, Stmt,
     SyntaxError, Type,
 };
 
-use crate::extern_::helper_command;
+use crate::binary::helper_command;
 
-/// Which module a parameter is written for.
+/// Which module a parameter is written for. In both, a counted flag is an `int` and a
+/// repeatable one a `list`, since a `def`'s flags cannot repeat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Target {
-    /// A `def` that hands the script `$usage`: defaults apply, a counted flag is an `int` and
-    /// a repeatable one a `list`, since a `def`'s flags cannot repeat.
+    /// A `def` that hands the script `$usage`: declared defaults apply.
     Script,
-    /// An `extern` for a binary: no defaults, since the binary applies its own; a counted flag
-    /// stays a switch and a repeatable one a single value, since Nushell forwards `-vv` and
-    /// `--tag a --tag b` to an external as typed.
-    Extern,
+    /// A `def` that runs a binary: no defaults, since the binary applies its own, and the
+    /// wrapper passes only what the call gave.
+    Binary,
 }
 
 pub fn attr_usage_alias() -> Result<Stmt, SyntaxError> {
@@ -49,7 +48,7 @@ pub fn usage_attrs(command: &Command) -> Result<Vec<Attr>, SyntaxError> {
         .map(|text| {
             Ok(Attr {
                 name: FlagName::new("usage")?,
-                args: vec![AttrArg::Str(text.clone())],
+                args: vec![text.clone()],
             })
         })
         .collect()
@@ -71,11 +70,11 @@ pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxEr
     };
     let default = match target {
         Target::Script => param.default.clone(),
-        Target::Extern => None,
+        Target::Binary => None,
     };
     let doc = param.doc.clone();
-    let main = match (param.kind, target) {
-        (ParamKind::Required | ParamKind::Optional, _) => NuParam::Positional {
+    let main = match param.kind {
+        ParamKind::Required | ParamKind::Optional => NuParam::Positional {
             name: Ident::new(&param.var)?,
             ty: Type::new(param.ty.as_str())?,
             optional: param.kind == ParamKind::Optional,
@@ -83,13 +82,13 @@ pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxEr
             completer,
             doc,
         },
-        (ParamKind::Rest, _) => NuParam::Rest {
+        ParamKind::Rest => NuParam::Rest {
             name: Ident::new(&param.var)?,
             ty: Type::new(param.ty.as_str())?,
             doc,
         },
         // A switch takes no default: the shim applies a declared one when it builds `$usage`.
-        (ParamKind::Switch, _) | (ParamKind::Count, Target::Extern) => NuParam::Flag {
+        ParamKind::Switch => NuParam::Flag {
             long: flag_name(param)?,
             short: param.short,
             ty: None,
@@ -97,7 +96,7 @@ pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxEr
             completer: None,
             doc,
         },
-        (ParamKind::Valued, _) | (ParamKind::Count, Target::Script) => NuParam::Flag {
+        ParamKind::Valued | ParamKind::Count => NuParam::Flag {
             long: flag_name(param)?,
             short: param.short,
             ty: Some(Type::new(param.ty.as_str())?),
@@ -105,19 +104,11 @@ pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxEr
             completer,
             doc,
         },
-        (ParamKind::Repeated, Target::Script) => NuParam::Flag {
+        ParamKind::Repeated => NuParam::Flag {
             long: flag_name(param)?,
             short: param.short,
             ty: Some(Type::new(format!("list<{}>", param.ty.as_str()))?),
             default,
-            completer,
-            doc,
-        },
-        (ParamKind::Repeated, Target::Extern) => NuParam::Flag {
-            long: flag_name(param)?,
-            short: param.short,
-            ty: Some(Type::new(param.ty.as_str())?),
-            default: None,
             completer,
             doc,
         },

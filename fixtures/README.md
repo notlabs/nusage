@@ -1,16 +1,14 @@
 # Fixtures
 
 Each directory holds a source (`script.nu`, a `<bin>/` tree, or `<bin>.usage.kdl`), the module
-the generator must produce for it byte for byte (`expected/<bin>.nu`, or `expected/<bin>-externs.nu`
-for a spec, since a module cannot export a command named after itself), the parsed signatures
-that module yields (`expected/signatures.nuon`), and cases (`cases/*.nuon`). `verify.nu` runs the
-cases against the Nushell that runs it; a `fixture.nuon` may give `requires_syntax`, a snippet
-the Nushell must parse, else the fixture's Nushell checks are skipped.
+the generator must produce for it byte for byte (`expected/<bin>.nu`), the parsed signatures that
+module yields (`expected/signatures.nuon`), and cases (`cases/*.nuon`). `verify.nu` runs the
+cases against the Nushell that runs it.
 
 A script case is `{argv, invoke?, usage, output?, complete?}`: `argv` is what the interpreter
 receives; `invoke` the Nushell spelling when it differs; `usage` the record the script must see;
 `output` what the command returns when that is not the record; `complete` a line and the
-completions expected at its end. An extern case is `{cmd, complete?, invoke?, argv?, stdout?,
+completions expected at its end. A binary case is `{cmd, complete?, invoke?, argv?, stdout?,
 output?}`: `invoke` is a call run with the fixture's `fake/<bin>` on `PATH`, a stand-in that
 records the argv it received, compared with `argv`, and prints `stdout`; `output` is what the
 call returns.

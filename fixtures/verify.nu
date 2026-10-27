@@ -5,15 +5,13 @@
 #   - shim:        `use expected/<bin>.nu; <bin> <words>`        (Nushell types the arguments)
 #   - interpreter: `let usage = ($env.NUSAGE_ARGS | from nuon); $in | run <script>`
 #                                                                  (the record is handed in as NUON)
-# An extern fixture (a `<bin>.usage.kdl`) has no scripts: a case's `invoke` runs the module
+# A binary fixture (a `<bin>.usage.kdl`) has no scripts: a case's `invoke` runs the module
 # against the fixture's `fake/<bin>`, which records the argv it received and prints what the
-# case says, so forwarding and decoding are checked; then completions and signatures.
+# case says, so argv building and decoding are checked; then completions and signatures.
 # A case with `complete` asks the module for completions at a point of a line. Then the parsed
 # signature and attributes of the root and every command a case names, as `scope commands`
 # reports them, are compared with expected/signatures.nuon.
 #
-# A fixture's `fixture.nuon` may give `requires_syntax`, a snippet the running Nushell must
-# parse; otherwise its checks are skipped.
 #
 #   nu fixtures/verify.nu                          # all fixtures
 #   nu fixtures/verify.nu fixtures/minimal         # one
@@ -43,32 +41,16 @@ def main [
 def verify-fixture [dir: path, update: bool] {
     let name = $dir | path basename
     let module = glob ($dir | path join expected '*.nu') | first
-    let spec = glob ($dir | path join '*.usage.kdl')
-    let is_extern = $spec | is-not-empty
-    # An extern module is named apart from the binary, since it exports a command of that name.
-    let bin = if $is_extern {
-        $spec | first | path basename | str replace '.usage.kdl' ''
-    } else {
-        $module | path parse | get stem
-    }
-    let meta = $dir | path join fixture.nuon
-    let meta = if ($meta | path exists) { open $meta } else { {} }
-    if ($meta.requires_syntax? | is-not-empty) and not (nu-parses $meta.requires_syntax) {
-        return [
-            (
-                row $name skipped "" {
-                    ok: true
-                    detail: $"needs syntax that nu (version).version does not parse"
-                }
-            )
-        ]
-    }
-    let import = if $is_extern { $"use ($module | to nuon) *" } else { $"use ($module | to nuon)" }
+    let bin = $module | path parse | get stem
+    # A binary module's root is `main` and its subcommands carry the binary's name: `use ... *`
+    # names them all as the binary does. A script module is used by its name.
+    let is_binary = ($dir | path join $"($bin).usage.kdl") | path exists
+    let import = if $is_binary { $"use ($module | to nuon) *" } else { $"use ($module | to nuon)" }
     let cases = glob ($dir | path join cases '*.nuon') | sort
     let per_case = $cases | each {|file|
         let case = open $file
         let id = $file | path parse | get stem
-        let rows = if $is_extern {
+        let rows = if $is_binary {
             if ($case.invoke? | is-not-empty) {
                 [(row $name invoke $id (check-invoke $dir $import $case))]
             } else {
@@ -98,11 +80,6 @@ def verify-fixture [dir: path, update: bool] {
         ""
         (check-signatures $dir $import $bin $cmds $update)
     ))
-}
-
-# Whether the running Nushell parses a snippet; a feature check that needs no version table.
-def nu-parses [source: string] {
-    (^$nu.current-exe -n -c $source | complete).exit_code == 0
 }
 
 def row [
@@ -145,7 +122,7 @@ def check-interpreter [dir: path, bin: string, case: record] {
     } | compare (expected-output $case)
 }
 
-# An extern call against the fixture's fake binary: the argv it recorded must be the case's
+# A binary call against the fixture's fake binary: the argv it recorded must be the case's
 # `argv`, and what the call returns the case's `output`, when the case gives them.
 def check-invoke [dir: path, import: string, case: record] {
     let argv_file = mktemp
