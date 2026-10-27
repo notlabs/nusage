@@ -1,5 +1,5 @@
 [
-  [name,               signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             attributes];
+  [name,               signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             attributes];
   [mycli,              {
       any: [
         [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description, completion, parameter_default];
@@ -7,7 +7,7 @@
         [verbose,        switch,         null,         true,        v,          "Say more",  null,       null],
         [null,           output,         any,          false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               [
       [name,  value];
       [usage, "flag \"-v --verbose\" help=\"Say more\" global=#true"]
     ]],
@@ -18,19 +18,19 @@
         [verbose,        switch,         null,         true,        v,          "Say more",  null,       null],
         [null,           output,         any,          false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               [
 
     ]],
   ["mycli db migrate", {
       any: [
-        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,                       completion,                   parameter_default];
-        [null,           input,          any,          false,       null,       null,                              null,                         null],
-        [target,         positional,     string,       false,       null,       "Target environment",              "db migrate complete-target", null],
-        [verbose,        switch,         null,         true,        v,          "Say more",                        null,                         null],
-        [dry-run,        switch,         null,         true,        null,       "Plan without applying",           null,                         null],
-        [since,          named,          datetime,     true,        null,       "Only migrations after this time", null,                         null],
-        [limit,          named,          int,          true,        null,       "At most this many",               null,                         10],
-        [null,           output,         any,          false,       null,       null,                              null,                         null]
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,                       completion,   parameter_default];
+        [null,           input,          any,          false,       null,       null,                              null,         null],
+        [target,         positional,     string,       false,       null,       "Target environment",              "db targets", null],
+        [verbose,        switch,         null,         true,        v,          "Say more",                        null,         null],
+        [dry-run,        switch,         null,         true,        null,       "Plan without applying",           null,         null],
+        [since,          named,          datetime,     true,        null,       "Only migrations after this time", null,         null],
+        [limit,          named,          int,          true,        null,       "At most this many",               null,         10],
+        [null,           output,         any,          false,       null,       null,                              null,         null]
       ]
     }, [
       [name,  value];
@@ -47,7 +47,7 @@
         [verbose,        switch,         null,         true,        v,          "Say more",              null,       null],
         [null,           output,         any,          false,       null,       null,                    null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   [
       [name,  value];
       [usage, "arg \"[fixture]\" help=\"Named fixture to load\""]
     ]],
@@ -58,7 +58,7 @@
         [verbose,        switch,         null,         true,        v,          "Say more",  null,       null],
         [null,           output,         list<string>, false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           [
       [name,  value];
       [usage, "output (\"list<string>\")\"nuon\" default=#true"]
     ]]

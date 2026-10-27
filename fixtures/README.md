@@ -78,21 +78,26 @@ Rules the hand-written modules follow, which a generator must reproduce:
 - The module is named after the spec's `bin`, so `use expected/mycli.nu` gives `mycli`,
   `mycli db`, `mycli db migrate`. The root command is `export def main`; a group is a plain
   `export def db` so that `mycli db` on its own runs the group's `mod.nu`.
+- Comments are Nushell's documentation channel, so `help` and the LSP show them: `about`
+  is the comment line above the `def` (the description), `long_about` would follow it as a
+  second paragraph (the extra description), and `help` on an arg or flag is the trailing
+  comment on its line (the parameter description).
 - One module-local `alias "attr usage" = echo` makes `@usage` a constant attribute. It is not
   exported and does not reach the user's scope.
 - **Every header node except `name`, `bin` and `about` is copied verbatim into a `@usage`
-  attribute** above the `def`, in header order. `about` becomes the doc comment, `help` on an
-  arg or flag the trailing comment on its parameter line. `scope commands` returns the
-  attributes as `[usage, '<the node>']` rows, so usage-lib can parse them back and nothing in
-  the header is lost, annotations included.
+  attribute** above the `def`, in header order. `scope commands` returns them as
+  `[usage, '<the node>']` rows, so usage-lib can parse them back and nothing in the header is
+  lost, annotations included.
 - A KDL type annotation becomes the parameter's type; an `output` annotation becomes the
   command's output type.
 - Static `choices` become an inline completer, `string@[tar zip]`; Nushell does not validate
   against it.
-- `choices run="./targets.nu"` naming a sibling script in the tree becomes a non-exported
-  helper, `def "<command> complete-<param>" [token: record]: nothing -> <provider output type>`,
-  that calls the sibling command. The parser then checks the provider's declared output type
-  against the helper's. Providers are emitted before the commands that use them.
+- `choices run="./targets.nu"` naming a sibling script in the tree makes that sibling command
+  the parameter's completer: `target: string@"db targets"`. Nushell calls a completer that
+  declares no positional without the token record, so a provider is an ordinary command.
+  The generator checks the provider's declared output against what a completer may return
+  (`list<string>` or a list of completion records). Providers are emitted before the
+  commands that name them.
 - A repeatable flag (`var=#true`) is `list<string> = []`, a count flag (`count=#true`) is
   `int = 0`, because Nushell flags cannot repeat. A case whose argv repeats a flag carries the
   Nushell spelling in `invoke`.

@@ -38,21 +38,17 @@ export def "db targets" [
     $in | run ../mycli/db/targets.nu
 }
 
-def "db migrate complete-target" [token: record]: nothing -> list<string> {
-    db targets
-}
-
 # Run migrations
 @usage 'arg "<target>" help="Target environment" { choices run="./targets.nu" }'
 @usage 'flag "--dry-run" help="Plan without applying"'
 @usage 'flag "--since" help="Only migrations after this time" { arg (datetime)"<since>" }'
 @usage 'flag "--limit" help="At most this many" default="10" { arg (int)"<n>" }'
 export def "db migrate" [
-    target: string@"db migrate complete-target",  # Target environment
-    --verbose (-v),                               # Say more
-    --dry-run,                                    # Plan without applying
-    --since: datetime,                            # Only migrations after this time
-    --limit: int = 10,                            # At most this many
+    target: string@"db targets",  # Target environment
+    --verbose (-v),               # Say more
+    --dry-run,                    # Plan without applying
+    --since: datetime,            # Only migrations after this time
+    --limit: int = 10,            # At most this many
 ] {
     let usage = {
         cmd: [db migrate]
