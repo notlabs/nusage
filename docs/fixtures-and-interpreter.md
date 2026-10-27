@@ -121,7 +121,7 @@ nusage /abs/script.nu <args...>          # from #!/usr/bin/env nusage
   → usage::parse::parse(&spec, &argv)     # help, errors, completions as usage does them
   → $usage record: ParseOutput, every declared name present, #NUSAGE coercions applied
   → NUON text
-  → exec nu [--stdin] -c 'let usage = ($env.NUSAGE_ARGS | from nuon); $in | do { source /abs/script.nu }'
+  → exec nu [--stdin] -c 'let usage = ($env.NUSAGE_ARGS | from nuon); $in | run /abs/script.nu'
       with NUSAGE_ARGS set, stdin/stdout/stderr inherited
 ```
 

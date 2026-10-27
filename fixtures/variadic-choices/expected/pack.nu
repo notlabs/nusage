@@ -10,5 +10,5 @@ export def main [
         args: {file: $file}
         flags: {tag: $tag, verbose: $verbose, format: $format}
     }
-    $in | do { source ../script.nu }
+    $in | run ../script.nu
 }

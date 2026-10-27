@@ -58,7 +58,7 @@ export def "db migrate" [
         args: {target: $target}
         flags: {verbose: $verbose, dry_run: $dry_run}
     }
-    $in | do { source ../mycli/db/migrate.nu }
+    $in | run ../mycli/db/migrate.nu
 }
 ```
 
@@ -75,9 +75,11 @@ Rules the hand-written modules follow, which a generator must reproduce:
   `int = 0`, because Nushell flags cannot repeat. A case whose argv repeats a flag carries the
   Nushell spelling in `invoke`.
 - A `default=` is written as a Nushell default on the parameter.
-- The body is always `$in | do { source <path> }`. A bare `source` statement would not see the
-  command's pipeline input; the `do` block passes it through as `$in`. The path is relative to
-  the module file, which is how `source` resolves it.
+- The body is always `$in | run <path>`. `run` (Nushell 0.114+) executes the script in an
+  isolated scope: the script sees `$usage` and `$in`, and its `$env` changes and variables do
+  not leak back. `source` was wrong here: it splices the script into the module's scope. The
+  path is relative to the module file, which is how `run` resolves it, and it is read at parse
+  time, so a script edit is picked up by re-`use`-ing the module (or `run --full-reparse`).
 - Layout is whatever nufmt (pinned in `mise.toml`) produces: one parameter per line with trailing
   commas and aligned comments, the record one field per line without commas. `mise run fmt-check`
   holds the expected modules and the harness to it, so a generator can target nufmt's output
@@ -88,7 +90,7 @@ Rules the hand-written modules follow, which a generator must reproduce:
 What `nusage script.nu <argv>` will run once it exists, and what the harness runs today:
 
 ```
-NUSAGE_ARGS='<nuon>' nu [--stdin] -c 'let usage = ($env.NUSAGE_ARGS | from nuon); $in | do { source /abs/script.nu }'
+NUSAGE_ARGS='<nuon>' nu [--stdin] -c 'let usage = ($env.NUSAGE_ARGS | from nuon); $in | run /abs/script.nu'
 ```
 
 The record travels in an environment variable so no user data is ever spliced into a command

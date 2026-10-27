@@ -3,7 +3,7 @@
 #
 # Every case is pushed through both entrypoints and must yield the same `$usage` record:
 #   - shim:        `use expected/<bin>.nu; <bin> <words>`        (Nushell types the arguments)
-#   - interpreter: `let usage = ($env.NUSAGE_ARGS | from nuon); $in | do { source <script> }`
+#   - interpreter: `let usage = ($env.NUSAGE_ARGS | from nuon); $in | run <script>`
 #                                                                  (the record is handed in as NUON)
 # Then `help` for the root and every command a case names is compared with expected/help.txt.
 #
@@ -80,7 +80,7 @@ def check-shim [module: path, bin: string, case: record] {
 
 def check-interpreter [dir: path, bin: string, case: record] {
     let script = script-for $dir $bin $case.usage.cmd
-    let code = $"let usage = \($env.NUSAGE_ARGS | from nuon\); $in | do { source ($script | to nuon) } | to nuon"
+    let code = $"let usage = \($env.NUSAGE_ARGS | from nuon\); $in | run ($script | to nuon) | to nuon"
     run-nu $code {
         NUSAGE_ARGS: ($case.usage | to nuon)
     } | compare $case.usage

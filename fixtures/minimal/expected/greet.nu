@@ -9,5 +9,5 @@ export def main [
         args: {name: $name}
         flags: {loud: $loud, times: $times}
     }
-    $in | do { source ../script.nu }
+    $in | run ../script.nu
 }

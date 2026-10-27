@@ -7,7 +7,7 @@ export def main [
         args: {}
         flags: {verbose: $verbose}
     }
-    $in | do { source ../mycli/mod.nu }
+    $in | run ../mycli/mod.nu
 }
 
 # Manage the database
@@ -19,7 +19,7 @@ export def db [
         args: {}
         flags: {verbose: $verbose}
     }
-    $in | do { source ../mycli/db/mod.nu }
+    $in | run ../mycli/db/mod.nu
 }
 
 # Run migrations
@@ -33,7 +33,7 @@ export def "db migrate" [
         args: {target: $target}
         flags: {verbose: $verbose, dry_run: $dry_run}
     }
-    $in | do { source ../mycli/db/migrate.nu }
+    $in | run ../mycli/db/migrate.nu
 }
 
 # Load fixtures
@@ -46,5 +46,5 @@ export def "db seed" [
         args: {fixture: $fixture}
         flags: {verbose: $verbose}
     }
-    $in | do { source ../mycli/db/seed.nu }
+    $in | run ../mycli/db/seed.nu
 }
