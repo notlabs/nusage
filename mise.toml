@@ -20,3 +20,15 @@ run = "nu fixtures/verify.nu --update-signatures"
 [tasks.fmt-check]
 description = "Check the hand-written shim modules and the harness are nufmt-stable"
 run = "nufmt --dry-run fixtures"
+
+[tasks.build]
+description = "Build the workspace"
+run = "cargo build --workspace"
+
+[tasks.test]
+description = "Rust tests, including every fixture generating its expected module byte for byte"
+run = "cargo test --workspace"
+
+[tasks.check]
+description = "Everything: Rust tests, the fixture harness against nu, and nufmt"
+depends = ["test", "verify-fixtures", "fmt-check"]

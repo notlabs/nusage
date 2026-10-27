@@ -1,0 +1,17 @@
+[package]
+name = "nusage"
+description = "Typed Nushell commands from usage-annotated scripts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "nusage"
+path = "src/main.rs"
+
+[dependencies]
+nusage-spec.workspace = true
+nusage-model.workspace = true
+nusage-nu.workspace = true
+usage-rs.workspace = true

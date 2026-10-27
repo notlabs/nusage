@@ -1,0 +1,9 @@
+[package]
+name = "nusage-nu"
+description = "A small Nushell syntax model and the printer that writes it"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]

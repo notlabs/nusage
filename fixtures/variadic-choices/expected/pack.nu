@@ -6,10 +6,10 @@ alias "attr usage" = echo
 @usage 'flag "-v --verbose" count=#true help="Log more, repeatable"'
 @usage 'flag "--format <format>" default="tar" help="Archive format" { choices "tar" "zip" }'
 export def main [
-    ...file: path,                      # Files to bundle
-    --tag (-t): list<string> = [],      # Tag to attach, repeatable
-    --verbose (-v): int = 0,            # Log more, repeatable
-    --format: string@[tar zip] = tar,   # Archive format
+    ...file: path,                     # Files to bundle
+    --tag (-t): list<string> = [],     # Tag to attach, repeatable
+    --verbose (-v): int = 0,           # Log more, repeatable
+    --format: string@[tar zip] = tar,  # Archive format
 ] {
     let usage = {
         cmd: []

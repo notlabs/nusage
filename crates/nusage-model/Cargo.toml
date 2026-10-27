@@ -1,0 +1,11 @@
+[package]
+name = "nusage-model"
+description = "The Nushell-facing command model derived from a usage spec and its type annotations"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+nusage-spec.workspace = true
+usage.workspace = true
