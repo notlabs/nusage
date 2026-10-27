@@ -11,10 +11,12 @@ fixtures/
   verify.nu                      # the harness; `mise run verify-fixtures`
   <name>/
     script.nu                    # a single-command script, or
-    <bin>/mod.nu, <bin>/<cmd>.nu # a tree: directories are groups, files are commands
-    expected/<bin>.nu            # the shim module, one `export def` per command
+    <bin>/mod.nu, <bin>/<cmd>.nu # a tree: directories are groups, files are commands, or
+    <bin>.usage.kdl              # a binary's spec: the extern target
+    fixture.nuon                 # optional: { requires_nu } to skip the Nushell checks below it
+    expected/<bin>.nu            # the module: one `export def` or `export extern` per command
     expected/signatures.nuon     # `scope commands` for the root and every command a case names
-    cases/<case>.nuon            # { argv, invoke?, usage, output?, complete? }
+    cases/<case>.nuon            # { argv, invoke?, usage, output?, complete? } or { cmd, complete? }
 ```
 
 ## The contract
@@ -108,6 +110,26 @@ Rules the hand-written modules follow, which a generator must reproduce:
 - Layout is whatever nufmt (pinned in `mise.toml`) produces. `mise run fmt-check` holds the
   modules and the harness to it, so a generator can target nufmt's output.
 
+## The extern module
+
+A `<bin>.usage.kdl` describes a binary Nushell runs from `PATH`, so the module is `extern`s,
+one per `cmd`, each carrying the binary's full name (`demo`, `demo install`) and imported with
+`use demo.nu *`. The same rules apply with these differences:
+
+- `extern --strict`, so an undeclared flag is a parse error, as a usage spec means it to be.
+- Defaults are not written: a binary applies its own, and `extern` would ignore them.
+- An `output` with `framing="json"` or `"jsonl"` becomes `@structured [args] { from json }` or
+  `{ from json --objects }`. The args select it: a `select="--json"` on the output is that
+  switch, a `select "--format"` on the command is `--format=json`; a default or sole structured
+  output needs none. Its type annotation is the extern's output type.
+- `complete "name" run="..."` and `choices run="..."` become a non-exported helper,
+  `def "complete name" [] { ^sh -c "..." | lines }`, with `parse "{value}:{description}"` when
+  `descriptions=#true`, and the parameter names the helper. A binary cannot be a completer, so
+  here the helper is the only way.
+- `extern --strict` and `@structured` are Nushell 0.117 syntax; `fixture.nuon` says so and the
+  harness skips the fixture's Nushell checks on an older version. The Rust test still holds the
+  generator to the expected module.
+
 ## The interpreter prelude
 
 What `nusage script.nu <argv>` will run once it exists, and what the harness runs today:
@@ -131,7 +153,5 @@ expected and actual values.
 
 ## Not here
 
-`mount` (rejected at assembly: the tree is the discovery), `extern` generation for binaries,
-`export type` aliases and `@structured` (0.117), `$in`-consuming scripts, and `choices run=`
-naming a script outside the tree (which would use `run` in the helper and lose the parser's
-output-type check).
+`mount` (rejected at assembly), `export type` aliases (0.117), `$in`-consuming scripts,
+`choices env=`, and `choices run=` on a script naming anything but a sibling `.nu` provider.

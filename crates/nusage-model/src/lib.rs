@@ -3,9 +3,9 @@
 //! Every lossy decision between usage's vocabulary and a Nushell signature is made here, once,
 //! in [`model`]: which usage argument becomes which parameter kind, what type it gets, how a
 //! repeated or counted flag is spelled, the order of inherited flags, the `$usage` record
-//! shape, which header nodes ride along as attributes, and what a completion provider may
-//! look like. The result is plain data a target turns into a module; it names no Nushell
-//! syntax and performs no I/O.
+//! shape, which header nodes ride along as attributes, what a completion provider may look
+//! like, and how a declared structured output is selected and decoded. The result is plain
+//! data a target turns into a module; it names no Nushell syntax and performs no I/O.
 
 mod build;
 
@@ -14,9 +14,9 @@ pub use nusage_spec::{CommandPath, Diagnostic};
 
 use std::path::PathBuf;
 
-/// Every command of a script or tree, in the order a module should define them: each command
-/// before its subcommands, and among siblings the completion providers first, so a parameter's
-/// completer is defined before the parameter that names it.
+/// Every command of a script, tree or spec, in the order a module should define them: each
+/// command before its subcommands, and among siblings the completion providers first, so a
+/// parameter's completer is defined before the parameter that names it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommandTree {
     pub bin: String,
@@ -36,12 +36,40 @@ pub struct Command {
     pub flags: Vec<Param>,
     /// The output type, from the annotation on the command's default `output` node.
     pub output: Option<NuType>,
+    /// How a binary's structured output is obtained, when the spec declares one.
+    pub structured: Option<Structured>,
     /// Header nodes carried verbatim, in header order.
     pub attributes: Vec<String>,
-    /// The script that is the command's body.
-    pub body: PathBuf,
+    pub execution: Execution,
     /// Whether another command names this one as a completion provider.
     pub is_provider: bool,
+}
+
+/// What runs when the command is called.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Execution {
+    /// `run` this script with `$usage` and `$in`.
+    Script(PathBuf),
+    /// The binary named by the spec, from `PATH`.
+    External,
+}
+
+/// A usage `output` with `json` or `jsonl` framing: the arguments that make the binary print
+/// it, and how the text becomes data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Structured {
+    /// Arguments added after the command's name: `--format=json`, or nothing when the
+    /// structured output is the default.
+    pub args: Vec<String>,
+    pub framing: Framing,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Framing {
+    /// One JSON document.
+    Json,
+    /// One JSON document per line.
+    Jsonl,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,7 +86,7 @@ pub struct Param {
     pub short: Option<char>,
     pub completer: Option<Completer>,
     /// The declared default, typed by `ty`. `Count` is `0` and `Repeated` is `[]` unless usage
-    /// declares otherwise.
+    /// declares otherwise. A binary applies its own defaults, so an extern never writes them.
     pub default: Option<Value>,
     /// usage `help`.
     pub doc: Option<String>,
@@ -101,6 +129,14 @@ pub enum Completer {
     Inline(Vec<String>),
     /// `choices run="./x.nu"` resolved to the command that is that script.
     Command(CommandPath),
+    /// A `complete "name" run="..."` or `choices run="..."` shell command: one value per line,
+    /// `value:description` lines when `descriptions` is set.
+    Shell {
+        /// A name unique within the spec, for the helper that runs it.
+        name: String,
+        run: String,
+        descriptions: bool,
+    },
 }
 
 /// A default value, typed by the parameter it belongs to.

@@ -13,17 +13,20 @@ pub fn print(module: &Module) -> String {
         write_stmt(&mut out, stmt, 0);
         out.push('\n');
     }
-    for (index, def) in module.defs.iter().enumerate() {
+    for (index, item) in module.items.iter().enumerate() {
         if index > 0 || !module.preamble.is_empty() {
             out.push('\n');
         }
-        write_def(&mut out, def);
+        match item {
+            Item::Def(def) => write_def(&mut out, def),
+            Item::Extern(ext) => write_extern(&mut out, ext),
+        }
     }
     out
 }
 
-fn write_def(out: &mut String, def: &Def) {
-    for (index, paragraph) in def.doc.iter().enumerate() {
+fn write_head(out: &mut String, doc: &[Vec<String>], attrs: &[Attr]) {
+    for (index, paragraph) in doc.iter().enumerate() {
         if index > 0 {
             out.push_str("#\n");
         }
@@ -35,19 +38,21 @@ fn write_def(out: &mut String, def: &Def) {
             }
         }
     }
-    for attr in &def.attrs {
-        writeln!(out, "@{} {}", attr.name.as_str(), attr_value(&attr.value)).expect("string write");
-    }
-    if def.export {
-        out.push_str("export ");
-    }
-    write!(out, "def {} [", def.name.printed()).expect("string write");
-    if def.params.is_empty() {
-        out.push(']');
-    } else {
+    for attr in attrs {
+        write!(out, "@{}", attr.name.as_str()).expect("string write");
+        for arg in &attr.args {
+            out.push(' ');
+            out.push_str(&attr_arg(arg));
+        }
         out.push('\n');
-        let lines: Vec<(String, Option<&str>)> = def
-            .params
+    }
+}
+
+fn write_signature(out: &mut String, params: &Params, io: &Option<(Type, Type)>) {
+    out.push('[');
+    if !params.is_empty() {
+        out.push('\n');
+        let lines: Vec<(String, Option<&str>)> = params
             .iter()
             .map(|param| (param_text(param) + ",", param_doc(param)))
             .collect();
@@ -63,11 +68,20 @@ fn write_def(out: &mut String, def: &Def) {
             }
             out.push('\n');
         }
-        out.push(']');
     }
-    if let Some((input, output)) = &def.io {
+    out.push(']');
+    if let Some((input, output)) = io {
         write!(out, ": {} -> {}", input.as_str(), output.as_str()).expect("string write");
     }
+}
+
+fn write_def(out: &mut String, def: &Def) {
+    write_head(out, &def.doc, &def.attrs);
+    if def.export {
+        out.push_str("export ");
+    }
+    write!(out, "def {} ", def.name.printed()).expect("string write");
+    write_signature(out, &def.params, &def.io);
     out.push_str(" {\n");
     for stmt in &def.body {
         write_stmt(out, stmt, 1);
@@ -76,19 +90,55 @@ fn write_def(out: &mut String, def: &Def) {
     out.push_str("}\n");
 }
 
-/// An attribute's value: a string single-quoted, or as a raw string when it contains `'`.
-fn attr_value(value: &Literal) -> String {
-    match value {
-        Literal::Str(text) if !text.contains('\'') => format!("'{text}'"),
-        Literal::Str(text) => {
+fn write_extern(out: &mut String, ext: &Extern) {
+    write_head(out, &ext.doc, &ext.attrs);
+    if ext.export {
+        out.push_str("export ");
+    }
+    out.push_str("extern ");
+    if ext.strict {
+        out.push_str("--strict ");
+    }
+    write!(out, "{} ", ext.name.printed()).expect("string write");
+    write_signature(out, &ext.params, &ext.io);
+    out.push('\n');
+}
+
+/// An attribute argument: a string single-quoted, or as a raw string when it contains `'`;
+/// words bare; a block as given.
+fn attr_arg(arg: &AttrArg) -> String {
+    match arg {
+        AttrArg::Str(text) if !text.contains('\'') => format!("'{text}'"),
+        AttrArg::Str(text) => {
             let mut hashes = String::from("#");
             while text.contains(&format!("'{hashes}")) {
                 hashes.push('#');
             }
             format!("r{hashes}'{text}'{hashes}")
         }
-        other => nuon(other),
+        AttrArg::Words(words) => {
+            let words: Vec<String> = words
+                .iter()
+                .map(|word| {
+                    if is_bare_argv_word(word) {
+                        word.clone()
+                    } else {
+                        quote(word)
+                    }
+                })
+                .collect();
+            format!("[{}]", words.join(" "))
+        }
+        AttrArg::Block(text) => format!("{{ {text} }}"),
     }
+}
+
+/// An argv word Nushell reads as itself inside a list: no spaces, quotes or brackets.
+fn is_bare_argv_word(word: &str) -> bool {
+    !word.is_empty()
+        && !word.chars().any(|c| {
+            c.is_whitespace() || matches!(c, '"' | '\'' | '[' | ']' | '{' | '}' | '(' | ')' | '$')
+        })
 }
 
 fn param_text(param: &Param) -> String {
@@ -97,17 +147,22 @@ fn param_text(param: &Param) -> String {
             name,
             ty,
             optional,
+            default,
             completer,
             ..
         } => {
             let mut text = name.as_str().to_string();
-            if *optional {
+            if *optional && default.is_none() {
                 text.push('?');
             }
             text.push_str(": ");
             text.push_str(ty.as_str());
             if let Some(completer) = completer {
                 text.push_str(&completer_text(completer));
+            }
+            if let Some(default) = default {
+                text.push_str(" = ");
+                text.push_str(&nuon(default));
             }
             text
         }
@@ -243,6 +298,20 @@ fn write_expr(out: &mut String, expr: &Expr, depth: usize, statement_value: bool
                 write_expr(out, arg, depth, false);
             }
         }
+        Expr::External { name, args } => {
+            out.push('^');
+            out.push_str(name);
+            for arg in args {
+                out.push(' ');
+                // An external's flag words stay bare: `^sh -c`, not `^sh "-c"`.
+                match arg {
+                    Expr::Literal(Literal::Str(word)) if is_bare_argv_word(word) => {
+                        out.push_str(word)
+                    }
+                    other => write_expr(out, other, depth, false),
+                }
+            }
+        }
     }
 }
 
@@ -270,7 +339,7 @@ mod tests {
             doc: vec![vec!["Greet someone".into()]],
             attrs: vec![Attr {
                 name: FlagName::new("usage").unwrap(),
-                value: Literal::Str("arg \"<name>\" help=\"Who\"".into()),
+                args: vec![AttrArg::Str("arg \"<name>\" help=\"Who\"".into())],
             }],
             name: CommandName::new("main").unwrap(),
             params: Params::new(vec![
@@ -278,6 +347,7 @@ mod tests {
                     name: ident("name"),
                     ty: Type::new("string").unwrap(),
                     optional: false,
+                    default: None,
                     completer: None,
                     doc: Some("Who".into()),
                 },
@@ -317,7 +387,7 @@ mod tests {
                 name: CommandName::new("attr usage").unwrap(),
                 target: CommandName::new("echo").unwrap(),
             }],
-            defs: vec![def],
+            items: vec![Item::Def(def)],
         };
         let expected = "\
 alias \"attr usage\" = echo
@@ -339,6 +409,48 @@ export def main [
     }
 
     #[test]
+    fn prints_an_extern_with_structured_output() {
+        let ext = Extern {
+            export: true,
+            doc: vec![vec!["Show status".into()]],
+            attrs: vec![Attr {
+                name: FlagName::new("structured").unwrap(),
+                args: vec![
+                    AttrArg::Words(vec!["--format=json".into()]),
+                    AttrArg::Block("from json".into()),
+                ],
+            }],
+            name: CommandName::new("demo status").unwrap(),
+            params: Params::new(vec![Param::Flag {
+                long: FlagName::new("format").unwrap(),
+                short: None,
+                ty: Some(Type::new("string").unwrap()),
+                default: None,
+                completer: Some(Completer::List(vec!["human".into(), "json".into()])),
+                doc: Some("Output format".into()),
+            }])
+            .unwrap(),
+            io: Some((
+                Type::new("nothing").unwrap(),
+                Type::new("record<ok: bool>").unwrap(),
+            )),
+            strict: true,
+        };
+        let module = Module {
+            preamble: vec![],
+            items: vec![Item::Extern(ext)],
+        };
+        let expected = "\
+# Show status
+@structured [--format=json] { from json }
+export extern --strict \"demo status\" [
+    --format: string@[human json],  # Output format
+]: nothing -> record<ok: bool>
+";
+        assert_eq!(print(&module), expected);
+    }
+
+    #[test]
     fn params_must_be_ordered() {
         let flag = Param::Flag {
             long: FlagName::new("x").unwrap(),
@@ -352,6 +464,7 @@ export def main [
             name: ident("a"),
             ty: Type::new("string").unwrap(),
             optional: false,
+            default: None,
             completer: None,
             doc: None,
         };

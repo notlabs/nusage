@@ -1,13 +1,16 @@
 #!/usr/bin/env nu
 # Verify the fixtures against the `nu` that runs this script.
 #
-# Every case goes through both entrypoints and must return the same value:
+# A script fixture's cases go through both entrypoints and must return the same value:
 #   - shim:        `use expected/<bin>.nu; <bin> <words>`        (Nushell types the arguments)
 #   - interpreter: `let usage = ($env.NUSAGE_ARGS | from nuon); $in | run <script>`
 #                                                                  (the record is handed in as NUON)
-# A case with `complete` also asks the shim module for completions at a point of a line.
-# Then the parsed signature and attributes of the root and every command a case names, as
-# `scope commands` reports them, are compared with expected/signatures.nuon.
+# An extern fixture (a `<bin>.usage.kdl`) has no scripts; its module is imported with `use ... *`.
+# A case with `complete` asks the module for completions at a point of a line. Then the parsed
+# signature and attributes of the root and every command a case names, as `scope commands`
+# reports them, are compared with expected/signatures.nuon.
+#
+# A fixture's `fixture.nuon` may say `requires_nu`; on an older Nushell its checks are skipped.
 #
 #   nu fixtures/verify.nu                          # all fixtures
 #   nu fixtures/verify.nu fixtures/minimal         # one
@@ -38,29 +41,61 @@ def verify-fixture [dir: path, update: bool] {
     let name = $dir | path basename
     let module = glob ($dir | path join expected '*.nu') | first
     let bin = $module | path parse | get stem
+    let meta = $dir | path join fixture.nuon
+    let meta = if ($meta | path exists) { open $meta } else { {} }
+    if not (nu-is-at-least ($meta.requires_nu? | default "0.0.0")) {
+        return [
+            (
+                row $name skipped "" {
+                    ok: true
+                    detail: $"needs nu ($meta.requires_nu), running (version).version"
+                }
+            )
+        ]
+    }
+    let is_extern = ($dir | path join $"($bin).usage.kdl") | path exists
+    let import = if $is_extern { $"use ($module | to nuon) *" } else { $"use ($module | to nuon)" }
     let cases = glob ($dir | path join cases '*.nuon') | sort
     let per_case = $cases | each {|file|
         let case = open $file
         let id = $file | path parse | get stem
-        let rows = [
-            (row $name shim $id (check-shim $module $bin $case))
-            (row $name interpreter $id (check-interpreter $dir $bin $case))
-        ]
+        let rows = if $is_extern {
+            []
+        } else {
+            [
+                (row $name shim $id (check-shim $import $bin $case))
+                (row $name interpreter $id (check-interpreter $dir $bin $case))
+            ]
+        }
         if ($case.complete? | is-not-empty) {
-            $rows | append (row $name complete $id (check-complete $module $case.complete))
+            $rows | append (row $name complete $id (check-complete $import $case.complete))
         } else {
             $rows
         }
     } | flatten
     let cmds = [
         []
-    ] | append ($cases | each {|f| open $f | get usage.cmd }) | uniq
+    ] | append (
+        $cases
+        | each {|f| let c = open $f; $c.usage?.cmd? | default ($c.cmd? | default []) }
+    ) | uniq
     $per_case | append ((row
         $name
         signatures
         ""
-        (check-signatures $dir $module $bin $cmds $update)
+        (check-signatures $dir $import $bin $cmds $update)
     ))
+}
+
+def nu-is-at-least [required: string] {
+    let parse = {|v|
+        $v | split row '.' | each { into int }
+    }
+    let have = do $parse (version).version
+    let need = do $parse $required
+    ($have | zip $need | reduce --fold null {|pair, acc|
+        if $acc != null { $acc } else if $pair.0 > $pair.1 { true } else if $pair.0 < $pair.1 { false } else { null }
+    }) | default true
 }
 
 def row [
@@ -90,8 +125,8 @@ def words-of [case: record] {
     $case.invoke? | default ($case.argv | str join ' ')
 }
 
-def check-shim [module: path, bin: string, case: record] {
-    let code = $"use ($module | to nuon); ($bin) (words-of $case) | to nuon"
+def check-shim [import: string, bin: string, case: record] {
+    let code = $"($import); ($bin) (words-of $case) | to nuon"
     run-nu $code {} | compare (expected-output $case)
 }
 
@@ -103,8 +138,8 @@ def check-interpreter [dir: path, bin: string, case: record] {
     } | compare (expected-output $case)
 }
 
-def check-complete [module: path, complete: record] {
-    let code = $"use ($module | to nuon); ($complete.line | to nuon) | commandline complete | to nuon"
+def check-complete [import: string, complete: record] {
+    let code = $"($import); ($complete.line | to nuon) | commandline complete | to nuon"
     run-nu $code {} | compare $complete.expect
 }
 
@@ -164,13 +199,13 @@ def compare [expected] {
 # The parsed signature and attributes of each command, keyed by its full name.
 def check-signatures [
     dir: path
-    module: path
+    import: string
     bin: string
     cmds: list<any>
     update: bool
 ] {
     let names = $cmds | each {|cmd| [$bin] | append $cmd | str join ' ' }
-    let code = $"use ($module | to nuon); scope commands | where name in ($names | to nuon) | select name signatures attributes | to nuon --indent 2"
+    let code = $"($import); scope commands | where name in ($names | to nuon) | select name signatures attributes | to nuon --indent 2"
     let out = run-nu $code {}
     if not $out.ok {
         return $out

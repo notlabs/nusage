@@ -119,7 +119,13 @@ impl std::error::Error for SyntaxError {}
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub preamble: Vec<Stmt>,
-    pub defs: Vec<Def>,
+    pub items: Vec<Item>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Item {
+    Def(Def),
+    Extern(Extern),
 }
 
 /// A custom command definition.
@@ -137,11 +143,34 @@ pub struct Def {
     pub body: Vec<Stmt>,
 }
 
-/// An attribute line above a `def`: `@name value`.
+/// A known external: a signature for a command Nushell runs from `PATH`. No body.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Extern {
+    pub export: bool,
+    pub doc: Vec<Vec<String>>,
+    pub attrs: Vec<Attr>,
+    pub name: CommandName,
+    pub params: Params,
+    pub io: Option<(Type, Type)>,
+    /// `extern --strict`: an undeclared flag is a parse error.
+    pub strict: bool,
+}
+
+/// An attribute line above a definition: `@name arg arg`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Attr {
     pub name: FlagName,
-    pub value: Literal,
+    pub args: Vec<AttrArg>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AttrArg {
+    /// A string, single-quoted (or a raw string when it contains `'`).
+    Str(String),
+    /// A list of argv words, written bare: `[--format=json]`.
+    Words(Vec<String>),
+    /// A block, written as given: `{ from json }`.
+    Block(String),
 }
 
 /// The parameters of a signature, in the order Nushell requires: required positionals,
@@ -157,9 +186,11 @@ impl Params {
         for item in &items {
             let this = match item {
                 Param::Positional {
-                    optional: false, ..
+                    optional: false,
+                    default: None,
+                    ..
                 } => 0,
-                Param::Positional { optional: true, .. } => 1,
+                Param::Positional { .. } => 1,
                 Param::Rest { .. } => 2,
                 Param::Flag { .. } => 3,
             };
@@ -191,6 +222,8 @@ pub enum Param {
         name: Ident,
         ty: Type,
         optional: bool,
+        /// A default makes the positional optional; it is written `name: type = value`.
+        default: Option<Literal>,
         completer: Option<Completer>,
         doc: Option<String>,
     },
@@ -243,6 +276,11 @@ pub enum Expr {
     /// `name arg arg`, arguments printed as given.
     Call {
         name: CommandName,
+        args: Vec<Expr>,
+    },
+    /// `^name arg arg`: an external command.
+    External {
+        name: String,
         args: Vec<Expr>,
     },
     /// A path argument, written bare when it can be.

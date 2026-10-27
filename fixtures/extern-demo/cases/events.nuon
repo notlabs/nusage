@@ -1,0 +1,4 @@
+# Names the command so its signature, with the jsonl output type, is in the snapshot.
+{
+    cmd: [events],
+}

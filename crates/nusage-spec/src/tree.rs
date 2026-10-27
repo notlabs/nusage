@@ -4,7 +4,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use usage::SpecCommand;
+use usage::kdl::{KdlDocument, KdlNode};
 
+use crate::header::header_node;
 use crate::{Diagnostic, Header, read_header};
 
 /// A command's place in the tree: subcommand names outermost first, empty at the root.
@@ -49,37 +51,59 @@ pub struct Provider {
     pub provider: CommandPath,
 }
 
-/// A script or a tree of scripts, as one usage spec plus what the spec cannot hold.
+/// What runs when a command is called.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Source {
+    /// Scripts: each command's body is a file.
+    Scripts {
+        bodies: BTreeMap<CommandPath, PathBuf>,
+    },
+    /// A binary described by a spec file; Nushell runs it from `PATH`.
+    Binary,
+}
+
+/// A script, a tree of scripts, or a spec file, as one usage spec plus what the spec cannot
+/// hold.
 #[derive(Debug, Clone)]
 pub struct Assembled {
     /// The whole command tree. A valid usage spec, so every usage tool can read it.
     pub spec: usage::Spec,
-    /// The script that is each command's body.
-    pub bodies: BTreeMap<CommandPath, PathBuf>,
-    /// Each command's header, for its node text and annotations.
+    pub source: Source,
+    /// Each command's declaration, for its node text and annotations.
     pub headers: BTreeMap<CommandPath, Header>,
     /// Completion providers resolved to commands in the tree.
     pub providers: Vec<Provider>,
 }
 
-/// Assemble a single script, or a directory whose `mod.nu` is the root and whose files and
-/// subdirectories (each with its own `mod.nu`) are its subcommands.
+impl Assembled {
+    /// The script that is the command's body, when the source is scripts.
+    pub fn body(&self, path: &CommandPath) -> Option<&Path> {
+        match &self.source {
+            Source::Scripts { bodies } => bodies.get(path).map(PathBuf::as_path),
+            Source::Binary => None,
+        }
+    }
+}
+
+/// Assemble a single script, a directory whose `mod.nu` is the root and whose files and
+/// subdirectories (each with its own `mod.nu`) are its subcommands, or a `.kdl` spec file
+/// describing a binary.
 pub fn assemble(source: &Path) -> Result<Assembled, Diagnostic> {
     if source.is_file() {
-        return assemble_single(source);
+        return if source.extension().and_then(|ext| ext.to_str()) == Some("kdl") {
+            assemble_spec_file(source)
+        } else {
+            assemble_single(source)
+        };
     }
     if !source.is_dir() {
         return Err(Diagnostic::new(source, "not a file or a directory"));
     }
-    let mut out = Assembled {
-        spec: usage::Spec::default(),
-        bodies: BTreeMap::new(),
-        headers: BTreeMap::new(),
-        providers: Vec::new(),
-    };
+    let mut bodies = BTreeMap::new();
+    let mut headers = BTreeMap::new();
     let root = CommandPath::root();
     let root_header = group_header(source)?;
-    reject_mounts(&root_header)?;
+    reject_mounts(&root_header.header)?;
     let mut spec = root_header.spec.clone();
     if spec.name.is_empty() {
         let name = dir_name(source)?;
@@ -87,19 +111,24 @@ pub fn assemble(source: &Path) -> Result<Assembled, Diagnostic> {
         spec.bin = name;
     }
     spec.cmd.name = spec.bin.clone();
-    spec.cmd.subcommands = children(source, &root, &mut out)?;
-    out.bodies.insert(root.clone(), source.join("mod.nu"));
-    out.headers.insert(root, root_header);
+    spec.cmd.subcommands = children(source, &root, &mut bodies, &mut headers)?;
+    bodies.insert(root.clone(), source.join("mod.nu"));
+    headers.insert(root, root_header.header);
     spec.restamp();
-    out.spec = spec;
+    let mut out = Assembled {
+        spec,
+        source: Source::Scripts { bodies },
+        headers,
+        providers: Vec::new(),
+    };
     resolve_providers(&mut out)?;
     Ok(out)
 }
 
 fn assemble_single(path: &Path) -> Result<Assembled, Diagnostic> {
-    let header = read_header(path)?;
-    reject_mounts(&header)?;
-    let mut spec = header.spec.clone();
+    let script = read_header(path)?;
+    reject_mounts(&script.header)?;
+    let mut spec = script.spec.clone();
     if spec.name.is_empty() {
         let stem = file_stem(path)?;
         spec.name = stem.clone();
@@ -110,15 +139,114 @@ fn assemble_single(path: &Path) -> Result<Assembled, Diagnostic> {
     let root = CommandPath::root();
     let mut out = Assembled {
         spec,
-        bodies: BTreeMap::from([(root.clone(), path.to_path_buf())]),
-        headers: BTreeMap::from([(root, header)]),
+        source: Source::Scripts {
+            bodies: BTreeMap::from([(root.clone(), path.to_path_buf())]),
+        },
+        headers: BTreeMap::from([(root, script.header)]),
         providers: Vec::new(),
     };
     resolve_providers(&mut out)?;
     Ok(out)
 }
 
-fn group_header(dir: &Path) -> Result<Header, Diagnostic> {
+/// A spec file: the root's declaration is its top-level nodes, each `cmd` node is a command
+/// whose declaration is its children.
+fn assemble_spec_file(path: &Path) -> Result<Assembled, Diagnostic> {
+    let text = fs::read_to_string(path)
+        .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?;
+    let doc: KdlDocument = text
+        .parse()
+        .map_err(|err| Diagnostic::new(path, format!("not valid KDL: {err}")))?;
+    let mut spec = usage::Spec::parse_str_with_path(&text, path)
+        .map_err(|err| Diagnostic::new(path, format!("usage rejects the spec: {err}")))?;
+    if spec.name.is_empty() {
+        let stem = file_stem(path)?.trim_end_matches(".usage").to_string();
+        spec.name = stem.clone();
+        spec.bin = stem;
+    }
+    spec.cmd.name = spec.bin.clone();
+    spec.restamp();
+    let line_of = |offset: usize| text[..offset.min(text.len())].matches('\n').count() + 1;
+    let mut headers = BTreeMap::new();
+    let root_nodes: Vec<_> = doc
+        .nodes()
+        .iter()
+        .filter(|node| node.name().value() != "cmd")
+        .map(|node| header_node(node, &text, line_of))
+        .collect();
+    headers.insert(
+        CommandPath::root(),
+        Header {
+            path: path.to_path_buf(),
+            nodes: root_nodes,
+            about: spec.about.clone(),
+            about_long: spec.about_long.clone(),
+        },
+    );
+    collect_cmd_headers(
+        doc.nodes(),
+        &CommandPath::root(),
+        &spec.cmd,
+        path,
+        &text,
+        &line_of,
+        &mut headers,
+    )?;
+    for header in headers.values() {
+        reject_mounts(header)?;
+    }
+    Ok(Assembled {
+        spec,
+        source: Source::Binary,
+        headers,
+        providers: Vec::new(),
+    })
+}
+
+fn collect_cmd_headers(
+    nodes: &[KdlNode],
+    parent: &CommandPath,
+    parent_cmd: &SpecCommand,
+    path: &Path,
+    text: &str,
+    line_of: &impl Fn(usize) -> usize,
+    headers: &mut BTreeMap<CommandPath, Header>,
+) -> Result<(), Diagnostic> {
+    for node in nodes.iter().filter(|node| node.name().value() == "cmd") {
+        let name = node
+            .entries()
+            .iter()
+            .find(|entry| entry.name().is_none())
+            .and_then(|entry| entry.value().as_string())
+            .ok_or_else(|| {
+                Diagnostic::new(path, "a `cmd` node needs a name")
+                    .at_line(line_of(node.span().offset()))
+            })?;
+        let cmd_path = parent.child(name);
+        let cmd = parent_cmd.subcommands.get(name).ok_or_else(|| {
+            Diagnostic::new(path, format!("usage did not keep the command `{cmd_path}`"))
+        })?;
+        let children = node.children().map(|doc| doc.nodes()).unwrap_or(&[]);
+        let own_nodes = children
+            .iter()
+            .filter(|child| child.name().value() != "cmd")
+            .map(|child| header_node(child, text, line_of))
+            .collect();
+        headers.insert(
+            cmd_path.clone(),
+            Header {
+                path: path.to_path_buf(),
+                nodes: own_nodes,
+                about: cmd.help.clone(),
+                about_long: cmd.help_long.clone(),
+            },
+        );
+        collect_cmd_headers(children, &cmd_path, cmd, path, text, line_of, headers)?;
+    }
+    Ok(())
+}
+
+fn group_header(dir: &Path) -> Result<crate::ScriptHeader, Diagnostic> {
     let mod_nu = dir.join("mod.nu");
     if !mod_nu.is_file() {
         return Err(Diagnostic::new(
@@ -134,7 +262,8 @@ fn group_header(dir: &Path) -> Result<Header, Diagnostic> {
 fn children(
     dir: &Path,
     parent: &CommandPath,
-    out: &mut Assembled,
+    bodies: &mut BTreeMap<CommandPath, PathBuf>,
+    headers: &mut BTreeMap<CommandPath, Header>,
 ) -> Result<indexmap::IndexMap<String, SpecCommand>, Diagnostic> {
     let mut entries: Vec<PathBuf> = fs::read_dir(dir)
         .map_err(|err| Diagnostic::new(dir, format!("cannot list: {err}")))?
@@ -144,31 +273,34 @@ fn children(
     let mut subcommands = indexmap::IndexMap::new();
     for entry in entries {
         let name = file_stem(&entry)?;
-        let (header, body, nested) = if entry.is_file() {
+        let (script, body, nested) = if entry.is_file() {
             if entry.extension().and_then(|ext| ext.to_str()) != Some("nu") || name == "mod" {
                 continue;
             }
-            let header = read_header(&entry)?;
-            (header, entry.clone(), indexmap::IndexMap::new())
+            (
+                read_header(&entry)?,
+                entry.clone(),
+                indexmap::IndexMap::new(),
+            )
         } else if entry.is_dir() && entry.join("mod.nu").is_file() {
-            let header = group_header(&entry)?;
+            let script = group_header(&entry)?;
             let path = parent.child(&name);
-            let nested = children(&entry, &path, out)?;
-            (header, entry.join("mod.nu"), nested)
+            let nested = children(&entry, &path, bodies, headers)?;
+            (script, entry.join("mod.nu"), nested)
         } else {
             continue;
         };
-        reject_mounts(&header)?;
+        reject_mounts(&script.header)?;
         let path = parent.child(&name);
-        let mut cmd = header.spec.cmd.clone();
+        let mut cmd = script.spec.cmd.clone();
         cmd.name = name.clone();
-        cmd.help = header.spec.about.clone();
-        cmd.help_long = header.spec.about_long.clone();
+        cmd.help = script.spec.about.clone();
+        cmd.help_long = script.spec.about_long.clone();
         // A fragment's top-level `output` nodes are CLI-wide to usage; here they are the command's.
-        cmd.outputs.extend(header.spec.outputs.iter().cloned());
+        cmd.outputs.extend(script.spec.outputs.iter().cloned());
         cmd.subcommands = nested;
-        out.bodies.insert(path.clone(), body);
-        out.headers.insert(path, header);
+        bodies.insert(path.clone(), body);
+        headers.insert(path, script.header);
         subcommands.insert(name, cmd);
     }
     Ok(subcommands)
@@ -178,7 +310,8 @@ fn reject_mounts(header: &Header) -> Result<(), Diagnostic> {
     if let Some(node) = header.nodes.iter().find(|node| node.name == "mount") {
         return Err(Diagnostic::new(
             &header.path,
-            "`mount` is not supported in a script tree: the directory is the discovery",
+            "`mount` is not supported: a script tree's directory is the discovery, and a \
+             spec's mounts cannot be resolved without running the binary",
         )
         .at_line(node.line));
     }
@@ -187,10 +320,15 @@ fn reject_mounts(header: &Header) -> Result<(), Diagnostic> {
 
 /// Resolve every `choices run="<path>.nu"` to the command whose body that path is.
 fn resolve_providers(out: &mut Assembled) -> Result<(), Diagnostic> {
+    let Source::Scripts { bodies } = &out.source else {
+        return Ok(());
+    };
     let mut providers = Vec::new();
     for (path, header) in &out.headers {
         let dir = header.path.parent().unwrap_or(Path::new(""));
-        let cmd = &header.spec.cmd;
+        let Some(cmd) = command_at(&out.spec.cmd, path) else {
+            continue;
+        };
         let args = cmd
             .args
             .iter()
@@ -208,8 +346,7 @@ fn resolve_providers(out: &mut Assembled) -> Result<(), Diagnostic> {
                 continue;
             }
             let target = normalize(&dir.join(run));
-            let provider = out
-                .bodies
+            let provider = bodies
                 .iter()
                 .find(|(_, body)| normalize(body) == target)
                 .map(|(path, _)| path.clone());
@@ -235,6 +372,13 @@ fn resolve_providers(out: &mut Assembled) -> Result<(), Diagnostic> {
     }
     out.providers = providers;
     Ok(())
+}
+
+/// The spec command at a path.
+pub fn command_at<'a>(root: &'a SpecCommand, path: &CommandPath) -> Option<&'a SpecCommand> {
+    path.words()
+        .iter()
+        .try_fold(root, |cmd, word| cmd.subcommands.get(word))
 }
 
 /// A path with `.` and `..` folded, without touching the filesystem.

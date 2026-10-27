@@ -5,11 +5,14 @@ Typed Nushell commands from usage-annotated scripts. Early development.
 A Nushell script declares its interface in a [usage](https://usage.jdx.dev) header, has no
 `def main`, and reads its arguments from `$usage`. nusage generates a module that defines one
 typed command per script, with completions, help and the header carried along as attributes,
-whose body hands the script its record and `run`s it.
+whose body hands the script its record and `run`s it. A usage spec file for an existing binary
+generates `extern`s instead, with `@structured` where the spec declares `json` or `jsonl`
+output; those need Nushell 0.117.
 
 ```
 nusage generate mycli/ --out mycli.nu    # a tree: mod.nu is the root, x.nu a subcommand
 nusage generate greet.nu                 # a single script, module on stdout
+nusage generate demo.usage.kdl           # a binary's spec: externs, import with `use demo.nu *`
 nusage spec mycli/                       # the assembled usage spec, as KDL
 ```
 

@@ -11,11 +11,15 @@ fn fixtures_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
 }
 
-/// The source of a fixture: its single `script.nu`, or its `<bin>/` tree.
+/// The source of a fixture: its single `script.nu`, its `<bin>.usage.kdl` spec, or its
+/// `<bin>/` tree.
 fn source_of(fixture: &Path, bin: &str) -> PathBuf {
     let single = fixture.join("script.nu");
+    let spec = fixture.join(format!("{bin}.usage.kdl"));
     if single.is_file() {
         single
+    } else if spec.is_file() {
+        spec
     } else {
         fixture.join(bin)
     }

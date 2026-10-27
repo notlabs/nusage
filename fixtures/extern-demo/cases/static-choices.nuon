@@ -1,0 +1,5 @@
+# usage fills `--format`'s choices from the output names; they become an inline completer.
+{
+    cmd: [status],
+    complete: {line: "demo status --format ", expect: [human json]},
+}

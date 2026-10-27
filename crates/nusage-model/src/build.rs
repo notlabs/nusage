@@ -1,9 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nusage_spec::{Assembled, CommandPath, Diagnostic, Header, HeaderNode};
-use usage::{SpecArg, SpecCommand, SpecFlag};
+use nusage_spec::{Assembled, CommandPath, Diagnostic, Header, HeaderNode, Source};
+use usage::{SpecArg, SpecCommand, SpecComplete, SpecFlag, SpecOutput};
 
-use crate::{Command, CommandTree, Completer, NuType, Param, ParamKind, Value};
+use crate::{
+    Command, CommandTree, Completer, Execution, Framing, NuType, Param, ParamKind, Structured,
+    Value,
+};
 
 /// Header nodes that have a native place in the module and so do not become attributes.
 const NATIVE_NODES: &[&str] = &[
@@ -24,14 +27,17 @@ pub fn model(assembled: &Assembled) -> Result<CommandTree, Diagnostic> {
         .iter()
         .map(|p| ((&p.consumer, p.param.as_str()), &p.provider))
         .collect();
+    let ctx = Context {
+        assembled,
+        providers,
+        completers,
+    };
     let mut commands = Vec::new();
-    visit(
+    ctx.visit(
         &assembled.spec.cmd,
         CommandPath::root(),
         &[],
-        assembled,
-        &providers,
-        &completers,
+        &[],
         &mut commands,
     )?;
     Ok(CommandTree {
@@ -40,136 +46,367 @@ pub fn model(assembled: &Assembled) -> Result<CommandTree, Diagnostic> {
     })
 }
 
-fn visit(
-    cmd: &SpecCommand,
-    path: CommandPath,
-    inherited: &[Param],
-    assembled: &Assembled,
-    providers: &BTreeSet<&CommandPath>,
-    completers: &BTreeMap<(&CommandPath, &str), &CommandPath>,
-    out: &mut Vec<Command>,
-) -> Result<(), Diagnostic> {
-    let header = assembled
-        .headers
-        .get(&path)
-        .expect("assemble records a header for every command");
-    let body = assembled
-        .bodies
-        .get(&path)
-        .expect("assemble records a body for every command");
-    let is_provider = providers.contains(&path);
+struct Context<'a> {
+    assembled: &'a Assembled,
+    providers: BTreeSet<&'a CommandPath>,
+    completers: BTreeMap<(&'a CommandPath, &'a str), &'a CommandPath>,
+}
 
-    let positionals = cmd
-        .args
-        .iter()
-        .map(|arg| positional(arg, header, &path, completers))
-        .collect::<Result<Vec<_>, _>>()?;
-    let own_flags = cmd
-        .flags
-        .iter()
-        .map(|flag| flag_param(flag, header, &path, completers, false))
-        .collect::<Result<Vec<_>, _>>()?;
-    let output = output_type(header);
+/// A completer and, when usage declared one, the `complete type=` it carries.
+type Found = Option<(Completer, Option<String>)>;
 
-    if is_provider {
-        if !positionals.is_empty() || !own_flags.is_empty() {
-            let line = header
-                .nodes
-                .iter()
-                .find(|node| matches!(node.name.as_str(), "arg" | "flag"))
-                .map(|node| node.line)
-                .unwrap_or(1);
-            return Err(Diagnostic::new(
-                &header.path,
-                "a completion provider cannot declare parameters: Nushell binds only the \
-                 completion token when it calls a completer, so any flag or argument would be \
-                 unbound",
-            )
-            .at_line(line));
-        }
-        match &output {
-            Some(ty) if ty.as_str().starts_with("list<") => {}
-            _ => {
+impl Context<'_> {
+    fn visit(
+        &self,
+        cmd: &SpecCommand,
+        path: CommandPath,
+        inherited: &[Param],
+        inherited_outputs: &[SpecOutput],
+        out: &mut Vec<Command>,
+    ) -> Result<(), Diagnostic> {
+        let header = self
+            .assembled
+            .headers
+            .get(&path)
+            .expect("assemble records a header for every command");
+        let execution = match &self.assembled.source {
+            Source::Scripts { .. } => Execution::Script(
+                self.assembled
+                    .body(&path)
+                    .expect("assemble records a body for every script command")
+                    .to_path_buf(),
+            ),
+            Source::Binary => Execution::External,
+        };
+        let is_provider = self.providers.contains(&path);
+
+        let positionals = cmd
+            .args
+            .iter()
+            .map(|arg| self.positional(arg, cmd, header, &path))
+            .collect::<Result<Vec<_>, _>>()?;
+        let own_flags = cmd
+            .flags
+            .iter()
+            .map(|flag| self.flag_param(flag, cmd, header, &path))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // The outputs this command can produce: its own, else the ones declared above it.
+        let outputs: &[SpecOutput] = if cmd.outputs.is_empty() {
+            inherited_outputs
+        } else {
+            &cmd.outputs
+        };
+        let structured = match execution {
+            Execution::External => structured_output(outputs, cmd.select.as_deref()),
+            Execution::Script(_) => None,
+        };
+        // A script's value is what its default output describes; a binary's is the structured
+        // output Nushell decodes.
+        let output = match &structured {
+            Some((_, name)) => output_type(header, Some(name)),
+            None => output_type(header, None),
+        };
+        let structured = structured.map(|(structured, _)| structured);
+
+        if is_provider {
+            if !positionals.is_empty() || !own_flags.is_empty() {
+                let line = header
+                    .nodes
+                    .iter()
+                    .find(|node| matches!(node.name.as_str(), "arg" | "flag"))
+                    .map(|node| node.line)
+                    .unwrap_or(1);
                 return Err(Diagnostic::new(
                     &header.path,
-                    "a completion provider must declare its output as a list, for example \
-                     `output (\"list<string>\")\"nuon\" default=#true`",
-                ));
+                    "a completion provider cannot declare parameters: Nushell binds only the \
+                     completion token when it calls a completer, so any flag or argument would \
+                     be unbound",
+                )
+                .at_line(line));
+            }
+            match &output {
+                Some(ty) if ty.as_str().starts_with("list<") => {}
+                _ => {
+                    return Err(Diagnostic::new(
+                        &header.path,
+                        "a completion provider must declare its output as a list, for example \
+                         `output (\"list<string>\")\"nuon\" default=#true`",
+                    ));
+                }
             }
         }
-    }
 
-    let flags: Vec<Param> = if is_provider {
-        Vec::new()
-    } else {
-        inherited
+        let flags: Vec<Param> = if is_provider {
+            Vec::new()
+        } else {
+            inherited
+                .iter()
+                .cloned()
+                .chain(own_flags.iter().cloned())
+                .collect()
+        };
+        let attributes = header
+            .nodes
+            .iter()
+            .filter(|node| !NATIVE_NODES.contains(&node.name.as_str()))
+            .map(|node| node.text.clone())
+            .collect();
+
+        out.push(Command {
+            path: path.clone(),
+            about: header.about.clone(),
+            about_long: header.about_long.clone(),
+            positionals,
+            flags,
+            output,
+            structured,
+            attributes,
+            execution,
+            is_provider,
+        });
+
+        // What children inherit: this command's inherited flags, then its own `global=#true`.
+        let own_globals = own_flags.iter().filter(|param| {
+            cmd.flags
+                .iter()
+                .any(|flag| flag.global && flag.name == param.usage_name)
+        });
+        let passed_down: Vec<Param> = inherited
             .iter()
             .cloned()
-            .chain(own_flags.iter().cloned())
-            .collect()
-    };
-    let attributes = header
-        .nodes
-        .iter()
-        .filter(|node| !NATIVE_NODES.contains(&node.name.as_str()))
-        .map(|node| node.text.clone())
-        .collect();
+            .chain(own_globals.cloned().map(|mut param| {
+                param.inherited = true;
+                param
+            }))
+            .collect();
+        // Top-level `output` nodes of a spec file are CLI-wide; usage keeps them on the spec.
+        let child_outputs: Vec<SpecOutput> = if !cmd.outputs.is_empty() {
+            cmd.outputs.clone()
+        } else if path.is_root() {
+            self.assembled.spec.outputs.clone()
+        } else {
+            inherited_outputs.to_vec()
+        };
 
-    out.push(Command {
-        path: path.clone(),
-        about: header.spec.about.clone(),
-        about_long: header.spec.about_long.clone(),
-        positionals,
-        flags,
-        output,
-        attributes,
-        body: body.clone(),
-        is_provider,
-    });
-
-    // What children inherit: this command's inherited flags, then its own `global=#true` ones.
-    let own_globals = own_flags.iter().filter(|param| {
-        cmd.flags
+        let (first, rest): (Vec<_>, Vec<_>) = cmd
+            .subcommands
             .iter()
-            .any(|flag| flag.global && flag.name == param.usage_name)
-    });
-    let passed_down: Vec<Param> = inherited
-        .iter()
-        .cloned()
-        .chain(own_globals.cloned().map(|mut param| {
-            param.inherited = true;
-            param
-        }))
-        .collect();
-
-    let (first, rest): (Vec<_>, Vec<_>) = cmd
-        .subcommands
-        .iter()
-        .partition(|(name, _)| providers.contains(&path.child(name)));
-    for (name, sub) in first.into_iter().chain(rest) {
-        visit(
-            sub,
-            path.child(name),
-            &passed_down,
-            assembled,
-            providers,
-            completers,
-            out,
-        )?;
+            .partition(|(name, _)| self.providers.contains(&path.child(name)));
+        for (name, sub) in first.into_iter().chain(rest) {
+            self.visit(sub, path.child(name), &passed_down, &child_outputs, out)?;
+        }
+        Ok(())
     }
-    Ok(())
+
+    fn positional(
+        &self,
+        arg: &SpecArg,
+        cmd: &SpecCommand,
+        header: &Header,
+        path: &CommandPath,
+    ) -> Result<Param, Diagnostic> {
+        let node = arg_node(header, arg);
+        let found = self.completer_for(arg, cmd, path, &arg.name, header)?;
+        let ty = NuType(
+            node.and_then(|n| n.value_type())
+                .map(str::to_string)
+                .unwrap_or_else(|| conventional_type(arg, &found)),
+        );
+        let kind = if arg.var {
+            ParamKind::Rest
+        } else if arg.required {
+            ParamKind::Required
+        } else {
+            ParamKind::Optional
+        };
+        let default = match kind {
+            ParamKind::Rest => None,
+            _ => arg.default.first().map(|text| typed_value(text, &ty)),
+        };
+        Ok(Param {
+            usage_name: arg.name.clone(),
+            var: snake(&arg.name),
+            kind,
+            ty,
+            long: None,
+            short: None,
+            completer: found.map(|(completer, _)| completer),
+            default,
+            doc: arg.help.clone(),
+            inherited: false,
+        })
+    }
+
+    fn flag_param(
+        &self,
+        flag: &SpecFlag,
+        cmd: &SpecCommand,
+        header: &Header,
+        path: &CommandPath,
+    ) -> Result<Param, Diagnostic> {
+        let node = flag_node(header, flag);
+        let long = flag.long.first().cloned();
+        let short = flag.short.first().copied();
+        let (kind, ty, default, completer) = match (&flag.arg, flag.count, flag.var) {
+            (None, true, _) => (
+                ParamKind::Count,
+                NuType("int".into()),
+                Some(Value::Int(0)),
+                None,
+            ),
+            (None, false, _) => (ParamKind::Switch, NuType("bool".into()), None, None),
+            (Some(arg), _, repeated) => {
+                let found = self.completer_for(arg, cmd, path, &flag.name, header)?;
+                let ty = NuType(
+                    node.and_then(|n| n.value_type())
+                        .map(str::to_string)
+                        .unwrap_or_else(|| conventional_type(arg, &found)),
+                );
+                let completer = found.map(|(completer, _)| completer);
+                if repeated {
+                    let defaults = flag
+                        .default
+                        .iter()
+                        .map(|text| typed_value(text, &ty))
+                        .collect();
+                    (
+                        ParamKind::Repeated,
+                        ty,
+                        Some(Value::List(defaults)),
+                        completer,
+                    )
+                } else {
+                    let default = flag.default.first().map(|text| typed_value(text, &ty));
+                    (ParamKind::Valued, ty, default, completer)
+                }
+            }
+        };
+        Ok(Param {
+            usage_name: flag.name.clone(),
+            var: snake(&flag.name),
+            kind,
+            ty,
+            long,
+            short,
+            completer,
+            default,
+            doc: flag.help.clone(),
+            inherited: false,
+        })
+    }
+
+    /// The completer for an argument. In order: a provider in the tree, static `choices`,
+    /// `choices run=`, then a `complete` node on the arg, on the command, or at the top level.
+    fn completer_for(
+        &self,
+        arg: &SpecArg,
+        cmd: &SpecCommand,
+        path: &CommandPath,
+        param: &str,
+        header: &Header,
+    ) -> Result<Found, Diagnostic> {
+        if let Some(provider) = self.completers.get(&(path, param)) {
+            return Ok(Some((Completer::Command((*provider).clone()), None)));
+        }
+        if let Some(choices) = &arg.choices {
+            if let Some(run) = &choices.run {
+                return match self.assembled.source {
+                    Source::Binary => Ok(Some((
+                        Completer::Shell {
+                            name: helper_name(path, param),
+                            run: run.clone(),
+                            descriptions: false,
+                        },
+                        None,
+                    ))),
+                    Source::Scripts { .. } => Err(Diagnostic::new(
+                        &header.path,
+                        format!(
+                            "`choices run=\"{run}\"` is not a script in this tree; a script's \
+                             choices come from a sibling `.nu` provider"
+                        ),
+                    )),
+                };
+            }
+            if choices.env().is_some() {
+                return Err(Diagnostic::new(
+                    &header.path,
+                    "`choices env=` is not supported yet",
+                ));
+            }
+            if !choices.choices.is_empty() {
+                return Ok(Some((Completer::Inline(choices.choices.clone()), None)));
+            }
+        }
+        let named = arg
+            .complete
+            .as_ref()
+            .or_else(|| cmd.complete.get(&arg.name))
+            .or_else(|| self.assembled.spec.complete.get(&arg.name));
+        match named {
+            Some(complete) => shell_completer(complete, &arg.name, header, &self.assembled.source),
+            None => Ok(None),
+        }
+    }
+}
+
+/// The name of the helper that runs a `choices run=` for one parameter.
+fn helper_name(path: &CommandPath, param: &str) -> String {
+    if path.is_root() {
+        param.to_string()
+    } else {
+        format!("{path} {param}")
+    }
+}
+
+fn shell_completer(
+    complete: &SpecComplete,
+    name: &str,
+    header: &Header,
+    source: &Source,
+) -> Result<Found, Diagnostic> {
+    let ty = complete.type_.clone();
+    let Some(run) = &complete.run else {
+        // Nothing to run, but a `type=` still says what the value is.
+        return Ok(ty.map(|ty| (Completer::Inline(Vec::new()), Some(ty))));
+    };
+    if let Source::Scripts { .. } = source {
+        return Err(Diagnostic::new(
+            &header.path,
+            format!(
+                "`complete \"{name}\" run=...` is not supported for scripts; name a sibling \
+                 `.nu` provider with `choices run=` instead"
+            ),
+        ));
+    }
+    Ok(Some((
+        Completer::Shell {
+            name: name.to_string(),
+            run: run.clone(),
+            descriptions: complete.descriptions,
+        },
+        ty,
+    )))
 }
 
 fn snake(name: &str) -> String {
     name.replace('-', "_")
 }
 
-/// usage's convention: `<file>` and `<dir>` complete as paths.
-fn conventional_type(usage_name: &str) -> &'static str {
-    match usage_name {
-        "file" | "dir" | "path" => "path",
+/// usage's conventions: `<file>` and `<dir>` complete as paths, as does an argument whose
+/// `complete type=` says so.
+fn conventional_type(arg: &SpecArg, found: &Found) -> String {
+    let typed = found
+        .as_ref()
+        .and_then(|(_, ty)| ty.as_deref())
+        .map(|ty| ty.split(':').next().unwrap_or(ty));
+    match (arg.name.as_str(), typed) {
+        (_, Some("file" | "path" | "dir")) => "path",
+        ("file" | "dir" | "path", _) => "path",
         _ => "string",
     }
+    .to_string()
 }
 
 fn arg_node<'a>(header: &'a Header, arg: &SpecArg) -> Option<&'a HeaderNode> {
@@ -183,7 +420,7 @@ fn arg_node<'a>(header: &'a Header, arg: &SpecArg) -> Option<&'a HeaderNode> {
     })
 }
 
-/// `<file>...`, `[file]`, `<-- file>` → `file`.
+/// `<file>...`, `[file]`, `<-- file>`, `file` → `file`.
 fn placeholder_name(first: &str) -> String {
     first
         .trim()
@@ -206,146 +443,57 @@ fn flag_node<'a>(header: &'a Header, flag: &SpecFlag) -> Option<&'a HeaderNode> 
     })
 }
 
-fn positional(
-    arg: &SpecArg,
-    header: &Header,
-    path: &CommandPath,
-    completers: &BTreeMap<(&CommandPath, &str), &CommandPath>,
-) -> Result<Param, Diagnostic> {
-    let node = arg_node(header, arg);
-    let ty = NuType(
-        node.and_then(|n| n.value_type())
-            .unwrap_or_else(|| conventional_type(&arg.name))
-            .to_string(),
-    );
-    let kind = if arg.var {
-        ParamKind::Rest
-    } else if arg.required {
-        ParamKind::Required
-    } else {
-        ParamKind::Optional
-    };
-    let completer = completer_for(arg, path, &arg.name, header, completers)?;
-    let default = match kind {
-        ParamKind::Rest => None,
-        _ => arg.default.first().map(|text| typed_value(text, &ty)),
-    };
-    Ok(Param {
-        usage_name: arg.name.clone(),
-        var: snake(&arg.name),
-        kind,
-        ty,
-        long: None,
-        short: None,
-        completer,
-        default,
-        doc: arg.help.clone(),
-        inherited: false,
-    })
-}
-
-fn flag_param(
-    flag: &SpecFlag,
-    header: &Header,
-    path: &CommandPath,
-    completers: &BTreeMap<(&CommandPath, &str), &CommandPath>,
-    inherited: bool,
-) -> Result<Param, Diagnostic> {
-    let node = flag_node(header, flag);
-    let long = flag.long.first().cloned();
-    let short = flag.short.first().copied();
-    let (kind, ty, default, completer) = match (&flag.arg, flag.count, flag.var) {
-        (None, true, _) => (
-            ParamKind::Count,
-            NuType("int".into()),
-            Some(Value::Int(0)),
-            None,
-        ),
-        (None, false, _) => (ParamKind::Switch, NuType("bool".into()), None, None),
-        (Some(arg), _, repeated) => {
-            let ty = NuType(
-                node.and_then(|n| n.value_type())
-                    .unwrap_or_else(|| conventional_type(&arg.name))
-                    .to_string(),
-            );
-            let completer = completer_for(arg, path, &flag.name, header, completers)?;
-            if repeated {
-                let defaults = flag
-                    .default
-                    .iter()
-                    .map(|text| typed_value(text, &ty))
-                    .collect();
-                (
-                    ParamKind::Repeated,
-                    ty,
-                    Some(Value::List(defaults)),
-                    completer,
-                )
-            } else {
-                let default = flag.default.first().map(|text| typed_value(text, &ty));
-                (ParamKind::Valued, ty, default, completer)
-            }
-        }
-    };
-    Ok(Param {
-        usage_name: flag.name.clone(),
-        var: snake(&flag.name),
-        kind,
-        ty,
-        long,
-        short,
-        completer,
-        default,
-        doc: flag.help.clone(),
-        inherited,
-    })
-}
-
-fn completer_for(
-    arg: &SpecArg,
-    path: &CommandPath,
-    param: &str,
-    header: &Header,
-    completers: &BTreeMap<(&CommandPath, &str), &CommandPath>,
-) -> Result<Option<Completer>, Diagnostic> {
-    if let Some(provider) = completers.get(&(path, param)) {
-        return Ok(Some(Completer::Command((*provider).clone())));
-    }
-    let Some(choices) = &arg.choices else {
-        return Ok(None);
-    };
-    if let Some(run) = &choices.run {
-        return Err(Diagnostic::new(
-            &header.path,
-            format!(
-                "`choices run=\"{run}\"` is not a script in this tree; only sibling `.nu` \
-                 providers are supported"
-            ),
-        ));
-    }
-    if choices.env().is_some() {
-        return Err(Diagnostic::new(
-            &header.path,
-            "`choices env=` is not supported yet",
-        ));
-    }
-    if choices.choices.is_empty() {
-        return Ok(None);
-    }
-    Ok(Some(Completer::Inline(choices.choices.clone())))
-}
-
-fn output_type(header: &Header) -> Option<NuType> {
+/// The annotation on an `output` node: the one named, else the default, else the only one.
+fn output_type(header: &Header, name: Option<&str>) -> Option<NuType> {
     let outputs: Vec<&HeaderNode> = header
         .nodes
         .iter()
         .filter(|node| node.name == "output")
         .collect();
+    let chosen = match name {
+        Some(name) => outputs
+            .iter()
+            .find(|node| node.first.as_deref() == Some(name))?,
+        None => outputs
+            .iter()
+            .find(|node| node.text.contains("default=#true"))
+            .or_else(|| (outputs.len() == 1).then(|| &outputs[0]))?,
+    };
+    chosen.value_type().map(|ty| NuType(ty.to_string()))
+}
+
+/// The structured output a binary can be asked for, and its usage name: the first `json`
+/// output, else the first `jsonl` one, with the arguments that select it. A `select` on the
+/// output is a boolean flag (`--json`); a `select` on the command names a value flag
+/// (`--format=json`). With neither, the output must be the default or the only one, or there
+/// is no way to ask for it.
+fn structured_output(
+    outputs: &[SpecOutput],
+    command_select: Option<&str>,
+) -> Option<(Structured, String)> {
+    let framed = |output: &&SpecOutput| {
+        matches!(output.framing, usage::Framing::Json | usage::Framing::Jsonl)
+    };
     let chosen = outputs
         .iter()
-        .find(|node| node.text.contains("default=#true"))
-        .or_else(|| (outputs.len() == 1).then(|| &outputs[0]))?;
-    chosen.value_type().map(|ty| NuType(ty.to_string()))
+        .filter(framed)
+        .find(|output| output.framing == usage::Framing::Json)
+        .or_else(|| outputs.iter().find(framed))?;
+    let framing = match chosen.framing {
+        usage::Framing::Json => Framing::Json,
+        usage::Framing::Jsonl => Framing::Jsonl,
+        _ => return None,
+    };
+    let args = if let Some(flag) = &chosen.select {
+        vec![flag.clone()]
+    } else if let Some(flag) = command_select {
+        vec![format!("{flag}={}", chosen.name)]
+    } else if chosen.default || outputs.len() == 1 {
+        Vec::new()
+    } else {
+        return None;
+    };
+    Some((Structured { args, framing }, chosen.name.clone()))
 }
 
 /// usage keeps every default as text; the parameter's type says how Nushell should read it.

@@ -1,0 +1,6 @@
+# `descriptions=#true` lines split on the first colon into value and description records,
+# which `commandline complete` reports as values.
+{
+    cmd: [run],
+    complete: {line: "demo run ", expect: [build test]},
+}

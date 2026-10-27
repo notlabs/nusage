@@ -5,19 +5,23 @@ use usage::kdl::{KdlDocument, KdlNode};
 
 use crate::Diagnostic;
 
-/// The usage header of one script: usage's parse of it, and what usage drops.
-#[derive(Debug, Clone)]
+/// What one command declares, beyond what usage's parse of it keeps: its nodes as written,
+/// their type annotations, and its description.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Header {
+    /// The file the declaration came from: the script, or the spec file.
     pub path: PathBuf,
-    /// The header's KDL, the `#USAGE` lines joined.
-    pub kdl: String,
-    /// The top-level nodes, in header order, with their verbatim text and annotations.
+    /// The command's own nodes, in order, with their verbatim text and annotations. For a
+    /// script this is the whole header; for a `cmd` node of a spec file, its children other
+    /// than nested `cmd`s.
     pub nodes: Vec<HeaderNode>,
-    /// usage's reading of the same text. Its `cmd` is the command this file declares.
-    pub spec: usage::Spec,
+    /// usage `about` or a `cmd`'s `help`: the description.
+    pub about: Option<String>,
+    /// usage `long_about`: the extra description.
+    pub about_long: Option<String>,
 }
 
-/// One top-level node of a header.
+/// One node of a declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeaderNode {
     /// The node's name: `arg`, `flag`, `output`, `about`, ...
@@ -30,7 +34,7 @@ pub struct HeaderNode {
     pub ty: Option<String>,
     /// The annotation on a nested `arg` child's first argument, for `flag "--x" { arg (int)"<n>" }`.
     pub nested_arg_ty: Option<String>,
-    /// 1-based line of the script where the node starts.
+    /// 1-based line of the file where the node starts.
     pub line: usize,
 }
 
@@ -40,6 +44,16 @@ impl HeaderNode {
     pub fn value_type(&self) -> Option<&str> {
         self.nested_arg_ty.as_deref().or(self.ty.as_deref())
     }
+}
+
+/// A script's header: the declaration plus usage's reading of the same text.
+#[derive(Debug, Clone)]
+pub struct ScriptHeader {
+    pub header: Header,
+    /// The header's KDL, the `#USAGE` lines joined.
+    pub kdl: String,
+    /// usage's parse. Its `cmd` holds the args and flags this file declares.
+    pub spec: usage::Spec,
 }
 
 /// Lines that open or continue a header. Only the `#` comment prefix: these are Nushell files.
@@ -108,8 +122,28 @@ fn nested_arg_ty(node: &KdlNode) -> Option<String> {
         .and_then(first_arg_ty)
 }
 
+/// The [`HeaderNode`] of a parsed node, with `text` sliced from the source it was parsed
+/// from and `line` looked up through `line_of`.
+pub(crate) fn header_node(
+    node: &KdlNode,
+    source: &str,
+    line_of: impl Fn(usize) -> usize,
+) -> HeaderNode {
+    let span = node.span();
+    let start = span.offset();
+    let end = start + span.len();
+    HeaderNode {
+        name: node.name().value().to_string(),
+        text: source[start..end].trim().to_string(),
+        first: string_arg(node, 0),
+        ty: first_arg_ty(node),
+        nested_arg_ty: nested_arg_ty(node),
+        line: line_of(start),
+    }
+}
+
 /// Read one script's header.
-pub fn read_header(path: &Path) -> Result<Header, Diagnostic> {
+pub fn read_header(path: &Path) -> Result<ScriptHeader, Diagnostic> {
     let source = fs::read_to_string(path)
         .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?;
     let lines = extract(path, &source)?;
@@ -121,39 +155,34 @@ pub fn read_header(path: &Path) -> Result<Header, Diagnostic> {
         kdl.push_str(text);
         kdl.push('\n');
     }
+    let first_line = lines[0].0;
     let doc: KdlDocument = kdl.parse().map_err(|err| {
-        Diagnostic::new(path, format!("header is not valid KDL: {err}")).at_line(lines[0].0)
+        Diagnostic::new(path, format!("header is not valid KDL: {err}")).at_line(first_line)
     })?;
     let spec = kdl.parse::<usage::Spec>().map_err(|err| {
-        Diagnostic::new(path, format!("usage rejects the header: {err}")).at_line(lines[0].0)
+        Diagnostic::new(path, format!("usage rejects the header: {err}")).at_line(first_line)
     })?;
+    let line_of = |offset: usize| {
+        offsets
+            .iter()
+            .take_while(|(start, _)| *start <= offset)
+            .last()
+            .map(|(_, line)| *line)
+            .unwrap_or(first_line)
+    };
     let nodes = doc
         .nodes()
         .iter()
-        .map(|node| {
-            let span = node.span();
-            let start = span.offset();
-            let end = start + span.len();
-            let line = offsets
-                .iter()
-                .take_while(|(offset, _)| *offset <= start)
-                .last()
-                .map(|(_, line)| *line)
-                .unwrap_or(lines[0].0);
-            HeaderNode {
-                name: node.name().value().to_string(),
-                text: kdl[start..end].trim().to_string(),
-                first: string_arg(node, 0),
-                ty: first_arg_ty(node),
-                nested_arg_ty: nested_arg_ty(node),
-                line,
-            }
-        })
+        .map(|node| header_node(node, &kdl, line_of))
         .collect();
-    Ok(Header {
-        path: path.to_path_buf(),
+    Ok(ScriptHeader {
+        header: Header {
+            path: path.to_path_buf(),
+            nodes,
+            about: spec.about.clone(),
+            about_long: spec.about_long.clone(),
+        },
         kdl,
-        nodes,
         spec,
     })
 }
@@ -162,7 +191,7 @@ pub fn read_header(path: &Path) -> Result<Header, Diagnostic> {
 mod tests {
     use super::*;
 
-    fn header_of(source: &str) -> Header {
+    fn header_of(source: &str) -> ScriptHeader {
         let dir = std::env::temp_dir().join(format!("nusage-spec-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join(format!("{}.nu", source.len()));
@@ -172,30 +201,33 @@ mod tests {
 
     #[test]
     fn keeps_node_text_and_annotations() {
-        let header = header_of(
+        let script = header_of(
             "#!/usr/bin/env nusage\n\
              #USAGE name \"t\"\n\
              #USAGE bin \"t\"\n\
+             #USAGE about \"Test\"\n\
              #USAGE arg (datetime)\"<since>\" help=\"After\"\n\
              #USAGE flag \"--limit\" default=\"10\" { arg (int)\"<n>\" }\n\
              #USAGE output (\"list<string>\")\"nuon\" default=#true\n\
              \n\
              $usage\n",
         );
+        let header = &script.header;
         let names: Vec<_> = header.nodes.iter().map(|n| n.name.as_str()).collect();
-        assert_eq!(names, ["name", "bin", "arg", "flag", "output"]);
-        let arg = &header.nodes[2];
+        assert_eq!(names, ["name", "bin", "about", "arg", "flag", "output"]);
+        let arg = &header.nodes[3];
         assert_eq!(arg.text, "arg (datetime)\"<since>\" help=\"After\"");
         assert_eq!(arg.value_type(), Some("datetime"));
         assert_eq!(arg.first.as_deref(), Some("<since>"));
-        assert_eq!(arg.line, 4);
-        let flag = &header.nodes[3];
+        assert_eq!(arg.line, 5);
+        let flag = &header.nodes[4];
         assert_eq!(flag.value_type(), Some("int"));
         assert_eq!(flag.first.as_deref(), Some("--limit"));
-        let output = &header.nodes[4];
+        let output = &header.nodes[5];
         assert_eq!(output.value_type(), Some("list<string>"));
-        assert_eq!(header.spec.bin, "t");
-        assert_eq!(header.spec.cmd.args[0].name, "since");
+        assert_eq!(header.about.as_deref(), Some("Test"));
+        assert_eq!(script.spec.bin, "t");
+        assert_eq!(script.spec.cmd.args[0].name, "since");
     }
 
     #[test]
