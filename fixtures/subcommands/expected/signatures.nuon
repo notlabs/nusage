@@ -55,10 +55,9 @@
       nothing: [
         [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description, completion, parameter_default];
         [null,           input,          nothing,      false,       null,       null,        null,       null],
-        [verbose,        switch,         null,         true,        v,          "Say more",  null,       null],
         [null,           output,         list<string>, false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           [
       [name,  value];
       [usage, "output (\"list<string>\")\"nuon\" default=#true"]
     ]]

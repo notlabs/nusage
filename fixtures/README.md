@@ -60,9 +60,9 @@ alias "attr usage" = echo
 @usage 'arg "<target>" help="Target environment" { choices run="./targets.nu" }'
 @usage 'flag "--since" help="Only migrations after this time" { arg (datetime)"<since>" }'
 export def "db migrate" [
-    target: string@"db migrate complete-target",  # Target environment
-    --verbose (-v),                               # Say more
-    --since: datetime,                            # Only migrations after this time
+    target: string@"db targets",  # Target environment
+    --verbose (-v),               # Say more
+    --since: datetime,            # Only migrations after this time
 ] {
     let usage = {
         cmd: [db migrate]
@@ -93,11 +93,12 @@ Rules the hand-written modules follow, which a generator must reproduce:
 - Static `choices` become an inline completer, `string@[tar zip]`; Nushell does not validate
   against it.
 - `choices run="./targets.nu"` naming a sibling script in the tree makes that sibling command
-  the parameter's completer: `target: string@"db targets"`. Nushell calls a completer that
-  declares no positional without the token record, so a provider is an ordinary command.
-  The generator checks the provider's declared output against what a completer may return
-  (`list<string>` or a list of completion records). Providers are emitted before the
-  commands that name them.
+  the parameter's completer: `target: string@"db targets"`. A provider declares no flags and
+  is emitted without the inherited globals, because Nushell binds only the token positional
+  when it calls a completer and any flag variable in the body would be unbound (verified on
+  0.116.1; a provider header with its own flags is a generation error). The generator checks
+  the provider's declared output against what a completer may return (`list<string>` or a
+  list of completion records). Providers are emitted before the commands that name them.
 - A repeatable flag (`var=#true`) is `list<string> = []`, a count flag (`count=#true`) is
   `int = 0`, because Nushell flags cannot repeat. A case whose argv repeats a flag carries the
   Nushell spelling in `invoke`.

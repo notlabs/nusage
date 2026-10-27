@@ -27,13 +27,11 @@ export def db [
 
 # List migration targets
 @usage 'output ("list<string>")"nuon" default=#true'
-export def "db targets" [
-    --verbose (-v),  # Say more
-]: nothing -> list<string> {
+export def "db targets" []: nothing -> list<string> {
     let usage = {
         cmd: [db targets]
         args: {}
-        flags: {verbose: $verbose}
+        flags: {}
     }
     $in | run ../mycli/db/targets.nu
 }
