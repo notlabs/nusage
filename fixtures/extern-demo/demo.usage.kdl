@@ -11,7 +11,7 @@ cmd "install" help="Install a plugin" {
     flag "-d --dir <dir>" help="Install into this directory"
 }
 
-cmd "exec" help="Run a task" {
+cmd "run" help="Run a task" {
     arg "<task>" help="Task to run"
     arg "[args]..." help="Arguments for the task"
     flag "-e --env <var>" help="Variable to set, repeatable" var=#true

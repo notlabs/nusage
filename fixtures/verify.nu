@@ -5,7 +5,9 @@
 #   - shim:        `use expected/<bin>.nu; <bin> <words>`        (Nushell types the arguments)
 #   - interpreter: `let usage = ($env.NUSAGE_ARGS | from nuon); $in | run <script>`
 #                                                                  (the record is handed in as NUON)
-# An extern fixture (a `<bin>.usage.kdl`) has no scripts: only completions and signatures.
+# An extern fixture (a `<bin>.usage.kdl`) has no scripts: a case's `invoke` runs the module
+# against the fixture's `fake/<bin>`, which records the argv it received and prints what the
+# case says, so forwarding and decoding are checked; then completions and signatures.
 # A case with `complete` asks the module for completions at a point of a line. Then the parsed
 # signature and attributes of the root and every command a case names, as `scope commands`
 # reports them, are compared with expected/signatures.nuon.
@@ -41,7 +43,14 @@ def main [
 def verify-fixture [dir: path, update: bool] {
     let name = $dir | path basename
     let module = glob ($dir | path join expected '*.nu') | first
-    let bin = $module | path parse | get stem
+    let spec = glob ($dir | path join '*.usage.kdl')
+    let is_extern = $spec | is-not-empty
+    # An extern module is named apart from the binary, since it exports a command of that name.
+    let bin = if $is_extern {
+        $spec | first | path basename | str replace '.usage.kdl' ''
+    } else {
+        $module | path parse | get stem
+    }
     let meta = $dir | path join fixture.nuon
     let meta = if ($meta | path exists) { open $meta } else { {} }
     if ($meta.requires_syntax? | is-not-empty) and not (nu-parses $meta.requires_syntax) {
@@ -54,14 +63,17 @@ def verify-fixture [dir: path, update: bool] {
             )
         ]
     }
-    let is_extern = ($dir | path join $"($bin).usage.kdl") | path exists
-    let import = $"use ($module | to nuon)"
+    let import = if $is_extern { $"use ($module | to nuon) *" } else { $"use ($module | to nuon)" }
     let cases = glob ($dir | path join cases '*.nuon') | sort
     let per_case = $cases | each {|file|
         let case = open $file
         let id = $file | path parse | get stem
         let rows = if $is_extern {
-            []
+            if ($case.invoke? | is-not-empty) {
+                [(row $name invoke $id (check-invoke $dir $import $case))]
+            } else {
+                []
+            }
         } else {
             [
                 (row $name shim $id (check-shim $import $bin $case))
@@ -131,6 +143,35 @@ def check-interpreter [dir: path, bin: string, case: record] {
     run-nu $code {
         NUSAGE_ARGS: ($case.usage | to nuon)
     } | compare (expected-output $case)
+}
+
+# An extern call against the fixture's fake binary: the argv it recorded must be the case's
+# `argv`, and what the call returns the case's `output`, when the case gives them.
+def check-invoke [dir: path, import: string, case: record] {
+    let argv_file = mktemp
+    let path = $env.PATH
+    let path = if ($path | describe | str starts-with list) { $path | str join (char esep) } else { $path }
+    let out = run-nu $"($import); ($case.invoke) | to nuon" {
+        PATH: $"($dir | path join fake)(char esep)($path)"
+        NUSAGE_FAKE_STDOUT: ($case.stdout? | default "")
+        NUSAGE_FAKE_ARGV: $argv_file
+    }
+    let argv = open --raw $argv_file | lines
+    rm $argv_file
+    if not $out.ok {
+        return $out
+    }
+    if ($case.argv? | is-not-empty) and $argv != $case.argv {
+        return {
+            ok: false
+            detail: $"expected argv (($case.argv | to nuon))\n     got (($argv | to nuon))"
+        }
+    }
+    if ($case.output? | is-not-empty) or ($case | columns | 'output' in $in) {
+        $out | compare $case.output
+    } else {
+        {ok: true, detail: ''}
+    }
 }
 
 def check-complete [import: string, complete: record] {

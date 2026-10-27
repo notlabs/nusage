@@ -1,7 +1,10 @@
 # A `complete` declared on the command is that command's own: its helper is named by the
-# command path. `descriptions=#true` lines split on the first colon into value and
-# description records, which `commandline complete` reports as values.
+# command's full name. `descriptions=#true` lines split on the first colon into value and
+# description records, which `commandline complete` reports as values. The call forwards a
+# counted flag as repeated switches and a repeatable flag as repeated pairs.
 {
-    cmd: [exec],
-    complete: {line: "demo exec ", expect: [build test]},
+    cmd: [run],
+    complete: {line: "demo run ", expect: [build test]},
+    invoke: "demo run build --env a --env b -vv",
+    argv: [run, build, --env, a, --env, b, --verbose, --verbose],
 }

@@ -17,11 +17,28 @@ use nusage_spec::Source;
 ///
 /// Scripts get the shim target: a `def` per command that hands the script `$usage` and
 /// `run`s it. A spec file gets the extern target: an `extern` per command of the binary it
-/// describes. `out` is where the module will be written; `run` paths inside a shim are
-/// relative to that file's directory, or to the current directory with `None`.
+/// describes, under the command's full name, for `use <file> *`. `out` is where the module
+/// will be written; `run` paths inside a shim are relative to that file's directory, or to
+/// the current directory with `None`.
 pub fn generate(source: &Path, out: Option<&Path>) -> Result<String, Diagnostic> {
     let assembled = nusage_spec::assemble(source)?;
     let tree = nusage_model::model(&assembled)?;
+    if assembled.source == Source::Binary
+        && out
+            .and_then(|out| out.file_stem())
+            .and_then(|stem| stem.to_str())
+            == Some(&tree.bin)
+    {
+        let bin = &tree.bin;
+        return Err(Diagnostic::new(
+            source,
+            format!(
+                "the module cannot be `{bin}.nu`: Nushell does not export a command named \
+                 after its module, and the extern `{bin}` is one; write it as, say, \
+                 `{bin}-externs.nu` and import it with `use {bin}-externs.nu *`"
+            ),
+        ));
+    }
     let module = match &assembled.source {
         Source::Scripts { .. } => {
             let base = match out {

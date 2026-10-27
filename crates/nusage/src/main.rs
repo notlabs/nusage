@@ -18,15 +18,17 @@ enum Commands {
     Spec(Spec),
 }
 
-/// Write the shim module for a script or a tree of scripts
+/// Write the module for a script, a tree of scripts, or a usage spec of a binary
 ///
 /// A script's interface is the `#USAGE` header at the top of the file. A directory is a tree:
 /// its `mod.nu` is the root command, each `x.nu` the subcommand `x`, each subdirectory with
 /// its own `mod.nu` a group. The module defines one typed command per script whose body
-/// hands the script its `$usage` record and `run`s it.
+/// hands the script its `$usage` record and `run`s it. A `.kdl` spec file describes a binary
+/// on PATH: the module defines an `extern` per command under its full name, for
+/// `use <file> *`; the file cannot be named `<bin>.nu`.
 #[derive(Args)]
 struct Generate {
-    /// The script, or the directory of scripts
+    /// The script, the directory of scripts, or the `.kdl` spec file
     source: PathBuf,
     /// Where to write the module; `run` paths are relative to it. Standard output when absent
     #[usage(long, short = 'o')]

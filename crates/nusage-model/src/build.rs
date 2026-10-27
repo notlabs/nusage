@@ -7,8 +7,8 @@ use nusage_spec::{Assembled, CommandPath, Diagnostic, Header, HeaderNode, Source
 use usage::{SpecArg, SpecCommand, SpecComplete, SpecFlag, SpecOutput};
 
 use crate::{
-    Command, CommandTree, Completer, Execution, Framing, NuType, Param, ParamKind, Structured,
-    Value,
+    Command, CommandTree, Completer, Conversion, Execution, Framing, NuType, Param, ParamKind,
+    Structured, Value,
 };
 
 /// Header nodes that have a native place in the module and so do not become attributes.
@@ -143,11 +143,25 @@ impl Context<'_> {
         // output Nushell decodes. The annotation is on the declaration of that output: the
         // deepest command declaring one by that name, else the spec's top level.
         let described = match &structured {
-            Some((_, name)) => Some(name.as_str()),
+            Some((_, _, name)) => Some(name.as_str()),
             None => default_output(&outputs).map(|output| output.name.as_str()),
         };
         let output = described.and_then(|name| output_annotation(&chain, name));
-        let structured = structured.map(|(structured, _)| structured);
+        let structured = match structured {
+            Some((args, framing, _)) => {
+                let conversions = match &output {
+                    Some(ty) => conversions_for(ty)
+                        .map_err(|message| Diagnostic::new(&header.path, message))?,
+                    None => Vec::new(),
+                };
+                Some(Structured {
+                    args,
+                    framing,
+                    conversions,
+                })
+            }
+            None => None,
+        };
 
         if is_provider {
             if !positionals.is_empty() || !cmd.flags.is_empty() {
@@ -339,7 +353,7 @@ impl Context<'_> {
                 return match self.assembled.source {
                     Source::Binary => Ok(Some((
                         Completer::Shell {
-                            name: scoped_name(path, param),
+                            name: self.scoped_name(path, param),
                             run: run.clone(),
                             descriptions: false,
                         },
@@ -369,11 +383,11 @@ impl Context<'_> {
         let named = arg
             .complete
             .as_ref()
-            .map(|complete| (complete, scoped_name(path, param)))
+            .map(|complete| (complete, self.scoped_name(path, param)))
             .or_else(|| {
                 cmd.complete
                     .get(&arg.name)
-                    .map(|complete| (complete, scoped_name(path, &arg.name)))
+                    .map(|complete| (complete, self.scoped_name(path, &arg.name)))
             })
             .or_else(|| {
                 self.assembled
@@ -391,12 +405,17 @@ impl Context<'_> {
     }
 }
 
-/// The name of a helper that belongs to one command's parameter.
-fn scoped_name(path: &CommandPath, param: &str) -> String {
-    if path.is_root() {
-        param.to_string()
-    } else {
-        format!("{path} {param}")
+impl Context<'_> {
+    /// The name of a helper that belongs to one command's parameter: the command's full name,
+    /// binary first, then the parameter. A spec-level completer's name is bare, so the root's
+    /// own completer for `value` is `demo value` and never the spec's `value`.
+    fn scoped_name(&self, path: &CommandPath, param: &str) -> String {
+        let bin = &self.assembled.spec.bin;
+        if path.is_root() {
+            format!("{bin} {param}")
+        } else {
+            format!("{bin} {path} {param}")
+        }
     }
 }
 
@@ -519,7 +538,7 @@ fn output_annotation(chain: &[Level<'_>], name: &str) -> Option<NuType> {
 fn structured_output(
     outputs: &[SpecOutput],
     command_select: Option<&str>,
-) -> Option<(Structured, String)> {
+) -> Option<(Vec<String>, Framing, String)> {
     let framed = |output: &&SpecOutput| {
         matches!(output.framing, usage::Framing::Json | usage::Framing::Jsonl)
     };
@@ -542,7 +561,69 @@ fn structured_output(
     } else {
         return None;
     };
-    Some((Structured { args, framing }, chosen.name.clone()))
+    Some((args, framing, chosen.name.clone()))
+}
+
+/// What the annotation declares that JSON cannot carry: datetimes, durations, filesizes and
+/// binary, each at the cell path where it sits, converted after decoding. Inside a list there
+/// is no cell path to convert at, so such an annotation is an error, not a silent string.
+fn conversions_for(ty: &NuType) -> Result<Vec<Conversion>, String> {
+    let parsed =
+        parse_type(ty).map_err(|err| format!("`{}` is not a Nushell type: {err}", ty.as_str()))?;
+    let mut out = Vec::new();
+    collect_conversions(&parsed, Vec::new(), &mut out, ty)?;
+    Ok(out)
+}
+
+fn collect_conversions(
+    ty: &Type,
+    path: Vec<String>,
+    out: &mut Vec<Conversion>,
+    declared: &NuType,
+) -> Result<(), String> {
+    let converted = match ty {
+        Type::Date => Some("datetime"),
+        Type::Duration => Some("duration"),
+        Type::Filesize => Some("filesize"),
+        Type::Binary => Some("binary"),
+        _ => None,
+    };
+    if let Some(into) = converted {
+        out.push(Conversion {
+            path,
+            ty: into.to_string(),
+        });
+        return Ok(());
+    }
+    match ty {
+        Type::Record(columns) | Type::Table(columns) => {
+            for (column, column_ty) in columns.iter() {
+                let mut path = path.clone();
+                path.push(column.clone());
+                collect_conversions(column_ty, path, out, declared)?;
+            }
+        }
+        Type::List(inner) if needs_conversion(inner) => {
+            return Err(format!(
+                "`{}` declares a {inner} inside a list, which cannot be converted after \
+                 decoding; JSON would deliver it as text",
+                declared.as_str()
+            ));
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn needs_conversion(ty: &Type) -> bool {
+    match ty {
+        Type::Date | Type::Duration | Type::Filesize | Type::Binary => true,
+        Type::Record(columns) | Type::Table(columns) => {
+            columns.iter().any(|(_, ty)| needs_conversion(ty))
+        }
+        Type::List(inner) => needs_conversion(inner),
+        _ => false,
+    }
 }
 
 /// Nushell's parser with its keywords, for reading a type annotation the way a signature
@@ -550,8 +631,8 @@ fn structured_output(
 static ENGINE: LazyLock<EngineState> = LazyLock::new(nu_cmd_lang::create_default_context);
 
 /// usage keeps every default as text; the parameter's type says how Nushell reads it. A
-/// `string` or path type takes the text itself. Any other type reads the text as NUON, and the
-/// value must be of the declared type, or the signature it is written into would not parse.
+/// `string` or path type takes the text itself; any other type reads the text as NUON. Then
+/// Nushell's parser judges the pair, as it would the signature the default is written into.
 fn typed_default(
     text: &str,
     ty: &NuType,
@@ -559,9 +640,6 @@ fn typed_default(
     node: Option<&HeaderNode>,
 ) -> Result<Value, Diagnostic> {
     let span = Span::unknown();
-    if matches!(ty.as_str(), "string" | "path" | "glob" | "directory") {
-        return Ok(Value::string(text, span));
-    }
     let at = |message: String| {
         let diagnostic = Diagnostic::new(&header.path, message);
         match node {
@@ -569,21 +647,18 @@ fn typed_default(
             None => diagnostic,
         }
     };
-    let declared = parse_type(ty)
-        .map_err(|err| at(format!("`{}` is not a Nushell type: {err}", ty.as_str())))?;
-    let value = nuon::from_nuon(text, Some(span)).map_err(|err| {
-        at(format!(
-            "default {text:?} does not read as a `{}`: {err}",
-            ty.as_str()
-        ))
-    })?;
-    if !fits(&value, &declared) {
-        return Err(at(format!(
-            "default {text:?} is a `{}`, not a `{}`",
-            value.get_type(),
-            ty.as_str()
-        )));
-    }
+    let value = if matches!(ty.as_str(), "string" | "path" | "glob" | "directory") {
+        Value::string(text, span)
+    } else {
+        nuon::from_nuon(text, Some(span)).map_err(|err| {
+            at(format!(
+                "default {text:?} does not read as a `{}`: {err}",
+                ty.as_str()
+            ))
+        })?
+    };
+    let nu_type = nusage_nu::Type::new(ty.as_str()).map_err(|err| at(err.to_string()))?;
+    nusage_nu::check_default(&nu_type, &value).map_err(|err| at(err.to_string()))?;
     Ok(value)
 }
 
@@ -605,16 +680,6 @@ fn parse_type(ty: &NuType) -> Result<Type, String> {
         .first()
         .map(|positional| positional.shape.to_type())
         .ok_or_else(|| "the parser kept no parameter".to_string())
-}
-
-/// Whether a value may be written where the declared type is expected: `number` takes either
-/// numeric type and `any` everything; otherwise the types must agree.
-fn fits(value: &Value, declared: &Type) -> bool {
-    match declared {
-        Type::Any => true,
-        Type::Number => matches!(value, Value::Int { .. } | Value::Float { .. }),
-        _ => value.get_type() == *declared,
-    }
 }
 
 #[cfg(test)]
@@ -642,6 +707,11 @@ mod tests {
         assert_eq!(text, Value::test_string("1"));
         let number = typed_default("1", &NuType("number".into()), &h, None).unwrap();
         assert_eq!(number, Value::test_int(1));
+        // The parser's own coercions and subtyping, not a second rule.
+        assert!(typed_default("1", &NuType("float".into()), &h, None).is_ok());
+        assert!(typed_default("[]", &NuType("list<string>".into()), &h, None).is_ok());
+        assert!(typed_default("[1 2]", &NuType("list<number>".into()), &h, None).is_ok());
+        assert!(typed_default("{a: 1}", &NuType("record".into()), &h, None).is_ok());
     }
 
     #[test]
@@ -650,8 +720,40 @@ mod tests {
         let err = typed_default("latest", &NuType("datetime".into()), &h, None).unwrap_err();
         assert!(err.message.contains("datetime"), "{err:?}");
         let err = typed_default("1.5", &NuType("int".into()), &h, None).unwrap_err();
-        assert!(err.message.contains("`float`, not a `int`"), "{err:?}");
+        assert!(
+            err.message.contains("not a default Nushell accepts"),
+            "{err:?}"
+        );
         let err = typed_default("1", &NuType("widget".into()), &h, None).unwrap_err();
-        assert!(err.message.contains("not a Nushell type"), "{err:?}");
+        assert!(err.message.contains("widget"), "{err:?}");
+    }
+
+    #[test]
+    fn conversions_follow_the_annotation() {
+        let paths = |ty: &str| -> Vec<(String, String)> {
+            conversions_for(&NuType(ty.into()))
+                .unwrap()
+                .into_iter()
+                .map(|c| (c.path.join("."), c.ty))
+                .collect()
+        };
+        assert_eq!(paths("record<ok: bool>"), vec![]);
+        assert_eq!(
+            paths("table<at: datetime, kind: string>"),
+            vec![("at".to_string(), "datetime".to_string())]
+        );
+        assert_eq!(
+            paths("record<meta: record<took: duration>, size: filesize>"),
+            vec![
+                ("meta.took".to_string(), "duration".to_string()),
+                ("size".to_string(), "filesize".to_string())
+            ]
+        );
+        assert_eq!(
+            paths("datetime"),
+            vec![("".to_string(), "datetime".to_string())]
+        );
+        assert!(conversions_for(&NuType("list<datetime>".into())).is_err());
+        assert!(conversions_for(&NuType("list<string>".into())).is_ok());
     }
 }

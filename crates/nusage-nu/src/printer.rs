@@ -135,11 +135,8 @@ fn param_text(param: &Param) -> String {
         Some(Completer::Command(name)) => format!("@{}", name.printed()),
         None => String::new(),
     };
-    // A signature reads a bare datetime with a time of day as something else; in parentheses
-    // it is the datetime.
     let default_text = |default: &Option<Value>| match default {
-        Some(value @ Value::Date { .. }) => format!(" = ({})", nuon(value)),
-        Some(value) => format!(" = {}", nuon(value)),
+        Some(value) => format!(" = {}", crate::default_text(value)),
         None => String::new(),
     };
     match param {

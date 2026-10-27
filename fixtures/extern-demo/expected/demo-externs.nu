@@ -6,7 +6,7 @@ plugin-2
 plugin-3\"" | lines
 }
 
-def "complete exec task" [] {
+def "complete demo run task" [] {
     ^sh -c "echo \"build:Build it
 test:Test it\"" | lines | parse "{value}:{description}"
 }
@@ -14,7 +14,7 @@ test:Test it\"" | lines | parse "{value}:{description}"
 # A demo CLI wrapped as externs
 @usage 'flag "-v --verbose" help="Say more" global=#true count=#true'
 @usage 'complete "plugin" run="echo \"plugin-1\nplugin-2\nplugin-3\""'
-export extern --strict main [
+export extern --strict demo [
     --verbose (-v),  # Say more
 ]
 
@@ -23,7 +23,7 @@ export extern --strict main [
 @usage 'arg "[version]" help="Version to install" default="latest"'
 @usage 'flag "-g --global" help="Install for every project"'
 @usage 'flag "-d --dir <dir>" help="Install into this directory"'
-export extern --strict install [
+export extern --strict "demo install" [
     plugin: string@"complete plugin",  # Plugin to install
     version?: string,                  # Version to install
     --verbose (-v),                    # Say more
@@ -36,11 +36,11 @@ export extern --strict install [
 @usage 'arg "[args]..." help="Arguments for the task"'
 @usage 'flag "-e --env <var>" help="Variable to set, repeatable" var=#true'
 @usage 'complete "task" descriptions=#true run="echo \"build:Build it\ntest:Test it\""'
-export extern --strict exec [
-    task: string@"complete exec task",  # Task to run
-    ...args: string,                    # Arguments for the task
-    --verbose (-v),                     # Say more
-    --env (-e): string,                 # Variable to set, repeatable
+export extern --strict "demo run" [
+    task: string@"complete demo run task",  # Task to run
+    ...args: string,                        # Arguments for the task
+    --verbose (-v),                         # Say more
+    --env (-e): string,                     # Variable to set, repeatable
 ]
 
 # Show status
@@ -49,7 +49,7 @@ export extern --strict exec [
 @usage 'output ("record<ok: bool, tasks: list<string>>")"json" framing="json" help="One report object"'
 @usage 'select "--format"'
 @structured ["--format=json"] { from json }
-export extern --strict status [
+export extern --strict "demo status" [
     --verbose (-v),                 # Say more
     --format: string@[human json],  # Output format
 ]: nothing -> record<ok: bool, tasks: list<string>>
@@ -58,8 +58,8 @@ export extern --strict status [
 @usage 'flag "--json" help="One JSON object per line"'
 @usage 'output "text" default=#true'
 @usage 'output ("table<at: datetime, kind: string>")"jsonl" framing="jsonl" select="--json"'
-@structured [--json] { from json --objects }
-export extern --strict events [
+@structured [--json] { from json --objects | into datetime at }
+export extern --strict "demo events" [
     --verbose (-v),  # Say more
     --json,          # One JSON object per line
 ]: nothing -> table<at: datetime, kind: string>

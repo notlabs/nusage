@@ -1,5 +1,10 @@
 # usage fills `--format`'s choices from the output names; they become an inline completer.
+# The call adds `--format=json`, the selector of the json output, and decodes one document.
 {
     cmd: [status],
     complete: {line: "demo status --format ", expect: [human json]},
+    invoke: "demo status",
+    argv: [status, --format=json],
+    stdout: "{\"ok\": true, \"tasks\": [\"a\", \"b\"]}",
+    output: {ok: true, tasks: [a, b]},
 }

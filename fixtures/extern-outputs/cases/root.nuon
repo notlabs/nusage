@@ -2,4 +2,8 @@
 {
     cmd: [],
     complete: {line: "rep --format ", expect: [json text]},
+    invoke: "rep",
+    argv: [--format=json],
+    stdout: "{\"ok\": true}",
+    output: {ok: true},
 }

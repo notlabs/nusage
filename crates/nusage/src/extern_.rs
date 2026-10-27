@@ -5,14 +5,15 @@
 use nusage_model::{Command, CommandTree, Completer, Execution, Framing};
 use nusage_nu::{
     Attr, AttrArg, CommandName, Def, Expr, Extern, FlagName, Item, Module, Params, Stmt,
-    SyntaxError, Type,
+    SyntaxError, Type, word,
 };
 
 use crate::common::{Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
 
-/// The module for a binary: completer helpers first, then the externs. The root is `main` and
-/// a subcommand drops the binary's name, as in a script module, so `use <bin>.nu` names the
-/// commands after the binary; Nushell runs the external by the name the call was typed with.
+/// The module for a binary: completer helpers first, then the externs, each under the
+/// command's full name, `demo` and `demo run`, so the module is imported with `use <file> *`
+/// and the binary's names, keywords included, are the ones Nushell runs. The file cannot be
+/// `<bin>.nu`: Nushell does not export a command named after its module.
 pub fn module(tree: &CommandTree) -> Result<Module, SyntaxError> {
     let mut items = Vec::new();
     let mut helpers_done = Vec::new();
@@ -33,7 +34,7 @@ pub fn module(tree: &CommandTree) -> Result<Module, SyntaxError> {
         }
     }
     for command in &tree.commands {
-        items.push(Item::Extern(extern_of(command)?));
+        items.push(Item::Extern(extern_of(tree, command)?));
     }
     Ok(Module {
         preamble: vec![attr_usage_alias()?],
@@ -75,7 +76,7 @@ pub fn helper_command(name: &str) -> String {
     format!("complete {name}")
 }
 
-fn extern_of(command: &Command) -> Result<Extern, SyntaxError> {
+fn extern_of(tree: &CommandTree, command: &Command) -> Result<Extern, SyntaxError> {
     if command.execution != Execution::External {
         return Err(SyntaxError(format!(
             "`{}` is a script; the extern target only wraps binaries",
@@ -83,9 +84,9 @@ fn extern_of(command: &Command) -> Result<Extern, SyntaxError> {
         )));
     }
     let name = if command.path.is_root() {
-        "main".to_string()
+        tree.bin.clone()
     } else {
-        command.path.to_string()
+        format!("{} {}", tree.bin, command.path)
     };
     let params = command
         .positionals
@@ -96,15 +97,26 @@ fn extern_of(command: &Command) -> Result<Extern, SyntaxError> {
         .concat();
     let mut attrs = usage_attrs(command)?;
     if let Some(structured) = &command.structured {
+        // Decode, then convert what JSON cannot carry to the annotated type, at its cell path.
         let decode = match structured.framing {
             Framing::Json => "from json",
             Framing::Jsonl => "from json --objects",
         };
+        let mut stages = vec![decode.to_string()];
+        for conversion in &structured.conversions {
+            let path: Vec<String> = conversion.path.iter().map(|part| word(part)).collect();
+            stages.push(
+                format!("into {} {}", conversion.ty, path.join("."))
+                    .trim()
+                    .to_string(),
+            );
+        }
+        let decode = stages.join(" | ");
         attrs.push(Attr {
             name: FlagName::new("structured")?,
             args: vec![
                 AttrArg::Words(structured.args.clone()),
-                AttrArg::Block(decode.into()),
+                AttrArg::Block(decode),
             ],
         });
     }

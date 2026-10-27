@@ -10,6 +10,6 @@ mod literal;
 mod printer;
 mod syntax;
 
-pub use literal::{Value, nuon};
+pub use literal::{Value, check_default, default_text, nuon};
 pub use printer::print;
 pub use syntax::*;

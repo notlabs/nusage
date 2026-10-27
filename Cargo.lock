@@ -3471,6 +3471,7 @@ dependencies = [
  "nu-parser",
  "nu-protocol",
  "nuon",
+ "nusage-nu",
  "nusage-spec",
  "usage-lib",
 ]
@@ -3480,6 +3481,7 @@ name = "nusage-nu"
 version = "0.1.0"
 dependencies = [
  "genco",
+ "nu-cmd-lang",
  "nu-parser",
  "nu-protocol",
  "nu-utils",

@@ -7,18 +7,18 @@ alias "attr usage" = echo
 @usage 'select "--format"'
 @usage 'include file="included.kdl"'
 @structured ["--format=json"] { from json }
-export extern --strict main [
+export extern --strict rep [
     --format: string@[text json],  # Output format
 ]: nothing -> record<ok: bool>
 
 # List reports
 @structured ["--format=json"] { from json }
-export extern --strict list [
+export extern --strict "rep list" [
     --format: string@[text json],  # Output format
 ]
 
 # Only text
 @usage 'output "json" hide=#true'
-export extern --strict quiet [
+export extern --strict "rep quiet" [
     --format: string@[text],  # Output format
 ]

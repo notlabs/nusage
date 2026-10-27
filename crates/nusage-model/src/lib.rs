@@ -56,13 +56,25 @@ pub enum Execution {
 }
 
 /// A usage `output` with `json` or `jsonl` framing: the arguments that make the binary print
-/// it, and how the text becomes data.
+/// it, and how the text becomes data of the annotated type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Structured {
     /// Arguments added after the command's name: `--format=json`, or nothing when the
     /// structured output is the default.
     pub args: Vec<String>,
     pub framing: Framing,
+    /// What JSON cannot carry and the annotation declares: each is converted after decoding,
+    /// in this order.
+    pub conversions: Vec<Conversion>,
+}
+
+/// `into <ty> <path>`: a value JSON delivers as text or a number, converted to the declared
+/// type at a cell path (empty for the whole value).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Conversion {
+    pub path: Vec<String>,
+    /// `datetime`, `duration`, `filesize` or `binary`.
+    pub ty: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
