@@ -9,3 +9,7 @@ repository.workspace = true
 [dependencies]
 nusage-spec.workspace = true
 usage.workspace = true
+nu-protocol.workspace = true
+nu-parser.workspace = true
+nuon.workspace = true
+nu-cmd-lang.workspace = true

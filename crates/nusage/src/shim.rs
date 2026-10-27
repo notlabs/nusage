@@ -3,12 +3,12 @@
 
 use std::path::Path;
 
-use nusage_model::{Command, CommandTree, Execution};
+use nusage_model::{Command, CommandTree, Execution, Param, ParamKind};
 use nusage_nu::{
-    CommandName, Def, Expr, Ident, Item, Literal, Module, Params, Stmt, SyntaxError, Type,
+    CommandName, Def, Expr, Ident, Infix, Item, Module, Params, Stmt, SyntaxError, Type, Value,
 };
 
-use crate::common::{attr_usage_alias, doc_of, nu_param, relative, usage_attrs};
+use crate::common::{Target, attr_usage_alias, doc_of, nu_params, relative, usage_attrs};
 
 /// The module for a command tree, with `run` paths relative to `base`.
 pub fn module(tree: &CommandTree, base: &Path) -> Result<Module, SyntaxError> {
@@ -39,8 +39,9 @@ fn def(command: &Command, base: &Path) -> Result<Def, SyntaxError> {
         .positionals
         .iter()
         .chain(command.flags.iter())
-        .map(|param| nu_param(param, true))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|param| nu_params(param, Target::Script))
+        .collect::<Result<Vec<_>, _>>()?
+        .concat();
     let io = match &command.output {
         Some(output) => Some((Type::new("nothing")?, Type::new(output.as_str())?)),
         None => None,
@@ -62,7 +63,7 @@ fn def(command: &Command, base: &Path) -> Result<Def, SyntaxError> {
         export: true,
         doc: doc_of(command),
         attrs: usage_attrs(command)?,
-        name: CommandName::new(name)?,
+        name: CommandName::definable(name)?,
         params: Params::new(params)?,
         io,
         body,
@@ -70,16 +71,16 @@ fn def(command: &Command, base: &Path) -> Result<Def, SyntaxError> {
 }
 
 fn usage_record(command: &Command) -> Result<Expr, SyntaxError> {
-    let cmd = Expr::Literal(Literal::List(
+    let cmd = Expr::Literal(Value::test_list(
         command
             .path
             .words()
             .iter()
-            .map(|word| Literal::Str(word.clone()))
+            .map(Value::test_string)
             .collect(),
     ));
-    let field = |param: &nusage_model::Param| -> Result<(Ident, Expr), SyntaxError> {
-        Ok((Ident::new(&param.var)?, Expr::Var(Ident::new(&param.var)?)))
+    let field = |param: &Param| -> Result<(Ident, Expr), SyntaxError> {
+        Ok((Ident::new(&param.var)?, param_value(param)?))
     };
     let args = command
         .positionals
@@ -96,4 +97,37 @@ fn usage_record(command: &Command) -> Result<Expr, SyntaxError> {
         (Ident::new("args")?, Expr::Record(args)),
         (Ident::new("flags")?, Expr::Record(flags)),
     ]))
+}
+
+/// What a parameter contributes to `$usage`: its variable, except for a switch usage declares
+/// on by default, which stays on unless its `negate` flag is given, as usage's own parsers
+/// read it. A switch with a `negate` flag and no default is on when given and not negated.
+fn param_value(param: &Param) -> Result<Expr, SyntaxError> {
+    let var = Expr::Var(Ident::new(&param.var)?);
+    if param.kind != ParamKind::Switch {
+        return Ok(var);
+    }
+    let on_by_default = matches!(&param.default, Some(Value::Bool { val: true, .. }));
+    let negated = match &param.negate {
+        Some(negate) => Expr::Call {
+            name: CommandName::new("not")?,
+            args: vec![Expr::Var(Ident::new(negate.replace('-', "_"))?)],
+        },
+        None => {
+            return Ok(if on_by_default {
+                Expr::Literal(Value::test_bool(true))
+            } else {
+                var
+            });
+        }
+    };
+    Ok(Expr::Group(Box::new(if on_by_default {
+        negated
+    } else {
+        Expr::Infix {
+            lhs: Box::new(var),
+            op: Infix::And,
+            rhs: Box::new(negated),
+        }
+    })))
 }

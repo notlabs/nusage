@@ -115,6 +115,12 @@ pub fn assemble(source: &Path) -> Result<Assembled, Diagnostic> {
     bodies.insert(root.clone(), source.join("mod.nu"));
     headers.insert(root, root_header.header);
     spec.restamp();
+    fill_headers(
+        &spec.cmd,
+        &CommandPath::root(),
+        &source.join("mod.nu"),
+        &mut headers,
+    );
     let mut out = Assembled {
         spec,
         source: Source::Scripts { bodies },
@@ -195,12 +201,33 @@ fn assemble_spec_file(path: &Path) -> Result<Assembled, Diagnostic> {
     for header in headers.values() {
         reject_mounts(header)?;
     }
+    fill_headers(&spec.cmd, &CommandPath::root(), path, &mut headers);
     Ok(Assembled {
         spec,
         source: Source::Binary,
         headers,
         providers: Vec::new(),
     })
+}
+
+/// Commands usage added that the source does not declare, from an `include`, get an empty
+/// declaration: usage's own help, no annotations and no attributes.
+fn fill_headers(
+    cmd: &SpecCommand,
+    path: &CommandPath,
+    file: &Path,
+    headers: &mut BTreeMap<CommandPath, Header>,
+) {
+    for (name, sub) in &cmd.subcommands {
+        let child = path.child(name);
+        headers.entry(child.clone()).or_insert_with(|| Header {
+            path: file.to_path_buf(),
+            nodes: Vec::new(),
+            about: sub.help.clone(),
+            about_long: sub.help_long.clone(),
+        });
+        fill_headers(sub, &child, file, headers);
+    }
 }
 
 fn collect_cmd_headers(

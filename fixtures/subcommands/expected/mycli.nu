@@ -39,14 +39,17 @@ export def "db targets" []: nothing -> list<string> {
 # Run migrations
 @usage 'arg "<target>" help="Target environment" { choices run="./targets.nu" }'
 @usage 'flag "--dry-run" help="Plan without applying"'
-@usage 'flag "--since" help="Only migrations after this time" { arg (datetime)"<since>" }'
+@usage 'flag "--since" help="Only migrations after this time" default="2026-01-01T00:00:00Z" { arg (datetime)"<since>" }'
 @usage 'flag "--limit" help="At most this many" default="10" { arg (int)"<n>" }'
+@usage 'flag "--color" help="Colorize the plan" default=#true negate="--no-color"'
 export def "db migrate" [
-    target: string@"db targets",  # Target environment
-    --verbose (-v),               # Say more
-    --dry-run,                    # Plan without applying
-    --since: datetime,            # Only migrations after this time
-    --limit: int = 10,            # At most this many
+    target: string@"db targets",                      # Target environment
+    --verbose (-v),                                   # Say more
+    --dry-run,                                        # Plan without applying
+    --since: datetime = (2026-01-01T00:00:00+00:00),  # Only migrations after this time
+    --limit: int = 10,                                # At most this many
+    --color,                                          # Colorize the plan
+    --no-color,                                       # Turn off --color
 ] {
     let usage = {
         cmd: [db, migrate]
@@ -56,6 +59,7 @@ export def "db migrate" [
             dry_run: $dry_run
             since: $since
             limit: $limit
+            color: (not $no_color)
         }
     }
     $in | run "../mycli/db/migrate.nu"

@@ -2,7 +2,8 @@
 #USAGE name "greet"
 #USAGE bin "greet"
 #USAGE about "Greet someone"
-#USAGE arg "<name>" help="Who to greet"
+#USAGE long_about "A contract fixture.\nIts value is the record it was handed."
+#USAGE arg "<name>" help="Who to greet,\nby name"
 #USAGE flag "-l --loud" help="Shout the greeting"
 #USAGE flag "--times" help="How many times to greet" default="1" { arg (int)"<n>" }
 #USAGE output ("record<cmd: list<string>, args: record<name: string>, flags: record<loud: bool, times: int>>")"nuon" default=#true

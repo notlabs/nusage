@@ -1,5 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::LazyLock;
 
+use nu_protocol::engine::{EngineState, StateWorkingSet};
+use nu_protocol::{Span, Type};
 use nusage_spec::{Assembled, CommandPath, Diagnostic, Header, HeaderNode, Source};
 use usage::{SpecArg, SpecCommand, SpecComplete, SpecFlag, SpecOutput};
 
@@ -33,13 +36,7 @@ pub fn model(assembled: &Assembled) -> Result<CommandTree, Diagnostic> {
         completers,
     };
     let mut commands = Vec::new();
-    ctx.visit(
-        &assembled.spec.cmd,
-        CommandPath::root(),
-        &[],
-        &[],
-        &mut commands,
-    )?;
+    ctx.visit(&assembled.spec.cmd, CommandPath::root(), &[], &mut commands)?;
     Ok(CommandTree {
         bin: assembled.spec.bin.clone(),
         commands,
@@ -52,6 +49,14 @@ struct Context<'a> {
     completers: BTreeMap<(&'a CommandPath, &'a str), &'a CommandPath>,
 }
 
+/// A command with its path and declaration; a chain of them runs from the root down.
+#[derive(Clone, Copy)]
+struct Level<'a> {
+    path: &'a CommandPath,
+    cmd: &'a SpecCommand,
+    header: &'a Header,
+}
+
 /// A completer and, when usage declared one, the `complete type=` it carries.
 type Found = Option<(Completer, Option<String>)>;
 
@@ -60,57 +65,92 @@ impl Context<'_> {
         &self,
         cmd: &SpecCommand,
         path: CommandPath,
-        inherited: &[Param],
-        inherited_outputs: &[SpecOutput],
+        ancestors: &[Level<'_>],
         out: &mut Vec<Command>,
     ) -> Result<(), Diagnostic> {
-        let header = self
-            .assembled
-            .headers
-            .get(&path)
-            .expect("assemble records a header for every command");
+        let header = self.assembled.headers.get(&path).ok_or_else(|| {
+            Diagnostic::new(
+                self.source_path(),
+                format!("`{path}` has no declaration; assembly should have recorded one"),
+            )
+        })?;
         let execution = match &self.assembled.source {
-            Source::Scripts { .. } => Execution::Script(
-                self.assembled
-                    .body(&path)
-                    .expect("assemble records a body for every script command")
-                    .to_path_buf(),
-            ),
+            Source::Scripts { .. } => {
+                let body = self.assembled.body(&path).ok_or_else(|| {
+                    Diagnostic::new(
+                        &header.path,
+                        format!(
+                            "`{path}` has no script: a command an `include` adds to a script \
+                             tree has nothing to run"
+                        ),
+                    )
+                })?;
+                Execution::Script(body.to_path_buf())
+            }
             Source::Binary => Execution::External,
         };
         let is_provider = self.providers.contains(&path);
+        let here = Level {
+            path: &path,
+            cmd,
+            header,
+        };
+        let chain: Vec<Level<'_>> = ancestors.iter().copied().chain([here]).collect();
+        let cmds: Vec<&SpecCommand> = chain.iter().map(|level| level.cmd).collect();
 
         let positionals = cmd
             .args
             .iter()
-            .map(|arg| self.positional(arg, cmd, header, &path))
-            .collect::<Result<Vec<_>, _>>()?;
-        let own_flags = cmd
-            .flags
-            .iter()
-            .map(|flag| self.flag_param(flag, cmd, header, &path))
+            .map(|arg| self.positional(arg, here))
             .collect::<Result<Vec<_>, _>>()?;
 
-        // The outputs this command can produce: its own, else the ones declared above it.
-        let outputs: &[SpecOutput] = if cmd.outputs.is_empty() {
-            inherited_outputs
+        // The flags usage resolves for this command: its own, and the globals above it merged
+        // by name, as the parser accepts them. usage lists them by name; here they go in
+        // declaration order, the root's first. Each is built where it is declared, so its
+        // annotation and completer are read from the right declaration.
+        let flags = if is_provider {
+            Vec::new()
         } else {
-            &cmd.outputs
+            let mut available = usage::available_flags(&cmds);
+            let mut flags = Vec::new();
+            for level in &chain {
+                for declared in &level.cmd.flags {
+                    let Some(index) = available.iter().position(|f| f.name == declared.name) else {
+                        continue;
+                    };
+                    let flag = available.remove(index);
+                    let mut param = self.flag_param(&flag, *level)?;
+                    param.inherited = level.path != &path;
+                    flags.push(param);
+                }
+            }
+            // Anything usage adds beyond the declarations, such as a flagset's.
+            for flag in &available {
+                flags.push(self.flag_param(flag, here)?);
+            }
+            flags
         };
+
+        // The outputs usage resolves for this command: the spec's, merged by name with each
+        // command's down the chain, hidden ones removed.
+        let outputs = usage::effective_outputs_ref(&self.assembled.spec, cmds.iter().copied());
+        let select = usage::effective_select_ref(&self.assembled.spec, &cmds);
         let structured = match execution {
-            Execution::External => structured_output(outputs, cmd.select.as_deref()),
+            Execution::External => structured_output(&outputs, select.as_deref()),
             Execution::Script(_) => None,
         };
         // A script's value is what its default output describes; a binary's is the structured
-        // output Nushell decodes.
-        let output = match &structured {
-            Some((_, name)) => output_type(header, Some(name)),
-            None => output_type(header, None),
+        // output Nushell decodes. The annotation is on the declaration of that output: the
+        // deepest command declaring one by that name, else the spec's top level.
+        let described = match &structured {
+            Some((_, name)) => Some(name.as_str()),
+            None => default_output(&outputs).map(|output| output.name.as_str()),
         };
+        let output = described.and_then(|name| output_annotation(&chain, name));
         let structured = structured.map(|(structured, _)| structured);
 
         if is_provider {
-            if !positionals.is_empty() || !own_flags.is_empty() {
+            if !positionals.is_empty() || !cmd.flags.is_empty() {
                 let line = header
                     .nodes
                     .iter()
@@ -137,15 +177,6 @@ impl Context<'_> {
             }
         }
 
-        let flags: Vec<Param> = if is_provider {
-            Vec::new()
-        } else {
-            inherited
-                .iter()
-                .cloned()
-                .chain(own_flags.iter().cloned())
-                .collect()
-        };
         let attributes = header
             .nodes
             .iter()
@@ -166,48 +197,27 @@ impl Context<'_> {
             is_provider,
         });
 
-        // What children inherit: this command's inherited flags, then its own `global=#true`.
-        let own_globals = own_flags.iter().filter(|param| {
-            cmd.flags
-                .iter()
-                .any(|flag| flag.global && flag.name == param.usage_name)
-        });
-        let passed_down: Vec<Param> = inherited
-            .iter()
-            .cloned()
-            .chain(own_globals.cloned().map(|mut param| {
-                param.inherited = true;
-                param
-            }))
-            .collect();
-        // Top-level `output` nodes of a spec file are CLI-wide; usage keeps them on the spec.
-        let child_outputs: Vec<SpecOutput> = if !cmd.outputs.is_empty() {
-            cmd.outputs.clone()
-        } else if path.is_root() {
-            self.assembled.spec.outputs.clone()
-        } else {
-            inherited_outputs.to_vec()
-        };
-
         let (first, rest): (Vec<_>, Vec<_>) = cmd
             .subcommands
             .iter()
             .partition(|(name, _)| self.providers.contains(&path.child(name)));
         for (name, sub) in first.into_iter().chain(rest) {
-            self.visit(sub, path.child(name), &passed_down, &child_outputs, out)?;
+            self.visit(sub, path.child(name), &chain, out)?;
         }
         Ok(())
     }
 
-    fn positional(
-        &self,
-        arg: &SpecArg,
-        cmd: &SpecCommand,
-        header: &Header,
-        path: &CommandPath,
-    ) -> Result<Param, Diagnostic> {
-        let node = arg_node(header, arg);
-        let found = self.completer_for(arg, cmd, path, &arg.name, header)?;
+    fn source_path(&self) -> std::path::PathBuf {
+        self.assembled
+            .headers
+            .get(&CommandPath::root())
+            .map(|header| header.path.clone())
+            .unwrap_or_default()
+    }
+
+    fn positional(&self, arg: &SpecArg, level: Level<'_>) -> Result<Param, Diagnostic> {
+        let node = arg_node(level.header, arg);
+        let found = self.completer_for(arg, level, &arg.name)?;
         let ty = NuType(
             node.and_then(|n| n.value_type())
                 .map(str::to_string)
@@ -222,7 +232,11 @@ impl Context<'_> {
         };
         let default = match kind {
             ParamKind::Rest => None,
-            _ => arg.default.first().map(|text| typed_value(text, &ty)),
+            _ => arg
+                .default
+                .first()
+                .map(|text| typed_default(text, &ty, level.header, node))
+                .transpose()?,
         };
         Ok(Param {
             usage_name: arg.name.clone(),
@@ -233,31 +247,35 @@ impl Context<'_> {
             short: None,
             completer: found.map(|(completer, _)| completer),
             default,
+            negate: None,
             doc: arg.help.clone(),
             inherited: false,
         })
     }
 
-    fn flag_param(
-        &self,
-        flag: &SpecFlag,
-        cmd: &SpecCommand,
-        header: &Header,
-        path: &CommandPath,
-    ) -> Result<Param, Diagnostic> {
-        let node = flag_node(header, flag);
+    /// A flag as declared at `level`, the command that declares it.
+    fn flag_param(&self, flag: &SpecFlag, level: Level<'_>) -> Result<Param, Diagnostic> {
+        let node = flag_node(level.header, flag);
         let long = flag.long.first().cloned();
         let short = flag.short.first().copied();
         let (kind, ty, default, completer) = match (&flag.arg, flag.count, flag.var) {
             (None, true, _) => (
                 ParamKind::Count,
                 NuType("int".into()),
-                Some(Value::Int(0)),
+                Some(Value::int(0, Span::unknown())),
                 None,
             ),
-            (None, false, _) => (ParamKind::Switch, NuType("bool".into()), None, None),
+            (None, false, _) => {
+                let ty = NuType("bool".into());
+                let default = flag
+                    .default
+                    .first()
+                    .map(|text| typed_default(text, &ty, level.header, node))
+                    .transpose()?;
+                (ParamKind::Switch, ty, default, None)
+            }
             (Some(arg), _, repeated) => {
-                let found = self.completer_for(arg, cmd, path, &flag.name, header)?;
+                let found = self.completer_for(arg, level, &flag.name)?;
                 let ty = NuType(
                     node.and_then(|n| n.value_type())
                         .map(str::to_string)
@@ -268,16 +286,20 @@ impl Context<'_> {
                     let defaults = flag
                         .default
                         .iter()
-                        .map(|text| typed_value(text, &ty))
-                        .collect();
+                        .map(|text| typed_default(text, &ty, level.header, node))
+                        .collect::<Result<Vec<_>, _>>()?;
                     (
                         ParamKind::Repeated,
                         ty,
-                        Some(Value::List(defaults)),
+                        Some(Value::list(defaults, Span::unknown())),
                         completer,
                     )
                 } else {
-                    let default = flag.default.first().map(|text| typed_value(text, &ty));
+                    let default = flag
+                        .default
+                        .first()
+                        .map(|text| typed_default(text, &ty, level.header, node))
+                        .transpose()?;
                     (ParamKind::Valued, ty, default, completer)
                 }
             }
@@ -291,6 +313,10 @@ impl Context<'_> {
             short,
             completer,
             default,
+            negate: flag
+                .negate
+                .as_deref()
+                .map(|negate| negate.trim_start_matches('-').to_string()),
             doc: flag.help.clone(),
             inherited: false,
         })
@@ -301,11 +327,10 @@ impl Context<'_> {
     fn completer_for(
         &self,
         arg: &SpecArg,
-        cmd: &SpecCommand,
-        path: &CommandPath,
+        level: Level<'_>,
         param: &str,
-        header: &Header,
     ) -> Result<Found, Diagnostic> {
+        let Level { path, cmd, header } = level;
         if let Some(provider) = self.completers.get(&(path, param)) {
             return Ok(Some((Completer::Command((*provider).clone()), None)));
         }
@@ -314,7 +339,7 @@ impl Context<'_> {
                 return match self.assembled.source {
                     Source::Binary => Ok(Some((
                         Completer::Shell {
-                            name: helper_name(path, param),
+                            name: scoped_name(path, param),
                             run: run.clone(),
                             descriptions: false,
                         },
@@ -339,20 +364,35 @@ impl Context<'_> {
                 return Ok(Some((Completer::Inline(choices.choices.clone()), None)));
             }
         }
+        // A `complete` on the argument or the command is that command's; one at the top level
+        // is shared by every command naming it. The helper's name says which.
         let named = arg
             .complete
             .as_ref()
-            .or_else(|| cmd.complete.get(&arg.name))
-            .or_else(|| self.assembled.spec.complete.get(&arg.name));
+            .map(|complete| (complete, scoped_name(path, param)))
+            .or_else(|| {
+                cmd.complete
+                    .get(&arg.name)
+                    .map(|complete| (complete, scoped_name(path, &arg.name)))
+            })
+            .or_else(|| {
+                self.assembled
+                    .spec
+                    .complete
+                    .get(&arg.name)
+                    .map(|complete| (complete, arg.name.clone()))
+            });
         match named {
-            Some(complete) => shell_completer(complete, &arg.name, header, &self.assembled.source),
+            Some((complete, name)) => {
+                shell_completer(complete, name, header, &self.assembled.source)
+            }
             None => Ok(None),
         }
     }
 }
 
-/// The name of the helper that runs a `choices run=` for one parameter.
-fn helper_name(path: &CommandPath, param: &str) -> String {
+/// The name of a helper that belongs to one command's parameter.
+fn scoped_name(path: &CommandPath, param: &str) -> String {
     if path.is_root() {
         param.to_string()
     } else {
@@ -362,7 +402,7 @@ fn helper_name(path: &CommandPath, param: &str) -> String {
 
 fn shell_completer(
     complete: &SpecComplete,
-    name: &str,
+    name: String,
     header: &Header,
     source: &Source,
 ) -> Result<Found, Diagnostic> {
@@ -382,7 +422,7 @@ fn shell_completer(
     }
     Ok(Some((
         Completer::Shell {
-            name: name.to_string(),
+            name,
             run: run.clone(),
             descriptions: complete.descriptions,
         },
@@ -390,6 +430,7 @@ fn shell_completer(
     )))
 }
 
+/// usage's own `snake_case`, as its SDKs name arguments; a copy, since usage keeps it private.
 fn snake(name: &str) -> String {
     name.replace('-', "_")
 }
@@ -443,30 +484,38 @@ fn flag_node<'a>(header: &'a Header, flag: &SpecFlag) -> Option<&'a HeaderNode> 
     })
 }
 
-/// The annotation on an `output` node: the one named, else the default, else the only one.
-fn output_type(header: &Header, name: Option<&str>) -> Option<NuType> {
-    let outputs: Vec<&HeaderNode> = header
+/// The output a command produces unasked: the default one, else the only one.
+fn default_output(outputs: &[SpecOutput]) -> Option<&SpecOutput> {
+    outputs
+        .iter()
+        .find(|output| output.default)
+        .or_else(|| (outputs.len() == 1).then(|| &outputs[0]))
+}
+
+/// The annotation on the declaration of the named output in effect: the deepest command in
+/// the chain that declares an output by that name, else the root, whose declaration holds
+/// the spec's top-level outputs. A declaration usage expanded from another file has no
+/// annotation.
+fn output_annotation(chain: &[Level<'_>], name: &str) -> Option<NuType> {
+    let declaring = chain
+        .iter()
+        .rev()
+        .find(|level| level.cmd.outputs.iter().any(|output| output.name == name))
+        .or_else(|| chain.first())?;
+    declaring
+        .header
         .nodes
         .iter()
-        .filter(|node| node.name == "output")
-        .collect();
-    let chosen = match name {
-        Some(name) => outputs
-            .iter()
-            .find(|node| node.first.as_deref() == Some(name))?,
-        None => outputs
-            .iter()
-            .find(|node| node.text.contains("default=#true"))
-            .or_else(|| (outputs.len() == 1).then(|| &outputs[0]))?,
-    };
-    chosen.value_type().map(|ty| NuType(ty.to_string()))
+        .find(|node| node.name == "output" && node.first.as_deref() == Some(name))
+        .and_then(|node| node.value_type())
+        .map(|ty| NuType(ty.to_string()))
 }
 
 /// The structured output a binary can be asked for, and its usage name: the first `json`
 /// output, else the first `jsonl` one, with the arguments that select it. A `select` on the
-/// output is a boolean flag (`--json`); a `select` on the command names a value flag
-/// (`--format=json`). With neither, the output must be the default or the only one, or there
-/// is no way to ask for it.
+/// output is a boolean flag (`--json`); a `select` in effect for the command names a value
+/// flag (`--format=json`). With neither, the output must be the default or the only one, or
+/// there is no way to ask for it.
 fn structured_output(
     outputs: &[SpecOutput],
     command_select: Option<&str>,
@@ -496,22 +545,113 @@ fn structured_output(
     Some((Structured { args, framing }, chosen.name.clone()))
 }
 
-/// usage keeps every default as text; the parameter's type says how Nushell should read it.
-fn typed_value(text: &str, ty: &NuType) -> Value {
-    match ty.as_str() {
-        "int" => text
-            .parse()
-            .map(Value::Int)
-            .unwrap_or_else(|_| Value::Str(text.to_string())),
-        "float" | "number" => text
-            .parse()
-            .map(Value::Float)
-            .unwrap_or_else(|_| Value::Str(text.to_string())),
-        "bool" => match text {
-            "true" => Value::Bool(true),
-            "false" => Value::Bool(false),
-            other => Value::Str(other.to_string()),
-        },
-        _ => Value::Str(text.to_string()),
+/// Nushell's parser with its keywords, for reading a type annotation the way a signature
+/// does.
+static ENGINE: LazyLock<EngineState> = LazyLock::new(nu_cmd_lang::create_default_context);
+
+/// usage keeps every default as text; the parameter's type says how Nushell reads it. A
+/// `string` or path type takes the text itself. Any other type reads the text as NUON, and the
+/// value must be of the declared type, or the signature it is written into would not parse.
+fn typed_default(
+    text: &str,
+    ty: &NuType,
+    header: &Header,
+    node: Option<&HeaderNode>,
+) -> Result<Value, Diagnostic> {
+    let span = Span::unknown();
+    if matches!(ty.as_str(), "string" | "path" | "glob" | "directory") {
+        return Ok(Value::string(text, span));
+    }
+    let at = |message: String| {
+        let diagnostic = Diagnostic::new(&header.path, message);
+        match node {
+            Some(node) => diagnostic.at_line(node.line),
+            None => diagnostic,
+        }
+    };
+    let declared = parse_type(ty)
+        .map_err(|err| at(format!("`{}` is not a Nushell type: {err}", ty.as_str())))?;
+    let value = nuon::from_nuon(text, Some(span)).map_err(|err| {
+        at(format!(
+            "default {text:?} does not read as a `{}`: {err}",
+            ty.as_str()
+        ))
+    })?;
+    if !fits(&value, &declared) {
+        return Err(at(format!(
+            "default {text:?} is a `{}`, not a `{}`",
+            value.get_type(),
+            ty.as_str()
+        )));
+    }
+    Ok(value)
+}
+
+/// The type a signature reads from the annotation: nu-parser keeps its type parser private,
+/// so the annotation is parsed as the type of a parameter.
+fn parse_type(ty: &NuType) -> Result<Type, String> {
+    let mut working_set = StateWorkingSet::new(&ENGINE);
+    let source = format!("def __nusage_type [p: {}] {{}}", ty.as_str());
+    nu_parser::parse(&mut working_set, None, source.as_bytes(), false);
+    if let Some(err) = working_set.parse_errors.first() {
+        return Err(err.to_string());
+    }
+    let decl = working_set
+        .find_decl(b"__nusage_type")
+        .map(|id| working_set.get_decl(id))
+        .ok_or_else(|| "the parser did not define the probe".to_string())?;
+    decl.signature()
+        .required_positional
+        .first()
+        .map(|positional| positional.shape.to_type())
+        .ok_or_else(|| "the parser kept no parameter".to_string())
+}
+
+/// Whether a value may be written where the declared type is expected: `number` takes either
+/// numeric type and `any` everything; otherwise the types must agree.
+fn fits(value: &Value, declared: &Type) -> bool {
+    match declared {
+        Type::Any => true,
+        Type::Number => matches!(value, Value::Int { .. } | Value::Float { .. }),
+        _ => value.get_type() == *declared,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn header() -> Header {
+        Header {
+            path: "spec.kdl".into(),
+            nodes: Vec::new(),
+            about: None,
+            about_long: None,
+        }
+    }
+
+    #[test]
+    fn defaults_read_as_their_declared_type() {
+        let h = header();
+        let int = typed_default("10", &NuType("int".into()), &h, None).unwrap();
+        assert_eq!(int, Value::test_int(10));
+        let date =
+            typed_default("2026-10-27T00:00:00Z", &NuType("datetime".into()), &h, None).unwrap();
+        assert!(matches!(date, Value::Date { .. }));
+        let text = typed_default("1", &NuType("string".into()), &h, None).unwrap();
+        assert_eq!(text, Value::test_string("1"));
+        let number = typed_default("1", &NuType("number".into()), &h, None).unwrap();
+        assert_eq!(number, Value::test_int(1));
+    }
+
+    #[test]
+    fn a_default_of_the_wrong_type_is_a_diagnostic() {
+        let h = header();
+        let err = typed_default("latest", &NuType("datetime".into()), &h, None).unwrap_err();
+        assert!(err.message.contains("datetime"), "{err:?}");
+        let err = typed_default("1.5", &NuType("int".into()), &h, None).unwrap_err();
+        assert!(err.message.contains("`float`, not a `int`"), "{err:?}");
+        let err = typed_default("1", &NuType("widget".into()), &h, None).unwrap_err();
+        assert!(err.message.contains("not a Nushell type"), "{err:?}");
     }
 }

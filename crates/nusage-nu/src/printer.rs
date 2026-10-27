@@ -2,11 +2,13 @@
 //!
 //! Layout lives in the templates, where it reads as the Nushell it produces. The only rules
 //! outside them are a record's breaking (a statement's value, or more than three fields, goes
-//! one field per line) and the alignment of parameter comments.
+//! one field per line), the alignment of parameter comments, and that documentation is
+//! commented line by line: a description's lines each get a `#`, and a parameter's lines are
+//! joined, since Nushell reads only the comment on the parameter's own line.
 
 use genco::quote;
 
-use crate::literal::{Literal, nuon};
+use crate::literal::{Value, nuon};
 use crate::syntax::*;
 
 genco::impl_lang! {
@@ -40,7 +42,7 @@ pub fn print(module: &Module) -> String {
 fn head(doc: &[Vec<String>], attrs: &[Attr]) -> Tokens {
     quote! {
         $(for paragraph in doc join (#$['\r']) =>
-            $(for line in paragraph => $(comment(line))$['\r'])
+            $(for line in paragraph.iter().flat_map(|line| line.split('\n')) => $(comment(line))$['\r'])
         )
         $(for attr in attrs =>
             @$(attr.name.as_str())$(for arg in &attr.args => $[' ']$(attr_arg(arg)))$['\r']
@@ -77,13 +79,14 @@ fn extern_tokens(ext: &Extern) -> Tokens {
 fn signature(params: &Params, io: &Option<(Type, Type)>) -> Tokens {
     let texts: Vec<String> = params.iter().map(|param| param_text(param) + ",").collect();
     let width = texts.iter().map(String::len).max().unwrap_or(0);
-    let lines = texts
+    let lines: Vec<String> = texts
         .iter()
         .zip(params.iter())
         .map(|(text, param)| match param_doc(param) {
             Some(doc) => format!("{text}{}# {doc}", " ".repeat(width + 2 - text.len())),
             None => text.clone(),
-        });
+        })
+        .collect();
     let io =
         quote!($(if let Some((input, output)) = io => : $(input.as_str()) -> $(output.as_str())));
     if params.is_empty() {
@@ -132,7 +135,10 @@ fn param_text(param: &Param) -> String {
         Some(Completer::Command(name)) => format!("@{}", name.printed()),
         None => String::new(),
     };
-    let default_text = |default: &Option<Literal>| match default {
+    // A signature reads a bare datetime with a time of day as something else; in parentheses
+    // it is the datetime.
+    let default_text = |default: &Option<Value>| match default {
+        Some(value @ Value::Date { .. }) => format!(" = ({})", nuon(value)),
         Some(value) => format!(" = {}", nuon(value)),
         None => String::new(),
     };
@@ -177,12 +183,20 @@ fn param_text(param: &Param) -> String {
     }
 }
 
-fn param_doc(param: &Param) -> Option<&str> {
-    match param {
+/// A parameter's documentation on one line: Nushell reads only the comment beside it.
+fn param_doc(param: &Param) -> Option<String> {
+    let doc = match param {
         Param::Positional { doc, .. } | Param::Rest { doc, .. } | Param::Flag { doc, .. } => {
-            doc.as_deref()
+            doc.as_deref()?
         }
-    }
+    };
+    Some(
+        doc.split('\n')
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .collect::<Vec<_>>()
+            .join(" "),
+    )
 }
 
 fn stmt_tokens(stmt: &Stmt) -> Tokens {
@@ -218,6 +232,10 @@ fn expr_tokens(expr: &Expr, statement_value: bool) -> Tokens {
         Expr::External { name, args } => {
             quote!(^$(name.as_str())$(for arg in args => $[' ']$(expr_tokens(arg, false))))
         }
+        Expr::Group(inner) => quote!(($(expr_tokens(inner, false)))),
+        Expr::Infix { lhs, op, rhs } => {
+            quote!($(expr_tokens(lhs, false)) $(op.as_str()) $(expr_tokens(rhs, false)))
+        }
     }
 }
 
@@ -235,7 +253,7 @@ mod tests {
             export: true,
             doc: vec![
                 vec!["Greet someone".into()],
-                vec!["Loudly, if asked.".into()],
+                vec!["Loudly, if asked.\nOr not.".into()],
             ],
             attrs: vec![Attr {
                 name: FlagName::new("usage").unwrap(),
@@ -249,7 +267,7 @@ mod tests {
                     optional: false,
                     default: None,
                     completer: None,
-                    doc: Some("Who".into()),
+                    doc: Some("Who\nby name".into()),
                 },
                 Param::Flag {
                     long: FlagName::new("loud").unwrap(),
@@ -270,6 +288,16 @@ mod tests {
                         (
                             ident("args"),
                             Expr::Record(vec![(ident("name"), Expr::Var(ident("name")))]),
+                        ),
+                        (
+                            ident("flags"),
+                            Expr::Record(vec![(
+                                ident("loud"),
+                                Expr::Group(Box::new(Expr::Call {
+                                    name: CommandName::new("not").unwrap(),
+                                    args: vec![Expr::Var(ident("loud"))],
+                                })),
+                            )]),
                         ),
                     ]),
                 },
@@ -294,14 +322,16 @@ mod tests {
 # Greet someone
 #
 # Loudly, if asked.
+# Or not.
 @usage 'arg "<name>" help="Who"'
 export def main [
-    name: string,  # Who
+    name: string,  # Who by name
     --loud (-l),   # Shout
 ] {
     let usage = {
         cmd: []
         args: {name: $name}
+        flags: {loud: (not $loud)}
     }
     $in | run "../script.nu"
 }

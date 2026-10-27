@@ -8,13 +8,16 @@ use nusage_nu::{
     SyntaxError, Type,
 };
 
-use crate::common::{attr_usage_alias, doc_of, nu_param, usage_attrs};
+use crate::common::{Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
 
-/// The module for a binary: completer helpers first, then the externs. Import it with
-/// `use <bin>.nu *`, since every extern carries the binary's name.
+/// The module for a binary: completer helpers first, then the externs. The root is `main` and
+/// a subcommand drops the binary's name, as in a script module, so `use <bin>.nu` names the
+/// commands after the binary; Nushell runs the external by the name the call was typed with.
 pub fn module(tree: &CommandTree) -> Result<Module, SyntaxError> {
     let mut items = Vec::new();
     let mut helpers_done = Vec::new();
+    // A helper's name carries the command path when the completer is one command's own, so
+    // two helpers with one name run the same program: the spec-level completer they share.
     for command in &tree.commands {
         for param in command.positionals.iter().chain(command.flags.iter()) {
             if let Some(Completer::Shell {
@@ -30,7 +33,7 @@ pub fn module(tree: &CommandTree) -> Result<Module, SyntaxError> {
         }
     }
     for command in &tree.commands {
-        items.push(Item::Extern(extern_of(tree, command)?));
+        items.push(Item::Extern(extern_of(command)?));
     }
     Ok(Module {
         preamble: vec![attr_usage_alias()?],
@@ -61,7 +64,7 @@ fn helper(name: &str, run: &str, descriptions: bool) -> Result<Def, SyntaxError>
         export: false,
         doc: vec![],
         attrs: vec![],
-        name: CommandName::new(helper_command(name))?,
+        name: CommandName::definable(helper_command(name))?,
         params: Params::default(),
         io: None,
         body: vec![Stmt::Pipeline(stages)],
@@ -72,7 +75,7 @@ pub fn helper_command(name: &str) -> String {
     format!("complete {name}")
 }
 
-fn extern_of(tree: &CommandTree, command: &Command) -> Result<Extern, SyntaxError> {
+fn extern_of(command: &Command) -> Result<Extern, SyntaxError> {
     if command.execution != Execution::External {
         return Err(SyntaxError(format!(
             "`{}` is a script; the extern target only wraps binaries",
@@ -80,17 +83,17 @@ fn extern_of(tree: &CommandTree, command: &Command) -> Result<Extern, SyntaxErro
         )));
     }
     let name = if command.path.is_root() {
-        tree.bin.clone()
+        "main".to_string()
     } else {
-        format!("{} {}", tree.bin, command.path)
+        command.path.to_string()
     };
-    // A binary applies its own defaults, and `extern` would ignore them anyway.
     let params = command
         .positionals
         .iter()
         .chain(command.flags.iter())
-        .map(|param| nu_param(param, false))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|param| nu_params(param, Target::Extern))
+        .collect::<Result<Vec<_>, _>>()?
+        .concat();
     let mut attrs = usage_attrs(command)?;
     if let Some(structured) = &command.structured {
         let decode = match structured.framing {
@@ -113,7 +116,7 @@ fn extern_of(tree: &CommandTree, command: &Command) -> Result<Extern, SyntaxErro
         export: true,
         doc: doc_of(command),
         attrs,
-        name: CommandName::new(name)?,
+        name: CommandName::definable(name)?,
         params: Params::new(params)?,
         io,
         strict: true,

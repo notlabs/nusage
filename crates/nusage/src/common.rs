@@ -2,13 +2,25 @@
 
 use std::path::{Component, Path, PathBuf};
 
-use nusage_model::{Command, Completer, Param, ParamKind, Value};
+use nusage_model::{Command, Completer, Param, ParamKind};
 use nusage_nu::{
-    Attr, AttrArg, CommandName, Completer as NuCompleter, FlagName, Ident, Literal,
-    Param as NuParam, Stmt, SyntaxError, Type,
+    Attr, AttrArg, CommandName, Completer as NuCompleter, FlagName, Ident, Param as NuParam, Stmt,
+    SyntaxError, Type,
 };
 
 use crate::extern_::helper_command;
+
+/// Which module a parameter is written for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Target {
+    /// A `def` that hands the script `$usage`: defaults apply, a counted flag is an `int` and
+    /// a repeatable one a `list`, since a `def`'s flags cannot repeat.
+    Script,
+    /// An `extern` for a binary: no defaults, since the binary applies its own; a counted flag
+    /// stays a switch and a repeatable one a single value, since Nushell forwards `-vv` and
+    /// `--tag a --tag b` to an external as typed.
+    Extern,
+}
 
 pub fn attr_usage_alias() -> Result<Stmt, SyntaxError> {
     Ok(Stmt::Alias {
@@ -43,9 +55,9 @@ pub fn usage_attrs(command: &Command) -> Result<Vec<Attr>, SyntaxError> {
         .collect()
 }
 
-/// A model parameter as a Nushell one. `with_defaults` is false for externs, which ignore
-/// defaults and leave them to the binary.
-pub fn nu_param(param: &Param, with_defaults: bool) -> Result<NuParam, SyntaxError> {
+/// A model parameter as Nushell parameters: the parameter itself, then the switch that
+/// negates it when usage declares one.
+pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxError> {
     let completer = match &param.completer {
         Some(Completer::Inline(items)) if items.is_empty() => None,
         Some(Completer::Inline(items)) => Some(NuCompleter::List(items.clone())),
@@ -57,14 +69,13 @@ pub fn nu_param(param: &Param, with_defaults: bool) -> Result<NuParam, SyntaxErr
         )?)),
         None => None,
     };
-    let default = if with_defaults {
-        param.default.as_ref().map(literal)
-    } else {
-        None
+    let default = match target {
+        Target::Script => param.default.clone(),
+        Target::Extern => None,
     };
     let doc = param.doc.clone();
-    Ok(match param.kind {
-        ParamKind::Required | ParamKind::Optional => NuParam::Positional {
+    let main = match (param.kind, target) {
+        (ParamKind::Required | ParamKind::Optional, _) => NuParam::Positional {
             name: Ident::new(&param.var)?,
             ty: Type::new(param.ty.as_str())?,
             optional: param.kind == ParamKind::Optional,
@@ -72,12 +83,13 @@ pub fn nu_param(param: &Param, with_defaults: bool) -> Result<NuParam, SyntaxErr
             completer,
             doc,
         },
-        ParamKind::Rest => NuParam::Rest {
+        (ParamKind::Rest, _) => NuParam::Rest {
             name: Ident::new(&param.var)?,
             ty: Type::new(param.ty.as_str())?,
             doc,
         },
-        ParamKind::Switch => NuParam::Flag {
+        // A switch takes no default: the shim applies a declared one when it builds `$usage`.
+        (ParamKind::Switch, _) | (ParamKind::Count, Target::Extern) => NuParam::Flag {
             long: flag_name(param)?,
             short: param.short,
             ty: None,
@@ -85,7 +97,7 @@ pub fn nu_param(param: &Param, with_defaults: bool) -> Result<NuParam, SyntaxErr
             completer: None,
             doc,
         },
-        ParamKind::Valued | ParamKind::Count => NuParam::Flag {
+        (ParamKind::Valued, _) | (ParamKind::Count, Target::Script) => NuParam::Flag {
             long: flag_name(param)?,
             short: param.short,
             ty: Some(Type::new(param.ty.as_str())?),
@@ -93,7 +105,7 @@ pub fn nu_param(param: &Param, with_defaults: bool) -> Result<NuParam, SyntaxErr
             completer,
             doc,
         },
-        ParamKind::Repeated => NuParam::Flag {
+        (ParamKind::Repeated, Target::Script) => NuParam::Flag {
             long: flag_name(param)?,
             short: param.short,
             ty: Some(Type::new(format!("list<{}>", param.ty.as_str()))?),
@@ -101,7 +113,27 @@ pub fn nu_param(param: &Param, with_defaults: bool) -> Result<NuParam, SyntaxErr
             completer,
             doc,
         },
-    })
+        (ParamKind::Repeated, Target::Extern) => NuParam::Flag {
+            long: flag_name(param)?,
+            short: param.short,
+            ty: Some(Type::new(param.ty.as_str())?),
+            default: None,
+            completer,
+            doc,
+        },
+    };
+    let mut params = vec![main];
+    if let Some(negate) = &param.negate {
+        params.push(NuParam::Flag {
+            long: FlagName::new(negate.clone())?,
+            short: None,
+            ty: None,
+            default: None,
+            completer: None,
+            doc: Some(format!("Turn off --{}", flag_name(param)?.as_str())),
+        });
+    }
+    Ok(params)
 }
 
 fn flag_name(param: &Param) -> Result<FlagName, SyntaxError> {
@@ -111,17 +143,6 @@ fn flag_name(param: &Param) -> Result<FlagName, SyntaxError> {
             .clone()
             .unwrap_or_else(|| param.usage_name.clone()),
     )
-}
-
-fn literal(value: &Value) -> Literal {
-    match value {
-        Value::Null => Literal::Null,
-        Value::Bool(b) => Literal::Bool(*b),
-        Value::Int(i) => Literal::Int(*i),
-        Value::Float(f) => Literal::Float(*f),
-        Value::Str(s) => Literal::Str(s.clone()),
-        Value::List(items) => Literal::List(items.iter().map(literal).collect()),
-    }
 }
 
 /// `target` relative to the directory `base`, with forward slashes, without touching the

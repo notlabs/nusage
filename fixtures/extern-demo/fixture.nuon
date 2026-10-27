@@ -1,6 +1,6 @@
 # An extern fixture: no scripts, so no shim or interpreter checks. `extern --strict` and
-# `@structured` are 0.117 syntax, so the harness skips its Nushell checks on older versions;
-# the Rust test still holds the generator to expected/demo.nu.
+# `@structured` are 0.117 syntax; a Nushell that does not parse `requires_syntax` skips the
+# fixture's checks. The Rust test still holds the generator to expected/demo.nu.
 {
-    requires_nu: "0.117.0",
+    requires_syntax: "module m {\n@structured [] { from json }\nexport extern --strict x []\n}",
 }

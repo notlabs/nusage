@@ -1,9 +1,8 @@
 name "demo"
 bin "demo"
 about "A demo CLI wrapped as externs"
-flag "-v --verbose" help="Say more" global=#true
+flag "-v --verbose" help="Say more" global=#true count=#true
 complete "plugin" run="echo \"plugin-1\nplugin-2\nplugin-3\""
-complete "task" descriptions=#true run="echo \"build:Build it\ntest:Test it\""
 
 cmd "install" help="Install a plugin" {
     arg "<plugin>" help="Plugin to install"
@@ -12,9 +11,11 @@ cmd "install" help="Install a plugin" {
     flag "-d --dir <dir>" help="Install into this directory"
 }
 
-cmd "run" help="Run a task" {
+cmd "exec" help="Run a task" {
     arg "<task>" help="Task to run"
     arg "[args]..." help="Arguments for the task"
+    flag "-e --env <var>" help="Variable to set, repeatable" var=#true
+    complete "task" descriptions=#true run="echo \"build:Build it\ntest:Test it\""
 }
 
 cmd "status" help="Show status" {

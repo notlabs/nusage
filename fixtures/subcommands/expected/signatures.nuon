@@ -1,5 +1,5 @@
 [
-  [name,               signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             attributes];
+  [name,               signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  attributes];
   [mycli,              {
       any: [
         [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description, completion, parameter_default];
@@ -7,7 +7,7 @@
         [verbose,        switch,         null,         true,        v,          "Say more",  null,       null],
         [null,           output,         any,          false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    [
       [name,  value];
       [usage, "flag \"-v --verbose\" help=\"Say more\" global=#true"]
     ]],
@@ -18,7 +18,7 @@
         [verbose,        switch,         null,         true,        v,          "Say more",  null,       null],
         [null,           output,         any,          false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    [
 
     ]],
   ["mycli db migrate", {
@@ -28,16 +28,19 @@
         [target,         positional,     string,       false,       null,       "Target environment",              "db targets", null],
         [verbose,        switch,         null,         true,        v,          "Say more",                        null,         null],
         [dry-run,        switch,         null,         true,        null,       "Plan without applying",           null,         null],
-        [since,          named,          datetime,     true,        null,       "Only migrations after this time", null,         null],
+        [since,          named,          datetime,     true,        null,       "Only migrations after this time", null,         2026-01-01T00:00:00+00:00],
         [limit,          named,          int,          true,        null,       "At most this many",               null,         10],
+        [color,          switch,         null,         true,        null,       "Colorize the plan",               null,         null],
+        [no-color,       switch,         null,         true,        null,       "Turn off --color",                null,         null],
         [null,           output,         any,          false,       null,       null,                              null,         null]
       ]
     }, [
       [name,  value];
       [usage, "arg \"<target>\" help=\"Target environment\" { choices run=\"./targets.nu\" }"],
       [usage, "flag \"--dry-run\" help=\"Plan without applying\""],
-      [usage, "flag \"--since\" help=\"Only migrations after this time\" { arg (datetime)\"<since>\" }"],
-      [usage, "flag \"--limit\" help=\"At most this many\" default=\"10\" { arg (int)\"<n>\" }"]
+      [usage, "flag \"--since\" help=\"Only migrations after this time\" default=\"2026-01-01T00:00:00Z\" { arg (datetime)\"<since>\" }"],
+      [usage, "flag \"--limit\" help=\"At most this many\" default=\"10\" { arg (int)\"<n>\" }"],
+      [usage, "flag \"--color\" help=\"Colorize the plan\" default=#true negate=\"--no-color\""]
     ]],
   ["mycli db seed",    {
       any: [
@@ -47,7 +50,7 @@
         [verbose,        switch,         null,         true,        v,          "Say more",              null,       null],
         [null,           output,         any,          false,       null,       null,                    null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        [
       [name,  value];
       [usage, "arg \"[fixture]\" help=\"Named fixture to load\""]
     ]],
@@ -57,7 +60,7 @@
         [null,           input,          nothing,      false,       null,       null,        null,       null],
         [null,           output,         list<string>, false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                [
       [name,  value];
       [usage, "output (\"list<string>\")\"nuon\" default=#true"]
     ]]

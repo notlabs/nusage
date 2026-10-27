@@ -1,0 +1,5 @@
+# A switch on by default is turned off by its `negate` flag, which the shim declares too.
+{
+    argv: [db migrate dev --no-color],
+    usage: {cmd: [db migrate], args: {target: dev}, flags: {verbose: false, dry_run: false, since: 2026-01-01T00:00:00+00:00, limit: 10, color: false}},
+}

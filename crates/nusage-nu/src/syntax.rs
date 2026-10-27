@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::Literal;
+use crate::Value;
 
 /// A Nushell type as written in a signature: `int`, `list<string>`, `record<x: int>`.
 ///
@@ -81,12 +81,27 @@ impl FlagName {
 pub struct CommandName(String);
 
 impl CommandName {
+    /// A name to call: any command's, keywords such as `run` included.
     pub fn new(text: impl Into<String>) -> Result<Self, SyntaxError> {
         let text: String = text.into();
         if text.trim().is_empty() || text.starts_with('-') || text.contains('\n') {
             return Err(SyntaxError(format!("not a command name: {text:?}")));
         }
         Ok(Self(text))
+    }
+
+    /// A name to define: not a parser keyword, since Nushell refuses to define `run` or
+    /// `def`, in a module as anywhere else, and nu-parser is the authority on which names
+    /// those are.
+    pub fn definable(text: impl Into<String>) -> Result<Self, SyntaxError> {
+        let name = Self::new(text)?;
+        if nu_parser::is_parser_keyword(name.0.as_bytes()) {
+            return Err(SyntaxError(format!(
+                "`{}` is a Nushell parser keyword and cannot name a command; rename it",
+                name.0
+            )));
+        }
+        Ok(name)
     }
 
     pub fn as_str(&self) -> &str {
@@ -229,7 +244,7 @@ pub enum Param {
         ty: Type,
         optional: bool,
         /// A default makes the positional optional; it is written `name: type = value`.
-        default: Option<Literal>,
+        default: Option<Value>,
         completer: Option<Completer>,
         doc: Option<String>,
     },
@@ -244,7 +259,7 @@ pub enum Param {
         short: Option<char>,
         /// `None` is a switch.
         ty: Option<Type>,
-        default: Option<Literal>,
+        default: Option<Value>,
         completer: Option<Completer>,
         doc: Option<String>,
     },
@@ -274,21 +289,53 @@ pub enum Stmt {
 pub enum Expr {
     /// `$name`, including `$in`.
     Var(Ident),
-    Literal(Literal),
+    /// A value written as NUON.
+    Literal(Value),
     /// `{k: v ...}`; the printer decides the layout.
     Record(Vec<(Ident, Expr)>),
     /// `[a b]`
     List(Vec<Expr>),
     /// `name arg arg`, arguments printed as given.
-    Call {
-        name: CommandName,
-        args: Vec<Expr>,
-    },
+    Call { name: CommandName, args: Vec<Expr> },
     /// `^name arg arg`: an external command.
-    External {
-        name: String,
-        args: Vec<Expr>,
-    },
+    External { name: String, args: Vec<Expr> },
     /// A string in argument position: bare when Nushell reads it back as itself, else quoted.
     Str(String),
+    /// `(expr)`: a call or pipeline where a value is expected, such as a record field.
+    Group(Box<Expr>),
+    /// `lhs and rhs`, `lhs or rhs`.
+    Infix {
+        lhs: Box<Expr>,
+        op: Infix,
+        rhs: Box<Expr>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Infix {
+    And,
+    Or,
+}
+
+impl Infix {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Infix::And => "and",
+            Infix::Or => "or",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parser_keywords_cannot_be_defined_but_can_be_called() {
+        assert!(CommandName::definable("run").is_err());
+        assert!(CommandName::definable("def").is_err());
+        assert!(CommandName::definable("db run").is_ok());
+        assert!(CommandName::definable("exec").is_ok());
+        assert!(CommandName::new("run").is_ok());
+    }
 }

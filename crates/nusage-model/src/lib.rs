@@ -10,6 +10,7 @@
 mod build;
 
 pub use build::model;
+pub use nu_protocol::Value;
 pub use nusage_spec::{CommandPath, Diagnostic};
 
 use std::path::PathBuf;
@@ -85,9 +86,12 @@ pub struct Param {
     pub long: Option<String>,
     pub short: Option<char>,
     pub completer: Option<Completer>,
-    /// The declared default, typed by `ty`. `Count` is `0` and `Repeated` is `[]` unless usage
-    /// declares otherwise. A binary applies its own defaults, so an extern never writes them.
+    /// The declared default as a Nushell value of type `ty`. `Count` is `0` and `Repeated` is
+    /// `[]` unless usage declares otherwise; a switch has one only when usage declares it. A
+    /// binary applies its own defaults, so an extern never writes them.
     pub default: Option<Value>,
+    /// usage `negate`: the long name, without dashes, of the switch that turns this one off.
+    pub negate: Option<String>,
     /// usage `help`.
     pub doc: Option<String>,
     /// Whether the flag is inherited from an ancestor's `global=#true`.
@@ -106,9 +110,11 @@ pub enum ParamKind {
     Switch,
     /// `flag "--x <v>"`
     Valued,
-    /// `flag "-v" count=#true`: an `int`, since Nushell flags cannot repeat.
+    /// `flag "-v" count=#true`: an `int` in `$usage`, since a `def`'s flags cannot repeat. An
+    /// extern keeps the switch, since an external accepts `-vv`.
     Count,
-    /// `flag "--x <v>" var=#true`: a `list`, since Nushell flags cannot repeat.
+    /// `flag "--x <v>" var=#true`: a `list` in `$usage`, since a `def`'s flags cannot repeat.
+    /// An extern keeps the single value, since an external accepts `--x a --x b`.
     Repeated,
 }
 
@@ -132,20 +138,11 @@ pub enum Completer {
     /// A `complete "name" run="..."` or `choices run="..."` shell command: one value per line,
     /// `value:description` lines when `descriptions` is set.
     Shell {
-        /// A name unique within the spec, for the helper that runs it.
+        /// A name unique within the spec, for the helper that runs it: the completer's name,
+        /// prefixed by the command path when the `complete` node is the command's or the
+        /// argument's own rather than the spec's.
         name: String,
         run: String,
         descriptions: bool,
     },
-}
-
-/// A default value, typed by the parameter it belongs to.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Value {
-    Null,
-    Bool(bool),
-    Int(i64),
-    Float(f64),
-    Str(String),
-    List(Vec<Value>),
 }

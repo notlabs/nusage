@@ -4,6 +4,6 @@
 # argv words are strings, so the date is quoted here or NUON would read it as a datetime.
 {
     argv: [db migrate prod --dry-run -v --since "2026-10-27" --limit 5],
-    usage: {cmd: [db migrate], args: {target: prod}, flags: {verbose: true, dry_run: true, since: 2026-10-27T00:00:00+00:00, limit: 5}},
+    usage: {cmd: [db migrate], args: {target: prod}, flags: {verbose: true, dry_run: true, since: 2026-10-27T00:00:00+00:00, limit: 5, color: true}},
     complete: {line: "mycli db migrate ", expect: [dev prod staging]},
 }

@@ -1,6 +1,6 @@
-# The same command with nothing optional given: a declared default applies, an absent
-# valued flag is null.
+# The same command with nothing optional given: a declared default applies, typed by the
+# annotation (`since` is a datetime), and a switch declared on by default is on.
 {
     argv: [db migrate dev],
-    usage: {cmd: [db migrate], args: {target: dev}, flags: {verbose: false, dry_run: false, since: null, limit: 10}},
+    usage: {cmd: [db migrate], args: {target: dev}, flags: {verbose: false, dry_run: false, since: 2026-01-01T00:00:00+00:00, limit: 10, color: true}},
 }

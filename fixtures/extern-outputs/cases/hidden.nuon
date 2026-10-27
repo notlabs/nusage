@@ -1,0 +1,4 @@
+# `output "json" hide=#true` removes the inherited json output: nothing to decode.
+{
+    cmd: [quiet],
+}

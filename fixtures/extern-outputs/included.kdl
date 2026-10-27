@@ -1,0 +1,3 @@
+cmd "list" help="List reports" {
+    output ("list<string>")"json" framing="json" help="Names"
+}

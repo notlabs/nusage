@@ -1,0 +1,4 @@
+# A command from an `include`: its own json output, decoded through the inherited selector.
+{
+    cmd: [list],
+}

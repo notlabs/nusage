@@ -70,9 +70,6 @@ fn fixtures_parse_with_nu_parser() {
     use nu_protocol::engine::StateWorkingSet;
     use nu_protocol::{Span, Value};
 
-    // The Nushell these crates are; a fixture that needs a newer one is skipped here.
-    const NU_VERSION: &str = "0.116.1";
-
     let mut fixtures: Vec<PathBuf> = fs::read_dir(fixtures_dir())
         .expect("fixtures directory")
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
@@ -85,11 +82,11 @@ fn fixtures_parse_with_nu_parser() {
         if meta.is_file() {
             let meta = nuon::from_nuon(&fs::read_to_string(&meta).unwrap(), Some(Span::unknown()))
                 .expect("fixture.nuon is NUON");
-            if let Ok(required) = meta
-                .get_data_by_key("requires_nu")
+            // A fixture may need syntax this nu-parser lacks; it says which.
+            if let Some(syntax) = meta
+                .get_data_by_key("requires_syntax")
                 .map(|v| v.coerce_string().unwrap())
-                .ok_or(())
-                && !version_at_least(NU_VERSION, &required)
+                && !parses(&syntax)
             {
                 continue;
             }
@@ -161,7 +158,11 @@ fn fixtures_parse_with_nu_parser() {
     );
 }
 
-fn version_at_least(have: &str, need: &str) -> bool {
-    let parse = |v: &str| -> Vec<u64> { v.split('.').filter_map(|p| p.parse().ok()).collect() };
-    parse(have) >= parse(need)
+/// Whether this nu-parser parses a snippet without errors.
+fn parses(source: &str) -> bool {
+    use nu_protocol::engine::StateWorkingSet;
+    let engine_state = nu_command::add_shell_command_context(nu_cmd_lang::create_default_context());
+    let mut working_set = StateWorkingSet::new(&engine_state);
+    nu_parser::parse(&mut working_set, None, source.as_bytes(), false);
+    working_set.parse_errors.is_empty()
 }

@@ -1,0 +1,6 @@
+# Outputs resolved the way usage resolves them: the root decodes the CLI-wide `json` output
+# through the CLI-wide selector, `quiet` hides it and decodes nothing, and `list`, which an
+# `include` adds, replaces it with its own. The included file is not read for annotations.
+{
+    requires_syntax: "module m {\n@structured [] { from json }\nexport extern --strict x []\n}",
+}

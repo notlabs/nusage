@@ -1,6 +1,7 @@
-# `descriptions=#true` lines split on the first colon into value and description records,
-# which `commandline complete` reports as values.
+# A `complete` declared on the command is that command's own: its helper is named by the
+# command path. `descriptions=#true` lines split on the first colon into value and
+# description records, which `commandline complete` reports as values.
 {
-    cmd: [run],
-    complete: {line: "demo run ", expect: [build test]},
+    cmd: [exec],
+    complete: {line: "demo exec ", expect: [build test]},
 }

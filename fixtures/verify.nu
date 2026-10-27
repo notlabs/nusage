@@ -5,12 +5,13 @@
 #   - shim:        `use expected/<bin>.nu; <bin> <words>`        (Nushell types the arguments)
 #   - interpreter: `let usage = ($env.NUSAGE_ARGS | from nuon); $in | run <script>`
 #                                                                  (the record is handed in as NUON)
-# An extern fixture (a `<bin>.usage.kdl`) has no scripts; its module is imported with `use ... *`.
+# An extern fixture (a `<bin>.usage.kdl`) has no scripts: only completions and signatures.
 # A case with `complete` asks the module for completions at a point of a line. Then the parsed
 # signature and attributes of the root and every command a case names, as `scope commands`
 # reports them, are compared with expected/signatures.nuon.
 #
-# A fixture's `fixture.nuon` may say `requires_nu`; on an older Nushell its checks are skipped.
+# A fixture's `fixture.nuon` may give `requires_syntax`, a snippet the running Nushell must
+# parse; otherwise its checks are skipped.
 #
 #   nu fixtures/verify.nu                          # all fixtures
 #   nu fixtures/verify.nu fixtures/minimal         # one
@@ -43,18 +44,18 @@ def verify-fixture [dir: path, update: bool] {
     let bin = $module | path parse | get stem
     let meta = $dir | path join fixture.nuon
     let meta = if ($meta | path exists) { open $meta } else { {} }
-    if not (nu-is-at-least ($meta.requires_nu? | default "0.0.0")) {
+    if ($meta.requires_syntax? | is-not-empty) and not (nu-parses $meta.requires_syntax) {
         return [
             (
                 row $name skipped "" {
                     ok: true
-                    detail: $"needs nu ($meta.requires_nu), running (version).version"
+                    detail: $"needs syntax that nu (version).version does not parse"
                 }
             )
         ]
     }
     let is_extern = ($dir | path join $"($bin).usage.kdl") | path exists
-    let import = if $is_extern { $"use ($module | to nuon) *" } else { $"use ($module | to nuon)" }
+    let import = $"use ($module | to nuon)"
     let cases = glob ($dir | path join cases '*.nuon') | sort
     let per_case = $cases | each {|file|
         let case = open $file
@@ -87,15 +88,9 @@ def verify-fixture [dir: path, update: bool] {
     ))
 }
 
-def nu-is-at-least [required: string] {
-    let parse = {|v|
-        $v | split row '.' | each { into int }
-    }
-    let have = do $parse (version).version
-    let need = do $parse $required
-    ($have | zip $need | reduce --fold null {|pair, acc|
-        if $acc != null { $acc } else if $pair.0 > $pair.1 { true } else if $pair.0 < $pair.1 { false } else { null }
-    }) | default true
+# Whether the running Nushell parses a snippet; a feature check that needs no version table.
+def nu-parses [source: string] {
+    (^$nu.current-exe -n -c $source | complete).exit_code == 0
 }
 
 def row [
