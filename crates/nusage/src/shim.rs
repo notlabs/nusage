@@ -54,7 +54,7 @@ fn def(command: &Command, base: &Path) -> Result<Def, SyntaxError> {
             Expr::Var(Ident::new("in")?),
             Expr::Call {
                 name: CommandName::new("run")?,
-                args: vec![Expr::Path(relative(base, body_path))],
+                args: vec![Expr::Str(relative(base, body_path))],
             },
         ]),
     ];
@@ -70,14 +70,14 @@ fn def(command: &Command, base: &Path) -> Result<Def, SyntaxError> {
 }
 
 fn usage_record(command: &Command) -> Result<Expr, SyntaxError> {
-    let cmd = Expr::List(
+    let cmd = Expr::Literal(Literal::List(
         command
             .path
             .words()
             .iter()
-            .map(|word| Expr::Literal(Literal::Str(word.clone())))
+            .map(|word| Literal::Str(word.clone()))
             .collect(),
-    );
+    ));
     let field = |param: &nusage_model::Param| -> Result<(Ident, Expr), SyntaxError> {
         Ok((Ident::new(&param.var)?, Expr::Var(Ident::new(&param.var)?)))
     };

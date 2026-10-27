@@ -1,111 +1,103 @@
-use std::fmt::Write;
+//! The printer: one genco template per shape of output.
+//!
+//! Layout lives in the templates, where it reads as the Nushell it produces. The only rules
+//! outside them are a record's breaking (a statement's value, or more than three fields, goes
+//! one field per line) and the alignment of parameter comments.
 
-use crate::Literal;
-use crate::literal::{is_bare_word, nuon, quote};
+use genco::quote;
+
+use crate::literal::{Literal, nuon};
 use crate::syntax::*;
 
-const INDENT: &str = "    ";
+genco::impl_lang! {
+    /// Nushell for genco: the default four-space indentation and nothing else. Quoting is not
+    /// genco's; words go through [`word`] and values through [`nuon`].
+    pub Nu {
+        type Config = ();
+        type Format = ();
+        type Item = Any;
+    }
+}
 
-/// Write a module as Nushell source, in nufmt's layout.
+type Tokens = genco::Tokens<Nu>;
+
+/// Write a module as Nushell source.
 pub fn print(module: &Module) -> String {
-    let mut out = String::new();
-    for stmt in &module.preamble {
-        write_stmt(&mut out, stmt, 0);
-        out.push('\n');
-    }
-    for (index, item) in module.items.iter().enumerate() {
-        if index > 0 || !module.preamble.is_empty() {
-            out.push('\n');
-        }
-        match item {
-            Item::Def(def) => write_def(&mut out, def),
-            Item::Extern(ext) => write_extern(&mut out, ext),
-        }
-    }
-    out
+    let tokens: Tokens = quote! {
+        $(for stmt in &module.preamble => $(stmt_tokens(stmt))$['\r'])
+        $(if !module.preamble.is_empty() => $['\n'])
+        $(for item in &module.items join ($['\n']) => $(match item {
+            Item::Def(def) => $(def_tokens(def)),
+            Item::Extern(ext) => $(extern_tokens(ext)),
+        }))
+    };
+    tokens
+        .to_file_string()
+        .expect("formatting into a String cannot fail")
 }
 
-fn write_head(out: &mut String, doc: &[Vec<String>], attrs: &[Attr]) {
-    for (index, paragraph) in doc.iter().enumerate() {
-        if index > 0 {
-            out.push_str("#\n");
-        }
-        for line in paragraph {
-            if line.is_empty() {
-                out.push_str("#\n");
-            } else {
-                writeln!(out, "# {line}").expect("string write");
-            }
-        }
-    }
-    for attr in attrs {
-        write!(out, "@{}", attr.name.as_str()).expect("string write");
-        for arg in &attr.args {
-            out.push(' ');
-            out.push_str(&attr_arg(arg));
-        }
-        out.push('\n');
+/// The comment paragraphs and attribute lines above a definition.
+fn head(doc: &[Vec<String>], attrs: &[Attr]) -> Tokens {
+    quote! {
+        $(for paragraph in doc join (#$['\r']) =>
+            $(for line in paragraph => $(comment(line))$['\r'])
+        )
+        $(for attr in attrs =>
+            @$(attr.name.as_str())$(for arg in &attr.args => $[' ']$(attr_arg(arg)))$['\r']
+        )
     }
 }
 
-fn write_signature(out: &mut String, params: &Params, io: &Option<(Type, Type)>) {
-    out.push('[');
-    if !params.is_empty() {
-        out.push('\n');
-        let lines: Vec<(String, Option<&str>)> = params
-            .iter()
-            .map(|param| (param_text(param) + ",", param_doc(param)))
-            .collect();
-        let width = lines.iter().map(|(text, _)| text.len()).max().unwrap_or(0);
-        for (text, doc) in &lines {
-            out.push_str(INDENT);
-            out.push_str(text);
-            if let Some(doc) = doc {
-                for _ in text.len()..width + 2 {
-                    out.push(' ');
-                }
-                write!(out, "# {doc}").expect("string write");
-            }
-            out.push('\n');
+fn comment(line: &str) -> String {
+    if line.is_empty() {
+        "#".to_string()
+    } else {
+        format!("# {line}")
+    }
+}
+
+fn def_tokens(def: &Def) -> Tokens {
+    quote! {
+        $(head(&def.doc, &def.attrs))
+        $(if def.export => export$[' '])def $(def.name.printed()) $(signature(&def.params, &def.io)) {
+            $(for stmt in &def.body join ($['\r']) => $(stmt_tokens(stmt)))
         }
     }
-    out.push(']');
-    if let Some((input, output)) = io {
-        write!(out, ": {} -> {}", input.as_str(), output.as_str()).expect("string write");
+}
+
+fn extern_tokens(ext: &Extern) -> Tokens {
+    quote! {
+        $(head(&ext.doc, &ext.attrs))
+        $(if ext.export => export$[' '])extern $(if ext.strict => --strict$[' '])$(ext.name.printed()) $(signature(&ext.params, &ext.io))
     }
 }
 
-fn write_def(out: &mut String, def: &Def) {
-    write_head(out, &def.doc, &def.attrs);
-    if def.export {
-        out.push_str("export ");
+/// `[` one parameter per line `]`, trailing comments aligned two columns past the longest
+/// parameter, then `: input -> output` when declared.
+fn signature(params: &Params, io: &Option<(Type, Type)>) -> Tokens {
+    let texts: Vec<String> = params.iter().map(|param| param_text(param) + ",").collect();
+    let width = texts.iter().map(String::len).max().unwrap_or(0);
+    let lines = texts
+        .iter()
+        .zip(params.iter())
+        .map(|(text, param)| match param_doc(param) {
+            Some(doc) => format!("{text}{}# {doc}", " ".repeat(width + 2 - text.len())),
+            None => text.clone(),
+        });
+    let io =
+        quote!($(if let Some((input, output)) = io => : $(input.as_str()) -> $(output.as_str())));
+    if params.is_empty() {
+        return quote!([]$io);
     }
-    write!(out, "def {} ", def.name.printed()).expect("string write");
-    write_signature(out, &def.params, &def.io);
-    out.push_str(" {\n");
-    for stmt in &def.body {
-        write_stmt(out, stmt, 1);
-        out.push('\n');
+    quote! {
+        [
+            $(for line in lines join ($['\r']) => $line)
+        ]$io
     }
-    out.push_str("}\n");
 }
 
-fn write_extern(out: &mut String, ext: &Extern) {
-    write_head(out, &ext.doc, &ext.attrs);
-    if ext.export {
-        out.push_str("export ");
-    }
-    out.push_str("extern ");
-    if ext.strict {
-        out.push_str("--strict ");
-    }
-    write!(out, "{} ", ext.name.printed()).expect("string write");
-    write_signature(out, &ext.params, &ext.io);
-    out.push('\n');
-}
-
-/// An attribute argument: a string single-quoted, or as a raw string when it contains `'`;
-/// words bare; a block as given.
+/// An attribute argument: a string single-quoted so it reads as written, or as a raw string
+/// when it contains `'`; words bare where they can be; a block as given.
 fn attr_arg(arg: &AttrArg) -> String {
     match arg {
         AttrArg::Str(text) if !text.contains('\'') => format!("'{text}'"),
@@ -116,32 +108,34 @@ fn attr_arg(arg: &AttrArg) -> String {
             }
             format!("r{hashes}'{text}'{hashes}")
         }
-        AttrArg::Words(words) => {
-            let words: Vec<String> = words
-                .iter()
-                .map(|word| {
-                    if is_bare_argv_word(word) {
-                        word.clone()
-                    } else {
-                        quote(word)
-                    }
-                })
-                .collect();
-            format!("[{}]", words.join(" "))
-        }
+        AttrArg::Words(words) => format!(
+            "[{}]",
+            words.iter().map(|w| word(w)).collect::<Vec<_>>().join(" ")
+        ),
         AttrArg::Block(text) => format!("{{ {text} }}"),
     }
 }
 
-/// An argv word Nushell reads as itself inside a list: no spaces, quotes or brackets.
-fn is_bare_argv_word(word: &str) -> bool {
-    !word.is_empty()
-        && !word.chars().any(|c| {
-            c.is_whitespace() || matches!(c, '"' | '\'' | '[' | ']' | '{' | '}' | '(' | ')' | '$')
-        })
-}
-
+/// A parameter as written in a signature, without its comment.
 fn param_text(param: &Param) -> String {
+    let completer_text = |completer: &Option<Completer>| match completer {
+        Some(Completer::List(items)) => {
+            format!(
+                "@[{}]",
+                items
+                    .iter()
+                    .map(|item| word(item))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            )
+        }
+        Some(Completer::Command(name)) => format!("@{}", name.printed()),
+        None => String::new(),
+    };
+    let default_text = |default: &Option<Literal>| match default {
+        Some(value) => format!(" = {}", nuon(value)),
+        None => String::new(),
+    };
     match param {
         Param::Positional {
             name,
@@ -151,20 +145,18 @@ fn param_text(param: &Param) -> String {
             completer,
             ..
         } => {
-            let mut text = name.as_str().to_string();
-            if *optional && default.is_none() {
-                text.push('?');
-            }
-            text.push_str(": ");
-            text.push_str(ty.as_str());
-            if let Some(completer) = completer {
-                text.push_str(&completer_text(completer));
-            }
-            if let Some(default) = default {
-                text.push_str(" = ");
-                text.push_str(&nuon(default));
-            }
-            text
+            let mark = if *optional && default.is_none() {
+                "?"
+            } else {
+                ""
+            };
+            format!(
+                "{}{mark}: {}{}{}",
+                name.as_str(),
+                ty.as_str(),
+                completer_text(completer),
+                default_text(default)
+            )
         }
         Param::Rest { name, ty, .. } => format!("...{}: {}", name.as_str(), ty.as_str()),
         Param::Flag {
@@ -175,42 +167,13 @@ fn param_text(param: &Param) -> String {
             completer,
             ..
         } => {
-            let mut text = format!("--{}", long.as_str());
-            if let Some(short) = short {
-                write!(text, " (-{short})").expect("string write");
-            }
-            if let Some(ty) = ty {
-                text.push_str(": ");
-                text.push_str(ty.as_str());
-                if let Some(completer) = completer {
-                    text.push_str(&completer_text(completer));
-                }
-            }
-            if let Some(default) = default {
-                text.push_str(" = ");
-                text.push_str(&nuon(default));
-            }
-            text
+            let short = short.map(|c| format!(" (-{c})")).unwrap_or_default();
+            let typed = match ty {
+                Some(ty) => format!(": {}{}", ty.as_str(), completer_text(completer)),
+                None => String::new(),
+            };
+            format!("--{}{short}{typed}{}", long.as_str(), default_text(default))
         }
-    }
-}
-
-fn completer_text(completer: &Completer) -> String {
-    match completer {
-        Completer::List(items) => {
-            let words: Vec<String> = items
-                .iter()
-                .map(|item| {
-                    if is_bare_word(item) {
-                        item.clone()
-                    } else {
-                        quote(item)
-                    }
-                })
-                .collect();
-            format!("@[{}]", words.join(" "))
-        }
-        Completer::Command(name) => format!("@{}", quote(name.as_str())),
     }
 }
 
@@ -222,106 +185,40 @@ fn param_doc(param: &Param) -> Option<&str> {
     }
 }
 
-fn write_stmt(out: &mut String, stmt: &Stmt, depth: usize) {
-    let indent = INDENT.repeat(depth);
-    out.push_str(&indent);
+fn stmt_tokens(stmt: &Stmt) -> Tokens {
     match stmt {
-        Stmt::Alias { name, target } => {
-            write!(out, "alias {} = {}", name.printed(), target.printed()).expect("string write")
-        }
-        Stmt::Let { name, value } => {
-            write!(out, "let {} = ", name.as_str()).expect("string write");
-            write_expr(out, value, depth, true);
-        }
+        Stmt::Alias { name, target } => quote!(alias $(name.printed()) = $(target.printed())),
+        Stmt::Let { name, value } => quote!(let $(name.as_str()) = $(expr_tokens(value, true))),
         Stmt::Pipeline(stages) => {
-            for (index, stage) in stages.iter().enumerate() {
-                if index > 0 {
-                    out.push_str(" | ");
-                }
-                write_expr(out, stage, depth, false);
-            }
+            quote!($(for stage in stages join ( | ) => $(expr_tokens(stage, false))))
         }
     }
 }
 
-/// nufmt's record layout: a record that is a statement's value goes one field per line; a
-/// nested record stays on one line up to three fields.
-fn write_expr(out: &mut String, expr: &Expr, depth: usize, statement_value: bool) {
+/// An expression; `statement_value` is a record that is the whole right side of a `let`.
+fn expr_tokens(expr: &Expr, statement_value: bool) -> Tokens {
     match expr {
-        Expr::Var(name) => write!(out, "${}", name.as_str()).expect("string write"),
-        Expr::Literal(value) => out.push_str(&nuon(value)),
-        Expr::Path(path) => {
-            if is_bare_path(path) {
-                out.push_str(path);
-            } else {
-                out.push_str(&quote(path));
-            }
-        }
+        Expr::Var(name) => quote!($(format!("${}", name.as_str()))),
+        Expr::Literal(value) => quote!($(nuon(value))),
+        Expr::Str(text) => quote!($(word(text))),
         Expr::List(items) => {
-            out.push('[');
-            for (index, item) in items.iter().enumerate() {
-                if index > 0 {
-                    out.push(' ');
-                }
-                write_expr(out, item, depth, false);
-            }
-            out.push(']');
+            quote!([$(for item in items join ($[' ']) => $(expr_tokens(item, false)))])
         }
-        Expr::Record(fields) => {
-            if statement_value || fields.len() > 3 {
-                out.push_str("{\n");
-                let inner = INDENT.repeat(depth + 1);
-                for (key, value) in fields {
-                    out.push_str(&inner);
-                    write!(out, "{}: ", key.as_str()).expect("string write");
-                    write_expr(out, value, depth + 1, false);
-                    out.push('\n');
-                }
-                out.push_str(&INDENT.repeat(depth));
-                out.push('}');
-            } else {
-                out.push('{');
-                for (index, (key, value)) in fields.iter().enumerate() {
-                    if index > 0 {
-                        out.push_str(", ");
-                    }
-                    write!(out, "{}: ", key.as_str()).expect("string write");
-                    write_expr(out, value, depth, false);
-                }
-                out.push('}');
+        Expr::Record(fields) if statement_value || fields.len() > 3 => quote! {
+            {
+                $(for (key, value) in fields join ($['\r']) => $(key.as_str()): $(expr_tokens(value, false)))
             }
+        },
+        Expr::Record(fields) => {
+            quote!({$(for (key, value) in fields join (, ) => $(key.as_str()): $(expr_tokens(value, false)))})
         }
         Expr::Call { name, args } => {
-            out.push_str(&name.printed());
-            for arg in args {
-                out.push(' ');
-                write_expr(out, arg, depth, false);
-            }
+            quote!($(name.printed())$(for arg in args => $[' ']$(expr_tokens(arg, false))))
         }
         Expr::External { name, args } => {
-            out.push('^');
-            out.push_str(name);
-            for arg in args {
-                out.push(' ');
-                // An external's flag words stay bare: `^sh -c`, not `^sh "-c"`.
-                match arg {
-                    Expr::Literal(Literal::Str(word)) if is_bare_argv_word(word) => {
-                        out.push_str(word)
-                    }
-                    other => write_expr(out, other, depth, false),
-                }
-            }
+            quote!(^$(name.as_str())$(for arg in args => $[' ']$(expr_tokens(arg, false))))
         }
     }
-}
-
-/// A path that Nushell reads as one bare word: no spaces, quotes or shell-significant
-/// characters.
-fn is_bare_path(path: &str) -> bool {
-    !path.is_empty()
-        && path.chars().all(|c| {
-            c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | '\\' | ':' | '~')
-        })
 }
 
 #[cfg(test)]
@@ -333,10 +230,13 @@ mod tests {
     }
 
     #[test]
-    fn prints_a_def_in_nufmt_layout() {
+    fn prints_a_def() {
         let def = Def {
             export: true,
-            doc: vec![vec!["Greet someone".into()]],
+            doc: vec![
+                vec!["Greet someone".into()],
+                vec!["Loudly, if asked.".into()],
+            ],
             attrs: vec![Attr {
                 name: FlagName::new("usage").unwrap(),
                 args: vec![AttrArg::Str("arg \"<name>\" help=\"Who\"".into())],
@@ -377,7 +277,7 @@ mod tests {
                     Expr::Var(ident("in")),
                     Expr::Call {
                         name: CommandName::new("run").unwrap(),
-                        args: vec![Expr::Path("../script.nu".into())],
+                        args: vec![Expr::Str("../script.nu".into())],
                     },
                 ]),
             ],
@@ -389,11 +289,12 @@ mod tests {
             }],
             items: vec![Item::Def(def)],
         };
-        let expected = "\
-alias \"attr usage\" = echo
+        let expected = r#"alias "attr usage" = echo
 
 # Greet someone
-@usage 'arg \"<name>\" help=\"Who\"'
+#
+# Loudly, if asked.
+@usage 'arg "<name>" help="Who"'
 export def main [
     name: string,  # Who
     --loud (-l),   # Shout
@@ -402,14 +303,32 @@ export def main [
         cmd: []
         args: {name: $name}
     }
-    $in | run ../script.nu
+    $in | run "../script.nu"
 }
-";
+"#;
         assert_eq!(print(&module), expected);
     }
 
     #[test]
-    fn prints_an_extern_with_structured_output() {
+    fn prints_an_extern_with_structured_output_and_a_bare_helper() {
+        let helper = Def {
+            export: false,
+            doc: vec![],
+            attrs: vec![],
+            name: CommandName::new("complete region").unwrap(),
+            params: Params::default(),
+            io: None,
+            body: vec![Stmt::Pipeline(vec![
+                Expr::External {
+                    name: "sh".into(),
+                    args: vec![Expr::Str("-c".into()), Expr::Str("demo regions".into())],
+                },
+                Expr::Call {
+                    name: CommandName::new("lines").unwrap(),
+                    args: vec![],
+                },
+            ])],
+        };
         let ext = Extern {
             export: true,
             doc: vec![vec!["Show status".into()]],
@@ -438,15 +357,18 @@ export def main [
         };
         let module = Module {
             preamble: vec![],
-            items: vec![Item::Extern(ext)],
+            items: vec![Item::Def(helper), Item::Extern(ext)],
         };
-        let expected = "\
+        let expected = r#"def "complete region" [] {
+    ^sh -c "demo regions" | lines
+}
+
 # Show status
-@structured [--format=json] { from json }
-export extern --strict \"demo status\" [
+@structured ["--format=json"] { from json }
+export extern --strict "demo status" [
     --format: string@[human json],  # Output format
 ]: nothing -> record<ok: bool>
-";
+"#;
         assert_eq!(print(&module), expected);
     }
 

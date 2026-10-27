@@ -1,7 +1,6 @@
 use std::fmt;
 
 use crate::Literal;
-use crate::literal::{is_bare_word, quote};
 
 /// A Nushell type as written in a signature: `int`, `list<string>`, `record<x: int>`.
 ///
@@ -96,11 +95,18 @@ impl CommandName {
 
     /// As it appears after `def` or as a completer reference.
     pub fn printed(&self) -> String {
-        if is_bare_word(&self.0) {
-            self.0.clone()
-        } else {
-            quote(&self.0)
-        }
+        word(&self.0)
+    }
+}
+
+/// Text in a syntax position (a command name, an argument, a path, a completion word):
+/// bare when Nushell reads it back as itself, else double-quoted. The rule is Nushell's own,
+/// from `nu-utils`.
+pub fn word(text: &str) -> String {
+    if nu_utils::needs_quoting(text) {
+        nu_utils::escape_quote_string(text)
+    } else {
+        text.to_string()
     }
 }
 
@@ -283,6 +289,6 @@ pub enum Expr {
         name: String,
         args: Vec<Expr>,
     },
-    /// A path argument, written bare when it can be.
-    Path(String),
+    /// A string in argument position: bare when Nushell reads it back as itself, else quoted.
+    Str(String),
 }

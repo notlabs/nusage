@@ -1,11 +1,14 @@
 alias "attr usage" = echo
 
 def "complete plugin" [] {
-    ^sh -c "echo \"plugin-1\nplugin-2\nplugin-3\"" | lines
+    ^sh -c "echo \"plugin-1
+plugin-2
+plugin-3\"" | lines
 }
 
 def "complete task" [] {
-    ^sh -c "echo \"build:Build it\ntest:Test it\"" | lines | parse "{value}:{description}"
+    ^sh -c "echo \"build:Build it
+test:Test it\"" | lines | parse "{value}:{description}"
 }
 
 # A demo CLI wrapped as externs
@@ -43,7 +46,7 @@ export extern --strict "demo run" [
 @usage 'output "human" default=#true help="A readable report"'
 @usage 'output ("record<ok: bool, tasks: list<string>>")"json" framing="json" help="One report object"'
 @usage 'select "--format"'
-@structured [--format=json] { from json }
+@structured ["--format=json"] { from json }
 export extern --strict "demo status" [
     --verbose (-v),                 # Say more
     --format: string@[human json],  # Output format

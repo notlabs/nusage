@@ -7,3 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+nuon.workspace = true
+nu-protocol.workspace = true
+genco.workspace = true
+nu-utils.workspace = true

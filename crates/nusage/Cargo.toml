@@ -15,3 +15,10 @@ nusage-spec.workspace = true
 nusage-model.workspace = true
 nusage-nu.workspace = true
 usage-rs.workspace = true
+
+[dev-dependencies]
+nu-parser.workspace = true
+nu-protocol.workspace = true
+nu-cmd-lang.workspace = true
+nu-command.workspace = true
+nuon.workspace = true

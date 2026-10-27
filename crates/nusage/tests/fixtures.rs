@@ -61,3 +61,107 @@ fn fixtures_generate_their_expected_modules() {
         "expected at least three fixtures, found {checked}"
     );
 }
+
+/// Every fixture module parses with Nushell's own parser, and defines every command its
+/// signature snapshot names. The parse runs in-process; the harness in `fixtures/verify.nu`
+/// still covers behaviour against the pinned binary.
+#[test]
+fn fixtures_parse_with_nu_parser() {
+    use nu_protocol::engine::StateWorkingSet;
+    use nu_protocol::{Span, Value};
+
+    // The Nushell these crates are; a fixture that needs a newer one is skipped here.
+    const NU_VERSION: &str = "0.116.1";
+
+    let mut fixtures: Vec<PathBuf> = fs::read_dir(fixtures_dir())
+        .expect("fixtures directory")
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| path.is_dir())
+        .collect();
+    fixtures.sort();
+    let mut checked = 0;
+    for fixture in fixtures {
+        let meta = fixture.join("fixture.nuon");
+        if meta.is_file() {
+            let meta = nuon::from_nuon(&fs::read_to_string(&meta).unwrap(), Some(Span::unknown()))
+                .expect("fixture.nuon is NUON");
+            if let Ok(required) = meta
+                .get_data_by_key("requires_nu")
+                .map(|v| v.coerce_string().unwrap())
+                .ok_or(())
+                && !version_at_least(NU_VERSION, &required)
+            {
+                continue;
+            }
+        }
+        let expected_dir = fixture.join("expected");
+        let module_file = fs::read_dir(&expected_dir)
+            .expect("expected directory")
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .find(|path| path.extension().is_some_and(|ext| ext == "nu"))
+            .expect("expected/<bin>.nu");
+        let source = fs::read_to_string(&module_file).unwrap();
+
+        let mut engine_state =
+            nu_command::add_shell_command_context(nu_cmd_lang::create_default_context());
+        engine_state.add_env_var(
+            "PWD".into(),
+            Value::string(expected_dir.to_string_lossy(), Span::unknown()),
+        );
+        let mut working_set = StateWorkingSet::new(&engine_state);
+        let bin = module_file.file_stem().unwrap().to_str().unwrap();
+        let wrapped = format!("module {bin} {{\n{source}\n}}\n");
+        nu_parser::parse(
+            &mut working_set,
+            Some(&module_file.to_string_lossy()),
+            wrapped.as_bytes(),
+            false,
+        );
+        assert!(
+            working_set.parse_errors.is_empty(),
+            "{}: {:?}",
+            module_file.display(),
+            working_set.parse_errors
+        );
+
+        let module_id = working_set
+            .find_module(bin.as_bytes())
+            .expect("module parsed");
+        let module = working_set.get_module(module_id);
+        let names = nuon::from_nuon(
+            &fs::read_to_string(expected_dir.join("signatures.nuon")).unwrap(),
+            Some(Span::unknown()),
+        )
+        .expect("signatures.nuon is NUON");
+        for row in names.as_list().expect("a list of commands") {
+            let full = row
+                .get_data_by_key("name")
+                .unwrap()
+                .coerce_string()
+                .unwrap();
+            // A script module's root is its `main` and its subcommands drop the bin prefix;
+            // an extern module carries the full names.
+            let inner = full.strip_prefix(&format!("{bin} ")).unwrap_or(&full);
+            let defined = (full == bin && module.main.is_some())
+                || module
+                    .decls
+                    .keys()
+                    .any(|k| k.as_slice() == inner.as_bytes() || k.as_slice() == full.as_bytes());
+            assert!(
+                defined,
+                "{}: `{full}` is not defined",
+                module_file.display()
+            );
+        }
+        checked += 1;
+    }
+    assert!(
+        checked >= 3,
+        "expected at least three fixtures parsed, found {checked}"
+    );
+}
+
+fn version_at_least(have: &str, need: &str) -> bool {
+    let parse = |v: &str| -> Vec<u64> { v.split('.').filter_map(|p| p.parse().ok()).collect() };
+    parse(have) >= parse(need)
+}

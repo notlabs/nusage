@@ -4,7 +4,7 @@
 
 use nusage_model::{Command, CommandTree, Completer, Execution, Framing};
 use nusage_nu::{
-    Attr, AttrArg, CommandName, Def, Expr, Extern, FlagName, Item, Literal, Module, Params, Stmt,
+    Attr, AttrArg, CommandName, Def, Expr, Extern, FlagName, Item, Module, Params, Stmt,
     SyntaxError, Type,
 };
 
@@ -44,10 +44,7 @@ fn helper(name: &str, run: &str, descriptions: bool) -> Result<Def, SyntaxError>
     let mut stages = vec![
         Expr::External {
             name: "sh".into(),
-            args: vec![
-                Expr::Literal(Literal::Str("-c".into())),
-                Expr::Literal(Literal::Str(run.to_string())),
-            ],
+            args: vec![Expr::Str("-c".into()), Expr::Str(run.to_string())],
         },
         Expr::Call {
             name: CommandName::new("lines")?,
@@ -57,7 +54,7 @@ fn helper(name: &str, run: &str, descriptions: bool) -> Result<Def, SyntaxError>
     if descriptions {
         stages.push(Expr::Call {
             name: CommandName::new("parse")?,
-            args: vec![Expr::Literal(Literal::Str("{value}:{description}".into()))],
+            args: vec![Expr::Str("{value}:{description}".into())],
         });
     }
     Ok(Def {

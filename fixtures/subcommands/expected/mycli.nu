@@ -10,7 +10,7 @@ export def main [
         args: {}
         flags: {verbose: $verbose}
     }
-    $in | run ../mycli/mod.nu
+    $in | run "../mycli/mod.nu"
 }
 
 # Manage the database
@@ -22,18 +22,18 @@ export def db [
         args: {}
         flags: {verbose: $verbose}
     }
-    $in | run ../mycli/db/mod.nu
+    $in | run "../mycli/db/mod.nu"
 }
 
 # List migration targets
 @usage 'output ("list<string>")"nuon" default=#true'
 export def "db targets" []: nothing -> list<string> {
     let usage = {
-        cmd: [db targets]
+        cmd: [db, targets]
         args: {}
         flags: {}
     }
-    $in | run ../mycli/db/targets.nu
+    $in | run "../mycli/db/targets.nu"
 }
 
 # Run migrations
@@ -49,7 +49,7 @@ export def "db migrate" [
     --limit: int = 10,            # At most this many
 ] {
     let usage = {
-        cmd: [db migrate]
+        cmd: [db, migrate]
         args: {target: $target}
         flags: {
             verbose: $verbose
@@ -58,7 +58,7 @@ export def "db migrate" [
             limit: $limit
         }
     }
-    $in | run ../mycli/db/migrate.nu
+    $in | run "../mycli/db/migrate.nu"
 }
 
 # Load fixtures
@@ -68,9 +68,9 @@ export def "db seed" [
     --verbose (-v),    # Say more
 ] {
     let usage = {
-        cmd: [db seed]
+        cmd: [db, seed]
         args: {fixture: $fixture}
         flags: {verbose: $verbose}
     }
-    $in | run ../mycli/db/seed.nu
+    $in | run "../mycli/db/seed.nu"
 }

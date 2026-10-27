@@ -5,9 +5,6 @@ rust = { version = "1.99.1", mr_boxington = true }
 mr-boxington = "1.27.0"
 nu = "0.116.1"
 jujutsu = "0.46.0"
-# nufmt has no release or crates.io package; it is built from its repository. The revision pins
-# nu-parser 0.116.1, the same as `nu` above; move both together.
-"cargo:https://github.com/nushell/nufmt" = "rev:3dfd39c1499f065285052d0324541b8c26870e57"
 
 [tasks.verify-fixtures]
 description = "Run every fixture through both entrypoints, check completions and parsed signatures"
@@ -16,10 +13,6 @@ run = "nu fixtures/verify.nu"
 [tasks.update-fixture-signatures]
 description = "Rewrite the fixtures' expected/signatures.nuon from the live `scope commands` output"
 run = "nu fixtures/verify.nu --update-signatures"
-
-[tasks.fmt-check]
-description = "Check the hand-written shim modules and the harness are nufmt-stable"
-run = "nufmt --dry-run fixtures"
 
 [tasks.build]
 description = "Build the workspace"
@@ -30,5 +23,5 @@ description = "Rust tests, including every fixture generating its expected modul
 run = "cargo test --workspace"
 
 [tasks.check]
-description = "Everything: Rust tests, the fixture harness against nu, and nufmt"
-depends = ["test", "verify-fixtures", "fmt-check"]
+description = "Everything: Rust tests and the fixture harness against nu"
+depends = ["test", "verify-fixtures"]
