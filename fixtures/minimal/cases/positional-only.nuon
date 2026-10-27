@@ -1,0 +1,5 @@
+# The required positional alone: switches are false, valued flags are null, never absent.
+{
+    argv: [alice],
+    usage: { cmd: [], args: { name: alice }, flags: { loud: false, times: null } },
+}

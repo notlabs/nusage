@@ -1,0 +1,5 @@
+# A group command invoked on its own gets its own record; the global flag is inherited.
+{
+    argv: [db],
+    usage: { cmd: [db], args: {}, flags: { verbose: false } },
+}

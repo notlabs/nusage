@@ -32,32 +32,38 @@ usage ships no Nushell fixtures, but it ships four things that are directly reus
   communique, plus clap-generated specs for fd, tokei and starship. Stress input for
   the `extern` generator later; not needed for the scripts case.
 
-Suggested layout for nusage's own corpus, hand-written before any generator exists:
+Suggested layout for nusage's own corpus, hand-written before any generator exists. The
+first three fixtures (`minimal`, `subcommands`, `variadic-choices`) now exist under
+`fixtures/` with a harness; `fixtures/README.md` records the conventions they settled.
 
 ```
 fixtures/
+  verify.nu                # harness: both entrypoints per case, then help text
   minimal/
-    script.nu            # #!/usr/bin/env nusage + #USAGE header, no def main
-    expected/mod.nu      # the def shim you want the generator to produce, byte for byte
-    expected/help.txt    # `nu -c 'use fixtures/minimal/expected; help minimal'` output
-    cases/
-      no-args.nuon       # { argv: [], usage: { cmd: [], args: {...}, flags: {...} } }
-      all-flags.nuon
-  subcommands/           # db migrate / db seed, mod.nu with multi-word names
-  variadic-choices/      # rest arg, choices → @[a b c], a count flag
-  defaults-env/          # default=, env=, a value that comes from the environment
-  typed/                 # #NUSAGE type lines, datetime and int coercion
-  output-table/          # #NUSAGE output, export type alias, : nothing -> list<Row>
+    script.nu              # #!/usr/bin/env nusage + #USAGE header, no def main
+    expected/greet.nu      # the def shim named after `bin`, byte for byte
+    expected/help.txt      # `help greet` as the pinned nu renders it
+    cases/*.nuon           # { argv, invoke?, usage }
+  subcommands/             # mycli/mod.nu, mycli/db/mod.nu, mycli/db/{migrate,seed}.nu
+  variadic-choices/        # rest arg, repeatable and count flags, choices with a default
+  typed/                   # next: #NUSAGE type lines, datetime and int coercion
+  output-table/            # next: #NUSAGE output, export type alias (needs 0.117)
 ```
 
 Each case is one argv and the `$usage` record it must yield, written as NUON so the
-same file drives both entrypoints below. The argv corpus can be converted into
-`cases/` mechanically for the interpreter path, with one normalisation: the corpus
-omits unset values, while `$usage` should carry every declared arg and flag as
-`null`, `false` or `[]` so scripts never need `?` accessors and both entrypoints
-produce identical records.
+same file drives both entrypoints below. Where argv has no direct Nushell spelling
+(a repeated or counted flag), the case also carries `invoke`. The argv corpus can be
+converted into `cases/` mechanically for the interpreter path, with one
+normalisation: the corpus omits unset values, while `$usage` carries every declared
+arg and flag as `null`, `false`, `[]` or `0` so scripts never need `?` accessors and
+both entrypoints produce identical records.
 
-The generator's acceptance test is then byte equality against `expected/mod.nu`,
+Two mechanics the first run on 0.116.1 settled: `source` inside a module's `def`
+resolves relative to the module file and sees the enclosing `let usage`; and the body
+must be `$in | do { source ... }`, because a bare `source` statement receives no
+pipeline input and `source` cannot appear in a pipeline itself.
+
+The generator's acceptance test is then byte equality against `expected/<bin>.nu`,
 plus a parse through the pinned `nu` binary. Design in the hand-written files, let
 the generator catch up.
 
@@ -115,7 +121,7 @@ nusage /abs/script.nu <args...>          # from #!/usr/bin/env nusage
   → usage::parse::parse(&spec, &argv)     # help, errors, completions as usage does them
   → $usage record: ParseOutput, every declared name present, #NUSAGE coercions applied
   → NUON text
-  → exec nu [--stdin] -c 'let usage = ($env.NUSAGE_ARGS | from nuon); source /abs/script.nu'
+  → exec nu [--stdin] -c 'let usage = ($env.NUSAGE_ARGS | from nuon); $in | do { source /abs/script.nu }'
       with NUSAGE_ARGS set, stdin/stdout/stderr inherited
 ```
 

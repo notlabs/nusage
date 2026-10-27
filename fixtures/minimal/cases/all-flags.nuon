@@ -1,0 +1,5 @@
+# Short alias for the switch, a valued flag; the value is typed by the signature.
+{
+    argv: [bob -l --times 3],
+    usage: { cmd: [], args: { name: bob }, flags: { loud: true, times: 3 } },
+}

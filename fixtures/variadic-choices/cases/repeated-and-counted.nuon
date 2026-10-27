@@ -1,0 +1,7 @@
+# Nushell cannot repeat a flag, so the shim takes a list and an int where argv repeats
+# the word. `invoke` is the Nushell spelling; `argv` is what the interpreter receives.
+{
+    argv: [a.txt b.txt -t x -t y -vv --format zip],
+    invoke: "a.txt b.txt --tag [x y] -v 2 --format zip",
+    usage: { cmd: [], args: { file: [a.txt b.txt] }, flags: { tag: [x y], verbose: 2, format: zip } },
+}
