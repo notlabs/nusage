@@ -1,4 +1,7 @@
+alias "attr usage" = echo
+
 # Manage a project
+@usage 'flag "-v --verbose" help="Say more" global=#true'
 export def main [
     --verbose (-v),  # Say more
 ] {
@@ -22,21 +25,50 @@ export def db [
     $in | run ../mycli/db/mod.nu
 }
 
+# List migration targets
+@usage 'output ("list<string>")"nuon" default=#true'
+export def "db targets" [
+    --verbose (-v),  # Say more
+]: nothing -> list<string> {
+    let usage = {
+        cmd: [db targets]
+        args: {}
+        flags: {verbose: $verbose}
+    }
+    $in | run ../mycli/db/targets.nu
+}
+
+def "db migrate complete-target" [token: record]: nothing -> list<string> {
+    db targets
+}
+
 # Run migrations
+@usage 'arg "<target>" help="Target environment" { choices run="./targets.nu" }'
+@usage 'flag "--dry-run" help="Plan without applying"'
+@usage 'flag "--since" help="Only migrations after this time" { arg (datetime)"<since>" }'
+@usage 'flag "--limit" help="At most this many" default="10" { arg (int)"<n>" }'
 export def "db migrate" [
-    target: string@[dev staging prod],  # Target environment
-    --verbose (-v),                     # Say more
-    --dry-run,                          # Plan without applying
+    target: string@"db migrate complete-target",  # Target environment
+    --verbose (-v),                               # Say more
+    --dry-run,                                    # Plan without applying
+    --since: datetime,                            # Only migrations after this time
+    --limit: int = 10,                            # At most this many
 ] {
     let usage = {
         cmd: [db migrate]
         args: {target: $target}
-        flags: {verbose: $verbose, dry_run: $dry_run}
+        flags: {
+            verbose: $verbose
+            dry_run: $dry_run
+            since: $since
+            limit: $limit
+        }
     }
     $in | run ../mycli/db/migrate.nu
 }
 
 # Load fixtures
+@usage 'arg "[fixture]" help="Named fixture to load"'
 export def "db seed" [
     fixture?: string,  # Named fixture to load
     --verbose (-v),    # Say more

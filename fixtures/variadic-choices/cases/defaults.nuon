@@ -1,6 +1,8 @@
 # Variadic positional with one value; a repeatable flag not given is an empty list,
-# a count flag not given is 0, and a declared default is applied.
+# a count flag not given is 0, and a declared default is applied. Static choices are
+# an inline completer, so `complete` lists them.
 {
     argv: [a.txt],
-    usage: { cmd: [], args: { file: [a.txt] }, flags: { tag: [], verbose: 0, format: tar } },
+    usage: {cmd: [], args: {file: [a.txt]}, flags: {tag: [], verbose: 0, format: tar}},
+    complete: {line: "pack a.txt --format ", expect: [tar zip]},
 }

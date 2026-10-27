@@ -1,0 +1,9 @@
+# Two levels down with every flag. `since` is a datetime and `limit` an int, from the KDL
+# annotations; inherited globals come first in `flags`. `complete` asks the shim module
+# what it offers at that point of the line: the provider's list, which Nushell sorts.
+# argv words are strings, so the date is quoted here or NUON would read it as a datetime.
+{
+    argv: [db migrate prod --dry-run -v --since "2026-10-27" --limit 5],
+    usage: {cmd: [db migrate], args: {target: prod}, flags: {verbose: true, dry_run: true, since: 2026-10-27T00:00:00+00:00, limit: 5}},
+    complete: {line: "mycli db migrate ", expect: [dev prod staging]},
+}

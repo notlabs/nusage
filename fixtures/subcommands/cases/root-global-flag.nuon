@@ -1,5 +1,5 @@
 # The root command with only the global flag: cmd is the empty path.
 {
     argv: [-v],
-    usage: { cmd: [], args: {}, flags: { verbose: true } },
+    usage: {cmd: [], args: {}, flags: {verbose: true}},
 }

@@ -10,12 +10,12 @@ jujutsu = "0.46.0"
 "cargo:https://github.com/nushell/nufmt" = "rev:3dfd39c1499f065285052d0324541b8c26870e57"
 
 [tasks.verify-fixtures]
-description = "Run every fixture through both entrypoints and compare help text"
+description = "Run every fixture through both entrypoints, check completions and parsed signatures"
 run = "nu fixtures/verify.nu"
 
-[tasks.update-fixture-help]
-description = "Rewrite the fixtures' expected/help.txt from the live `help` output"
-run = "nu fixtures/verify.nu --update-help"
+[tasks.update-fixture-signatures]
+description = "Rewrite the fixtures' expected/signatures.nuon from the live `scope commands` output"
+run = "nu fixtures/verify.nu --update-signatures"
 
 [tasks.fmt-check]
 description = "Check the hand-written shim modules and the harness are nufmt-stable"

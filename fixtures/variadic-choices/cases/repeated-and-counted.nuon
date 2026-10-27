@@ -3,5 +3,5 @@
 {
     argv: [a.txt b.txt -t x -t y -vv --format zip],
     invoke: "a.txt b.txt --tag [x y] -v 2 --format zip",
-    usage: { cmd: [], args: { file: [a.txt b.txt] }, flags: { tag: [x y], verbose: 2, format: zip } },
+    usage: {cmd: [], args: {file: [a.txt b.txt]}, flags: {tag: [x y], verbose: 2, format: zip}},
 }

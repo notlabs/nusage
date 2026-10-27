@@ -1,0 +1,6 @@
+# The same command with nothing optional given: a declared default applies, an absent
+# valued flag is null.
+{
+    argv: [db migrate dev],
+    usage: {cmd: [db migrate], args: {target: dev}, flags: {verbose: false, dry_run: false, since: null, limit: 10}},
+}

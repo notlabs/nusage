@@ -1,19 +1,21 @@
 #!/usr/bin/env nu
 # Verify the fixtures against the `nu` that runs this script.
 #
-# Every case is pushed through both entrypoints and must yield the same `$usage` record:
+# Every case goes through both entrypoints and must return the same value:
 #   - shim:        `use expected/<bin>.nu; <bin> <words>`        (Nushell types the arguments)
 #   - interpreter: `let usage = ($env.NUSAGE_ARGS | from nuon); $in | run <script>`
 #                                                                  (the record is handed in as NUON)
-# Then `help` for the root and every command a case names is compared with expected/help.txt.
+# A case with `complete` also asks the shim module for completions at a point of a line.
+# Then the parsed signature and attributes of the root and every command a case names, as
+# `scope commands` reports them, are compared with expected/signatures.nuon.
 #
-#   nu fixtures/verify.nu                      # all fixtures
-#   nu fixtures/verify.nu fixtures/minimal     # one
-#   nu fixtures/verify.nu --update-help        # rewrite expected/help.txt from the live output
+#   nu fixtures/verify.nu                          # all fixtures
+#   nu fixtures/verify.nu fixtures/minimal         # one
+#   nu fixtures/verify.nu --update-signatures      # rewrite expected/signatures.nuon from live output
 
 def main [
-    ...fixtures: path,  # Fixture directories; default: every directory under fixtures/
-    --update-help,      # Rewrite expected/help.txt instead of comparing it
+    ...fixtures: path,     # Fixture directories; default: every directory under fixtures/
+    --update-signatures,   # Rewrite expected/signatures.nuon instead of comparing it
 ] {
     let root = $env.CURRENT_FILE | path dirname
     let fixtures = if ($fixtures | is-empty) {
@@ -21,7 +23,7 @@ def main [
     } else {
         $fixtures | each { path expand }
     }
-    let results = $fixtures | each {|dir| verify-fixture $dir $update_help } | flatten
+    let results = $fixtures | each {|dir| verify-fixture $dir $update_signatures } | flatten
     print ($results | select fixture check case ok | table --expand)
     let failed = $results | where not ok
     if ($failed | is-not-empty) {
@@ -31,8 +33,8 @@ def main [
     print $"all ($results | length) checks passed"
 }
 
-# One row per check: shim and interpreter per case, then help.
-def verify-fixture [dir: path, update_help: bool] {
+# One row per check: shim, interpreter and (when present) completion per case, then signatures.
+def verify-fixture [dir: path, update: bool] {
     let name = $dir | path basename
     let module = glob ($dir | path join expected '*.nu') | first
     let bin = $module | path parse | get stem
@@ -40,16 +42,25 @@ def verify-fixture [dir: path, update_help: bool] {
     let per_case = $cases | each {|file|
         let case = open $file
         let id = $file | path parse | get stem
-        [
+        let rows = [
             (row $name shim $id (check-shim $module $bin $case))
             (row $name interpreter $id (check-interpreter $dir $bin $case))
         ]
+        if ($case.complete? | is-not-empty) {
+            $rows | append (row $name complete $id (check-complete $module $case.complete))
+        } else {
+            $rows
+        }
     } | flatten
     let cmds = [
         []
     ] | append ($cases | each {|f| open $f | get usage.cmd }) | uniq
-    let help = check-help $dir $module $bin $cmds $update_help
-    $per_case | append (row $name help "" $help)
+    $per_case | append ((row
+        $name
+        signatures
+        ""
+        (check-signatures $dir $module $bin $cmds $update)
+    ))
 }
 
 def row [
@@ -67,6 +78,12 @@ def row [
     }
 }
 
+# What the command must return: `output` when the script returns something other than its
+# record (a provider), otherwise the record itself.
+def expected-output [case: record] {
+    $case.output? | default $case.usage
+}
+
 # The Nushell spelling of a case: `invoke` when argv has no direct Nushell form (repeated
 # or counted flags), otherwise the argv words as written.
 def words-of [case: record] {
@@ -75,7 +92,7 @@ def words-of [case: record] {
 
 def check-shim [module: path, bin: string, case: record] {
     let code = $"use ($module | to nuon); ($bin) (words-of $case) | to nuon"
-    run-nu $code {} | compare $case.usage
+    run-nu $code {} | compare (expected-output $case)
 }
 
 def check-interpreter [dir: path, bin: string, case: record] {
@@ -83,7 +100,12 @@ def check-interpreter [dir: path, bin: string, case: record] {
     let code = $"let usage = \($env.NUSAGE_ARGS | from nuon\); $in | run ($script | to nuon) | to nuon"
     run-nu $code {
         NUSAGE_ARGS: ($case.usage | to nuon)
-    } | compare $case.usage
+    } | compare (expected-output $case)
+}
+
+def check-complete [module: path, complete: record] {
+    let code = $"use ($module | to nuon); ($complete.line | to nuon) | commandline complete | to nuon"
+    run-nu $code {} | compare $complete.expect
 }
 
 # A single `script.nu`, or a `<bin>/` tree where `[db migrate]` is `db/migrate.nu` and a
@@ -116,7 +138,7 @@ def run-nu [code: string, env_vars: record] {
     }
 }
 
-def compare [expected: record] {
+def compare [expected] {
     let out = $in
     if not $out.ok {
         return $out
@@ -139,23 +161,22 @@ def compare [expected: record] {
     }
 }
 
-def check-help [
+# The parsed signature and attributes of each command, keyed by its full name.
+def check-signatures [
     dir: path
     module: path
     bin: string
     cmds: list<any>
     update: bool
 ] {
-    let sections = $cmds | each {|cmd|
-        let full = [$bin] | append $cmd | str join ' '
-        let out = run-nu $"use ($module | to nuon); help ($full)" {}
-        if not $out.ok {
-            return $out
-        }
-        $"# help: ($full)\n($out.detail)\n"
+    let names = $cmds | each {|cmd| [$bin] | append $cmd | str join ' ' }
+    let code = $"use ($module | to nuon); scope commands | where name in ($names | to nuon) | select name signatures attributes | to nuon --indent 2"
+    let out = run-nu $code {}
+    if not $out.ok {
+        return $out
     }
-    let live = $sections | str join "\n"
-    let file = $dir | path join expected help.txt
+    let live = $out.detail + "\n"
+    let file = $dir | path join expected signatures.nuon
     if $update {
         $live | save --force $file
         return {
@@ -166,7 +187,7 @@ def check-help [
     if not ($file | path exists) {
         return {
             ok: false
-            detail: $"missing ($file); run with --update-help"
+            detail: $"missing ($file); run with --update-signatures"
         }
     }
     if (open --raw $file) == $live {
@@ -174,7 +195,7 @@ def check-help [
     } else {
         {
             ok: false
-            detail: $"help differs from ($file); diff it or run with --update-help"
+            detail: $"signatures differ from ($file); diff it or run with --update-signatures"
         }
     }
 }

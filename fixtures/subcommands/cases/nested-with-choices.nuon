@@ -1,5 +1,0 @@
-# Two levels down. Inherited globals come first in `flags`, then the command's own.
-{
-    argv: [db migrate prod --dry-run -v],
-    usage: { cmd: [db migrate], args: { target: prod }, flags: { verbose: true, dry_run: true } },
-}

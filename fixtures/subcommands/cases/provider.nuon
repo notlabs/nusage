@@ -1,0 +1,7 @@
+# A provider script returns a value rather than its record: `output` is what the command
+# returns, `usage` is what the script was handed.
+{
+    argv: [db targets],
+    usage: {cmd: [db targets], args: {}, flags: {verbose: false}},
+    output: [dev staging prod],
+}
