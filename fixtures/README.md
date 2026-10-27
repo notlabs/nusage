@@ -33,7 +33,8 @@ consumer can read it), has no `def main`, and reads its arguments from `$usage`:
   usage's own output omits what was not given; `$usage` does not, so scripts never need `?`.
 - Inherited (`global`) flags come first in `flags`, then the command's own, in declaration order.
 - Types are what the Nushell signature says: `<file>` and `<dir>` positionals are `path`,
-  everything else is `string` until a `#NUSAGE type` line (not yet in any fixture) says otherwise.
+  everything else is `string`. Declaring other Nushell types for a usage argument is a later
+  addition, not designed yet.
 
 Two entrypoints deliver that record and a script cannot tell them apart:
 
@@ -110,7 +111,7 @@ and actual records.
 
 ## What is deliberately not here yet
 
-`#NUSAGE type` and `#NUSAGE output` (typed coercions, `export type` aliases, declared output
-types), `default`/`env` fallbacks resolved by usage rather than by the signature, `requires` and
-`conflicts` relationship checks, `$in`-consuming scripts, and anything needing 0.117 syntax.
-Each wants its own fixture once the contract above has been looked at.
+Per-property attributes for the usage properties a signature cannot carry (`requires`,
+`conflicts`, `env`, and the rest), typed values beyond `string`/`path`/`bool`/`int`, declared
+output types, `$in`-consuming scripts, and anything needing 0.117 syntax. Each wants its own
+fixture.
