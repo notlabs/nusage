@@ -17,5 +17,10 @@ file = "install.nu"
 
 [tasks.check]
 description = "Hold the module to mise's spec and drive mise through it"
-depends = [":generate"]
+depends = [":generate", ":check-schemas"]
 file = "check.nu"
+
+[tasks.check-schemas]
+description = "Validate raw mise output against the reviewed schemas and fixture assertions"
+depends = ["//nusage:build"]
+file = "check-schemas.nu"

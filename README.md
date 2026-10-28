@@ -12,8 +12,8 @@ Early development.
   once per version. Its README says how to add a binary.
 - `jj/`: the module for jj, generated from the committed spec `clap/` reads from jj-cli;
   `mise run //jj:spec` writes it again for a new jj.
-- `schemas/`: shared development scripts for output-schema conformance checks. See
-  `schemas/README.md`.
+- `schemas/`: shared development scripts for output-schema conformance checks; the first
+  reviewed schemas and fixtures are under `mise/`. See `schemas/README.md`.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nusage built here. `mise run //mise:install` generates the mise

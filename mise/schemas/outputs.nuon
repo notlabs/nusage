@@ -1,0 +1,31 @@
+{
+    format: 1
+    tool: mise
+    baseline: {
+        version: "2026.10.21"
+        repository: "https://github.com/jdx/mise"
+        revision: "61eb04dbc806cb646821e342b7abbbdaf1581e84"
+        extraction: "Handwritten from the output builders and serializers at this revision"
+    }
+    outputs: [
+        {id: version, command: [version], name: json, select: --json, framing: json, schema: version.schema.json, source: ["src/cli/version.rs:164"]}
+        {id: env, command: [env], name: json, select: --json, framing: json, schema: env.schema.json, source: ["src/cli/env.rs:156"]}
+        {id: config-ls, command: [config ls], name: json, select: --json, framing: json, schema: config-ls.schema.json, source: ["src/cli/config/ls.rs:123"]}
+        {
+            id: ls
+            command: [ls]
+            name: json
+            select: --json
+            framing: json
+            schema: ls.schema.json
+            source: ["src/cli/ls.rs:229" "src/cli/ls.rs:550" "src/toolset/tool_source.rs:49"]
+        }
+    ]
+    cases: [
+        {id: version, output: version, argv: [version --json], exit_codes: [0], expect: {properties: {version: {pattern: '^[0-9]{4}[.][0-9]+[.][0-9]+'}}}}
+        {id: env-populated, output: env, argv: [env --json], exit_codes: [0], expect: {required: [NUSAGE_SCHEMA_FIXTURE], properties: {NUSAGE_SCHEMA_FIXTURE: {const: "present"}}}}
+        {id: config-populated, output: config-ls, argv: [config ls --json], exit_codes: [0], expect: {minItems: 1, contains: {properties: {tools: {contains: {const: "node"}}}, required: [tools]}}}
+        {id: ls-map, output: ls, argv: [ls --json --offline], exit_codes: [0], expect: {type: object, minProperties: 1, additionalProperties: {minItems: 2}}}
+        {id: ls-filtered, output: ls, argv: [ls node --json --offline], exit_codes: [0], expect: {type: array, minItems: 2, allOf: [{contains: {required: [source requested_version], properties: {installed: {const: false}}}} {contains: {properties: {installed: {const: true}}}}]}}
+    ]
+}
