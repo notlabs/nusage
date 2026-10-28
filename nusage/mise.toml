@@ -14,6 +14,8 @@ shell = "nu -c"
 # reports: a build cache may keep the target directory elsewhere.
 [tasks.build]
 description = "Build the workspace and link nusage into the repository's bin directory"
+sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
+outputs = ["../.bin/nusage"]
 run = '''
 let built = ^cargo build --workspace --message-format json-render-diagnostics
   | lines
@@ -22,8 +24,11 @@ let built = ^cargo build --workspace --message-format json-render-diagnostics
   | where reason == compiler-artifact and executable != null and target.name == nusage
   | get 0.executable
 let bin = "{{ config_root }}/../.bin" | path expand
+let link = $bin | path join nusage
 mkdir $bin
-^ln -sf $built ($bin | path join nusage)
+if ($link | path type) != symlink or (ls -l $link | get 0.target) != $built {
+    ^ln -sf $built $link
+}
 '''
 
 [tasks.test]

@@ -1,0 +1,1 @@
+use {{ config_root }}/generated/mise.nu *

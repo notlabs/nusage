@@ -1,7 +1,24 @@
-[tasks.generate]
-description = "Generate the module from the spec of the mise on PATH and the overlays here"
+# Loading the module in the user's interactive shell: Nushell sources every file of its
+# autoload directory when it starts a session.
+[dotfiles]
+"~/.config/nushell/autoload/mise.nu" = { source = "autoload.nu.tera", mode = "template" }
+
+[tasks.spec]
+description = "Export the spec of the mise on PATH, left untouched when it has not changed"
 depends = ["//nusage:build"]
+file = "spec.nu"
+
+[tasks.generate]
+description = "Generate the module from the spec and the overlays here"
+depends = [":spec"]
+sources = ["generated/mise.usage.kdl", "*.kdl", "../.bin/nusage"]
+outputs = ["generated/mise.json.kdl", "generated/mise.nu"]
 file = "generate.nu"
+
+[tasks.install]
+description = "Generate the module and have every new Nushell session load it"
+depends = [":generate"]
+run = "mise dotfiles apply --yes ~/.config/nushell/autoload/mise.nu"
 
 [tasks.check]
 description = "Generate the module and drive mise through it"
