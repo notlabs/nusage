@@ -107,11 +107,24 @@ let cases = [
     }
 ]
 for case in $cases {
-    let result = validate-result $suite $case {stdout: $case.stdout, stderr: "", exit_code: $case.code}
+    let result = (validate-result
+        $suite
+        $case
+        {stdout: $case.stdout, stderr: "", exit_code: $case.code}
+    )
     assert equal $result.ok $case.passes $"($case.id): ($result | to nuon)"
 }
 let overlay = schema-overlay $suite
 assert ($overlay | str contains 'cmd "status"')
 assert ($overlay | str contains 'framing="jsonl"')
 assert not ($overlay | str contains 'schema file=')
+# Words no switch spells are the output's `nusage-args`, as written.
+let worded = schema-overlay ($suite | update outputs {|suite|
+    $suite.outputs | update select {|output| [--no-graph --template 'json(self) ++ "\n"'] }
+})
+assert (
+    $worded
+    | str contains 'nusage-args "--no-graph" "--template" "json(self) ++ \"\\n\""; schema'
+) $worded
+assert not ($worded | str contains 'select=')
 print $"schemas: ($cases | length) validation cases passed; overlay embeds its schemas"

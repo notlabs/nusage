@@ -12,6 +12,9 @@ export def load-suite [manifest: path] {
         if $output.framing not-in [json jsonl] {
             error make --unspanned {msg: $"Unsupported framing: ($output.framing)"}
         }
+        if ($output.select | describe) not-in [string list<string>] {
+            error make --unspanned {msg: $"($output.id): `select` is a switch or a list of words"}
+        }
         let file = $manifest | path dirname | path join $output.schema
         if not ($file | path exists) {
             error make --unspanned {msg: $"Missing schema: ($file)"}
@@ -21,7 +24,9 @@ export def load-suite [manifest: path] {
 }
 
 # The overlay declares each attached output with its schema embedded, so where the overlay
-# and the spec sit cannot change how a schema file resolves.
+# and the spec sit cannot change how a schema file resolves. A `select` that is a switch is
+# usage's `select`; a list of words, such as jj's `--no-graph --template ...`, is nusage's
+# `nusage-args`, which nusage passes for the output and usage never reads.
 export def schema-overlay [suite: record] {
     $suite.outputs
     | where {|output| $output.attach? != false }
@@ -29,8 +34,13 @@ export def schema-overlay [suite: record] {
         let schema = open --raw ($suite.directory | path join $output.schema) | to json --raw
         let name = $output.name | to json --raw
         let framing = $output.framing | to json --raw
-        let selector = $output.select | to json --raw
-        let body = $"output ($name) framing=($framing) select=($selector) { schema ($schema) }"
+        let body = if ($output.select | describe) == string {
+            let selector = $output.select | to json --raw
+            $"output ($name) framing=($framing) select=($selector) { schema ($schema) }"
+        } else {
+            let words = $output.select | each { to json --raw } | str join " "
+            $"output ($name) framing=($framing) { nusage-args ($words); schema ($schema) }"
+        }
         $output.command | reverse | reduce --fold $body {|word, inner|
             $"cmd ($word | to json --raw) { ($inner) }"
         }
