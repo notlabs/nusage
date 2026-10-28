@@ -1,2 +1,6 @@
+# The released nusage, with what it runs: the interpreter starts `nu`, and a generated
+# module's completions run `usage`.
 [tools]
 "github:notlabs/nusage" = "latest"
+nu = "0.116.1"
+usage = "7.1.3"

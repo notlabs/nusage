@@ -173,7 +173,11 @@ impl Run for Parse {
                 println!("{page}");
                 Ok(())
             }
-            nusage::Parsed::Rejected(why) => Err(why),
+            // usage's refusal, with the exit code the interpreter gives it.
+            nusage::Parsed::Rejected(why) => {
+                eprintln!("{why}");
+                std::process::exit(2)
+            }
         }
     }
 }

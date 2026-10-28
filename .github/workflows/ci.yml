@@ -4,13 +4,34 @@ on:
   pull_request:
   push:
     branches: [main]
+  # release.yml runs these checks on the tagged commit before it builds anything.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Mr Boxington keeps Cargo's target directory elsewhere; here Cargo's own is cached.
+  MBX_DISABLE: "1"
+  # A check the environment cannot run is a failure, not a skip.
+  CI: "true"
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
+        with:
+          version: 2026.10.21
       - uses: Swatinem/rust-cache@v2
-      - run: mise install --monorepo
       - run: mise run '//...:check'

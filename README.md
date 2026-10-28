@@ -11,5 +11,6 @@ Early development.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nusage built here. `mise run //mise:install` generates the mise
-module and has every new Nushell session load it; `mise dot apply` links the global fragment
-that installs the released nusage for the user. The repository uses a single `main` bookmark with a colocated Git/Jujutsu checkout.
+module and has every new interactive Nushell session load it. `mise dot apply` links the
+global fragment that installs the released nusage for the user, with the `nu` it runs scripts
+in and the `usage` its completions run. The repository uses a single `main` bookmark with a colocated Git/Jujutsu checkout.

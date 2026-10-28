@@ -3,8 +3,11 @@ name = "nusage-model"
 description = "The Nushell-facing command model derived from a usage spec and its type annotations"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+# Released as binaries, not on crates.io.
+publish = false
 
 [dependencies]
 nusage-spec.workspace = true

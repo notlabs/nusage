@@ -3,8 +3,11 @@ name = "nusage"
 description = "Typed Nushell commands from usage-annotated scripts"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+# Released as binaries, not on crates.io.
+publish = false
 
 [[bin]]
 name = "nusage"

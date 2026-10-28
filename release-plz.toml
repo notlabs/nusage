@@ -1,6 +1,8 @@
-# The crates share the workspace version and are not published; a release is the tag and
-# the GitHub release that `nusage` gets, which release.yml attaches the binaries to.
+# The crates share the workspace version and are never published: git tags are the version
+# authority, and a release is the tag and the GitHub release that `nusage` gets, created as a
+# draft that release.yml publishes once every binary is attached.
 [workspace]
+git_only = true
 publish = false
 git_tag_enable = false
 git_release_enable = false
@@ -15,3 +17,4 @@ git_tag_enable = true
 git_tag_name = "v{{ version }}"
 git_release_enable = true
 git_release_name = "v{{ version }}"
+git_release_draft = true

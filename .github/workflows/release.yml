@@ -1,7 +1,7 @@
 name: release
 
-# The binaries for the release release-plz created for the tag, one archive per target with
-# its checksum, each attested; what mise's `github:` backend installs.
+# The binaries for the draft release release-plz created for the tag, once the tagged commit
+# passes the checks: one archive per target with its checksum, then the release is published.
 on:
   push:
     tags: ["v[0-9]+.*"]
@@ -9,8 +9,15 @@ on:
 permissions:
   contents: read
 
+env:
+  MBX_DISABLE: "1"
+
 jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+
   assets:
+    needs: check
     strategy:
       fail-fast: false
       matrix:
@@ -24,15 +31,17 @@ jobs:
           - { target: x86_64-pc-windows-msvc, os: windows-latest, build-tool: cargo }
           - { target: aarch64-pc-windows-msvc, os: windows-latest, build-tool: cargo }
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     permissions:
       contents: write
       id-token: write
       attestations: write
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: jdx/mise-action@v5
         with:
-          targets: ${{ matrix.target }}
+          version: 2026.10.21
+      - run: rustup target add ${{ matrix.target }}
       - uses: taiki-e/install-action@cross
         if: matrix.build-tool == 'cross'
       - uses: taiki-e/upload-rust-binary-action@v1
@@ -45,6 +54,19 @@ jobs:
           checksum: sha256
           locked: true
           token: ${{ secrets.GITHUB_TOKEN }}
+      # Attestations for a private repository need GitHub Enterprise Cloud.
       - uses: actions/attest-build-provenance@v4
+        if: ${{ !github.event.repository.private }}
         with:
           subject-path: ${{ steps.upload.outputs.tar || steps.upload.outputs.zip }}
+
+  publish:
+    needs: assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

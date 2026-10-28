@@ -24,6 +24,12 @@ use usage::kdl::{KdlDocument, KdlNode};
 #[test]
 fn usage_corpus_binds_the_same() {
     let Ok(corpus) = std::env::var("NUSAGE_CORPUS") else {
+        // The mise task sets it; a bare `cargo test` without the corpus says so, and in CI
+        // that is a failure, since a check that did not run proves nothing.
+        assert!(
+            std::env::var_os("CI").is_none(),
+            "NUSAGE_CORPUS is not set; `mise run //nusage:test` sets it to usage's corpus"
+        );
         eprintln!("NUSAGE_CORPUS is not set; usage's corpus is not posed");
         return;
     };
@@ -97,13 +103,17 @@ fn pose(dir: &Path, vector: &Json) -> Option<String> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let expect = &vector["expect"];
     if let Some(error) = expect.get("error") {
-        return if output.status.success() {
-            Some(format!(
+        // usage's refusal is exit code 2; anything else is the interpreter's own failure.
+        return match output.status.code() {
+            Some(2) => None,
+            Some(0) => Some(format!(
                 "expected the error {error}, bound {}",
                 stdout.trim()
-            ))
-        } else {
-            None
+            )),
+            code => Some(format!(
+                "expected the error {error}, but the interpreter failed (exit {code:?}): {}",
+                stderr.trim()
+            )),
         };
     }
     if !output.status.success() {
