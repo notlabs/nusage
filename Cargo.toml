@@ -23,6 +23,8 @@ indexmap = "2"
 # and `nu-engine` only compiles when `nu-protocol` agrees, so the direct dependencies leave
 # `os` off too; `nu-command` turns it on everywhere for the tests that need it.
 nuon = "0.116.1"
+# The corpus test reads usage's vectors.
+serde_json = "1"
 nu-protocol = { version = "0.116.1", default-features = false }
 nu-parser = "0.116.1"
 nu-cmd-lang = "0.116.1"

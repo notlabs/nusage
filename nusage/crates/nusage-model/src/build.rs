@@ -368,7 +368,8 @@ impl Context<'_> {
                         .unwrap_or_else(|| conventional_type(arg, &found)),
                 );
                 let completer = found.map(|(completer, _)| completer);
-                if repeated {
+                // A flag given several times, or one taking several values, is a list.
+                if repeated || arg.var {
                     let defaults = flag
                         .default
                         .iter()

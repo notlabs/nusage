@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use nu_protocol::{Record, Span, Value};
-use nusage_model::{Param, ParamKind, value_from_text};
+use nusage_model::{Execution, Param, ParamKind, value_from_text};
 use nusage_spec::{CommandPath, Diagnostic};
 use usage::parse::{ParseOutput, ParseValue};
 
@@ -28,8 +28,15 @@ pub enum Parsed {
 }
 
 /// Parse the arguments against the script's header, as usage does, into the record a shim
-/// would build.
+/// would build. In a tree, the arguments may select a subcommand of the script's command,
+/// as usage routes them, by name, alias or `default_subcommand`: the record is then that
+/// command's, and [`interpret`] runs its script.
 pub fn parse(script: &Path, args: &[String]) -> Result<Parsed, Diagnostic> {
+    Ok(parse_routed(script, args)?.0)
+}
+
+/// [`parse`], with the script of the command the arguments selected.
+fn parse_routed(script: &Path, args: &[String]) -> Result<(Parsed, PathBuf), Diagnostic> {
     let (root, path) = place_in_tree(script)?;
     let assembled = nusage_spec::assemble(&root)?;
     let tree = nusage_model::model(&assembled)?;
@@ -53,19 +60,34 @@ pub fn parse(script: &Path, args: &[String]) -> Result<Parsed, Diagnostic> {
         Ok(parsed) => parsed,
         // usage renders help as the error for `--help`; anything else is a usage error.
         Err(err) if args.iter().any(|arg| arg == "--help" || arg == "-h") => {
-            return Ok(Parsed::Help(err.to_string()));
+            return Ok((Parsed::Help(err.to_string()), script.to_path_buf()));
         }
-        Err(err) => return Ok(Parsed::Rejected(err.to_string())),
+        Err(err) => return Ok((Parsed::Rejected(err.to_string()), script.to_path_buf())),
     };
+    // The command usage selected, which the script's own when nothing routed deeper.
+    let mut selected: &[String] = &parsed.cmd.full_cmd;
+    if selected.first() == Some(&assembled.spec.bin) {
+        selected = &selected[1..];
+    }
+    let command = tree
+        .commands
+        .iter()
+        .find(|candidate| candidate.path.words() == selected)
+        .unwrap_or(command);
     let record =
         usage_record(command, &parsed).map_err(|message| Diagnostic::new(script, message))?;
-    Ok(Parsed::Record(record))
+    let run = match &command.execution {
+        Execution::Script(body) => body.clone(),
+        Execution::External => script.to_path_buf(),
+    };
+    Ok((Parsed::Record(record), run))
 }
 
 /// Run the script with the arguments; the exit code is the script's, or 0 after printing
 /// help, or 2 when usage rejects the arguments.
 pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
-    let record = match parse(script, args)? {
+    let (parsed, run) = parse_routed(script, args)?;
+    let record = match parsed {
         Parsed::Record(record) => record,
         Parsed::Help(page) => {
             println!("{page}");
@@ -76,7 +98,7 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
             return Ok(2);
         }
     };
-    let path = std::path::absolute(script)
+    let path = std::path::absolute(&run)
         .map_err(|err| Diagnostic::new(script, format!("cannot resolve: {err}")))?;
     // The script's `$in` is standard input when something is piped in, read only if the
     // script reads it: `nu --stdin` would read a pipe to its end before the script runs, so
@@ -219,6 +241,21 @@ fn usage_record(command: &nusage_model::Command, parsed: &ParseOutput) -> Result
         };
         flags.push(param.var.clone(), flag_value(param, found)?);
     }
+    // Whatever else the call bound on the way to the command, as usage reports it: an
+    // ancestor's own flag before a default subcommand's word, a sigil argument. A declared
+    // parameter is typed and defaulted above; these are as bound.
+    for (arg, value) in &parsed.args {
+        let name = nusage_model::identifier(&arg.name).var;
+        if !args.contains(&name) {
+            args.push(name, as_bound(value));
+        }
+    }
+    for (flag, value) in &parsed.flags {
+        let name = nusage_model::identifier(&flag.name).var;
+        if !flags.contains(&name) {
+            flags.push(name, as_bound(value));
+        }
+    }
     let mut record = Record::new();
     record.push(
         "cmd",
@@ -234,6 +271,20 @@ fn usage_record(command: &nusage_model::Command, parsed: &ParseOutput) -> Result
     );
     record.push("args", Value::record(args, span));
     record.push("flags", Value::record(flags, span));
+    // The words after an `external_subcommand`, when the command declares one and the call
+    // reached it.
+    if let Some(external) = &parsed.external {
+        record.push(
+            "external",
+            Value::list(
+                external
+                    .iter()
+                    .map(|word| Value::string(word, span))
+                    .collect(),
+                span,
+            ),
+        );
+    }
     Ok(Value::record(record, span))
 }
 
@@ -263,6 +314,22 @@ fn positional_value(param: &Param, found: Option<&ParseValue>) -> Result<Value, 
             ));
         }
     })
+}
+
+/// A value as usage bound it, untyped: text, a list of text, a switch, a count.
+fn as_bound(value: &ParseValue) -> Value {
+    let span = Span::unknown();
+    match value {
+        ParseValue::String(text) => Value::string(text, span),
+        ParseValue::MultiString(items) => Value::list(
+            items.iter().map(|item| Value::string(item, span)).collect(),
+            span,
+        ),
+        ParseValue::Bool(flag) => Value::bool(*flag, span),
+        ParseValue::MultiBool(flags) => {
+            Value::int(flags.iter().filter(|on| **on).count() as i64, span)
+        }
+    }
 }
 
 fn flag_value(param: &Param, found: Option<&ParseValue>) -> Result<Value, String> {

@@ -52,8 +52,12 @@ pub struct ScriptHeader {
     pub header: Header,
     /// The header's KDL, the `#USAGE` lines joined.
     pub kdl: String,
-    /// usage's parse. Its `cmd` holds the args and flags this file declares.
+    /// usage's parse: the whole spec for a root script; for a subcommand's, the spec that
+    /// wraps its header in a `cmd`, which [`ScriptHeader::cmd`] is taken from.
     pub spec: usage::Spec,
+    /// The command this file declares: its args, flags, outputs, and for a subcommand its
+    /// `alias` and `hide` too.
+    pub cmd: usage::SpecCommand,
 }
 
 /// Lines that open or continue a header. Only the `#` comment prefix: these are Nushell files.
@@ -93,9 +97,7 @@ fn extract(path: &Path, source: &str) -> Result<Vec<(usize, String)>, Diagnostic
             break;
         }
     }
-    if lines.is_empty() {
-        return Err(Diagnostic::new(path, "no `#USAGE` lines found").at_line(1));
-    }
+    // No lines is a command with no parameters.
     Ok(lines)
 }
 
@@ -142,8 +144,20 @@ pub(crate) fn header_node(
     }
 }
 
-/// Read one script's header.
+/// Read a root script's header: a usage spec, as its `#USAGE` lines spell it.
 pub fn read_header(path: &Path) -> Result<ScriptHeader, Diagnostic> {
+    read(path, None)
+}
+
+/// Read a subcommand script's header: what a `cmd "<name>" { }` holds, as its `#USAGE`
+/// lines spell it, `about` and `long_about` standing for the command's `help` and
+/// `long_help`, so a subcommand declares what usage lets a command declare, an `alias` or
+/// `hide` included.
+pub fn read_subcommand_header(path: &Path, name: &str) -> Result<ScriptHeader, Diagnostic> {
+    read(path, Some(name))
+}
+
+fn read(path: &Path, subcommand: Option<&str>) -> Result<ScriptHeader, Diagnostic> {
     let source = fs::read_to_string(path)
         .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?;
     let lines = extract(path, &source)?;
@@ -155,12 +169,9 @@ pub fn read_header(path: &Path) -> Result<ScriptHeader, Diagnostic> {
         kdl.push_str(text);
         kdl.push('\n');
     }
-    let first_line = lines[0].0;
-    let doc: KdlDocument = kdl.parse().map_err(|err| {
+    let first_line = lines.first().map(|(line, _)| *line).unwrap_or(1);
+    let mut doc: KdlDocument = kdl.parse().map_err(|err| {
         Diagnostic::new(path, format!("header is not valid KDL: {err}")).at_line(first_line)
-    })?;
-    let spec = kdl.parse::<usage::Spec>().map_err(|err| {
-        Diagnostic::new(path, format!("usage rejects the header: {err}")).at_line(first_line)
     })?;
     let line_of = |offset: usize| {
         offsets
@@ -175,15 +186,43 @@ pub fn read_header(path: &Path) -> Result<ScriptHeader, Diagnostic> {
         .iter()
         .map(|node| header_node(node, &kdl, line_of))
         .collect();
+    let rejected = |err: usage::error::UsageErr| {
+        Diagnostic::new(path, format!("usage rejects the header: {err}")).at_line(first_line)
+    };
+    let (spec, cmd, about, about_long) = match subcommand {
+        None => {
+            let spec = kdl.parse::<usage::Spec>().map_err(rejected)?;
+            let cmd = spec.cmd.clone();
+            let (about, about_long) = (spec.about.clone(), spec.about_long.clone());
+            (spec, cmd, about, about_long)
+        }
+        Some(name) => {
+            for node in doc.nodes_mut() {
+                match node.name().value() {
+                    "about" => node.set_name("help"),
+                    "long_about" => node.set_name("long_help"),
+                    _ => {}
+                }
+            }
+            let wrapped = format!("name \"_\"\nbin \"_\"\ncmd {name:?} {{\n{doc}}}\n");
+            let spec = wrapped.parse::<usage::Spec>().map_err(rejected)?;
+            let cmd = spec.cmd.subcommands.get(name).cloned().ok_or_else(|| {
+                Diagnostic::new(path, "usage did not read the header as a command")
+            })?;
+            let (about, about_long) = (cmd.help.clone(), cmd.help_long.clone());
+            (spec, cmd, about, about_long)
+        }
+    };
     Ok(ScriptHeader {
         header: Header {
             path: path.to_path_buf(),
             nodes,
-            about: spec.about.clone(),
-            about_long: spec.about_long.clone(),
+            about,
+            about_long,
         },
         kdl,
         spec,
+        cmd,
     })
 }
 

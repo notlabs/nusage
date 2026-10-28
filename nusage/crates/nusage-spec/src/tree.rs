@@ -7,7 +7,7 @@ use usage::SpecCommand;
 use usage::kdl::{KdlDocument, KdlNode};
 
 use crate::header::header_node;
-use crate::{Diagnostic, Header, read_header};
+use crate::{Diagnostic, Header, read_header, read_subcommand_header};
 
 /// A command's place in the tree: subcommand names outermost first, empty at the root.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -342,12 +342,12 @@ fn children(
                 continue;
             }
             (
-                read_header(&entry)?,
+                read_subcommand_header(&entry, &name)?,
                 entry.clone(),
                 indexmap::IndexMap::new(),
             )
         } else if entry.is_dir() && entry.join("mod.nu").is_file() {
-            let script = group_header(&entry)?;
+            let script = read_subcommand_header(&entry.join("mod.nu"), &name)?;
             let path = parent.child(&name);
             let nested = children(&entry, &path, bodies, headers)?;
             (script, entry.join("mod.nu"), nested)
@@ -356,12 +356,8 @@ fn children(
         };
         reject_mounts(&script.header)?;
         let path = parent.child(&name);
-        let mut cmd = script.spec.cmd.clone();
+        let mut cmd = script.cmd.clone();
         cmd.name = name.clone();
-        cmd.help = script.spec.about.clone();
-        cmd.help_long = script.spec.about_long.clone();
-        // A fragment's top-level `output` nodes are CLI-wide to usage; here they are the command's.
-        cmd.outputs.extend(script.spec.outputs.iter().cloned());
         cmd.subcommands = nested;
         bodies.insert(path.clone(), body);
         headers.insert(path, script.header);

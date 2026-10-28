@@ -15,5 +15,5 @@ mod overlay;
 mod tree;
 
 pub use error::Diagnostic;
-pub use header::{Header, HeaderNode, ScriptHeader, read_header};
+pub use header::{Header, HeaderNode, ScriptHeader, read_header, read_subcommand_header};
 pub use tree::{Assembled, CommandPath, Provider, Source, assemble, assemble_with, command_at};
