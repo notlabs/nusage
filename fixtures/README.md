@@ -1,12 +1,15 @@
 # Fixtures
 
-Each directory holds a source (`script.nu`, a `<bin>/` tree, or `<bin>.usage.kdl`), the module
-the generator must produce for it byte for byte (`expected/<bin>.nu`), the parsed signatures that
-module yields (`expected/signatures.nuon`), and cases (`cases/*.nuon`). `verify.nu` runs the
-cases against the Nushell that runs it.
+Each directory holds a source (`script.nu`, a `<bin>/` tree, or `<bin>.usage.kdl`, with a
+`<bin>.overlay.kdl` merged onto it when present), the module the generator must produce for it
+byte for byte (`expected/<bin>.nu`), the parsed signatures that module yields
+(`expected/signatures.nuon`), and cases (`cases/*.nuon`). `verify.nu` runs the cases against
+the Nushell that runs it, and a single script's cases also through the `nusage` interpreter
+when the binary is built.
 
 A script case is `{argv, invoke?, usage, output?, complete?}`: `argv` is what the interpreter
-receives; `invoke` the Nushell spelling when it differs; `usage` the record the script must see;
+receives, as `nusage <script> ...argv` parses it; `invoke` the Nushell spelling when it differs;
+`usage` the record the script must see;
 `output` what the command returns when that is not the record; `complete` a line and the
 completions expected at its end. A binary case is `{cmd, complete?, invoke?, argv?, stdout?,
 output?}`: `invoke` is a call run with the fixture's `fake/<bin>` on `PATH`, a stand-in that

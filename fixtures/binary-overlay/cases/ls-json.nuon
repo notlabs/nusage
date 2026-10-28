@@ -1,0 +1,9 @@
+# The overlay's json output: selected by the base's `--json`, decoded, `size` converted to the
+# filesize the overlay's annotation declares.
+{
+    cmd: [ls],
+    invoke: "tool ls --json",
+    argv: [ls, --json],
+    stdout: "[{\"name\": \"a\", \"size\": 2048}]",
+    output: [[name, size]; [a, 2048b]],
+}

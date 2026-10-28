@@ -671,7 +671,6 @@ fn typed_default(
     header: &Header,
     node: Option<&HeaderNode>,
 ) -> Result<Value, Diagnostic> {
-    let span = Span::unknown();
     let at = |message: String| {
         let diagnostic = Diagnostic::new(&header.path, message);
         match node {
@@ -679,19 +678,21 @@ fn typed_default(
             None => diagnostic,
         }
     };
-    let value = if matches!(ty.as_str(), "string" | "path" | "glob" | "directory") {
-        Value::string(text, span)
-    } else {
-        nuon::from_nuon(text, Some(span)).map_err(|err| {
-            at(format!(
-                "default {text:?} does not read as a `{}`: {err}",
-                ty.as_str()
-            ))
-        })?
-    };
+    let value = value_from_text(text, ty).map_err(|err| at(format!("default {err}")))?;
     let nu_type = nusage_nu::Type::new(ty.as_str()).map_err(|err| at(err.to_string()))?;
     nusage_nu::check_default(&nu_type, &value).map_err(|err| at(err.to_string()))?;
     Ok(value)
+}
+
+/// A value of the parameter's type from the text usage holds for it, a default or a word of
+/// argv: the text itself for a string type, else the text read as NUON.
+pub fn value_from_text(text: &str, ty: &NuType) -> Result<Value, String> {
+    let span = Span::unknown();
+    if matches!(ty.as_str(), "string" | "path" | "glob" | "directory") {
+        return Ok(Value::string(text, span));
+    }
+    nuon::from_nuon(text, Some(span))
+        .map_err(|err| format!("{text:?} does not read as a `{}`: {err}", ty.as_str()))
 }
 
 /// The type a signature reads from the annotation: nu-parser keeps its type parser private,

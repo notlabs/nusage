@@ -5,6 +5,8 @@
 #   - shim:        `use expected/<bin>.nu; <bin> <words>`        (Nushell types the arguments)
 #   - interpreter: `let usage = ($env.NUSAGE_ARGS | from nuon); $in | run <script>`
 #                                                                  (the record is handed in as NUON)
+#   - parse:       `nusage parse <script> -- <argv>`, for a single script, when
+#                  target/debug/nusage is built: the record usage's parser yields
 # A binary fixture (a `<bin>.usage.kdl`) has no scripts: a case's `invoke` runs the module
 # against the fixture's `fake/<bin>`, which records the argv it received and prints what the
 # case says, so argv building and decoding are checked; then completions and signatures.
@@ -22,6 +24,7 @@ def main [
     --update-signatures,   # Rewrite expected/signatures.nuon instead of comparing it
 ] {
     let root = $env.CURRENT_FILE | path dirname
+    $env.NUSAGE_BIN = $root | path dirname | path join target debug nusage
     let fixtures = if ($fixtures | is-empty) {
         ls $root | where type == dir | get name
     } else {
@@ -60,7 +63,13 @@ def verify-fixture [dir: path, update: bool] {
             [
                 (row $name shim $id (check-shim $import $bin $case))
                 (row $name interpreter $id (check-interpreter $dir $bin $case))
-            ]
+            ] | append (
+                if ($dir | path join script.nu | path exists) {
+                    [(row $name parse $id (check-parse $dir $case))]
+                } else {
+                    []
+                }
+            )
         }
         if ($case.complete? | is-not-empty) {
             $rows | append (row $name complete $id (check-complete $import $case.complete))
@@ -149,6 +158,20 @@ def check-invoke [dir: path, import: string, case: record] {
     } else {
         {ok: true, detail: ''}
     }
+}
+
+# The record the built `nusage` makes of the case's argv, as its shebang form would hand it
+# to the script.
+def check-parse [dir: path, case: record] {
+    if not ($env.NUSAGE_BIN | path exists) {
+        return {ok: true, detail: $"skipped: ($env.NUSAGE_BIN) is not built"}
+    }
+    let script = $dir | path join script.nu
+    let out = ^$env.NUSAGE_BIN parse $script -- ...$case.argv | complete
+    if $out.exit_code != 0 {
+        return {ok: false, detail: ($out.stderr | str trim)}
+    }
+    {ok: true, detail: ($out.stdout | str trim)} | compare $case.usage
 }
 
 def check-complete [import: string, complete: record] {

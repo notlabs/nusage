@@ -4,6 +4,10 @@ use std::process::ExitCode;
 use usage_rs::{Args, Cli, Run, Subcommands};
 
 /// Typed Nushell commands from usage-annotated scripts
+///
+/// As an interpreter, `nusage <script> [args...]` runs a script whose first line is
+/// `#!/usr/bin/env nusage`: the arguments are parsed against its `#USAGE` header and the
+/// script runs in Nushell with its `$usage` record, as the generated module would run it.
 #[derive(Cli)]
 #[usage(bin = "nusage", version)]
 struct Nusage {
@@ -16,6 +20,7 @@ struct Nusage {
 enum Commands {
     Generate(Generate),
     Spec(Spec),
+    Parse(Parse),
 }
 
 /// Write the module for a script, a tree of scripts, or a usage spec of a binary
@@ -33,14 +38,19 @@ struct Generate {
     /// Where to write the module; `run` paths are relative to it. Standard output when absent
     #[usage(long, short = 'o')]
     out: Option<PathBuf>,
+    /// A usage KDL document merged onto the spec file first: a `cmd` merges into the command
+    /// of the same name, any other node replaces the one with the same name and first
+    /// argument. For outputs, selectors and type annotations a spec one does not own lacks
+    #[usage(long)]
+    overlay: Vec<PathBuf>,
 }
 
 impl Run for Generate {
     type Output = Result<(), String>;
 
     fn run(self) -> Self::Output {
-        let module =
-            nusage::generate(&self.source, self.out.as_deref()).map_err(|e| e.to_string())?;
+        let module = nusage::generate_with(&self.source, self.out.as_deref(), &self.overlay)
+            .map_err(|e| e.to_string())?;
         match &self.out {
             Some(out) => {
                 std::fs::write(out, module).map_err(|err| format!("{}: {err}", out.display()))
@@ -58,21 +68,68 @@ impl Run for Generate {
 /// The tree's per-file headers merged into one spec, which every usage tool can read.
 #[derive(Args)]
 struct Spec {
-    /// The script, or the directory of scripts
+    /// The script, the directory of scripts, or the `.kdl` spec file
     source: PathBuf,
+    /// A usage KDL document merged onto the spec file first, as for `generate`
+    #[usage(long)]
+    overlay: Vec<PathBuf>,
 }
 
 impl Run for Spec {
     type Output = Result<(), String>;
 
     fn run(self) -> Self::Output {
-        let spec = nusage::spec(&self.source).map_err(|e| e.to_string())?;
+        let spec = nusage::spec(&self.source, &self.overlay).map_err(|e| e.to_string())?;
         print!("{spec}");
         Ok(())
     }
 }
 
+/// Print the `$usage` record a script would see for the arguments, as NUON
+///
+/// What `nusage <script> [args...]` hands the script, without running it: the arguments
+/// parsed by usage against the `#USAGE` header. Put the script's arguments after `--`.
+#[derive(Args)]
+struct Parse {
+    /// The script
+    script: PathBuf,
+    /// The script's arguments
+    args: Vec<String>,
+}
+
+impl Run for Parse {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        match nusage::parse(&self.script, &self.args).map_err(|e| e.to_string())? {
+            nusage::Parsed::Record(record) => {
+                println!("{}", nusage_nu::nuon(&record));
+                Ok(())
+            }
+            nusage::Parsed::Help(page) => {
+                println!("{page}");
+                Ok(())
+            }
+            nusage::Parsed::Rejected(why) => Err(why),
+        }
+    }
+}
+
 fn main() -> ExitCode {
+    // `nusage <script> [args...]`, the shebang form: the first argument names a file. The
+    // subcommands are words, never files.
+    let argv: Vec<String> = std::env::args().collect();
+    if let Some(first) = argv.get(1)
+        && std::path::Path::new(first).is_file()
+    {
+        return match nusage::interpret(std::path::Path::new(first), &argv[2..]) {
+            Ok(code) => ExitCode::from(code.clamp(0, 255) as u8),
+            Err(err) => {
+                eprintln!("nusage: {err}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     match Nusage::parse().command.run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {

@@ -1,0 +1,7 @@
+name "tool"
+bin "tool"
+about "A tool whose own spec, as `tool usage` prints it, declares no outputs or types"
+cmd "ls" help="List things" {
+    flag "-J --json" help="Print JSON"
+    arg "[name]" help="Only this one"
+}

@@ -7,9 +7,12 @@
 
 mod binary;
 mod common;
+mod interpret;
 mod shim;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+pub use interpret::{Parsed, interpret, parse};
 
 pub use nusage_spec::Diagnostic;
 use nusage_spec::Source;
@@ -24,7 +27,17 @@ use nusage_spec::Source;
 /// relative to that file's directory, or to the current directory with `None`. The result
 /// has been parsed by Nushell: what Nushell rejects is a diagnostic here, not at `use`.
 pub fn generate(source: &Path, out: Option<&Path>) -> Result<String, Diagnostic> {
-    let assembled = nusage_spec::assemble(source)?;
+    generate_with(source, out, &[])
+}
+
+/// [`generate`], with overlays merged onto a spec file first; see
+/// [`nusage_spec::assemble_with`].
+pub fn generate_with(
+    source: &Path,
+    out: Option<&Path>,
+    overlays: &[PathBuf],
+) -> Result<String, Diagnostic> {
+    let assembled = nusage_spec::assemble_with(source, overlays)?;
     let tree = nusage_model::model(&assembled)?;
     let module = match &assembled.source {
         Source::Scripts { .. } => {
@@ -48,8 +61,8 @@ pub fn generate(source: &Path, out: Option<&Path>) -> Result<String, Diagnostic>
     Ok(text)
 }
 
-/// The assembled spec as usage KDL, for every tool that reads usage specs.
-pub fn spec(source: &Path) -> Result<String, Diagnostic> {
-    let assembled = nusage_spec::assemble(source)?;
+/// The assembled spec as usage KDL, overlays merged, for every tool that reads usage specs.
+pub fn spec(source: &Path, overlays: &[PathBuf]) -> Result<String, Diagnostic> {
+    let assembled = nusage_spec::assemble_with(source, overlays)?;
     Ok(assembled.spec.to_string())
 }

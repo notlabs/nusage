@@ -1,0 +1,27 @@
+[
+  [name,      signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            attributes];
+  [tool,      {
+      any: [
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          any,          false,       null,       null,        null,       null],
+        [null,           output,         any,          false,       null,       null,        null,       null]
+      ]
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              [
+
+    ]],
+  ["tool ls", {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                                         is_optional, short_flag, description,              completion, parameter_default];
+        [null,           input,          nothing,                                              false,       null,       null,                     null,       null],
+        [name,           positional,     string,                                               true,        null,       "Only this one, by name", null,       null],
+        [json,           switch,         null,                                                 true,        J,          "Print JSON",             null,       null],
+        [null,           output,         "oneof<string, table<name: string, size: filesize>>", false,       null,       null,                     null,       null]
+      ]
+    }, [
+      [name,  value];
+      [usage, "flag \"-J --json\" help=\"Print JSON\""],
+      [usage, "arg (\"string\")\"[name]\" help=\"Only this one, by name\""],
+      [usage, "output \"text\" default=#true"],
+      [usage, "output (\"table<name: string, size: filesize>\")\"json\" framing=\"json\" select=\"--json\""]
+    ]]
+]

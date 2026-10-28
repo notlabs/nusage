@@ -7,12 +7,13 @@
 //! exists beyond the file extension and the `mod.nu` layout.
 //!
 //! The entry points are [`read_header`] for one script and [`assemble`] for a script, a tree
-//! or a spec file.
+//! or a spec file; [`assemble_with`] merges overlays onto a spec file first.
 
 mod error;
 mod header;
+mod overlay;
 mod tree;
 
 pub use error::Diagnostic;
 pub use header::{Header, HeaderNode, ScriptHeader, read_header};
-pub use tree::{Assembled, CommandPath, Provider, Source, assemble, command_at};
+pub use tree::{Assembled, CommandPath, Provider, Source, assemble, assemble_with, command_at};

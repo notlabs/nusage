@@ -89,12 +89,31 @@ impl Assembled {
 /// subdirectories (each with its own `mod.nu`) are its subcommands, or a `.kdl` spec file
 /// describing a binary.
 pub fn assemble(source: &Path) -> Result<Assembled, Diagnostic> {
+    assemble_with(source, &[])
+}
+
+/// [`assemble`], with overlays merged onto a spec file before usage reads it: each is a usage
+/// KDL document whose nodes are added to the spec's, a `cmd` merging into the command of the
+/// same name and any other node replacing the one with the same name and first argument.
+/// Scripts take no overlay; their headers are their own.
+pub fn assemble_with(source: &Path, overlays: &[PathBuf]) -> Result<Assembled, Diagnostic> {
     if source.is_file() {
         return if source.extension().and_then(|ext| ext.to_str()) == Some("kdl") {
-            assemble_spec_file(source)
+            assemble_spec_file(source, overlays)
+        } else if let Some(overlay) = overlays.first() {
+            Err(Diagnostic::new(
+                overlay,
+                "an overlay applies to a spec file; a script declares its own header",
+            ))
         } else {
             assemble_single(source)
         };
+    }
+    if let Some(overlay) = overlays.first() {
+        return Err(Diagnostic::new(
+            overlay,
+            "an overlay applies to a spec file; scripts declare their own headers",
+        ));
     }
     if !source.is_dir() {
         return Err(Diagnostic::new(source, "not a file or a directory"));
@@ -157,12 +176,31 @@ fn assemble_single(path: &Path) -> Result<Assembled, Diagnostic> {
 
 /// A spec file: the root's declaration is its top-level nodes, each `cmd` node is a command
 /// whose declaration is its children.
-fn assemble_spec_file(path: &Path) -> Result<Assembled, Diagnostic> {
+fn assemble_spec_file(path: &Path, overlays: &[PathBuf]) -> Result<Assembled, Diagnostic> {
     let text = fs::read_to_string(path)
         .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?;
-    let doc: KdlDocument = text
+    let mut doc: KdlDocument = text
         .parse()
         .map_err(|err| Diagnostic::new(path, format!("not valid KDL: {err}")))?;
+    for overlay in overlays {
+        let overlay_text = fs::read_to_string(overlay)
+            .map_err(|err| Diagnostic::new(overlay, format!("cannot read: {err}")))?;
+        let overlay_doc: KdlDocument = overlay_text
+            .parse()
+            .map_err(|err| Diagnostic::new(overlay, format!("not valid KDL: {err}")))?;
+        crate::overlay::merge(&mut doc, &overlay_doc);
+    }
+    // With overlays, the text usage reads is the merged document, re-parsed so that node
+    // spans are its; a diagnostic's line then counts in that document rather than the file.
+    let (text, doc) = if overlays.is_empty() {
+        (text, doc)
+    } else {
+        let merged = doc.to_string();
+        let doc: KdlDocument = merged.parse().map_err(|err| {
+            Diagnostic::new(path, format!("the overlays merged into invalid KDL: {err}"))
+        })?;
+        (merged, doc)
+    };
     let mut spec = usage::Spec::parse_str_with_path(&text, path)
         .map_err(|err| Diagnostic::new(path, format!("usage rejects the spec: {err}")))?;
     if spec.name.is_empty() {

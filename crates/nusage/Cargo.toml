@@ -11,6 +11,8 @@ name = "nusage"
 path = "src/main.rs"
 
 [dependencies]
+usage.workspace = true
+nu-protocol.workspace = true
 nusage-spec.workspace = true
 nusage-model.workspace = true
 nusage-nu.workspace = true

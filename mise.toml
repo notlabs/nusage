@@ -7,7 +7,8 @@ nu = "0.116.1"
 jujutsu = "0.46.0"
 
 [tasks.verify-fixtures]
-description = "Run every fixture through both entrypoints, check completions and parsed signatures"
+description = "Run every fixture through its entrypoints, check completions and parsed signatures"
+depends = ["build"]
 run = "nu fixtures/verify.nu"
 
 [tasks.update-fixture-signatures]

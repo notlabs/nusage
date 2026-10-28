@@ -44,8 +44,11 @@ fn fixtures_generate_their_expected_modules() {
             .expect("expected/<bin>.nu");
         let bin = module_file.file_stem().unwrap().to_str().unwrap();
         let source = source_of(&fixture, bin);
+        // A spec fixture may carry an overlay beside its spec.
+        let overlay = fixture.join(format!("{bin}.overlay.kdl"));
+        let overlays: Vec<PathBuf> = overlay.is_file().then_some(overlay).into_iter().collect();
         let expected = fs::read_to_string(&module_file).unwrap();
-        match nusage::generate(&source, Some(&module_file)) {
+        match nusage::generate_with(&source, Some(&module_file), &overlays) {
             Ok(actual) if actual == expected => checked += 1,
             Ok(actual) => failures.push(format!(
                 "{}: generated module differs from {}\n--- expected\n{expected}--- actual\n{actual}",
@@ -142,5 +145,67 @@ fn fixtures_parse_with_nu_parser() {
     assert!(
         checked >= 3,
         "expected at least three fixtures parsed, found {checked}"
+    );
+}
+
+/// Every single-script case parses through `nusage parse` into the record it expects: the
+/// interpreter's half of the contract, without a Nushell.
+#[test]
+fn script_cases_parse_through_the_interpreter() {
+    use nu_protocol::Span;
+    use std::process::Command;
+
+    let mut checked = 0;
+    for fixture in fs::read_dir(fixtures_dir()).unwrap().flatten() {
+        let fixture = fixture.path();
+        let script = fixture.join("script.nu");
+        if !script.is_file() {
+            continue;
+        }
+        let mut cases: Vec<PathBuf> = fs::read_dir(fixture.join("cases"))
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.path())
+            .collect();
+        cases.sort();
+        for case in cases {
+            let text = fs::read_to_string(&case).unwrap();
+            let case_value = nuon::from_nuon(&text, Some(Span::unknown())).expect("a case is NUON");
+            let argv: Vec<String> = case_value
+                .get_data_by_key("argv")
+                .expect("a script case has argv")
+                .into_list()
+                .unwrap()
+                .into_iter()
+                .map(|word| word.coerce_string().unwrap())
+                .collect();
+            let expected = case_value
+                .get_data_by_key("usage")
+                .expect("a script case has usage");
+            let output = Command::new(env!("CARGO_BIN_EXE_nusage"))
+                .arg("parse")
+                .arg(&script)
+                .arg("--")
+                .args(&argv)
+                .output()
+                .expect("nusage runs");
+            assert!(
+                output.status.success(),
+                "{}: {}",
+                case.display(),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let got = nuon::from_nuon(
+                &String::from_utf8_lossy(&output.stdout),
+                Some(Span::unknown()),
+            )
+            .expect("nusage parse prints NUON");
+            assert_eq!(got, expected, "{}", case.display());
+            checked += 1;
+        }
+    }
+    assert!(
+        checked >= 4,
+        "expected at least four script cases, found {checked}"
     );
 }
