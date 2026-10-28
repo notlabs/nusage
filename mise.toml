@@ -21,10 +21,11 @@ actionlint = "1.7.11"
 
 # The repository's tasks run through the nusage built here, which `//nusage:build` links
 # into `.bin`, not through a release. jj reads the formatters from `jj.toml` here, after
-# the user's own configuration.
+# the user's own configuration files in the order jj itself reads them; a path that does
+# not exist is passed over.
 [env]
 _.path = ["{{config_root}}/.bin"]
-JJ_CONFIG = "{{ env.HOME }}/.jjconfig.toml:{{ xdg_config_home }}/jj:{{ config_root }}/jj.toml"
+JJ_CONFIG = "{{ env.HOME }}/.jjconfig.toml:{{ xdg_config_home }}/jj/config.toml:{{ xdg_config_home }}/jj/conf.d:{{ config_root }}/jj.toml"
 
 [tasks.lint]
 description = "The workflows by actionlint, and the handwritten Nushell and the TOML as the formatters want them"
