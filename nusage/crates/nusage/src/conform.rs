@@ -9,7 +9,7 @@ use std::path::Path;
 
 use nusage_model::identifier;
 use nusage_nu::{Decl, SyntaxError, signatures};
-use nusage_spec::{Assembled, Source};
+use nusage_spec::{Assembled, CommandPath, Source};
 use usage::{Spec, SpecArg, SpecCommand, SpecFlag};
 
 use crate::common::restates;
@@ -34,6 +34,7 @@ pub fn conform(
         .collect();
     let checker = Checker {
         spec: &assembled.spec,
+        assembled,
         binary: matches!(assembled.source, Source::Binary),
         providers,
         decls: &decls,
@@ -44,6 +45,8 @@ pub fn conform(
 
 struct Checker<'a> {
     spec: &'a Spec,
+    /// For the `nusage-args` usage does not read.
+    assembled: &'a Assembled,
     binary: bool,
     /// The scripts other scripts name as completion providers: completion calls them with
     /// the word to complete and nothing else, so they take no flags.
@@ -73,9 +76,8 @@ impl Checker<'_> {
         } else {
             words.join(" ")
         };
-        let provider = self.providers.iter().any(|path| path == words);
         match self.decls.get(&def) {
-            Some(decl) => self.definition(cmd, &chain, &def, decl, provider, findings),
+            Some(decl) => self.definition(cmd, &chain, words, &def, decl, findings),
             None => findings.push(format!("`{def}`: no definition")),
         }
         for (name, sub) in &cmd.subcommands {
@@ -92,11 +94,12 @@ impl Checker<'_> {
         &self,
         cmd: &SpecCommand,
         chain: &[&SpecCommand],
+        words: &[String],
         def: &str,
         decl: &Decl,
-        provider: bool,
         findings: &mut Vec<String>,
     ) {
+        let provider = self.providers.iter().any(|path| path == words);
         let mut note = |what: String| findings.push(format!("`{def}`: {what}"));
 
         // Positionals: the command's or its clause's, a clause's one positional repeating.
@@ -177,13 +180,31 @@ impl Checker<'_> {
         }
 
         // Flags: what usage accepts here, less the hidden, the builtin and the output
-        // selectors, which the wrapper passes itself.
-        let selectors: Vec<String> = usage::effective_outputs_ref(self.spec, chain.iter().copied())
+        // selectors, which the wrapper passes itself: a `select`, and the flags an output's
+        // `nusage-args` name.
+        let outputs = usage::effective_outputs_ref(self.spec, chain.iter().copied());
+        let path = CommandPath(words.to_vec());
+        let named: Vec<String> = outputs
+            .iter()
+            .filter_map(|output| self.assembled.output_args(&path, &output.name))
+            .flatten()
+            .filter_map(|word| nusage_spec::flag_word(word))
+            .map(str::to_string)
+            .collect();
+        let selectors: Vec<String> = outputs
             .iter()
             .filter_map(|output| output.select.clone())
             .chain(usage::effective_select_ref(self.spec, chain))
             .map(|select| select.trim_start_matches('-').to_string())
             .collect();
+        let selects = |flag: &SpecFlag| {
+            selectors.contains(&flag.name)
+                || named.iter().any(|name| {
+                    flag.long.contains(name)
+                        || (name.chars().count() == 1
+                            && flag.short.contains(&name.chars().next().unwrap()))
+                })
+        };
         let mut expected_flags: Vec<(String, Option<char>, bool, bool)> = Vec::new();
         let available = if provider {
             Vec::new()
@@ -191,7 +212,7 @@ impl Checker<'_> {
             usage::available_flags(chain)
         };
         for flag in available {
-            if flag.hide || flag.builtin || selectors.contains(&flag.name) {
+            if flag.hide || flag.builtin || selects(&flag) {
                 continue;
             }
             let long = self.flag_long(&flag);

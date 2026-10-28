@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use usage::SpecCommand;
 use usage::kdl::{KdlDocument, KdlNode};
 
+use crate::args::OutputArgs;
 use crate::header::header_node;
 use crate::{Diagnostic, Header, read_header, read_subcommand_header};
 
@@ -73,6 +74,9 @@ pub struct Assembled {
     pub headers: BTreeMap<CommandPath, Header>,
     /// Completion providers resolved to commands in the tree.
     pub providers: Vec<Provider>,
+    /// The words that ask for an output where usage's `select` cannot say them: each
+    /// `nusage-args`, by the command whose `output` declared it.
+    pub output_args: OutputArgs,
 }
 
 impl Assembled {
@@ -81,6 +85,23 @@ impl Assembled {
         match &self.source {
             Source::Scripts { bodies } => bodies.get(path).map(PathBuf::as_path),
             Source::Binary => None,
+        }
+    }
+
+    /// The words that ask the command at `path` for its output `name`: the `nusage-args` of
+    /// the nearest command declaring them, the command's own or an ancestor's, as an output
+    /// a command declares is every command's under it.
+    pub fn output_args(&self, path: &CommandPath, name: &str) -> Option<&[String]> {
+        let mut words = path.words().to_vec();
+        loop {
+            if let Some(found) = self
+                .output_args
+                .get(&CommandPath(words.clone()))
+                .and_then(|outputs| outputs.get(name))
+            {
+                return Some(found);
+            }
+            words.pop()?;
         }
     }
 }
@@ -145,6 +166,7 @@ pub fn assemble_with(source: &Path, overlays: &[PathBuf]) -> Result<Assembled, D
         source: Source::Scripts { bodies },
         headers,
         providers: Vec::new(),
+        output_args: OutputArgs::new(),
     };
     resolve_providers(&mut out)?;
     Ok(out)
@@ -169,6 +191,7 @@ fn assemble_single(path: &Path) -> Result<Assembled, Diagnostic> {
         },
         headers: BTreeMap::from([(root, script.header)]),
         providers: Vec::new(),
+        output_args: OutputArgs::new(),
     };
     resolve_providers(&mut out)?;
     Ok(out)
@@ -190,9 +213,11 @@ fn assemble_spec_file(path: &Path, overlays: &[PathBuf]) -> Result<Assembled, Di
             .map_err(|err| Diagnostic::new(overlay, format!("not valid KDL: {err}")))?;
         crate::overlay::merge(&mut doc, &overlay_doc);
     }
-    // With overlays, the text usage reads is the merged document, re-parsed so that node
-    // spans are its; a diagnostic's line then counts in that document rather than the file.
-    let (text, doc) = if overlays.is_empty() {
+    let output_args = crate::args::lift(&mut doc, path)?;
+    // With overlays, or words taken out, the text usage reads is the document as it now is,
+    // re-parsed so that node spans are its; a diagnostic's line then counts in that document
+    // rather than the file.
+    let (text, doc) = if overlays.is_empty() && output_args.is_empty() {
         (text, doc)
     } else {
         let merged = doc.to_string();
@@ -244,6 +269,7 @@ fn assemble_spec_file(path: &Path, overlays: &[PathBuf]) -> Result<Assembled, Di
         source: Source::Binary,
         headers,
         providers: Vec::new(),
+        output_args,
     })
 }
 
