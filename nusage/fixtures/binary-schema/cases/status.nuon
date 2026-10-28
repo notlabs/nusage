@@ -1,0 +1,9 @@
+# An inline schema: `took` counts milliseconds and `size` kilobytes, `at` is ISO 8601, `note`
+# and `seen` are not required, so a document without them has them as `null`.
+{
+    cmd: [status],
+    invoke: "probe status",
+    argv: [status, --json],
+    stdout: "{\"ok\": true, \"took\": 1500, \"at\": \"2024-01-01T00:00:00Z\", \"size\": 3}",
+    output: {ok: true, took: 1500ms, at: 2024-01-01T00:00:00+00:00, size: 3kB, note: null, seen: null},
+}

@@ -3475,6 +3475,7 @@ dependencies = [
  "nuon",
  "nusage-nu",
  "nusage-spec",
+ "serde_json",
  "usage-lib",
 ]
 

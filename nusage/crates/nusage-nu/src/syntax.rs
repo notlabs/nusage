@@ -256,6 +256,11 @@ pub enum Stmt {
 pub enum Expr {
     /// `$name`, including `$in`.
     Var(Ident),
+    /// `$name.a.b`: a cell path into a variable, each part quoted when it needs to be.
+    Cell { var: Ident, path: Vec<String> },
+    /// Nushell as written: a literal the printer has no value for, such as `1kB` or a
+    /// datetime, which it copies verbatim.
+    Raw(String),
     /// A value written as NUON.
     Literal(Value),
     /// `{k: v ...}`, keys quoted when they need to be; the printer decides the layout.
@@ -286,6 +291,8 @@ pub enum Expr {
     },
     /// `{ body }`: a closure with no parameters, run on its input.
     Closure(Box<Expr>),
+    /// `{|param| body }`: a closure with one parameter.
+    ClosureWith { param: Ident, body: Box<Expr> },
     /// `...$x` or `...(expr)`: a list spread into a call's arguments.
     Spread(Box<Expr>),
 }
@@ -294,6 +301,9 @@ pub enum Expr {
 pub enum Infix {
     And,
     Or,
+    Eq,
+    Add,
+    Mul,
 }
 
 impl Infix {
@@ -301,6 +311,9 @@ impl Infix {
         match self {
             Infix::And => "and",
             Infix::Or => "or",
+            Infix::Eq => "==",
+            Infix::Add => "+",
+            Infix::Mul => "*",
         }
     }
 }

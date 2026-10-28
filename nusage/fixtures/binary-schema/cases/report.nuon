@@ -1,0 +1,9 @@
+# A schema with `$defs`: the dependencies are a table, `meta` a nested record whose `took` is
+# optional and counts seconds, `icon` is base64, `score` a nullable number.
+{
+    cmd: [report],
+    invoke: "probe report",
+    argv: [report],
+    stdout: "{\"name\": \"x\", \"dependencies\": [{\"name\": \"a\", \"version\": \"1\"}, {\"name\": \"b\", \"version\": \"2\", \"optional\": true}], \"meta\": {\"built\": \"2024-06-01T00:00:00Z\", \"took\": 1.5}, \"tags\": [\"t\"], \"icon\": \"aGk=\", \"score\": null}",
+    output: {name: x, dependencies: [[name, version, optional]; [a, "1", null], [b, "2", true]], meta: {built: 2024-06-01T00:00:00+00:00, took: 1500ms}, tags: [t], icon: 0x[6869], score: null},
+}

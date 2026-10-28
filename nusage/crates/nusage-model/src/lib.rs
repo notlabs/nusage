@@ -8,6 +8,7 @@
 //! target turns into a module; it names no Nushell syntax and performs no I/O.
 
 mod build;
+mod schema;
 
 pub use build::{Identifier, identifier, model, value_from_text};
 pub use nu_protocol::Value;
@@ -71,20 +72,30 @@ pub struct Structured {
     /// none when it is the default.
     pub args: Vec<String>,
     pub framing: Framing,
-    /// The annotation, when the output has one.
+    /// The type, from the output's JSON Schema or its annotation, when it has one.
     pub ty: Option<NuType>,
-    /// What JSON cannot carry and the annotation declares: each is converted after decoding,
-    /// in this order.
+    /// Properties the schema does not require, at their cell paths: a record JSON leaves
+    /// one out of gets it as `null`, so the field is there to read, typed
+    /// `oneof<T, nothing>`.
+    pub fills: Vec<Vec<String>>,
+    /// What JSON cannot carry and the schema or annotation declares: each is converted
+    /// after decoding, in this order.
     pub conversions: Vec<Conversion>,
 }
 
-/// `into <ty> <path>`: a value JSON delivers as text or a number, converted to the declared
-/// type at a cell path (empty for the whole value).
+/// A value JSON delivers as text or a number, converted to the declared type at a cell path
+/// (empty for the whole value).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Conversion {
     pub path: Vec<String>,
-    /// `datetime`, `duration`, `filesize` or `binary`.
+    /// `datetime`, `duration` or `filesize`; `binary` for text taken as bytes, `base64`
+    /// for text decoded.
     pub ty: String,
+    /// For a number: what it counts, as the schema's `x-nu` says, spelled as in a Nushell
+    /// literal (`ms`, `sec`, `kB`). `None` for text, such as an ISO 8601 datetime.
+    pub unit: Option<String>,
+    /// Whether the value may be `null`, which is left as it is.
+    pub nullable: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

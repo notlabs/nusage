@@ -214,7 +214,16 @@ fn stmt_tokens(stmt: &Stmt) -> Tokens {
 fn expr_tokens(expr: &Expr, statement_value: bool) -> Tokens {
     match expr {
         Expr::Var(name) => quote!($(format!("${}", name.as_str()))),
+        Expr::Cell { var, path } => {
+            let mut text = format!("${}", var.as_str());
+            for part in path {
+                text.push('.');
+                text.push_str(&word(part));
+            }
+            quote!($text)
+        }
         Expr::Literal(value) => quote!($(nuon(value))),
+        Expr::Raw(text) => quote!($text),
         Expr::Str(text) => quote!($(word(text))),
         Expr::List(items) => {
             quote!([$(for item in items join ($[' ']) => $(expr_tokens(item, false)))])
@@ -256,6 +265,9 @@ fn expr_tokens(expr: &Expr, statement_value: bool) -> Tokens {
             if $(expr_tokens(cond, false)) { $(expr_tokens(then, false)) } else { $(expr_tokens(otherwise, false)) }
         },
         Expr::Closure(body) => quote!({ $(expr_tokens(body, false)) }),
+        Expr::ClosureWith { param, body } => {
+            quote!({$(format!("|{}|", param.as_str())) $(expr_tokens(body, false)) })
+        }
         Expr::Spread(inner) => match inner.as_ref() {
             Expr::Var(_) => quote!(...$(expr_tokens(inner, false))),
             _ => quote!(...($(expr_tokens(inner, false)))),

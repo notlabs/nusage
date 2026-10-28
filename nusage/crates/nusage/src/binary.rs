@@ -2,15 +2,17 @@
 //! The root is `main` and a subcommand carries the binary's name, so `use <bin>.nu *` names
 //! them as the binary does. A wrapper is the binary's data form, as `^tool` is its text form:
 //! its body builds the binary's argv from its typed parameters, asks for the command's
-//! structured output with the spec's own selector words, and decodes it to the annotated
-//! type, so its return type is one type the parser checks. The helper that builds the argv
+//! structured output with the spec's own selector words, and decodes it to the type its
+//! schema or annotation declares, so its return type is one type the parser checks. The
+//! helper that builds the argv
 //! ships with the module as Nushell, and a helper runs each shell-backed completer.
 
+use nu_protocol::{Span, Value};
 use nusage_model::{
-    Command, CommandTree, Completer, Execution, Framing, Param, ParamKind, Structured,
+    Command, CommandTree, Completer, Conversion, Execution, Framing, Param, ParamKind, Structured,
 };
 use nusage_nu::{
-    CommandName, Def, Expr, Ident, Item, Module, Params, Stmt, SyntaxError, Type, word,
+    CommandName, Def, Expr, Ident, Infix, Item, Module, Params, Stmt, SyntaxError, Type, word,
 };
 
 use crate::common::{SPEC_COMPLETER, Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
@@ -189,23 +191,136 @@ fn flag_word(param: &Param) -> String {
     }
 }
 
-/// `from json`, then `into datetime at` for what the annotation declares and JSON cannot
-/// carry, at its cell path.
+/// `from json`, then what the schema or annotation declares and JSON cannot carry: first
+/// `default null` for each property the schema does not require, so the field is there to
+/// read; then each conversion at its cell path, `into <ty> <path>` where the value is text
+/// or a count of bytes, else an `update` whose closure counts the unit and leaves `null`
+/// alone where the value may be one.
 fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
     let mut stages = vec![match structured.framing {
         Framing::Json => call("from json", vec![])?,
         Framing::Jsonl => call("from json", vec![Expr::Str("--objects".into())])?,
     }];
-    for conversion in &structured.conversions {
-        let path: Vec<String> = conversion.path.iter().map(|part| word(part)).collect();
-        let args = if path.is_empty() {
-            vec![]
+    for fill in &structured.fills {
+        let (parent, field) = fill.split_at(fill.len() - 1);
+        let default = call(
+            "default",
+            vec![
+                Expr::Literal(Value::nothing(Span::unknown())),
+                Expr::Str(field[0].clone()),
+            ],
+        )?;
+        stages.push(if parent.is_empty() {
+            default
         } else {
-            vec![Expr::Str(path.join("."))]
-        };
-        stages.push(call(&format!("into {}", conversion.ty), args)?);
+            call(
+                "update",
+                vec![
+                    Expr::Raw(cell_path(parent)),
+                    Expr::Closure(Box::new(default)),
+                ],
+            )?
+        });
+    }
+    for conversion in &structured.conversions {
+        stages.push(conversion_stage(conversion)?);
     }
     Ok(stages)
+}
+
+fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
+    let path = cell_path(&conversion.path);
+    let plain = conversion.unit.is_none() && conversion.ty != "base64";
+    if plain && !conversion.nullable {
+        let args = if conversion.path.is_empty() {
+            vec![]
+        } else {
+            vec![Expr::Raw(path)]
+        };
+        return call(&format!("into {}", conversion.ty), args);
+    }
+    // `update <path> {|row| ... }`, or on the whole value `... | <convert>`.
+    let row = Ident::new("row")?;
+    let value = if conversion.path.is_empty() {
+        Expr::Var(Ident::new("in")?)
+    } else {
+        Expr::Cell {
+            var: row.clone(),
+            path: conversion.path.clone(),
+        }
+    };
+    let converted = match (conversion.ty.as_str(), &conversion.unit) {
+        ("base64", _) => Expr::Pipeline(vec![value.clone(), call("decode base64", vec![])?]),
+        ("duration", Some(unit)) => Expr::Pipeline(vec![
+            value.clone(),
+            call(
+                "into duration",
+                vec![Expr::Str("--unit".into()), Expr::Str(unit.clone())],
+            )?,
+        ]),
+        // The epoch plus the count, as a duration. Nushell reads a datetime literal at the
+        // head of an expression only in parentheses.
+        ("datetime", Some(unit)) => Expr::Infix {
+            lhs: Box::new(Expr::Group(Box::new(Expr::Raw(
+                "1970-01-01T00:00:00Z".into(),
+            )))),
+            op: Infix::Add,
+            rhs: Box::new(Expr::Group(Box::new(Expr::Pipeline(vec![
+                value.clone(),
+                call(
+                    "into duration",
+                    vec![Expr::Str("--unit".into()), Expr::Str(unit.clone())],
+                )?,
+            ])))),
+        },
+        ("filesize", Some(unit)) => Expr::Infix {
+            lhs: Box::new(value.clone()),
+            op: Infix::Mul,
+            rhs: Box::new(Expr::Raw(format!("1{unit}"))),
+        },
+        (ty, None) => Expr::Pipeline(vec![value.clone(), call(&format!("into {ty}"), vec![])?]),
+        (ty, Some(unit)) => {
+            return Err(SyntaxError(format!(
+                "a {ty} counts no `{unit}`; the model should not have declared one"
+            )));
+        }
+    };
+    let body = if conversion.nullable {
+        Expr::If {
+            cond: Box::new(Expr::Infix {
+                lhs: Box::new(value),
+                op: Infix::Eq,
+                rhs: Box::new(Expr::Literal(Value::nothing(Span::unknown()))),
+            }),
+            then: Box::new(Expr::Literal(Value::nothing(Span::unknown()))),
+            otherwise: Box::new(converted),
+        }
+    } else {
+        converted
+    };
+    if conversion.path.is_empty() {
+        Ok(body)
+    } else {
+        call(
+            "update",
+            vec![
+                Expr::Raw(path),
+                Expr::ClosureWith {
+                    param: row,
+                    body: Box::new(body),
+                },
+            ],
+        )
+    }
+}
+
+/// A cell path as `into` and `update` take it, written as is, each part quoted when it
+/// needs to be.
+fn cell_path(path: &[String]) -> String {
+    path.iter()
+        .map(|part| word(part))
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 fn call(name: &str, args: Vec<Expr>) -> Result<Expr, SyntaxError> {

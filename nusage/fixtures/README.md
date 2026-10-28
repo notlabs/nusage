@@ -23,4 +23,6 @@ present: an absent switch is `false`, an absent value or optional positional `nu
 variadic or repeatable flag `[]`, an absent count `0`, a declared default applied. A switch
 declared on by default stays on unless its `negate` flag is given. Inherited global flags come
 first. A KDL type annotation on an arg or output is its Nushell type;
-without one a value is `string`, or `path` for `<file>` and `<dir>`.
+without one a value is `string`, or `path` for `<file>` and `<dir>`. A binary's output may
+declare a JSON Schema instead, inline or `schema file=`, which is read as a Nushell type:
+`binary-schema` shows what it reads, and what it converts after decoding.

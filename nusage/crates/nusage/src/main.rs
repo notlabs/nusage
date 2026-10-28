@@ -42,7 +42,8 @@ struct Generate {
     out: Option<PathBuf>,
     /// A usage KDL document merged onto the spec file first: a `cmd` merges into the command
     /// of the same name, any other node replaces the one with the same name and first
-    /// argument. For outputs, selectors and type annotations a spec one does not own lacks
+    /// argument. For outputs, selectors, schemas and type annotations a spec one does not
+    /// own lacks
     #[usage(long)]
     overlay: Vec<PathBuf>,
 }

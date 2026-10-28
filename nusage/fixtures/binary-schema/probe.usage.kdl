@@ -1,0 +1,38 @@
+name "probe"
+bin "probe"
+about "A CLI whose outputs declare JSON Schemas"
+
+cmd "status" help="Show status" {
+    flag "--json" help="As JSON"
+    output "text" default=#true
+    output "json" framing="json" select="--json" {
+        schema #"""
+{
+  "type": "object",
+  "required": ["ok", "took", "at", "size"],
+  "properties": {
+    "ok": {"type": "boolean"},
+    "took": {"type": "integer", "x-nu": {"type": "duration", "unit": "ms"}},
+    "at": {"type": "string", "format": "date-time"},
+    "size": {"type": "integer", "x-nu": {"type": "filesize", "unit": "kB"}},
+    "note": {"type": "string"},
+    "seen": {"type": "integer", "x-nu": {"type": "datetime", "unit": "sec"}}
+  }
+}
+"""#
+    }
+}
+
+cmd "events" help="Stream events" {
+    flag "--json" help="One JSON object per line"
+    output "text" default=#true
+    output "jsonl" framing="jsonl" select="--json" {
+        schema file="events.schema.json"
+    }
+}
+
+cmd "report" help="Describe the project" {
+    output "json" framing="json" default=#true {
+        schema file="report.schema.json"
+    }
+}

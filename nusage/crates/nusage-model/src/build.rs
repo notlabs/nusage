@@ -6,6 +6,7 @@ use nu_protocol::{Span, Type};
 use nusage_spec::{Assembled, CommandPath, Diagnostic, Header, HeaderNode, Source};
 use usage::{SpecArg, SpecCommand, SpecComplete, SpecFlag, SpecOutput};
 
+use crate::schema;
 use crate::{
     Command, CommandTree, Completer, Conversion, Execution, Framing, NuType, Param, ParamKind,
     Structured, Value,
@@ -648,16 +649,42 @@ fn structured_output(
     let Some((output, args)) = chosen else {
         return Ok(None);
     };
-    let ty = output_annotation(chain, &output.name);
-    let conversions = match &ty {
-        Some(ty) => conversions_for(ty)?,
-        None => Vec::new(),
+    // The type: the output's schema, which usage carries, else the annotation on its
+    // declaration, which is nusage's own and says the same thing in Nushell's words.
+    let annotation = output_annotation(chain, &output.name);
+    let (ty, fills, conversions) = match (&output.schema, annotation) {
+        (Some(_), Some(_)) => {
+            return Err(format!(
+                "output `{}` has both a schema and a type annotation; declare one",
+                output.name
+            ));
+        }
+        (Some(schema), None) => {
+            let shape = schema::shape(schema)
+                .map_err(|why| format!("the schema of output `{}`: {why}", output.name))?;
+            // A schema describes one document; JSON lines are a list of them, a table when
+            // they are objects, and the fills and conversions apply to every row.
+            let ty = match framing_of(output) {
+                Some(Framing::Jsonl) => match shape.ty.0.strip_prefix("record<") {
+                    Some(rest) => NuType(format!("table<{rest}")),
+                    None => NuType(format!("list<{}>", shape.ty.0)),
+                },
+                _ => shape.ty,
+            };
+            (Some(ty), shape.fills, shape.conversions)
+        }
+        (None, Some(ty)) => {
+            let conversions = conversions_for(&ty)?;
+            (Some(ty), Vec::new(), conversions)
+        }
+        (None, None) => (None, Vec::new(), Vec::new()),
     };
     Ok(Some(Structured {
         name: output.name.clone(),
         args,
         framing: framing_of(output).expect("a candidate is framed"),
         ty,
+        fills,
         conversions,
     }))
 }
@@ -690,6 +717,8 @@ fn collect_conversions(
         out.push(Conversion {
             path,
             ty: into.to_string(),
+            unit: None,
+            nullable: false,
         });
         return Ok(());
     }

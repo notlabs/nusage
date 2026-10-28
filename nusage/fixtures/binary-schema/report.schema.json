@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "dependency": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string"},
+        "version": {"type": "string"},
+        "optional": {"type": "boolean"}
+      }
+    }
+  },
+  "type": "object",
+  "required": ["name", "dependencies", "meta", "tags", "icon"],
+  "properties": {
+    "name": {"type": "string"},
+    "dependencies": {"type": "array", "items": {"$ref": "#/$defs/dependency"}},
+    "meta": {
+      "type": "object",
+      "required": ["built"],
+      "properties": {
+        "built": {"type": "string", "format": "date-time"},
+        "took": {"type": "number", "x-nu": {"type": "duration", "unit": "sec"}}
+      }
+    },
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "icon": {"type": "string", "contentEncoding": "base64"},
+    "score": {"anyOf": [{"type": "number"}, {"type": "null"}]}
+  }
+}
