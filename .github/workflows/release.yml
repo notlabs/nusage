@@ -30,6 +30,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+      # release-plz reads the pull requests behind the commits, for the release notes.
+      pull-requests: read
     outputs:
       tag: ${{ steps.released.outputs.tag }}
     steps:
