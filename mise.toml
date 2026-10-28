@@ -7,8 +7,10 @@ config_roots = ["nusage", "mise"]
 nu = "0.116.1"
 usage = "7.1.3"
 jujutsu = "0.46.0"
-# The repository's own tasks run through the released nusage.
-"github:notlabs/nusage" = "latest"
+
+# The repository's tasks run through the nusage built here, not through a release.
+[env]
+_.path = ["{{config_root}}/target/debug"]
 
 [task_config]
 shell = "nu -c"

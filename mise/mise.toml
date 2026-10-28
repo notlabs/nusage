@@ -1,5 +1,6 @@
 [tasks.generate]
 description = "Generate the module from the spec of the mise on PATH and the overlays here"
+depends = ["//nusage:build"]
 file = "generate.nu"
 
 [tasks.check]

@@ -1,0 +1,34 @@
+name: release-plz
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-plz
+
+jobs:
+  # Opens or updates the release pull request with the version bump and changelog; merging
+  # it tags the version and creates its GitHub release. The token is a personal access token
+  # when the repository has one, so the pull request and the tag run the other workflows.
+  release-plz:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}

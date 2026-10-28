@@ -2,6 +2,11 @@
 rust = { version = "1.99.1", mr_boxington = true }
 mr-boxington = "1.27.0"
 
+# The released nusage for this user, pinned in a fragment of the global mise config that
+# `mise dot apply` links into place.
+[dotfiles]
+"~/.config/mise/conf.d/nusage.toml" = { source = "conf.d/nusage.toml", mode = "symlink" }
+
 [tasks.build]
 description = "Build the workspace"
 run = "cargo build --workspace"
