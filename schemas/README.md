@@ -4,20 +4,19 @@ This directory contains shared Nushell development scripts, invoked by mise task
 Each integration owns its schema files, output bindings, source provenance, and fixture setup.
 The interpreter's CLI and Rust dependencies are unchanged.
 
-## First slice
+## mise suite
 
-The mise suite is in `mise/schemas/outputs.nuon`. Its four schemas were read from the
+The mise suite is in `mise/schemas/outputs.nuon`. Its schemas were read from the
 output builders and serializers at mise 2026.10.21, commit
 `61eb04dbc806cb646821e342b7abbbdaf1581e84`. The manifest records those source locations.
 
-- `version`: a fixed record, including required nullable `latest`.
-- `env`: a map with string values.
-- `config ls`: a list of config records.
-- `ls`: a map without a tool argument and an array with one.
+The [mise coverage notes](../mise/schemas/README.md) list the 20 schemas and their
+26 command/mode bindings, including attachment limits and remaining extraction work.
 
-The five executable cases use a temporary project, isolated mise directories, one fake
-installed node version, and one missing version. They do not install node. A seeded
-release-index cache keeps the version check offline. The fixture is removed after each run.
+The 32 executable cases use temporary projects, isolated mise directories, fake installed
+binaries, a local plugin, and controlled task/diagnostic definitions. A seeded release
+cache and fixed local version listings avoid remote fixture setup. The task also validates
+schema documents and 17 source-derived examples. Fixtures are removed after each run.
 
 `ls` is validated as raw JSON but has `attach: false`: the current type projector
 accumulates optional-field fills across the map/array union. Attaching that schema would
@@ -72,7 +71,7 @@ deferred.
 
 ## Deferred for shape review
 
-- Remaining mise commands and variants, including extended JSON, tasks, and diagnostics.
+- Remaining mise commands and variants listed in the mise coverage notes.
 - Full inventory comparison and automated source/schema refresh.
 - Type projection and decoding fixes, including attaching the `ls` union.
 - Live JSONL streams, per-process timeouts, and cancellation. The current runner captures

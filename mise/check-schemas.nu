@@ -1,7 +1,7 @@
 #!/usr/bin/env nusage
 #USAGE about "Check mise's raw JSON against the reviewed output schemas"
 #USAGE flag "--bin <path>" help="Candidate mise binary; defaults to the one on PATH"
-use ../schemas/lib.nu [load-suite run-suite finish]
+use ../schemas/lib.nu [load-suite validate-result run-suite finish]
 
 const here = path self | path dirname
 
@@ -12,6 +12,28 @@ let binary = if $usage.flags.bin != null {
 } else {
     which mise | first | get path
 }
+
+# Check the schema documents themselves, including modes whose live fixture is empty.
+let schema_files = $suite.outputs | get schema | uniq | each {|file| $suite.directory | path join $file }
+let metaschemas = ^check-jsonschema --check-metaschema ...$schema_files | complete
+if $metaschemas.exit_code != 0 {
+    error make --unspanned {msg: $"Invalid output schema: ($metaschemas.stdout) ($metaschemas.stderr)"}
+}
+
+# Source-derived examples exercise omission, nullability, and unvisited mode branches.
+let examples = open ($here | path join schemas examples.nuon)
+
+let example_results = $examples | each {|example|
+    let case = {id: $example.id, output: $example.output, exit_codes: [0]}
+    let result = validate-result $suite $case {stdout: ($example.document | to json), stderr: "", exit_code: 0}
+    {
+        id: $example.id
+        ok: ($result.ok == $example.valid)
+        exit_code: 0
+        errors: (if $result.ok == $example.valid { [] } else { [$"Expected valid=($example.valid): ($result.errors | str join '; ')"] })
+    }
+}
+finish $example_results
 
 let scratch = mktemp -d
 
@@ -35,7 +57,17 @@ let result = try {
         MISE_TRUSTED_CONFIG_PATHS: $project
         MISE_YES: "1"
         MISE_COLOR: "0"
+        MISE_EXPERIMENTAL: "true"
+        MISE_USE_VERSIONS_HOST: "false"
     } {
+        # Register only the local fixture plugin; no remote plugin or tool is installed.
+        let plugin = do {
+            cd $project
+            ^$binary plugins install schema-fixture | complete
+        }
+        if $plugin.exit_code != 0 {
+            error make --unspanned {msg: $"Fixture plugin setup failed: ($plugin.stderr)"}
+        }
         run-suite $suite $binary $project
     }
 } catch {|err|

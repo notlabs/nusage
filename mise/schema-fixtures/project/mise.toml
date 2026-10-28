@@ -3,3 +3,44 @@ NUSAGE_SCHEMA_FIXTURE = "present"
 
 [tools]
 node = ["22.0.0", "24.0.0"]
+schema-fixture = ["1.0.0", "2.0.0"]
+
+[plugins]
+schema-fixture = "./schema-plugin"
+
+[tasks.prepare]
+description = "A dependency with no external work"
+run = "exit 0"
+
+[tasks.fixture]
+description = "A task with structured dependencies and run entries"
+alias = "f"
+depends = ["prepare", { task = "optional-missing", optional = true }]
+env = { FIXTURE_TASK = "present" }
+sources = ["input.txt"]
+outputs = { auto = true }
+silent = "stderr"
+timeout = "2s"
+run = [
+  { task = "prepare", args = [
+    "value",
+  ], env = { FIXTURE_CHILD = "present" } },
+  { tasks = [
+    "prepare",
+  ] },
+]
+
+[tasks.plain]
+description = "A task with explicit output files"
+outputs = ["output.txt"]
+run = "exit 0"
+
+[tasks.empty-outputs]
+description = "A task with an explicitly empty output list"
+outputs = []
+run = "exit 0"
+
+[doctor.checks.fixture]
+description = "Controlled successful diagnostic"
+run = "exit 0"
+timeout = "2s"
