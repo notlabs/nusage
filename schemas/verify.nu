@@ -1,7 +1,7 @@
 #!/usr/bin/env nusage
 #USAGE about "Exercise the shared schema checker with valid and deliberately invalid output"
 use std/assert
-use lib.nu [validate-result]
+use lib.nu [validate-result schema-overlay]
 
 const directory = path self | path dirname | path join fixtures
 
@@ -110,4 +110,8 @@ for case in $cases {
     let result = validate-result $suite $case {stdout: $case.stdout, stderr: "", exit_code: $case.code}
     assert equal $result.ok $case.passes $"($case.id): ($result | to nuon)"
 }
-print $"schemas: ($cases | length) validation cases passed"
+let overlay = schema-overlay $suite
+assert ($overlay | str contains 'cmd "status"')
+assert ($overlay | str contains 'framing="jsonl"')
+assert not ($overlay | str contains 'schema file=')
+print $"schemas: ($cases | length) validation cases passed; overlay embeds its schemas"

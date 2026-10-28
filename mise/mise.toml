@@ -6,8 +6,18 @@ file = "spec.nu"
 [tasks.generate]
 description = "Generate the module from the spec and the overlays here"
 depends = [":spec"]
-sources = ["generated/mise.usage.kdl", "*.kdl", "../.bin/nusage"]
-outputs = ["generated/mise.json.kdl", "generated/mise.nu"]
+sources = [
+  "generated/mise.usage.kdl",
+  "*.kdl",
+  "schemas/**/*",
+  "../schemas/*.nu",
+  "../.bin/nusage",
+]
+outputs = [
+  "generated/mise.json.kdl",
+  "generated/mise.schemas.kdl",
+  "generated/mise.nu",
+]
 file = "generate.nu"
 
 [tasks.install]

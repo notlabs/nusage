@@ -19,21 +19,30 @@ The five executable cases use a temporary project, isolated mise directories, on
 installed node version, and one missing version. They do not install node. A seeded
 release-index cache keeps the version check offline. The fixture is removed after each run.
 
+`ls` is validated as raw JSON but has `attach: false`: the current type projector
+accumulates optional-field fills across the map/array union. Attaching that schema would
+change decoded values incorrectly. Fixing that consumer behavior is a separate change.
+
 ## Existing task workflow
 
 ```sh
 mise run //schemas:check
 mise run //mise:check-schemas
 mise run //mise:check-schemas -- --bin /absolute/path/to/candidate/mise
+mise run //mise:generate
 ```
 
 `//schemas:check` exercises valid output and failures for missing fields, extra fields,
 trailing JSON documents, unexpected exit status, disappearing optional data, and invalid
-JSONL records.
+JSONL records. It also checks overlay construction.
 
 `//mise:check-schemas` runs the real mise executable against the unchanged baseline.
 It is included in `//mise:check`; the shared checks join the existing
 `mise run '//...:check'` CI command through their monorepo config root.
+
+`//mise:generate` writes an additional ignored `generated/mise.schemas.kdl` overlay.
+Schemas are embedded in that overlay so its location and the exported spec's location
+cannot change relative schema-file resolution. The original JSON files remain the source.
 
 ## Another tool
 
@@ -42,7 +51,9 @@ Add an output manifest beside that tool's schemas and a Nushell fixture script c
 integration's mise tasks. There are no tool names or fixture paths in the shared runner.
 
 An output has a stable `id`, command words, output `name`, boolean `select` flag,
-`framing`, and manifest-relative `schema` path.
+`framing`, and manifest-relative `schema` path. `attach: false` keeps a schema available
+to checks without adding it to the generated overlay. The initial overlay writer supports
+boolean selectors; value selectors can be added when an integration needs them.
 
 A case names an output, gives the complete `argv`, and declares acceptable `exit_codes`.
 Its optional `expect` is an additional JSON Schema, used for fixture-specific assertions
@@ -63,6 +74,7 @@ deferred.
 
 - Remaining mise commands and variants, including extended JSON, tasks, and diagnostics.
 - Full inventory comparison and automated source/schema refresh.
+- Type projection and decoding fixes, including attaching the `ls` union.
 - Live JSONL streams, per-process timeouts, and cancellation. The current runner captures
   a finite invocation to completion; do not use it for watch commands.
 - Shared external schema references and version-range/package distribution machinery.

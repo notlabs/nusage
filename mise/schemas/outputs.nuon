@@ -19,6 +19,8 @@
             framing: json
             schema: ls.schema.json
             source: ["src/cli/ls.rs:229" "src/cli/ls.rs:550" "src/toolset/tool_source.rs:49"]
+            attach: false
+            deferred: "The current projector applies optional-field fills across the map/array union; review that consumer change separately."
         }
     ]
     cases: [

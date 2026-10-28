@@ -6,4 +6,6 @@ let out = $usage.flags.out
 let spec = $out | path join mise.usage.kdl
 let json = $out | path join mise.json.kdl
 ^nusage overlay $spec --switch=--json --framing=json | save --force $json
-^nusage generate $spec --overlay $json --out ($out | path join mise.nu)
+let schemas = $out | path join mise.schemas.kdl
+^nusage ../schemas/overlay.nu schemas/outputs.nuon | save --force $schemas
+^nusage generate $spec --overlay $json --overlay $schemas --out ($out | path join mise.nu)

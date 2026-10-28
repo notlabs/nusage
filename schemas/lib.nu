@@ -20,6 +20,24 @@ export def load-suite [manifest: path] {
     $suite | insert directory ($manifest | path dirname)
 }
 
+# Embed schema text so an overlay can be merged into a spec in a different directory.
+# The schema itself is still authored once, in the adjacent JSON file.
+export def schema-overlay [suite: record] {
+    $suite.outputs
+    | where {|output| $output.attach? != false }
+    | each {|output|
+        let schema = open --raw ($suite.directory | path join $output.schema) | to json --raw
+        let name = $output.name | to json --raw
+        let framing = $output.framing | to json --raw
+        let selector = $output.select | to json --raw
+        let body = $"output ($name) framing=($framing) select=($selector) { schema ($schema) }"
+        $output.command | reverse | reduce --fold $body {|word, inner|
+            $"cmd ($word | to json --raw) { ($inner) }"
+        }
+    }
+    | str join (char nl)
+}
+
 def validate-file [schema: path, instance: path] {
     let result = ^check-jsonschema --schemafile $schema $instance | complete
     if $result.exit_code == 0 { [] } else {
