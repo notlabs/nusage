@@ -22,13 +22,3 @@ def "nusage argv" [positionals: list<any>, flags: record]: nothing -> list<strin
     } | flatten
     ($positionals | compact | each { nusage word }) ++ $flags
 }
-
-# A wrapper's output: decoded by the decoder named by the output the call selected, when
-# there is one for it, else as the binary printed it.
-def "nusage decode" [output: any, decoders: record] {
-    if ($decoders | get -o $output) == null {
-        $in
-    } else {
-        do ($decoders | get $output)
-    }
-}

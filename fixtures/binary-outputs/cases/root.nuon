@@ -1,8 +1,8 @@
-# The root decodes the CLI-wide json output when the CLI-wide `--format` selects it.
+# The root asks for the CLI-wide json output through the CLI-wide `--format`, which is the
+# wrapper's to pass, and decodes it.
 {
     cmd: [],
-    complete: {line: "rep --format ", expect: [json text]},
-    invoke: "rep --format json",
+    invoke: "rep",
     argv: [--format, json],
     stdout: "{\"ok\": true}",
     output: {ok: true},

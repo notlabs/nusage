@@ -1,8 +1,0 @@
-# The base's text output, with the overlay's annotated argument.
-{
-    cmd: [ls],
-    invoke: "tool ls a",
-    argv: [ls, a],
-    stdout: "a",
-    output: "a",
-}

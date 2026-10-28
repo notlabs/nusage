@@ -1,8 +1,9 @@
-# `--json` selects the jsonl output: one object per line, and the `at` column, which JSON
-# carries as text, converted to the datetime the annotation declares.
+# `select="--json"` on the jsonl output: the wrapper passes `--json` itself, decodes one
+# object per line, and converts the `at` column, which JSON carries as text, to the datetime
+# the annotation declares.
 {
     cmd: [events],
-    invoke: "demo events --json",
+    invoke: "demo events",
     argv: [events, --json],
     stdout: "{\"at\":\"2026-10-27T00:00:00Z\",\"kind\":\"start\"}\n{\"at\":\"2026-10-28T00:00:00Z\",\"kind\":\"stop\"}",
     output: [[at, kind]; [2026-10-27T00:00:00+00:00, start], [2026-10-28T00:00:00+00:00, stop]],

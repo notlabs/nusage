@@ -1,21 +1,20 @@
 [
-  [name,      signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            attributes];
+  [name,      signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           attributes];
   [tool,      {
-      any: [
+      nothing: [
         [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description, completion, parameter_default];
-        [null,           input,          any,          false,       null,       null,        null,       null],
-        [null,           output,         any,          false,       null,       null,        null,       null]
+        [null,           input,          nothing,      false,       null,       null,        null,       null],
+        [null,           output,         string,       false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              [
+    },                                                                                                                                                                                                                                                                         [
 
     ]],
   ["tool ls", {
       nothing: [
-        [parameter_name, parameter_type, syntax_shape,                                         is_optional, short_flag, description,              completion, parameter_default];
-        [null,           input,          nothing,                                              false,       null,       null,                     null,       null],
-        [name,           positional,     string,                                               true,        null,       "Only this one, by name", null,       null],
-        [json,           switch,         null,                                                 true,        J,          "Print JSON",             null,       null],
-        [null,           output,         "oneof<string, table<name: string, size: filesize>>", false,       null,       null,                     null,       null]
+        [parameter_name, parameter_type, syntax_shape,                          is_optional, short_flag, description,              completion, parameter_default];
+        [null,           input,          nothing,                               false,       null,       null,                     null,       null],
+        [name,           positional,     string,                                true,        null,       "Only this one, by name", null,       null],
+        [null,           output,         "table<name: string, size: filesize>", false,       null,       null,                     null,       null]
       ]
     }, [
       [name,  value];

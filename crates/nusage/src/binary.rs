@@ -1,15 +1,16 @@
 //! The binary target: one `export def` per command of a binary described by a spec file.
 //! The root is `main` and a subcommand carries the binary's name, so `use <bin>.nu *` names
-//! them as the binary does. A wrapper's body builds the binary's argv from its typed
-//! parameters and decodes what the binary printed, by the output the call selected through
-//! the spec's own selector flags. The helpers that do both ship with the module as Nushell,
-//! and a helper runs each shell-backed completer.
+//! them as the binary does. A wrapper is the binary's data form, as `^tool` is its text form:
+//! its body builds the binary's argv from its typed parameters, asks for the command's
+//! structured output with the spec's own selector words, and decodes it to the annotated
+//! type, so its return type is one type the parser checks. The helper that builds the argv
+//! ships with the module as Nushell, and a helper runs each shell-backed completer.
 
 use nusage_model::{
-    Command, CommandTree, Completer, Decoding, Execution, Framing, Output, Param, ParamKind,
+    Command, CommandTree, Completer, Execution, Framing, Param, ParamKind, Structured,
 };
 use nusage_nu::{
-    CommandName, Def, Expr, Ident, Item, Module, Params, Stmt, SyntaxError, Type, Value, word,
+    CommandName, Def, Expr, Ident, Item, Module, Params, Stmt, SyntaxError, Type, word,
 };
 
 use crate::common::{Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
@@ -84,12 +85,6 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
             command.path
         )));
     }
-    let decoding = command.decoding.as_ref().ok_or_else(|| {
-        SyntaxError(format!(
-            "`{}` has no decoding; the model gives every binary command one",
-            command.path
-        ))
-    })?;
     let name = if command.path.is_root() {
         "main".to_string()
     } else {
@@ -107,7 +102,8 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         None => None,
     };
 
-    // `^demo status ...(nusage argv [$a ...$rest] {--flag: $flag})`
+    // `^demo status --format json ...(nusage argv [$a ...$rest] {--flag: $flag})`: the
+    // selector words come first, so a `--` the caller passes still comes after them.
     let positionals = command
         .positionals
         .iter()
@@ -137,6 +133,12 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         .path
         .words()
         .iter()
+        .chain(
+            command
+                .structured
+                .iter()
+                .flat_map(|structured| structured.args.iter()),
+        )
         .map(|w| Expr::Str(w.clone()))
         .collect();
     args.push(Expr::Spread(Box::new(argv)));
@@ -145,30 +147,12 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         args,
     };
 
-    // Then `| nusage decode $output {json: { from json }}` when an output is framed.
-    let decoders = decoding
-        .outputs
-        .iter()
-        .filter(|output| output.framing.is_some())
-        .map(|output| Ok((output.name.clone(), decoder(output)?)))
-        .collect::<Result<Vec<_>, SyntaxError>>()?;
-    let body = if decoders.is_empty() {
-        vec![Stmt::Pipeline(vec![run])]
-    } else {
-        vec![
-            Stmt::Let {
-                name: Ident::new("output")?,
-                value: selected_output(decoding)?,
-            },
-            Stmt::Pipeline(vec![
-                run,
-                call(
-                    "nusage decode",
-                    vec![Expr::Var(Ident::new("output")?), Expr::Record(decoders)],
-                )?,
-            ]),
-        ]
-    };
+    // Then `| from json | into datetime at` for a structured output.
+    let mut stages = vec![run];
+    if let Some(structured) = &command.structured {
+        stages.extend(decode_stages(structured)?);
+    }
+    let body = vec![Stmt::Pipeline(stages)];
     Ok(Def {
         export: true,
         doc: doc_of(command),
@@ -189,44 +173,14 @@ fn flag_word(param: &Param) -> String {
     }
 }
 
-/// The name of the output a call selects: each switch selector in turn, else the value
-/// selector's value, else the default output, else nothing.
-fn selected_output(decoding: &Decoding) -> Result<Expr, SyntaxError> {
-    let default = decoding
-        .default
-        .as_ref()
-        .map(|name| Expr::Literal(Value::test_string(name)));
-    let fallback = match (&decoding.value_selector, default) {
-        (Some(var), Some(default)) => Expr::Pipeline(vec![
-            Expr::Var(Ident::new(var)?),
-            call("default", vec![default])?,
-        ]),
-        (Some(var), None) => Expr::Var(Ident::new(var)?),
-        (None, Some(default)) => default,
-        (None, None) => Expr::Literal(Value::test_nothing()),
-    };
-    decoding
-        .switches
-        .iter()
-        .rev()
-        .try_fold(fallback, |otherwise, (var, output)| {
-            Ok(Expr::If {
-                cond: Box::new(Expr::Var(Ident::new(var)?)),
-                then: Box::new(Expr::Literal(Value::test_string(output))),
-                otherwise: Box::new(otherwise),
-            })
-        })
-}
-
-/// `{ from json | into datetime at }`: decode the framing, then convert what the annotation
-/// declares and JSON cannot carry, at its cell path.
-fn decoder(output: &Output) -> Result<Expr, SyntaxError> {
-    let mut stages = vec![match output.framing {
-        Some(Framing::Json) => call("from json", vec![])?,
-        Some(Framing::Jsonl) => call("from json", vec![Expr::Str("--objects".into())])?,
-        None => unreachable!("only framed outputs get decoders"),
+/// `from json`, then `into datetime at` for what the annotation declares and JSON cannot
+/// carry, at its cell path.
+fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
+    let mut stages = vec![match structured.framing {
+        Framing::Json => call("from json", vec![])?,
+        Framing::Jsonl => call("from json", vec![Expr::Str("--objects".into())])?,
     }];
-    for conversion in &output.conversions {
+    for conversion in &structured.conversions {
         let path: Vec<String> = conversion.path.iter().map(|part| word(part)).collect();
         let args = if path.is_empty() {
             vec![]
@@ -235,7 +189,7 @@ fn decoder(output: &Output) -> Result<Expr, SyntaxError> {
         };
         stages.push(call(&format!("into {}", conversion.ty), args)?);
     }
-    Ok(Expr::Closure(Box::new(Expr::Pipeline(stages))))
+    Ok(stages)
 }
 
 fn call(name: &str, args: Vec<Expr>) -> Result<Expr, SyntaxError> {

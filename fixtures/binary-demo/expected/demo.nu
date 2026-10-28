@@ -25,16 +25,6 @@ def "nusage argv" [positionals: list<any>, flags: record]: nothing -> list<strin
     ($positionals | compact | each { nusage word }) ++ $flags
 }
 
-# A wrapper's output: decoded by the decoder named by the output the call selected, when
-# there is one for it, else as the binary printed it.
-def "nusage decode" [output: any, decoders: record] {
-    if ($decoders | get -o $output) == null {
-        $in
-    } else {
-        do ($decoders | get $output)
-    }
-}
-
 def "complete plugin" [] {
     ^sh -c "echo \"plugin-1
 plugin-2
@@ -51,7 +41,7 @@ test:Test it\"" | lines | parse "{value}:{description}"
 @usage 'complete "plugin" run="echo \"plugin-1\nplugin-2\nplugin-3\""'
 export def main [
     --verbose (-v): int,  # Say more
-] {
+]: nothing -> string {
     ^demo ...(nusage argv [] {--verbose: $verbose})
 }
 
@@ -66,7 +56,7 @@ export def "demo install" [
     --verbose (-v): int,               # Say more
     --global (-g),                     # Install for every project
     --dir (-d): path,                  # Install into this directory
-] {
+]: nothing -> string {
     ^demo install ...(nusage argv [$plugin $version] {--verbose: $verbose, --global: $global, --dir: $dir})
 }
 
@@ -80,7 +70,7 @@ export def "demo run" [
     ...args: string,                        # Arguments for the task
     --verbose (-v): int,                    # Say more
     --set (-e): list<string>,               # Variable to set, repeatable
-] {
+]: nothing -> string {
     ^demo run ...(nusage argv [$task ...$args] {--verbose: $verbose, --set: $set})
 }
 
@@ -90,13 +80,9 @@ export def "demo run" [
 @usage 'output ("record<ok: bool, tasks: list<string>>")"json" framing="json" help="One report object"'
 @usage 'select "--format"'
 export def "demo status" [
-    --verbose (-v): int,            # Say more
-    --format: string@[human json],  # Output format
-]: nothing -> oneof<string, record<ok: bool, tasks: list<string>>> {
-    let output = $format | default "human"
-    ^demo status ...(nusage argv [] {--verbose: $verbose, --format: $format}) | nusage decode $output {
-        json: { from json }
-    }
+    --verbose (-v): int,  # Say more
+]: nothing -> record<ok: bool, tasks: list<string>> {
+    ^demo status --format json ...(nusage argv [] {--verbose: $verbose}) | from json
 }
 
 # Stream events
@@ -105,10 +91,6 @@ export def "demo status" [
 @usage 'output ("table<at: datetime, kind: string>")"jsonl" framing="jsonl" select="--json"'
 export def "demo events" [
     --verbose (-v): int,  # Say more
-    --json,               # One JSON object per line
-]: nothing -> oneof<string, table<at: datetime, kind: string>> {
-    let output = if $json { "jsonl" } else { "text" }
-    ^demo events ...(nusage argv [] {--verbose: $verbose, --json: $json}) | nusage decode $output {
-        jsonl: { from json --objects | into datetime at }
-    }
+]: nothing -> table<at: datetime, kind: string> {
+    ^demo events --json ...(nusage argv [] {--verbose: $verbose}) | from json --objects | into datetime at
 }

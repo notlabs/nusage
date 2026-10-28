@@ -25,18 +25,8 @@ def "nusage argv" [positionals: list<any>, flags: record]: nothing -> list<strin
     ($positionals | compact | each { nusage word }) ++ $flags
 }
 
-# A wrapper's output: decoded by the decoder named by the output the call selected, when
-# there is one for it, else as the binary printed it.
-def "nusage decode" [output: any, decoders: record] {
-    if ($decoders | get -o $output) == null {
-        $in
-    } else {
-        do ($decoders | get $output)
-    }
-}
-
 # A tool whose own spec, as `tool usage` prints it, declares no outputs or types
-export def main [] {
+export def main []: nothing -> string {
     ^tool ...(nusage argv [] {})
 }
 
@@ -47,10 +37,6 @@ export def main [] {
 @usage 'output ("table<name: string, size: filesize>")"json" framing="json" select="--json"'
 export def "tool ls" [
     name?: string,  # Only this one, by name
-    --json (-J),    # Print JSON
-]: nothing -> oneof<string, table<name: string, size: filesize>> {
-    let output = if $json { "json" } else { "text" }
-    ^tool ls ...(nusage argv [$name] {--json: $json}) | nusage decode $output {
-        json: { from json | into filesize size }
-    }
+]: nothing -> table<name: string, size: filesize> {
+    ^tool ls --json ...(nusage argv [$name] {}) | from json | into filesize size
 }

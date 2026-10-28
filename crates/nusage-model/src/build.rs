@@ -7,8 +7,8 @@ use nusage_spec::{Assembled, CommandPath, Diagnostic, Header, HeaderNode, Source
 use usage::{SpecArg, SpecCommand, SpecComplete, SpecFlag, SpecOutput};
 
 use crate::{
-    Command, CommandTree, Completer, Conversion, Decoding, Execution, Framing, NuType, Output,
-    Param, ParamKind, Value,
+    Command, CommandTree, Completer, Conversion, Execution, Framing, NuType, Param, ParamKind,
+    Structured, Value,
 };
 
 /// Header nodes that have a native place in the module and so do not become attributes.
@@ -137,17 +137,33 @@ impl Context<'_> {
         // of each is on its declaration: the deepest command declaring an output by that
         // name, else the spec's top level.
         let outputs = usage::effective_outputs_ref(&self.assembled.spec, cmds.iter().copied());
-        let (output, decoding) = match execution {
+        let (output, structured, flags) = match execution {
             Execution::Script(_) => {
                 let output = default_output(&outputs)
                     .and_then(|output| output_annotation(&chain, &output.name));
-                (output, None)
+                (output, None, flags)
             }
             Execution::External => {
                 let select = usage::effective_select_ref(&self.assembled.spec, &cmds);
-                let decoding = decoding(&outputs, select.as_deref(), &flags, &chain)
+                let structured = structured_output(&outputs, select.as_deref(), &chain)
                     .map_err(|message| Diagnostic::new(&header.path, message))?;
-                (union_type(&decoding), Some(decoding))
+                // The wrapper owns the selectors: a flag that picks an output is not a
+                // parameter, since the wrapper asks for its structured output itself and the
+                // binary alone, `^tool`, gives the others.
+                let selectors: Vec<&str> = outputs
+                    .iter()
+                    .filter_map(|output| output.select.as_deref())
+                    .chain(select.as_deref())
+                    .collect();
+                let flags = flags
+                    .into_iter()
+                    .filter(|flag| !selectors.iter().any(|selector| flag_named(flag, selector)))
+                    .collect();
+                let output = match &structured {
+                    Some(structured) => structured.ty.clone(),
+                    None => Some(NuType("string".into())),
+                };
+                (output, structured, flags)
             }
         };
 
@@ -193,7 +209,7 @@ impl Context<'_> {
             positionals,
             flags,
             output,
-            decoding,
+            structured,
             attributes,
             execution,
             is_provider,
@@ -518,82 +534,61 @@ fn output_annotation(chain: &[Level<'_>], name: &str) -> Option<NuType> {
         .map(|ty| NuType(ty.to_string()))
 }
 
-/// How a binary's call selects an output and what each decodes to. A `select` on an output
-/// is a switch that picks it; a `select` in effect for the command is a flag whose value is
-/// the output's name. Either names a flag the command has, by its long or short form.
-fn decoding(
-    outputs: &[SpecOutput],
-    command_select: Option<&str>,
-    flags: &[Param],
-    chain: &[Level<'_>],
-) -> Result<Decoding, String> {
-    let var_of = |selector: &str| -> Option<String> {
-        let name = selector.trim_start_matches('-');
-        flags
-            .iter()
-            .find(|flag| {
-                flag.long.as_deref() == Some(name)
-                    || (name.chars().count() == 1 && flag.short == name.chars().next())
-            })
-            .map(|flag| flag.var.clone())
-    };
-    let switches = outputs
-        .iter()
-        .filter_map(|output| {
-            let selector = output.select.as_deref()?;
-            var_of(selector).map(|var| (var, output.name.clone()))
-        })
-        .collect();
-    let value_selector = command_select.and_then(var_of);
-    let default = default_output(outputs).map(|output| output.name.clone());
-    let outputs = outputs
-        .iter()
-        .map(|output| {
-            let framing = match output.framing {
-                usage::Framing::Json => Some(Framing::Json),
-                usage::Framing::Jsonl => Some(Framing::Jsonl),
-                _ => None,
-            };
-            let ty = framing.and_then(|_| output_annotation(chain, &output.name));
-            let conversions = match &ty {
-                Some(ty) => conversions_for(ty)?,
-                None => Vec::new(),
-            };
-            Ok(Output {
-                name: output.name.clone(),
-                framing,
-                ty,
-                conversions,
-            })
-        })
-        .collect::<Result<Vec<_>, String>>()?;
-    Ok(Decoding {
-        switches,
-        value_selector,
-        default,
-        outputs,
-    })
+/// Whether a selector word, `--json` or `-j`, names the flag.
+fn flag_named(flag: &Param, selector: &str) -> bool {
+    let name = selector.trim_start_matches('-');
+    flag.long.as_deref() == Some(name)
+        || (name.chars().count() == 1 && flag.short == name.chars().next())
 }
 
-/// What a binary's call can return: text for an unframed output, the annotation for a framed
-/// one; a `oneof` when they differ, nothing when a framed output has no annotation.
-fn union_type(decoding: &Decoding) -> Option<NuType> {
-    let mut types: Vec<String> = Vec::new();
-    for output in &decoding.outputs {
-        let ty = match (&output.framing, &output.ty) {
-            (None, _) => "string".to_string(),
-            (Some(_), Some(ty)) => ty.as_str().to_string(),
-            (Some(_), None) => return None,
-        };
-        if !types.contains(&ty) {
-            types.push(ty);
+/// The structured output a wrapper asks for: the default output when it is framed, else the
+/// first `json` output that is selectable, else the first `jsonl` one; `None` for a text
+/// command. An output is selectable when it is the default, has its own `select` switch, or
+/// the command has a `select` flag whose value names it.
+fn structured_output(
+    outputs: &[SpecOutput],
+    command_select: Option<&str>,
+    chain: &[Level<'_>],
+) -> Result<Option<Structured>, String> {
+    let framing_of = |output: &SpecOutput| match output.framing {
+        usage::Framing::Json => Some(Framing::Json),
+        usage::Framing::Jsonl => Some(Framing::Jsonl),
+        _ => None,
+    };
+    let args_of = |output: &SpecOutput| -> Option<Vec<String>> {
+        if output.default {
+            Some(Vec::new())
+        } else if let Some(switch) = &output.select {
+            Some(vec![switch.clone()])
+        } else {
+            command_select.map(|flag| vec![flag.to_string(), output.name.clone()])
         }
-    }
-    match types.len() {
-        0 => None,
-        1 => Some(NuType(types.remove(0))),
-        _ => Some(NuType(format!("oneof<{}>", types.join(", ")))),
-    }
+    };
+    let candidates = || {
+        outputs
+            .iter()
+            .filter(|output| framing_of(output).is_some())
+            .filter_map(|output| args_of(output).map(|args| (output, args)))
+    };
+    let chosen = candidates()
+        .find(|(output, _)| output.default)
+        .or_else(|| candidates().find(|(output, _)| output.framing == usage::Framing::Json))
+        .or_else(|| candidates().next());
+    let Some((output, args)) = chosen else {
+        return Ok(None);
+    };
+    let ty = output_annotation(chain, &output.name);
+    let conversions = match &ty {
+        Some(ty) => conversions_for(ty)?,
+        None => Vec::new(),
+    };
+    Ok(Some(Structured {
+        name: output.name.clone(),
+        args,
+        framing: framing_of(output).expect("a candidate is framed"),
+        ty,
+        conversions,
+    }))
 }
 
 /// What the annotation declares that JSON cannot carry: datetimes, durations, filesizes and

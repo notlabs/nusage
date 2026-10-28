@@ -25,45 +25,23 @@ def "nusage argv" [positionals: list<any>, flags: record]: nothing -> list<strin
     ($positionals | compact | each { nusage word }) ++ $flags
 }
 
-# A wrapper's output: decoded by the decoder named by the output the call selected, when
-# there is one for it, else as the binary printed it.
-def "nusage decode" [output: any, decoders: record] {
-    if ($decoders | get -o $output) == null {
-        $in
-    } else {
-        do ($decoders | get $output)
-    }
-}
-
 # Reports, with CLI-wide outputs and a CLI-wide selector
 @usage 'flag "--format <format>" help="Output format" global=#true'
 @usage 'output "text" default=#true help="Readable"'
 @usage 'output ("record<ok: bool>")"json" framing="json" help="One object"'
 @usage 'select "--format"'
 @usage 'include file="included.kdl"'
-export def main [
-    --format: string@[text json],  # Output format
-]: nothing -> oneof<string, record<ok: bool>> {
-    let output = $format | default "text"
-    ^rep ...(nusage argv [] {--format: $format}) | nusage decode $output {
-        json: { from json }
-    }
+export def main []: nothing -> record<ok: bool> {
+    ^rep --format json ...(nusage argv [] {}) | from json
 }
 
 # List reports
-export def "rep list" [
-    --format: string@[text json],  # Output format
-] {
-    let output = $format | default "text"
-    ^rep list ...(nusage argv [] {--format: $format}) | nusage decode $output {
-        json: { from json }
-    }
+export def "rep list" [] {
+    ^rep list --format json ...(nusage argv [] {}) | from json
 }
 
 # Only text
 @usage 'output "json" hide=#true'
-export def "rep quiet" [
-    --format: string@[text],  # Output format
-]: nothing -> string {
-    ^rep quiet ...(nusage argv [] {--format: $format})
+export def "rep quiet" []: nothing -> string {
+    ^rep quiet ...(nusage argv [] {})
 }

@@ -1,10 +1,9 @@
-# usage fills `--format`'s choices from the output names; they become an inline completer.
-# `--format json` selects the json output, decoded as one document.
+# `select "--format"` names the json output's selector: the wrapper asks for it itself with
+# `--format json` and decodes one document; `--format` is not a parameter of the wrapper.
 {
     cmd: [status],
-    complete: {line: "demo status --format ", expect: [human json]},
-    invoke: "demo status --format json",
-    argv: [status, --format, json],
+    invoke: "demo status -v 1",
+    argv: [status, --format, json, --verbose],
     stdout: "{\"ok\": true, \"tasks\": [\"a\", \"b\"]}",
     output: {ok: true, tasks: [a, b]},
 }
