@@ -3,12 +3,14 @@
 //! mapping is the obvious one: an object is a `record` of its properties in their order, an
 //! array of objects a `table`, any other array a `list`, `integer` is `int`, `number` is
 //! `float`, and a property the schema does not require is `oneof<T, nothing>`, filled with
-//! `null` when absent so it is there to read. A string with `format: date-time` becomes a
-//! datetime, one with `contentEncoding: base64` becomes binary, and a number with an `x-nu`
-//! vocabulary entry (`{"type": "duration", "unit": "ms"}`, also `filesize` and `datetime`)
-//! becomes that, counting its unit. `anyOf`, `oneOf` and a list of types are `oneof<…>`;
-//! `enum` and `const` take the type of their values; a local `$ref` is followed. What this
-//! does not read is `any`: `allOf`, `not`, conditionals, `patternProperties`.
+//! `null` when absent so it is there to read. In the items of a list that is not a table,
+//! where no cell path reaches to fill it, such a property is left out of the type instead,
+//! since the type of a record says what every record has. A string with `format: date-time`
+//! becomes a datetime, one with `contentEncoding: base64` becomes binary, and a number with
+//! an `x-nu` vocabulary entry (`{"type": "duration", "unit": "ms"}`, also `filesize` and
+//! `datetime`) becomes that, counting its unit. `anyOf`, `oneOf` and a list of types are
+//! `oneof<…>`; `enum` and `const` take the type of their values; a local `$ref` is followed.
+//! What this does not read is `any`: `allOf`, `not`, conditionals, `patternProperties`.
 
 use serde_json::Value as Json;
 
@@ -256,14 +258,16 @@ impl Reader<'_> {
         for (name, property) in properties {
             let optional = !required.contains(&name.as_str());
             let field = place.field(name, optional);
-            let mut ty = self.node(property, &field)?;
-            if optional {
-                if !field.in_list {
-                    self.fills.push(field.path.clone());
-                }
-                ty = oneof(vec![ty, "nothing".to_string()]);
+            let ty = self.node(property, &field)?;
+            if !optional {
+                columns.push(format!("{}: {ty}", column(name)));
+            } else if !field.in_list {
+                self.fills.push(field.path.clone());
+                let ty = oneof(vec![ty, "nothing".to_string()]);
+                columns.push(format!("{}: {ty}", column(name)));
             }
-            columns.push(format!("{}: {ty}", column(name)));
+            // An optional property no fill reaches is left out: a record may carry fields
+            // its type does not name, and must carry the ones it does.
         }
         Ok(format!("record<{}>", columns.join(", ")))
     }
@@ -445,6 +449,32 @@ mod tests {
         assert_eq!(
             ty(&referenced),
             "table<ok: bool, name: oneof<string, nothing>>"
+        );
+    }
+
+    #[test]
+    fn an_optional_property_no_fill_reaches_is_left_out() {
+        // A list of strings or records, as mise writes a task's dependencies: the records
+        // are no table's rows, so `args` cannot be filled, and a type naming it would be
+        // wrong for every record that lacks it.
+        let schema = r#"{"type": "array", "items": {"anyOf": [{"type": "string"}, {"type": "object",
+            "required": ["task"], "properties": {"task": {"type": "string"},
+            "args": {"type": "array", "items": {"type": "string"}}}}]}}"#;
+        let listed = shape(schema).unwrap();
+        assert_eq!(listed.ty.0, "list<oneof<string, record<task: string>>>");
+        assert!(listed.fills.is_empty(), "{:?}", listed.fills);
+        // A table nested in a record is still filled, column by column.
+        let nested = r#"{"type": "object", "required": ["rows"], "properties": {"rows": {"type":
+            "array", "items": {"type": "object", "required": ["id"], "properties": {"id": {"type":
+            "integer"}, "note": {"type": "string"}}}}}}"#;
+        let tabled = shape(nested).unwrap();
+        assert_eq!(
+            tabled.ty.0,
+            "record<rows: table<id: int, note: oneof<string, nothing>>>"
+        );
+        assert_eq!(
+            tabled.fills,
+            vec![vec!["rows".to_string(), "note".to_string()]]
         );
     }
 
