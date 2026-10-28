@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::LazyLock;
 
 use nu_protocol::engine::{EngineState, StateWorkingSet};
-use nu_protocol::{Span, Value};
+use nu_protocol::{DeclId, Span, Value};
 
 use crate::SyntaxError;
 
@@ -17,6 +17,80 @@ static ENGINE: LazyLock<EngineState> =
 /// `path self`, which is the file's own. The error names the line of generated Nushell at
 /// fault.
 pub fn check_module(name: &str, source: &str, dir: Option<&Path>) -> Result<(), SyntaxError> {
+    with_module(name, source, dir, |_| ())
+}
+
+/// A definition of a parsed module, as Nushell sees it: what `scope commands` reports.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Decl {
+    pub name: String,
+    /// The first paragraph of its doc comment.
+    pub description: String,
+    /// The rest of its doc comment.
+    pub extra_description: String,
+    pub required: Vec<DeclArg>,
+    pub optional: Vec<DeclArg>,
+    pub rest: Option<DeclArg>,
+    pub flags: Vec<DeclFlag>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeclArg {
+    pub name: String,
+    pub completer: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeclFlag {
+    pub long: String,
+    pub short: Option<char>,
+    pub takes_value: bool,
+    pub completer: bool,
+}
+
+/// The definitions the module declares, as Nushell parses them, after [`check_module`]'s
+/// check. Nushell's own `--help` flag is left out.
+pub fn signatures(name: &str, source: &str, dir: Option<&Path>) -> Result<Vec<Decl>, SyntaxError> {
+    with_module(name, source, dir, |working_set| {
+        (ENGINE.num_decls()..working_set.num_decls())
+            .map(|id| {
+                let sig = working_set.get_decl(DeclId::new(id)).signature();
+                let arg = |arg: &nu_protocol::PositionalArg| DeclArg {
+                    name: arg.name.clone(),
+                    completer: arg.completion.is_some(),
+                };
+                Decl {
+                    name: sig.name.clone(),
+                    description: sig.description.clone(),
+                    extra_description: sig.extra_description.clone(),
+                    required: sig.required_positional.iter().map(arg).collect(),
+                    optional: sig.optional_positional.iter().map(arg).collect(),
+                    rest: sig.rest_positional.as_ref().map(arg),
+                    flags: sig
+                        .named
+                        .iter()
+                        .filter(|flag| flag.long != "help")
+                        .map(|flag| DeclFlag {
+                            long: flag.long.clone(),
+                            short: flag.short,
+                            takes_value: flag.arg.is_some(),
+                            completer: flag.completion.is_some(),
+                        })
+                        .collect(),
+                }
+            })
+            .collect()
+    })
+}
+
+/// Parse the module as [`check_module`] describes and hand the parsed state to `read`, or
+/// the first parse error, naming the line of generated Nushell at fault.
+fn with_module<T>(
+    name: &str,
+    source: &str,
+    dir: Option<&Path>,
+    read: impl FnOnce(&StateWorkingSet<'_>) -> T,
+) -> Result<T, SyntaxError> {
     let mut engine_state = ENGINE.clone();
     // The parser resolves against `PWD` as an absolute path.
     let dir = dir
@@ -42,7 +116,7 @@ pub fn check_module(name: &str, source: &str, dir: Option<&Path>) -> Result<(), 
         false,
     );
     let Some(err) = working_set.parse_errors.first() else {
-        return Ok(());
+        return Ok(read(&working_set));
     };
     // The wrapper adds one line above the module's own.
     let line = wrapped[..err.span().start.min(wrapped.len())]

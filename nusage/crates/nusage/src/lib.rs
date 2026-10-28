@@ -7,6 +7,7 @@
 
 mod binary;
 mod common;
+mod conform;
 mod interpret;
 mod shim;
 mod switch_overlay;
@@ -56,9 +57,49 @@ pub fn generate_with(
         .and_then(|out| out.file_stem())
         .and_then(|stem| stem.to_str())
         .unwrap_or("nusage");
-    nusage_nu::check_module(name, &text, out.and_then(Path::parent))
+    let dir = out.and_then(Path::parent);
+    nusage_nu::check_module(name, &text, dir)
         .map_err(|err| Diagnostic::new(source, err.to_string()))?;
+    // What was written is held to usage's reading of the spec, not to the model's.
+    let findings = conform::conform(&assembled, name, &text, dir)
+        .map_err(|err| Diagnostic::new(source, err.to_string()))?;
+    if !findings.is_empty() {
+        return Err(Diagnostic::new(
+            source,
+            format!(
+                "the generated module does not carry what the spec shows:\n  {}",
+                findings.join("\n  ")
+            ),
+        ));
+    }
     Ok(text)
+}
+
+/// Check a module written for the source, with overlays, against the spec as usage reads
+/// it: every command the spec shows is a definition with the spec's positionals, flags and
+/// completers, named as the generator names them, with its description once. [`generate`]
+/// checks what it writes the same way.
+pub fn check(source: &Path, overlays: &[PathBuf], module: &Path) -> Result<(), Diagnostic> {
+    let assembled = nusage_spec::assemble_with(source, overlays)?;
+    let text = std::fs::read_to_string(module)
+        .map_err(|err| Diagnostic::new(module, format!("cannot read: {err}")))?;
+    let name = module
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("nusage");
+    let findings = conform::conform(&assembled, name, &text, module.parent())
+        .map_err(|err| Diagnostic::new(module, err.to_string()))?;
+    if findings.is_empty() {
+        Ok(())
+    } else {
+        Err(Diagnostic::new(
+            module,
+            format!(
+                "does not carry what the spec shows:\n  {}",
+                findings.join("\n  ")
+            ),
+        ))
+    }
 }
 
 /// The assembled spec as usage KDL, overlays merged, for every tool that reads usage specs.

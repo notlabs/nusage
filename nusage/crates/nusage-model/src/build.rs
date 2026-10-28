@@ -127,6 +127,20 @@ impl Context<'_> {
         } else {
             let mut available = usage::available_flags(&cmds);
             let mut flags = Vec::new();
+            let declares = |level: &Level<'_>, name: &str| {
+                level
+                    .cmd
+                    .flags
+                    .iter()
+                    .chain(
+                        level
+                            .cmd
+                            .clause
+                            .iter()
+                            .flat_map(|clause| clause.flags.iter()),
+                    )
+                    .any(|flag| flag.name == name)
+            };
             for level in &chain {
                 let declared = level.cmd.flags.iter().map(|flag| (flag, false)).chain(
                     level
@@ -141,14 +155,29 @@ impl Context<'_> {
                         continue;
                     };
                     let flag = available.remove(index);
-                    let mut param = self.flag_param(&flag, *level)?;
-                    param.inherited = level.path != &path;
+                    // A hidden flag is not the module's; a builtin one, `--help`, is Nushell's.
+                    if flag.hide || flag.builtin {
+                        continue;
+                    }
+                    // The flag usage accepts is the deepest declaration of the name, a
+                    // subcommand's over an inherited global's: its annotation and completer
+                    // are read there, in the position of the first declaration.
+                    let owner = chain
+                        .iter()
+                        .rev()
+                        .find(|level| declares(level, &declared.name))
+                        .unwrap_or(level);
+                    let mut param = self.flag_param(&flag, *owner)?;
+                    param.inherited = owner.path != &path;
                     param.clause = clause;
                     flags.push(param);
                 }
             }
             // Anything usage adds beyond the declarations, such as a flagset's.
             for flag in &available {
+                if flag.hide || flag.builtin {
+                    continue;
+                }
                 flags.push(self.flag_param(flag, here)?);
             }
             flags
@@ -243,7 +272,11 @@ impl Context<'_> {
             .subcommands
             .iter()
             .partition(|(name, _)| self.providers.contains(&path.child(name)));
+        // What usage hides is not a command of the module; `^tool` still runs it.
         for (name, sub) in first.into_iter().chain(rest) {
+            if sub.hide {
+                continue;
+            }
             self.visit(sub, path.child(name), &chain, out)?;
         }
         Ok(())
@@ -476,6 +509,22 @@ fn variable(key: &str) -> String {
         format!("{key}_")
     } else {
         key.to_string()
+    }
+}
+
+/// How a usage name is spelled in Nushell: the `$usage` key and the variable, as
+/// [`Param::key`] and [`Param::var`] describe them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Identifier {
+    pub key: String,
+    pub var: String,
+}
+
+pub fn identifier(usage_name: &str) -> Identifier {
+    let key = snake(usage_name);
+    Identifier {
+        var: variable(&key),
+        key,
     }
 }
 

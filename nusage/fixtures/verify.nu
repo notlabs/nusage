@@ -14,7 +14,8 @@
 # case says, so argv building and decoding are checked; then completions and signatures.
 # A case with `complete` asks the module for completions at a point of a line. Then the parsed
 # signature and attributes of the root and every command a case names, as `scope commands`
-# reports them, are compared with expected/signatures.nuon.
+# reports them, are compared with expected/signatures.nuon, and `nusage check` holds the
+# module to the spec as usage reads it.
 #
 #
 #   mise run //nusage:verify-fixtures                       # all fixtures
@@ -77,7 +78,26 @@ def verify-fixture [dir: path, update: bool] {
         signatures
         ""
         (check-signatures $dir $import $bin $cmds $update)
-    ))
+    )) | append ((row $name conform "" (check-conform $dir $module $bin $is_binary)))
+}
+
+# `nusage check`: the module carries what the spec shows, as usage reads the spec, for
+# every command, its positionals, flags, completers and description.
+def check-conform [dir: path, module: path, bin: string, is_binary: bool] {
+    if not ($env.NUSAGE_BIN | path exists) {
+        return {ok: true, detail: $"skipped: ($env.NUSAGE_BIN) is not built"}
+    }
+    let source = if $is_binary {
+        $dir | path join $"($bin).usage.kdl"
+    } else if ($dir | path join script.nu | path exists) {
+        $dir | path join script.nu
+    } else {
+        $dir | path join $bin
+    }
+    let overlay = $dir | path join $"($bin).overlay.kdl"
+    let overlays = if ($overlay | path exists) { [--overlay $overlay] } else { [] }
+    let out = ^$env.NUSAGE_BIN check $source $module ...$overlays | complete
+    {ok: ($out.exit_code == 0), detail: ($out.stderr | str trim)}
 }
 
 def row [

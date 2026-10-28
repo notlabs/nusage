@@ -20,6 +20,7 @@ struct Nusage {
 enum Commands {
     Generate(Generate),
     Spec(Spec),
+    Check(Check),
     Overlay(Overlay),
     Parse(Parse),
 }
@@ -83,6 +84,32 @@ impl Run for Spec {
         let spec = nusage::spec(&self.source, &self.overlay).map_err(|e| e.to_string())?;
         print!("{spec}");
         Ok(())
+    }
+}
+
+/// Check a generated module against the spec of its source
+///
+/// Every command the spec shows must be a definition with the spec's positionals, flags
+/// and completers, named as `generate` names them, with its description once. The spec is
+/// read by usage itself, so this holds the generator to usage rather than to its own model;
+/// `generate` runs the same check on what it writes.
+#[derive(Args)]
+struct Check {
+    /// The script, the directory of scripts, or the `.kdl` spec file the module was
+    /// generated from
+    source: PathBuf,
+    /// The generated module
+    module: PathBuf,
+    /// A usage KDL document merged onto the spec file first, as for `generate`
+    #[usage(long)]
+    overlay: Vec<PathBuf>,
+}
+
+impl Run for Check {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        nusage::check(&self.source, &self.overlay, &self.module).map_err(|e| e.to_string())
     }
 }
 

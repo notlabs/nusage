@@ -1,7 +1,9 @@
 #!/usr/bin/env nusage
-#USAGE about "Drives mise through the generated module: each call decodes to the data it declares"
+#USAGE about "Holds the generated module to mise's spec, then drives mise through it: each call decodes to the data it declares"
 use std/assert
 use generated/mise.nu *
+
+^nusage check generated/mise.usage.kdl generated/mise.nu --overlay generated/mise.json.kdl
 
 let version = mise version
 assert ($version.version =~ '^\d{4}\.\d+\.\d+') ($version | to nuon)
