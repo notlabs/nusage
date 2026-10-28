@@ -17,7 +17,8 @@ jujutsu = "0.46.0"
 # The formatters `jj fix` runs and CI checks with: nufmt tracks the Nushell above.
 "cargo:https://github.com/nushell/nufmt" = "tag:v0.1.6"
 taplo = "0.10.0"
-actionlint = "1.7.11"
+jactionlint = "2.3.0"
+release-plz = "0.4.2"
 
 # The repository's tasks run through the nusage built here, which `//nusage:build` links
 # into `.bin`, not through a release. jj reads the formatters from `jj.toml` here, after
@@ -28,9 +29,9 @@ _.path = ["{{config_root}}/.bin"]
 JJ_CONFIG = "{{ env.HOME }}/.jjconfig.toml:{{ xdg_config_home }}/jj/config.toml:{{ xdg_config_home }}/jj/conf.d:{{ config_root }}/jj.toml"
 
 [tasks.lint]
-description = "The workflows by actionlint, and the handwritten Nushell and the TOML as the formatters want them"
+description = "The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them"
 run = [
-  "actionlint",
+  "jactionlint",
   "git ls-files '*.nu' | grep -v /expected/ | xargs nufmt --dry-run",
   "taplo fmt --check",
 ]
@@ -38,3 +39,8 @@ run = [
 [tasks.check]
 description = "The root's own checks"
 depends = [":lint"]
+
+# The release is the commit this leaves to make: pushed to main, release.yml tags it.
+[tasks.release]
+description = "Bump the versions and write the changelog from the commits since the last tag"
+run = "release-plz update"

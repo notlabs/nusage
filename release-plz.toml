@@ -1,13 +1,14 @@
-# The crates share the workspace version and are never published: git tags are the version
-# authority, and a release is the tag and the GitHub release that `nusage` gets, created as a
-# draft that release.yml publishes once every binary is attached.
+# The crates share the repository and are never published: git tags are the version
+# authority. `release-plz update` (`mise run release`) bumps the versions and writes
+# nusage's changelog from the commits since the last tag, to commit; `release-plz release`
+# in release.yml then tags that version and creates its GitHub release, as a draft that the
+# workflow publishes once every binary is attached.
 [workspace]
 git_only = true
 publish = false
 git_tag_enable = false
 git_release_enable = false
 changelog_update = false
-release_always = false
 
 [[package]]
 name = "nusage"
