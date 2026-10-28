@@ -7,9 +7,24 @@ mr-boxington = "1.27.0"
 [dotfiles]
 "~/.config/mise/conf.d/nusage.toml" = { source = "conf.d/nusage.toml", mode = "symlink" }
 
+[task_config]
+shell = "nu -c"
+
+# The build, linked where the root's `[env] _.path` looks for it, from the path Cargo
+# reports: a build cache may keep the target directory elsewhere.
 [tasks.build]
-description = "Build the workspace"
-run = "cargo build --workspace"
+description = "Build the workspace and link nusage into the repository's bin directory"
+run = '''
+let built = ^cargo build --workspace --message-format json-render-diagnostics
+  | lines
+  | where ($it | str starts-with "{")
+  | each { from json }
+  | where reason == compiler-artifact and executable != null and target.name == nusage
+  | get 0.executable
+let bin = "{{ config_root }}/../.bin" | path expand
+mkdir $bin
+^ln -sf $built ($bin | path join nusage)
+'''
 
 [tasks.test]
 description = "Rust tests, including every fixture generating its expected module byte for byte"

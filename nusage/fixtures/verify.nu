@@ -21,7 +21,7 @@
 #   mise run //nusage:verify-fixtures fixtures/minimal      # one
 #   mise run //nusage:verify-fixtures --update-signatures   # rewrite expected/signatures.nuon
 #
-# `NUSAGE_BIN` names the nusage to check; the workspace's debug build by default.
+# `NUSAGE_BIN` names the nusage to check; the build `//nusage:build` links into `.bin` by default.
 
 # One row per check: shim, interpreter and (when present) completion per case, then signatures.
 def verify-fixture [dir: path, update: bool] {
@@ -261,7 +261,7 @@ def check-signatures [
 }
 
 const root = path self | path dirname
-$env.NUSAGE_BIN = $env.NUSAGE_BIN? | default ($root | path dirname | path dirname | path join target debug nusage)
+$env.NUSAGE_BIN = $env.NUSAGE_BIN? | default ($root | path dirname | path dirname | path join .bin nusage)
 let fixtures = if ($usage.args.fixtures | is-empty) {
     ls $root | where type == dir | get name
 } else {
