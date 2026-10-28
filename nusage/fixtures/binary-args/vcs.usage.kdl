@@ -8,3 +8,7 @@ cmd "log" help="Show revisions" {
     flag "-G --no-graph" help="A flat list, not a graph"
     arg "[FILESETS]..." help="Only revisions touching these"
 }
+cmd "evolog" help="Show how a change evolved" {
+    flag "-T --template <TEMPLATE>" help="Render each entry with this"
+    flag "-G --no-graph" help="A flat list, not a graph"
+}

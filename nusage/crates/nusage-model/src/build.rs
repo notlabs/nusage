@@ -731,7 +731,7 @@ fn collect_conversions(
             path,
             ty: into.to_string(),
             unit: None,
-            nullable: false,
+            nullable: Vec::new(),
         });
         return Ok(());
     }

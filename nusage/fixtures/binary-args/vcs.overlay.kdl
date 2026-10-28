@@ -7,3 +7,10 @@ cmd "log" {
         schema #"{"type": "object", "required": ["commit_id", "author"], "properties": {"commit_id": {"type": "string"}, "author": {"type": "object", "required": ["name", "timestamp"], "properties": {"name": {"type": "string"}, "timestamp": {"type": "string", "format": "date-time"}}}}}"#
     }
 }
+// An entry's operation may be null, and its time is converted only when it is not.
+cmd "evolog" {
+    output "json" framing="jsonl" {
+        nusage-args "--no-graph" "--template" #"json(self) ++ "\n""#
+        schema #"{"type": "object", "required": ["commit_id", "operation"], "properties": {"commit_id": {"type": "string"}, "operation": {"anyOf": [{"type": "object", "required": ["time"], "properties": {"time": {"type": "object", "required": ["start"], "properties": {"start": {"type": "string", "format": "date-time"}}}}}, {"type": "null"}]}}}"#
+    }
+}

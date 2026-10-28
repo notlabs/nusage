@@ -94,8 +94,10 @@ pub struct Conversion {
     /// For a number: what it counts, as the schema's `x-nu` says, spelled as in a Nushell
     /// literal (`ms`, `sec`, `kB`). `None` for text, such as an ISO 8601 datetime.
     pub unit: Option<String>,
-    /// Whether the value may be `null`, which is left as it is.
-    pub nullable: bool,
+    /// Where on the way to the value `null` may stand instead, as the lengths of the
+    /// prefixes of `path` that may be `null`, shortest first: the whole path for the value
+    /// itself. A `null` is left as it is, with nothing under it to convert.
+    pub nullable: Vec<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

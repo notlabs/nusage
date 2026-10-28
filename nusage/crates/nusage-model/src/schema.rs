@@ -50,11 +50,12 @@ struct Reader<'a> {
 }
 
 /// Where in the value a schema node sits: its cell path, whether a list stands between it
-/// and the top (where no cell path reaches), and whether it may be null.
+/// and the top (where no cell path reaches), and the prefixes of its path that may be null,
+/// by length, itself or what it sits in.
 struct Place {
     path: Vec<String>,
     in_list: bool,
-    nullable: bool,
+    nullable: Vec<usize>,
 }
 
 impl Place {
@@ -62,17 +63,34 @@ impl Place {
         Place {
             path: Vec::new(),
             in_list: false,
-            nullable: false,
+            nullable: Vec::new(),
         }
     }
 
     fn field(&self, name: &str, nullable: bool) -> Self {
         let mut path = self.path.clone();
         path.push(name.to_string());
-        Place {
+        let mut place = Place {
             path,
             in_list: self.in_list,
-            nullable: self.nullable || nullable,
+            nullable: self.nullable.clone(),
+        };
+        if nullable {
+            place.nullable.push(place.path.len());
+        }
+        place
+    }
+
+    /// The same place, where the value itself may be null.
+    fn or_null(&self, nullable: bool) -> Self {
+        let mut nulls = self.nullable.clone();
+        if nullable && nulls.last() != Some(&self.path.len()) {
+            nulls.push(self.path.len());
+        }
+        Place {
+            path: self.path.clone(),
+            in_list: self.in_list,
+            nullable: nulls,
         }
     }
 
@@ -80,7 +98,7 @@ impl Place {
         Place {
             path: self.path.clone(),
             in_list: true,
-            nullable: false,
+            nullable: Vec::new(),
         }
     }
 
@@ -118,12 +136,7 @@ impl Reader<'_> {
             for ty in &types {
                 let mut one = object.clone();
                 one.insert("type".into(), Json::String(ty.to_string()));
-                let place = Place {
-                    path: place.path.clone(),
-                    in_list: place.in_list,
-                    nullable: place.nullable || nullable,
-                };
-                members.push(self.node(&Json::Object(one), &place)?);
+                members.push(self.node(&Json::Object(one), &place.or_null(nullable))?);
             }
             return Ok(oneof(members));
         }
@@ -188,11 +201,7 @@ impl Reader<'_> {
         let nullable = members
             .iter()
             .any(|member| member.get("type").and_then(Json::as_str) == Some("null"));
-        let place = Place {
-            path: place.path.clone(),
-            in_list: place.in_list,
-            nullable: place.nullable || nullable,
-        };
+        let place = place.or_null(nullable);
         let mut types = Vec::new();
         for member in members {
             types.push(self.node(member, &place)?);
@@ -331,18 +340,19 @@ impl Reader<'_> {
             path: place.path.clone(),
             ty: ty.to_string(),
             unit: unit.map(str::to_string),
-            nullable: place.nullable,
+            nullable: place.nullable.clone(),
         });
     }
 }
 
 impl Place {
-    /// The rows of a table: the same cell paths, nothing between them and the top.
+    /// The rows of a table: the same cell paths, nothing between them and the top but what
+    /// may be null on the way to the table.
     fn field_less(&self) -> Self {
         Place {
             path: self.path.clone(),
             in_list: self.in_list,
-            nullable: false,
+            nullable: self.nullable.clone(),
         }
     }
 }
@@ -491,19 +501,31 @@ mod tests {
             shape.ty.0,
             "record<took: duration, at: datetime, size: filesize, data: binary, seen: oneof<datetime, nothing>>"
         );
-        let conversions: Vec<(String, String, Option<String>, bool)> = shape
+        let conversions: Vec<(String, String, Option<String>, Vec<usize>)> = shape
             .conversions
             .iter()
-            .map(|c| (c.path.join("."), c.ty.clone(), c.unit.clone(), c.nullable))
+            .map(|c| {
+                (
+                    c.path.join("."),
+                    c.ty.clone(),
+                    c.unit.clone(),
+                    c.nullable.clone(),
+                )
+            })
             .collect();
         assert_eq!(
             conversions,
             vec![
-                ("took".into(), "duration".into(), Some("ms".into()), false),
-                ("at".into(), "datetime".into(), None, false),
-                ("size".into(), "filesize".into(), Some("kB".into()), false),
-                ("data".into(), "base64".into(), None, false),
-                ("seen".into(), "datetime".into(), Some("sec".into()), true),
+                ("took".into(), "duration".into(), Some("ms".into()), vec![]),
+                ("at".into(), "datetime".into(), None, vec![]),
+                ("size".into(), "filesize".into(), Some("kB".into()), vec![]),
+                ("data".into(), "base64".into(), None, vec![]),
+                (
+                    "seen".into(),
+                    "datetime".into(),
+                    Some("sec".into()),
+                    vec![1]
+                ),
             ]
         );
     }

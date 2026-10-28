@@ -60,3 +60,15 @@ export def "vcs log" [
 ]: nothing -> table<commit_id: string, author: record<name: string, timestamp: datetime>> {
     ^vcs log --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [...$filesets] {--repository: $repository, --revision: $revision}) | from json --objects | into datetime author.timestamp
 }
+
+# Show how a change evolved
+@usage 'flag "-T --template <TEMPLATE>" help="Render each entry with this"'
+@usage 'flag "-G --no-graph" help="A flat list, not a graph"'
+@usage 'output "json" framing="jsonl" {
+        schema #"{"type": "object", "required": ["commit_id", "operation"], "properties": {"commit_id": {"type": "string"}, "operation": {"anyOf": [{"type": "object", "required": ["time"], "properties": {"time": {"type": "object", "required": ["start"], "properties": {"start": {"type": "string", "format": "date-time"}}}}}, {"type": "null"}]}}}"#
+    }'
+export def "vcs evolog" [
+    --repository (-R): string,  # Where to work
+]: nothing -> table<commit_id: string, operation: oneof<record<time: record<start: datetime>>, nothing>> {
+    ^vcs evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [] {--repository: $repository}) | from json --objects | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.start } }
+}

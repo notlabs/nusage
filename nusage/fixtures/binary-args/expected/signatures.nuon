@@ -1,6 +1,6 @@
 [
-  [name,      signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 attributes];
-  [vcs,       {
+  [name,         signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 attributes];
+  [vcs,          {
       nothing: [
         [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,     completion, parameter_default];
         [null,           input,          nothing,      false,       null,       null,            null,       null],
@@ -11,7 +11,22 @@
       [name,  value];
       [usage, "flag \"-R --repository <REPOSITORY>\" help=\"Where to work\" global=#true"]
     ]],
-  ["vcs log", {
+  ["vcs evolog", {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                                                                                 is_optional, short_flag, description,     completion, parameter_default];
+        [null,           input,          nothing,                                                                                      false,       null,       null,            null,       null],
+        [repository,     named,          string,                                                                                       true,        R,          "Where to work", null,       null],
+        [null,           output,         "table<commit_id: string, operation: oneof<record<time: record<start: datetime>>, nothing>>", false,       null,       null,            null,       null]
+      ]
+    },                                                                                                                                                                                                                                                                                                                                                                                                               [
+      [name,  value];
+      [usage, "flag \"-T --template <TEMPLATE>\" help=\"Render each entry with this\""],
+      [usage, "flag \"-G --no-graph\" help=\"A flat list, not a graph\""],
+      [usage, "output \"json\" framing=\"jsonl\" {
+        schema #\"{\"type\": \"object\", \"required\": [\"commit_id\", \"operation\"], \"properties\": {\"commit_id\": {\"type\": \"string\"}, \"operation\": {\"anyOf\": [{\"type\": \"object\", \"required\": [\"time\"], \"properties\": {\"time\": {\"type\": \"object\", \"required\": [\"start\"], \"properties\": {\"start\": {\"type\": \"string\", \"format\": \"date-time\"}}}}}, {\"type\": \"null\"}]}}}\"#
+    }"]
+    ]],
+  ["vcs log",    {
       nothing: [
         [parameter_name, parameter_type, syntax_shape,                                                                  is_optional, short_flag, description,                     completion, parameter_default];
         [null,           input,          nothing,                                                                       false,       null,       null,                            null,       null],
