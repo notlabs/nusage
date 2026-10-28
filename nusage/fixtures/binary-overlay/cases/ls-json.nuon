@@ -1,0 +1,10 @@
+# The overlay's json output: the wrapper asks for it with the base's `--json`, decodes it, and
+# converts `size` to the filesize the overlay's annotation declares. The overlay's annotated
+# argument follows the selector in the argv.
+{
+    cmd: [ls],
+    invoke: "tool ls a",
+    argv: [ls, --json, a],
+    stdout: "[{\"name\": \"a\", \"size\": 2048}]",
+    output: [[name, size]; [a, 2048b]],
+}

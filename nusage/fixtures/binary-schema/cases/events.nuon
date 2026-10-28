@@ -1,0 +1,9 @@
+# A schema in a file beside the spec, for JSON lines: each line is a row, `at` counts seconds,
+# `detail` may be null or absent.
+{
+    cmd: [events],
+    invoke: "probe events",
+    argv: [events, --json],
+    stdout: "{\"at\": 0, \"kind\": \"start\", \"detail\": null}\n{\"at\": 60, \"kind\": \"stop\"}",
+    output: [[at, kind, detail]; [1970-01-01T00:00:00+00:00, start, null], [1970-01-01T00:01:00+00:00, stop, null]],
+}

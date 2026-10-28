@@ -1,0 +1,8 @@
+# A `clause` is usage's repeatable group of flags and positionals: `demo tag -l x a -l y b`
+# labels each item. A `def` is flat, so the clause's positionals are the command's and its
+# flags go before every instance: one label for both items.
+{
+    cmd: [tag],
+    invoke: "demo tag a b --label x",
+    argv: [tag, --label, x, a, --label, x, b],
+}

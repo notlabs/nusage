@@ -1,0 +1,14 @@
+# The formatters, as `jj fix` runs them on the changes themselves: each reads a file on
+# standard input and writes it formatted. The same formatters check the tree in CI.
+[fix.tools.rustfmt]
+command = ["rustfmt", "--edition", "2024"]
+patterns = ["glob:'**/*.rs'"]
+
+# Not the modules the generator writes: they are compared byte for byte with its output.
+[fix.tools.nufmt]
+command = ["nufmt", "--stdin"]
+patterns = ["glob:'**/*.nu' ~ glob:'**/expected/*.nu'"]
+
+[fix.tools.taplo]
+command = ["taplo", "fmt", "-"]
+patterns = ["glob:'**/*.toml'"]

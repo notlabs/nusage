@@ -1,0 +1,21 @@
+# The crates share the repository and are never published: git tags are the version
+# authority. `release-plz update` (`mise run release`) bumps the versions and writes
+# nusage's changelog from the commits since the last tag, to commit; `release-plz release`
+# in release.yml then tags that version and creates its GitHub release, as a draft that the
+# workflow publishes once every binary is attached.
+[workspace]
+git_only = true
+publish = false
+git_tag_enable = false
+git_release_enable = false
+changelog_update = false
+
+[[package]]
+name = "nusage"
+changelog_update = true
+changelog_path = "CHANGELOG.md"
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+git_release_enable = true
+git_release_name = "v{{ version }}"
+git_release_draft = true

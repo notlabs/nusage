@@ -1,0 +1,15 @@
+[package]
+name = "nusage-spec"
+description = "Read usage headers from Nushell scripts and assemble a script tree into one spec"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Released as binaries, not on crates.io.
+publish = false
+
+[dependencies]
+usage.workspace = true
+thiserror.workspace = true
+indexmap.workspace = true

@@ -1,0 +1,9 @@
+# A command from an `include`: its own json output, asked for through the inherited
+# `--format`. The included file is not read for annotations, so it is decoded but not typed.
+{
+    cmd: [list],
+    invoke: "rep list",
+    argv: [list, --format, json],
+    stdout: "[\"a\", \"b\"]",
+    output: [a, b],
+}

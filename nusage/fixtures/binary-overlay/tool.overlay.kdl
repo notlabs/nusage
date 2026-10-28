@@ -1,0 +1,7 @@
+// What the base lacks: an output per format, the switch that selects the json one, and
+// a Nushell type for the argument. A `cmd` merges into the base command of the same name.
+cmd "ls" {
+    arg ("string")"[name]" help="Only this one, by name"
+    output "text" default=#true
+    output ("table<name: string, size: filesize>")"json" framing="json" select="--json"
+}

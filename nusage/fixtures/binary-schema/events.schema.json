@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["at", "kind"],
+  "properties": {
+    "at": {"type": "integer", "x-nu": {"type": "datetime", "unit": "sec"}},
+    "kind": {"enum": ["start", "stop"]},
+    "detail": {"type": ["string", "null"]}
+  }
+}

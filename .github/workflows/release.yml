@@ -1,0 +1,120 @@
+name: release
+
+# Every push to main: the checks, then release-plz tags the version Cargo.toml declares when
+# no tag for it exists, with the changelog's section as the draft release's notes; the
+# binaries are built for that tag and attached, and the release is published. The version
+# and the changelog are committed beforehand (`mise run release`), so the push that bumps
+# them is the release. The workflow's own token is enough: a tag it pushes runs no other
+# workflow, and none has to run.
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+
+env:
+  MBX_DISABLE: "1"
+
+jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  tag:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.released.outputs.tag }}
+    steps:
+      # release-plz pushes the tag with git, so the checkout keeps its credentials.
+      # jactionlint ignore=artipacked
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          version: 2026.10.21
+      - uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c # v0.5.147
+        id: release-plz
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - id: released
+        env:
+          RELEASES: ${{ steps.release-plz.outputs.releases }}
+        run: |
+          tag=$(jq -r '.[] | select(.package_name == "nusage") | .tag' <<< "${RELEASES:-[]}")
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  assets:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, build-tool: cargo }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, build-tool: cross }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, build-tool: cross }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, build-tool: cross }
+          - { target: x86_64-apple-darwin, os: macos-latest, build-tool: cargo }
+          - { target: aarch64-apple-darwin, os: macos-latest, build-tool: cargo }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, build-tool: cargo }
+          - { target: aarch64-pc-windows-msvc, os: windows-latest, build-tool: cargo }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ needs.tag.outputs.tag }}
+          persist-credentials: false
+      # No cache: what is published is built from the checkout alone.
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          version: 2026.10.21
+          cache: false
+      - run: rustup target add ${{ matrix.target }}
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        if: matrix.build-tool == 'cross'
+        with:
+          tool: cross
+      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
+        id: upload
+        with:
+          bin: nusage
+          target: ${{ matrix.target }}
+          build-tool: ${{ matrix.build-tool }}
+          archive: $bin-$tag-$target
+          checksum: sha256
+          locked: true
+          ref: refs/tags/${{ needs.tag.outputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      # Attestations for a private repository need GitHub Enterprise Cloud.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: ${{ !github.event.repository.private }}
+        with:
+          subject-path: ${{ steps.upload.outputs.tar || steps.upload.outputs.zip }}
+
+  publish:
+    needs: [tag, assets]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ needs.tag.outputs.tag }}
+    steps:
+      - run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false

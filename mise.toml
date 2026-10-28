@@ -1,27 +1,48 @@
 min_version = "2026.9.2"
+monorepo_root = true
 
+[monorepo]
+config_roots = ["nusage", "mise"]
+
+# The Cargo workspace is at the root, so its toolchain is: one pin for Cargo, the tasks and CI.
 [tools]
-rust = { version = "1.99.1", mr_boxington = true }
+rust = { version = "1.99.1", profile = "minimal", components = [
+  "rustfmt",
+  "clippy",
+], mr_boxington = true }
 mr-boxington = "1.27.0"
 nu = "0.116.1"
+usage = "7.1.3"
 jujutsu = "0.46.0"
+# The formatters `jj fix` runs and CI checks with: nufmt tracks the Nushell above.
+"github:nushell/nufmt" = "0.1.6"
+taplo = "0.10.0"
+jactionlint = "2.3.0"
+# jactionlint checks the workflows' `run` scripts with it.
+shellcheck = "0.11.0"
+release-plz = "0.4.2"
 
-[tasks.verify-fixtures]
-description = "Run every fixture through both entrypoints, check completions and parsed signatures"
-run = "nu fixtures/verify.nu"
+# The repository's tasks run through the nusage built here, which `//nusage:build` links
+# into `.bin`, not through a release. jj reads the formatters from `jj.toml` here, after
+# the user's own configuration files in the order jj itself reads them; a path that does
+# not exist is passed over.
+[env]
+_.path = ["{{config_root}}/.bin"]
+JJ_CONFIG = "{{ env.HOME }}/.jjconfig.toml:{{ xdg_config_home }}/jj/config.toml:{{ xdg_config_home }}/jj/conf.d:{{ config_root }}/jj.toml"
 
-[tasks.update-fixture-signatures]
-description = "Rewrite the fixtures' expected/signatures.nuon from the live `scope commands` output"
-run = "nu fixtures/verify.nu --update-signatures"
-
-[tasks.build]
-description = "Build the workspace"
-run = "cargo build --workspace"
-
-[tasks.test]
-description = "Rust tests, including every fixture generating its expected module byte for byte"
-run = "cargo test --workspace"
+[tasks.lint]
+description = "The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them"
+run = [
+  "jactionlint",
+  "git ls-files '*.nu' | grep -v /expected/ | xargs nufmt --dry-run",
+  "taplo fmt --check",
+]
 
 [tasks.check]
-description = "Everything: Rust tests and the fixture harness against nu"
-depends = ["test", "verify-fixtures"]
+description = "The root's own checks"
+depends = [":lint"]
+
+# The release is the commit this leaves to make: pushed to main, release.yml tags it.
+[tasks.release]
+description = "Bump the versions and write the changelog from the commits since the last tag"
+run = "release-plz update"

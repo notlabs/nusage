@@ -1,0 +1,9 @@
+# The root asks for the CLI-wide json output through the CLI-wide `--format`, which is the
+# wrapper's to pass, and decodes it.
+{
+    cmd: [],
+    invoke: "rep",
+    argv: [--format, json],
+    stdout: "{\"ok\": true}",
+    output: {ok: true},
+}

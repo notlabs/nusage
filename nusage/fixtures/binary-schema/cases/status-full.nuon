@@ -1,0 +1,8 @@
+# The optional properties given: `seen` counts seconds since the epoch.
+{
+    cmd: [status],
+    invoke: "probe status",
+    argv: [status, --json],
+    stdout: "{\"ok\": false, \"took\": 20, \"at\": \"2024-01-01T12:00:00+02:00\", \"size\": 0, \"note\": \"slow\", \"seen\": 1700000000}",
+    output: {ok: false, took: 20ms, at: 2024-01-01T10:00:00+00:00, size: 0kB, note: slow, seen: 2023-11-14T22:13:20+00:00},
+}

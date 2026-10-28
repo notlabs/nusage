@@ -1,0 +1,9 @@
+# `select "--format"` names the json output's selector: the wrapper asks for it itself with
+# `--format json` and decodes one document; `--format` is not a parameter of the wrapper.
+{
+    cmd: [status],
+    invoke: "demo status -v 1",
+    argv: [status, --format, json, --verbose],
+    stdout: "{\"ok\": true, \"tasks\": [\"a\", \"b\"]}",
+    output: {ok: true, tasks: [a, b]},
+}

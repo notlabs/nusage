@@ -1,0 +1,40 @@
+name "demo"
+bin "demo"
+about "A demo CLI"
+flag "-v --verbose" help="Say more" global=#true count=#true
+complete "plugin" run="echo \"plugin-1\nplugin-2\nplugin-3\""
+
+cmd "install" help="Install a plugin" {
+    arg "<plugin>" help="Plugin to install"
+    arg "[version]" help="Version to install" default="latest"
+    flag "-g --global" help="Install for every project"
+    flag "-d --dir <dir>" help="Install into this directory"
+    flag "--env <env>" help="Environment to install into"
+}
+
+cmd "run" help="Run a task" {
+    arg "<task>" help="Task to run"
+    arg "[args]..." help="Arguments for the task"
+    flag "-e --set <var>" help="Variable to set, repeatable" var=#true
+    complete "task" descriptions=#true run="echo \"build:Build it\ntest:Test it\""
+}
+
+cmd "status" help="Show status" {
+    flag "--format <format>" help="Output format"
+    output "human" default=#true help="A readable report"
+    output ("record<ok: bool, tasks: list<string>>")"json" framing="json" help="One report object"
+    select "--format"
+}
+
+cmd "events" help="Stream events" {
+    flag "--json" help="One JSON object per line"
+    output "text" default=#true
+    output ("table<at: datetime, kind: string>")"jsonl" framing="jsonl" select="--json"
+}
+
+cmd "tag" help="Tag items" {
+    clause "items" {
+        flag "-l --label <label>" help="Label for the item that follows"
+        arg "<item>" help="Item to tag"
+    }
+}
