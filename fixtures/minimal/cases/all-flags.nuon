@@ -1,0 +1,5 @@
+# Short alias for the switch, a valued flag typed int by its KDL annotation.
+{
+    argv: [bob -l --times 3],
+    usage: {cmd: [], args: {name: bob}, flags: {loud: true, times: 3}},
+}

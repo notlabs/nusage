@@ -1,0 +1,12 @@
+[package]
+name = "nusage-spec"
+description = "Read usage headers from Nushell scripts and assemble a script tree into one spec"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+usage.workspace = true
+thiserror.workspace = true
+indexmap.workspace = true

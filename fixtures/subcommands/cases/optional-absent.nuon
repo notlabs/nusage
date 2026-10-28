@@ -1,0 +1,5 @@
+# An optional positional that was not given is null, not absent.
+{
+    argv: [db seed],
+    usage: {cmd: [db seed], args: {fixture: null}, flags: {verbose: false}},
+}

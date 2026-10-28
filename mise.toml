@@ -5,3 +5,23 @@ rust = { version = "1.99.1", mr_boxington = true }
 mr-boxington = "1.27.0"
 nu = "0.116.1"
 jujutsu = "0.46.0"
+
+[tasks.verify-fixtures]
+description = "Run every fixture through both entrypoints, check completions and parsed signatures"
+run = "nu fixtures/verify.nu"
+
+[tasks.update-fixture-signatures]
+description = "Rewrite the fixtures' expected/signatures.nuon from the live `scope commands` output"
+run = "nu fixtures/verify.nu --update-signatures"
+
+[tasks.build]
+description = "Build the workspace"
+run = "cargo build --workspace"
+
+[tasks.test]
+description = "Rust tests, including every fixture generating its expected module byte for byte"
+run = "cargo test --workspace"
+
+[tasks.check]
+description = "Everything: Rust tests and the fixture harness against nu"
+depends = ["test", "verify-fixtures"]

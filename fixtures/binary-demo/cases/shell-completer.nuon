@@ -1,0 +1,5 @@
+# A top-level `complete "plugin" run=...` becomes a helper the parameter names.
+{
+    cmd: [install],
+    complete: {line: "demo install ", expect: [plugin-1 plugin-2 plugin-3]},
+}

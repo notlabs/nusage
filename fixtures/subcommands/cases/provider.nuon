@@ -1,0 +1,8 @@
+# A provider script returns a value rather than its record: `output` is what the command
+# returns, `usage` is what the script was handed. A provider carries no flags, not even the
+# inherited global, because Nushell binds only the token when it calls a completer.
+{
+    argv: [db targets],
+    usage: {cmd: [db targets], args: {}, flags: {}},
+    output: [dev staging prod],
+}

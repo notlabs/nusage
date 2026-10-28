@@ -1,0 +1,19 @@
+[
+  [name,  signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                attributes];
+  [greet, {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                                                                                   is_optional, short_flag, description,               completion, parameter_default];
+        [null,           input,          nothing,                                                                                        false,       null,       null,                      null,       null],
+        [name,           positional,     string,                                                                                         false,       null,       "Who to greet, by name",   null,       null],
+        [loud,           switch,         null,                                                                                           true,        l,          "Shout the greeting",      null,       null],
+        [times,          named,          int,                                                                                            true,        null,       "How many times to greet", null,       1],
+        [null,           output,         "record<cmd: list<string>, args: record<name: string>, flags: record<loud: bool, times: int>>", false,       null,       null,                      null,       null]
+      ]
+    }, [
+      [name,  value];
+      [usage, "arg \"<name>\" help=\"Who to greet,\\nby name\""],
+      [usage, "flag \"-l --loud\" help=\"Shout the greeting\""],
+      [usage, "flag \"--times\" help=\"How many times to greet\" default=\"1\" { arg (int)\"<n>\" }"],
+      [usage, "output (\"record<cmd: list<string>, args: record<name: string>, flags: record<loud: bool, times: int>>\")\"nuon\" default=#true"]
+    ]]
+]

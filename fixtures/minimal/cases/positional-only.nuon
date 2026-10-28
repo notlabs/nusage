@@ -1,0 +1,5 @@
+# The required positional alone: the switch is false, the defaulted flag is its default.
+{
+    argv: [alice],
+    usage: {cmd: [], args: {name: alice}, flags: {loud: false, times: 1}},
+}

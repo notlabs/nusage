@@ -1,0 +1,25 @@
+[
+  [name, signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 attributes];
+  [pack, {
+      any: [
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,                 completion,                                     parameter_default];
+        [null,           input,          any,          false,       null,       null,                        null,                                           null],
+        [file,           rest,           path,         true,        null,       "Files to bundle",           null,                                           null],
+        [tag,            named,          list<string>, true,        t,          "Tag to attach, repeatable", null,                                           [
+
+          ]],
+        [verbose,        named,          int,          true,        v,          "Log more, repeatable",      null,                                           0],
+        [format,         named,          string,       true,        null,       "Archive format",            [
+            tar,
+            zip
+          ], tar],
+        [null,           output,         any,          false,       null,       null,                        null,                                           null]
+      ]
+    }, [
+      [name,  value];
+      [usage, "arg \"<file>...\" help=\"Files to bundle\""],
+      [usage, "flag \"-t --tag <tag>\" var=#true help=\"Tag to attach, repeatable\""],
+      [usage, "flag \"-v --verbose\" count=#true help=\"Log more, repeatable\""],
+      [usage, "flag \"--format <format>\" default=\"tar\" help=\"Archive format\" { choices \"tar\" \"zip\" }"]
+    ]]
+]

@@ -1,0 +1,12 @@
+name "rep"
+bin "rep"
+about "Reports, with CLI-wide outputs and a CLI-wide selector"
+flag "--format <format>" help="Output format" global=#true
+output "text" default=#true help="Readable"
+output ("record<ok: bool>")"json" framing="json" help="One object"
+select "--format"
+include file="included.kdl"
+
+cmd "quiet" help="Only text" {
+    output "json" hide=#true
+}
