@@ -1,5 +1,8 @@
 # Loading the module in the user's interactive shell: Nushell sources every file of its
 # autoload directory when it starts a session.
+[vars]
+module = "{{ config_root }}/generated/mise.nu"
+
 [dotfiles]
 "~/.config/nushell/autoload/mise.nu" = { source = "autoload.nu.tera", mode = "template" }
 
