@@ -8,6 +8,8 @@ Early development.
   the generator reproduces and the contract a script relies on, `cargo doc --workspace
   --no-deps` for the crates.
 - `mise/`: the module for mise, generated from mise's own spec and the overlays there.
+- `schemas/`: shared development scripts for output-schema overlays and conformance checks;
+  the first reviewed schemas and fixtures are under `mise/`. See `schemas/README.md`.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nusage built here. `mise run //mise:install` generates the mise

@@ -3,7 +3,7 @@
 use std/assert
 use generated/mise.nu *
 
-^nusage check generated/mise.usage.kdl generated/mise.nu --overlay generated/mise.json.kdl
+^nusage check generated/mise.usage.kdl generated/mise.nu --overlay generated/mise.json.kdl --overlay generated/mise.schemas.kdl
 
 let version = mise version
 assert ($version.version =~ '^\d{4}\.\d+\.\d+') ($version | to nuon)

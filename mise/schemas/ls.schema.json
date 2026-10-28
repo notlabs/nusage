@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                ".tool-versions",
+                "mise.toml",
+                "mise.toml-daemon",
+                "idiomatic-version-file",
+                "tool-stub"
+              ]
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "argument",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "environment"
+            },
+            "key": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "key",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "sourceWithRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                ".tool-versions",
+                "mise.toml",
+                "mise.toml-daemon",
+                "idiomatic-version-file",
+                "tool-stub"
+              ]
+            },
+            "path": {
+              "type": "string"
+            },
+            "requested_version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "argument",
+                "unknown"
+              ]
+            },
+            "requested_version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "environment"
+            },
+            "key": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            },
+            "requested_version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "key",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "version": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "requested_version": {
+          "type": "string"
+        },
+        "install_path": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceWithRequest"
+          }
+        },
+        "symlinked_to": {
+          "type": "string"
+        },
+        "broken": {
+          "const": true
+        },
+        "scheduled_for_pruning": {
+          "const": true
+        },
+        "prune_after": {
+          "type": "string"
+        },
+        "installed": {
+          "type": "boolean"
+        },
+        "active": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "version",
+        "install_path",
+        "installed",
+        "active"
+      ],
+      "additionalProperties": false
+    },
+    "filtered": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/version"
+      }
+    },
+    "all": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/filtered"
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/all"
+    },
+    {
+      "$ref": "#/$defs/filtered"
+    }
+  ]
+}

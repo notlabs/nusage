@@ -231,6 +231,11 @@ checksum_source = "mise-versions"
 url = "https://github.com/nushell/nushell/releases/download/0.116.1/nu-0.116.1-x86_64-pc-windows-msvc.zip"
 url_api = "https://api.github.com/repos/nushell/nushell/releases/assets/610069956"
 
+[[tools."pipx:check-jsonschema"]]
+version = "0.39.0"
+backend = "pipx:check-jsonschema"
+specifiers = ["0.39.0"]
+
 [[tools.release-plz]]
 version = "0.4.2"
 backend = "aqua:release-plz/release-plz"
