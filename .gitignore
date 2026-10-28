@@ -1,4 +1,5 @@
 /.jj/
 /target/
+/mise/generated/
 /mise.local.toml
 /.mise.local.toml

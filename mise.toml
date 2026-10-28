@@ -1,30 +1,14 @@
-min_version = "2026.9.2"
+monorepo_root = true
+
+[monorepo]
+config_roots = ["nusage", "mise"]
 
 [tools]
-rust = { version = "1.99.1", mr_boxington = true }
-mr-boxington = "1.27.0"
 nu = "0.116.1"
-# The generated binary modules complete through `usage complete-word`.
 usage = "7.1.3"
 jujutsu = "0.46.0"
+# The repository's own tasks run through the released nusage.
+"github:notlabs/nusage" = "latest"
 
-[tasks.verify-fixtures]
-description = "Run every fixture through its entrypoints, check completions and parsed signatures"
-depends = ["build"]
-run = "nu fixtures/verify.nu"
-
-[tasks.update-fixture-signatures]
-description = "Rewrite the fixtures' expected/signatures.nuon from the live `scope commands` output"
-run = "nu fixtures/verify.nu --update-signatures"
-
-[tasks.build]
-description = "Build the workspace"
-run = "cargo build --workspace"
-
-[tasks.test]
-description = "Rust tests, including every fixture generating its expected module byte for byte"
-run = "cargo test --workspace"
-
-[tasks.check]
-description = "Everything: Rust tests and the fixture harness against nu"
-depends = ["test", "verify-fixtures"]
+[task_config]
+shell = "nu -c"

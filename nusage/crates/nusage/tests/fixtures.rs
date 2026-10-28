@@ -2,7 +2,7 @@
 //!
 //! The fixtures are the design: a hand-written target module per script or tree, with the
 //! cases `fixtures/verify.nu` runs against the pinned Nushell. This test keeps the generator
-//! honest to them; `mise run verify-fixtures` keeps them honest to Nushell.
+//! honest to them; `mise run //nusage:verify-fixtures` keeps them honest to Nushell.
 
 use std::fs;
 use std::path::{Path, PathBuf};

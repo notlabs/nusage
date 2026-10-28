@@ -4,11 +4,10 @@ Typed Nushell commands from usage-annotated scripts, and typed wrappers from usa
 binaries.
 Early development.
 
-- `nusage --help`: the CLI.
-- `fixtures/`: the hand-written modules the generator reproduces, and the contract a script
-  relies on.
-- `cargo doc --workspace --no-deps`: the crates.
-- `mise tasks`: the developer workflow.
+- `nusage/`: the tool. `nusage --help` for the CLI, `fixtures/` for the hand-written modules
+  the generator reproduces and the contract a script relies on, `cargo doc --workspace
+  --no-deps` for the crates.
+- `mise/`: the module for mise, generated from mise's own spec and the overlays there.
 
-Install the development tools with `mise install`. The repository uses a single `main`
-bookmark with a colocated Git/Jujutsu checkout.
+Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
+tasks. The repository uses a single `main` bookmark with a colocated Git/Jujutsu checkout.

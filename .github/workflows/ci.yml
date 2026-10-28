@@ -1,0 +1,22 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # The repository's tasks run through the released nusage; CI runs them through the
+      # candidate built here instead.
+      MISE_DISABLE_TOOLS: github:notlabs/nusage
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - uses: Swatinem/rust-cache@v2
+      - run: mise install --monorepo
+      - run: mise run //nusage:build
+      - run: echo "$PWD/target/debug" >> "$GITHUB_PATH"
+      - run: mise run '//...:check'

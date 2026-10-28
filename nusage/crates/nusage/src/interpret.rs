@@ -78,15 +78,20 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
     };
     let path = std::path::absolute(script)
         .map_err(|err| Diagnostic::new(script, format!("cannot resolve: {err}")))?;
-    // The script's `$in` is standard input, read only if the script reads it: `nu --stdin`
-    // would read a pipe to its end before the script runs, so where `/dev/stdin` exists the
-    // input is opened as a stream instead.
+    // The script's `$in` is standard input when something is piped in, read only if the
+    // script reads it: `nu --stdin` would read a pipe to its end before the script runs, so
+    // on unix a pipe or a file is opened as a stream through `/dev/stdin` instead. A
+    // terminal, a socket or a closed descriptor gives the script no input.
     let script_word = nusage_nu::word(&path.to_string_lossy());
     let mut nu = Command::new("nu");
     let code = if cfg!(unix) {
-        format!(
-            "let usage = ($env.NUSAGE_USAGE | from nuon); open --raw /dev/stdin | run {script_word}"
-        )
+        if stdin_is_stream() {
+            format!(
+                "let usage = ($env.NUSAGE_USAGE | from nuon); open --raw /dev/stdin | run {script_word}"
+            )
+        } else {
+            format!("let usage = ($env.NUSAGE_USAGE | from nuon); run {script_word}")
+        }
     } else {
         if !std::io::stdin().is_terminal() {
             nu.arg("--stdin");
@@ -102,6 +107,20 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
         .status()
         .map_err(|err| Diagnostic::new(script, format!("cannot run `nu`: {err}")))?;
     Ok(status.code().unwrap_or(1))
+}
+
+/// Whether standard input is a pipe or a regular file: what `/dev/stdin` opens as a stream.
+#[cfg(unix)]
+fn stdin_is_stream() -> bool {
+    use std::os::unix::fs::FileTypeExt;
+    std::fs::metadata("/dev/stdin")
+        .map(|meta| meta.file_type().is_fifo() || meta.file_type().is_file())
+        .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn stdin_is_stream() -> bool {
+    false
 }
 
 /// Where the script stands: the root of the tree it belongs to and its path in it, or the

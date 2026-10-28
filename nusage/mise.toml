@@ -1,0 +1,24 @@
+[tools]
+rust = { version = "1.99.1", mr_boxington = true }
+mr-boxington = "1.27.0"
+
+[tasks.build]
+description = "Build the workspace"
+run = "cargo build --workspace"
+
+[tasks.test]
+description = "Rust tests, including every fixture generating its expected module byte for byte"
+run = "cargo test --workspace"
+
+[tasks.lint]
+description = "Formatting and clippy, as CI checks them"
+run = ["cargo fmt --all --check", "cargo clippy --workspace --all-targets -- -D warnings"]
+
+[tasks.verify-fixtures]
+description = "Run every fixture through its entrypoints, check completions and parsed signatures"
+depends = [":build"]
+file = "fixtures/verify.nu"
+
+[tasks.check]
+description = "Everything: tests, the fixture harness against nu, formatting and clippy"
+depends = [":test", ":verify-fixtures", ":lint"]

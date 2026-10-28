@@ -1,4 +1,6 @@
-#!/usr/bin/env nu
+#!/usr/bin/env nusage
+#USAGE arg "[fixtures]..." help="Fixture directories; every directory under fixtures/ by default"
+#USAGE flag "--update-signatures" help="Rewrite expected/signatures.nuon instead of comparing it"
 # Verify the fixtures against the `nu` that runs this script.
 #
 # A script fixture's cases go through both entrypoints and must return the same value:
@@ -15,30 +17,11 @@
 # reports them, are compared with expected/signatures.nuon.
 #
 #
-#   nu fixtures/verify.nu                          # all fixtures
-#   nu fixtures/verify.nu fixtures/minimal         # one
-#   nu fixtures/verify.nu --update-signatures      # rewrite expected/signatures.nuon from live output
-
-def main [
-    ...fixtures: path,     # Fixture directories; default: every directory under fixtures/
-    --update-signatures,   # Rewrite expected/signatures.nuon instead of comparing it
-] {
-    let root = $env.CURRENT_FILE | path dirname
-    $env.NUSAGE_BIN = $root | path dirname | path join target debug nusage
-    let fixtures = if ($fixtures | is-empty) {
-        ls $root | where type == dir | get name
-    } else {
-        $fixtures | each { path expand }
-    }
-    let results = $fixtures | each {|dir| verify-fixture $dir $update_signatures } | flatten
-    print ($results | select fixture check case ok | table --expand)
-    let failed = $results | where not ok
-    if ($failed | is-not-empty) {
-        print --stderr ($failed | select fixture check case detail | table --expand)
-        error make --unspanned {msg: $"($failed | length) of ($results | length) checks failed"}
-    }
-    print $"all ($results | length) checks passed"
-}
+#   mise run //nusage:verify-fixtures                       # all fixtures
+#   mise run //nusage:verify-fixtures fixtures/minimal      # one
+#   mise run //nusage:verify-fixtures --update-signatures   # rewrite expected/signatures.nuon
+#
+# `NUSAGE_BIN` names the nusage to check; the workspace's debug build by default.
 
 # One row per check: shim, interpreter and (when present) completion per case, then signatures.
 def verify-fixture [dir: path, update: bool] {
@@ -276,3 +259,19 @@ def check-signatures [
         }
     }
 }
+
+const root = path self | path dirname
+$env.NUSAGE_BIN = $env.NUSAGE_BIN? | default ($root | path dirname | path dirname | path join target debug nusage)
+let fixtures = if ($usage.args.fixtures | is-empty) {
+    ls $root | where type == dir | get name
+} else {
+    $usage.args.fixtures | each { path expand }
+}
+let results = $fixtures | each {|dir| verify-fixture $dir $usage.flags.update_signatures } | flatten
+print ($results | select fixture check case ok | table --expand)
+let failed = $results | where not ok
+if ($failed | is-not-empty) {
+    print --stderr ($failed | select fixture check case detail | table --expand)
+    error make --unspanned {msg: $"($failed | length) of ($results | length) checks failed"}
+}
+print $"all ($results | length) checks passed"

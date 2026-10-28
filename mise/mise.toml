@@ -1,0 +1,8 @@
+[tasks.generate]
+description = "Generate the module from the spec of the mise on PATH and the overlays here"
+file = "generate.nu"
+
+[tasks.check]
+description = "Generate the module and drive mise through it"
+depends = [":generate"]
+file = "check.nu"

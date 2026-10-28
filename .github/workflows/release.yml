@@ -1,0 +1,88 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+        env:
+          MISE_DISABLE_TOOLS: github:notlabs/nusage
+      - run: mise install --monorepo
+        env:
+          MISE_DISABLE_TOOLS: github:notlabs/nusage
+      - id: version
+        shell: nu {0}
+        run: |
+          let version = ^cargo metadata --no-deps --format-version 1 | from json | get packages | where name == nusage | first | get version
+          if $"v($version)" != $env.GITHUB_REF_NAME {
+            error make --unspanned {msg: $"tag ($env.GITHUB_REF_NAME) does not match the crate's version ($version)"}
+          }
+          $"version=($version)" | save --append $env.GITHUB_OUTPUT
+
+  build:
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: macos-15-intel, target: x86_64-apple-darwin }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    env:
+      MISE_DISABLE_TOOLS: github:notlabs/nusage
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - run: mise install --monorepo
+      - run: cargo build --release --locked -p nusage --target ${{ matrix.target }}
+      - name: Package
+        shell: nu {0}
+        run: |
+          let name = $"nusage-${{ needs.version.outputs.version }}-${{ matrix.target }}"
+          let bin = if $nu.os-info.name == windows { "nusage.exe" } else { "nusage" }
+          let built = ["target", "${{ matrix.target }}", "release", $bin] | path join
+          mkdir $name
+          cp $built $name
+          let archive = if $nu.os-info.name == windows {
+            ^tar -a -cf $"($name).zip" $name
+            $"($name).zip"
+          } else {
+            ^tar -czf $"($name).tar.gz" $name
+            $"($name).tar.gz"
+          }
+          open --raw $archive | hash sha256 | $"($in)  ($archive)\n" | save $"($archive).sha256"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target }}
+          path: nusage-*.*
+          if-no-files-found: error
+
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: assets
+          merge-multiple: true
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: assets/nusage-*.tar.gz, assets/nusage-*.zip
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: assets/*
+          generate_release_notes: true

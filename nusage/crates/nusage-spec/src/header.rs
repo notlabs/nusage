@@ -70,8 +70,8 @@ fn blank_comment(line: &str) -> bool {
 }
 
 /// The header lines of a script, each with its 1-based line number, as usage reads them: a
-/// shebang first, then `#USAGE` lines, blank comment lines allowed between them, stopping at
-/// the first other line.
+/// shebang first, then `#USAGE` lines, blank comment lines and mise's `#MISE` lines allowed
+/// between them, stopping at the first other line.
 fn extract(path: &Path, source: &str) -> Result<Vec<(usize, String)>, Diagnostic> {
     if !source.starts_with("#!") {
         return Err(Diagnostic::new(
@@ -87,7 +87,7 @@ fn extract(path: &Path, source: &str) -> Result<Vec<(usize, String)>, Diagnostic
             started = true;
             lines.push((index + 1, rest.trim().to_string()));
         } else if started {
-            if blank_comment(line) {
+            if blank_comment(line) || line.starts_with("#MISE") {
                 continue;
             }
             break;

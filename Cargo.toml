@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/nusage-spec", "crates/nusage-model", "crates/nusage-nu", "crates/nusage"]
+members = ["nusage/crates/*"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,9 +9,9 @@ license = "MIT"
 repository = "https://github.com/notlabs/nusage"
 
 [workspace.dependencies]
-nusage-spec = { path = "crates/nusage-spec" }
-nusage-model = { path = "crates/nusage-model" }
-nusage-nu = { path = "crates/nusage-nu" }
+nusage-spec = { path = "nusage/crates/nusage-spec" }
+nusage-model = { path = "nusage/crates/nusage-model" }
+nusage-nu = { path = "nusage/crates/nusage-nu" }
 # `cli-help` renders the help page usage's parser returns for `--help`, which the
 # interpreter prints.
 usage = { package = "usage-lib", version = "7.1.3", default-features = false, features = ["cli-help"] }
