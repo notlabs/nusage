@@ -1,5 +1,6 @@
-//! An overlay for a CLI that has `--json` flags and no `output` declarations: for every
-//! command with the switch, one framed output the switch selects.
+//! An overlay for a CLI whose commands share a switch that selects a framed output, such as
+//! `--json`, and whose spec declares no `output`: for every command with the switch, one
+//! framed output the switch selects.
 
 use usage::kdl::{KdlDocument, KdlEntry, KdlNode};
 use usage::{Spec, SpecCommand};

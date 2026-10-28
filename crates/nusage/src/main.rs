@@ -88,10 +88,11 @@ impl Run for Spec {
 
 /// Print an overlay declaring a framed output for every command that has a switch
 ///
-/// For a binary whose spec has `--json` flags but no `output` declarations: every command
-/// with the switch gets `output "json" framing="json" select="--json"`, so its wrapper asks
-/// for and decodes that output. Save it and pass it to `generate --overlay`; a second overlay
-/// adds the types. A command already declaring such an output is left alone.
+/// For a binary whose spec declares no `output` but whose commands share a switch that
+/// selects one, such as `--json`: every command with the switch gets `output <framing>
+/// framing=<framing> select=<switch>`, so its wrapper asks for and decodes that output. Save
+/// it and pass it to `generate --overlay`; a second overlay adds the types. A command already
+/// declaring such an output is left alone.
 #[derive(Args)]
 struct Overlay {
     /// The `.kdl` spec file
@@ -99,11 +100,11 @@ struct Overlay {
     /// A usage KDL document merged onto the spec file first, as for `generate`
     #[usage(long)]
     overlay: Vec<PathBuf>,
-    /// The switch that selects the output
-    #[usage(long, default = "--json")]
+    /// The switch that selects the output, with its dashes, so written `--switch=--json`
+    #[usage(long)]
     switch: String,
-    /// The output's framing: `json` or `jsonl`
-    #[usage(long, default = "json")]
+    /// The output's framing: `json` for one document, `jsonl` for one per line
+    #[usage(long)]
     framing: String,
 }
 
