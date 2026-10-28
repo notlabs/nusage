@@ -31,3 +31,10 @@ cmd "events" help="Stream events" {
     output "text" default=#true
     output ("table<at: datetime, kind: string>")"jsonl" framing="jsonl" select="--json"
 }
+
+cmd "tag" help="Tag items" {
+    clause "items" {
+        flag "-l --label <label>" help="Label for the item that follows"
+        arg "<item>" help="Item to tag"
+    }
+}

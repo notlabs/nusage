@@ -75,5 +75,21 @@
       [usage, "output \"human\" default=#true help=\"A readable report\""],
       [usage, "output (\"record<ok: bool, tasks: list<string>>\")\"json\" framing=\"json\" help=\"One report object\""],
       [usage, "select \"--format\""]
+    ]],
+  ["demo tag",     {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,                       completion, parameter_default];
+        [null,           input,          nothing,      false,       null,       null,                              null,       null],
+        [item,           rest,           string,       true,        null,       "Item to tag",                     null,       null],
+        [verbose,        named,          int,          true,        v,          "Say more",                        null,       null],
+        [label,          named,          string,       true,        l,          "Label for the item that follows", null,       null],
+        [null,           output,         string,       false,       null,       null,                              null,       null]
+      ]
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                              [
+      [name,  value];
+      [usage, "clause \"items\" {
+        flag \"-l --label <label>\" help=\"Label for the item that follows\"
+        arg \"<item>\" help=\"Item to tag\"
+    }"]
     ]]
 ]

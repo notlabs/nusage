@@ -153,7 +153,17 @@ fn param_text(param: &Param) -> String {
                 default_text(default)
             )
         }
-        Param::Rest { name, ty, .. } => format!("...{}: {}", name.as_str(), ty.as_str()),
+        Param::Rest {
+            name,
+            ty,
+            completer,
+            ..
+        } => format!(
+            "...{}: {}{}",
+            name.as_str(),
+            ty.as_str(),
+            completer_text(completer)
+        ),
         Param::Flag {
             long,
             short,

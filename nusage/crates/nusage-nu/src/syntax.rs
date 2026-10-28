@@ -218,6 +218,7 @@ pub enum Param {
         name: Ident,
         /// The element type.
         ty: Type,
+        completer: Option<Completer>,
         doc: Option<String>,
     },
     Flag {

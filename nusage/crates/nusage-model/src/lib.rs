@@ -41,6 +41,9 @@ pub struct Command {
     /// A binary command's structured output, which its wrapper selects and decodes; `None`
     /// for a script or a text command.
     pub structured: Option<Structured>,
+    /// usage `clause`: the name of the command's repeatable group of flags and positionals,
+    /// whose members are the parameters marked [`Param::clause`].
+    pub clause: Option<String>,
     /// Header nodes carried verbatim, in header order.
     pub attributes: Vec<String>,
     pub execution: Execution,
@@ -119,6 +122,12 @@ pub struct Param {
     pub doc: Option<String>,
     /// Whether the flag is inherited from an ancestor's `global=#true`.
     pub inherited: bool,
+    /// Whether it belongs to the command's `clause`, usage's repeatable group of flags and
+    /// positionals (`mise use --postinstall X node@24 --postinstall Y python@3`). A `def` is
+    /// flat: a clause's positionals are the command's, its flags go before every instance
+    /// on the argv, and the `$usage` of a script collects a repeated positional across the
+    /// instances and takes a flag from the first.
+    pub clause: bool,
 }
 
 impl Param {

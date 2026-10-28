@@ -98,10 +98,24 @@ impl Context<'_> {
         let chain: Vec<Level<'_>> = ancestors.iter().copied().chain([here]).collect();
         let cmds: Vec<&SpecCommand> = chain.iter().map(|level| level.cmd).collect();
 
+        // A command declares its positionals at the top level or in its clause, not both. A
+        // clause repeats, so its one positional is the def's rest parameter, each instance an
+        // item; a clause of several positionals is declared once, as a `def` is flat.
+        let repeats = cmd
+            .clause
+            .as_ref()
+            .is_some_and(|clause| clause.args.len() == 1);
         let positionals = cmd
             .args
             .iter()
-            .map(|arg| self.positional(arg, here))
+            .map(|arg| (arg, false))
+            .chain(
+                cmd.clause
+                    .iter()
+                    .flat_map(|clause| clause.args.iter())
+                    .map(|arg| (arg, true)),
+            )
+            .map(|(arg, clause)| self.positional(arg, here, clause, clause && repeats))
             .collect::<Result<Vec<_>, _>>()?;
 
         // The flags usage resolves for this command: its own, and the globals above it merged
@@ -114,13 +128,22 @@ impl Context<'_> {
             let mut available = usage::available_flags(&cmds);
             let mut flags = Vec::new();
             for level in &chain {
-                for declared in &level.cmd.flags {
+                let declared = level.cmd.flags.iter().map(|flag| (flag, false)).chain(
+                    level
+                        .cmd
+                        .clause
+                        .iter()
+                        .flat_map(|clause| clause.flags.iter())
+                        .map(|flag| (flag, true)),
+                );
+                for (declared, clause) in declared {
                     let Some(index) = available.iter().position(|f| f.name == declared.name) else {
                         continue;
                     };
                     let flag = available.remove(index);
                     let mut param = self.flag_param(&flag, *level)?;
                     param.inherited = level.path != &path;
+                    param.clause = clause;
                     flags.push(param);
                 }
             }
@@ -206,6 +229,7 @@ impl Context<'_> {
             path: path.clone(),
             about: header.about.clone(),
             about_long: header.about_long.clone(),
+            clause: cmd.clause.as_ref().map(|clause| clause.name.clone()),
             positionals,
             flags,
             output,
@@ -233,7 +257,15 @@ impl Context<'_> {
             .unwrap_or_default()
     }
 
-    fn positional(&self, arg: &SpecArg, level: Level<'_>) -> Result<Param, Diagnostic> {
+    /// A positional as declared at `level`; `repeats` makes it the rest parameter whatever
+    /// usage says, for a clause's.
+    fn positional(
+        &self,
+        arg: &SpecArg,
+        level: Level<'_>,
+        clause: bool,
+        repeats: bool,
+    ) -> Result<Param, Diagnostic> {
         let node = arg_node(level.header, arg);
         let found = self.completer_for(arg, level, &arg.name)?;
         let ty = NuType(
@@ -241,7 +273,7 @@ impl Context<'_> {
                 .map(str::to_string)
                 .unwrap_or_else(|| conventional_type(arg, &found)),
         );
-        let kind = if arg.var {
+        let kind = if arg.var || repeats {
             ParamKind::Rest
         } else if arg.required {
             ParamKind::Required
@@ -270,6 +302,7 @@ impl Context<'_> {
             negate: None,
             doc: arg.help.clone(),
             inherited: false,
+            clause,
         })
     }
 
@@ -341,6 +374,7 @@ impl Context<'_> {
                 .map(|negate| negate.trim_start_matches('-').to_string()),
             doc: flag.help.clone(),
             inherited: false,
+            clause: false,
         })
     }
 
@@ -379,14 +413,8 @@ impl Context<'_> {
                 return Ok(Some((Completer::Inline(choices.choices.clone()), None)));
             }
         }
-        // A `complete` on the argument, on the command, or at the top level; usage resolves
-        // them in that order too.
-        let named = arg
-            .complete
-            .as_ref()
-            .or_else(|| cmd.complete.get(&arg.name))
-            .or_else(|| self.assembled.spec.complete.get(&arg.name));
-        match named {
+        // A `complete` on the argument, or one naming it, as usage resolves them.
+        match self.assembled.spec.completer(cmd, arg) {
             Some(complete) => spec_completer(complete, &arg.name, header, &self.assembled.source),
             None => Ok(None),
         }
@@ -418,7 +446,8 @@ fn spec_completer(
 }
 
 /// A usage name as a Nushell identifier: every run of characters an identifier cannot hold
-/// becomes one `_` (`dry-run` is `dry_run`, `TOOL@VERSION` is `TOOL_VERSION`), and a leading
+/// becomes one `_`, letters are lowercased (`dry-run` is `dry_run`, `TOOL@VERSION` is
+/// `tool_version`), and a leading
 /// digit gets one in front. usage's own `snake_case` does the same for its SDKs; it is a
 /// copy, since usage keeps it private.
 fn snake(name: &str) -> String {
@@ -430,7 +459,7 @@ fn snake(name: &str) -> String {
                 out.push('_');
             }
             gap = false;
-            out.push(c);
+            out.push(c.to_ascii_lowercase());
         } else {
             gap = true;
         }
@@ -751,7 +780,7 @@ mod tests {
     #[test]
     fn names_become_identifiers() {
         assert_eq!(snake("dry-run"), "dry_run");
-        assert_eq!(snake("TOOL@VERSION"), "TOOL_VERSION");
+        assert_eq!(snake("TOOL@VERSION"), "tool_version");
         assert_eq!(snake("a.b/c"), "a_b_c");
         assert_eq!(snake("1st"), "_1st");
         assert_eq!(snake("--x"), "x");

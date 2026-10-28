@@ -159,22 +159,64 @@ fn place_in_tree(script: &Path) -> Result<(PathBuf, CommandPath), Diagnostic> {
 /// The `$usage` record: `{cmd, args, flags}`, as the shim builds it.
 fn usage_record(command: &nusage_model::Command, parsed: &ParseOutput) -> Result<Value, String> {
     let span = Span::unknown();
+    // A clause's instances are flattened: a repeated positional collects every instance's
+    // values, any other parameter takes the first instance's.
+    let clause = command.clause.as_deref().unwrap_or_default();
+    let instances = parsed.clauses.get(clause).into_iter().flatten();
+    let instance_flags = parsed.clause_flags.get(clause).into_iter().flatten();
     let mut args = Record::new();
     for param in &command.positionals {
-        let found = parsed
-            .args
-            .iter()
-            .find(|(arg, _)| arg.name == param.usage_name)
-            .map(|(_, value)| value);
+        let found = if param.clause {
+            let mut found: Vec<&ParseValue> = instances
+                .clone()
+                .filter_map(|instance| {
+                    instance
+                        .iter()
+                        .find(|(arg, _)| arg.name == param.usage_name)
+                        .map(|(_, value)| value)
+                })
+                .collect();
+            if param.kind == ParamKind::Rest {
+                let items: Vec<String> = found
+                    .iter()
+                    .flat_map(|value| match value {
+                        ParseValue::MultiString(items) => items.clone(),
+                        ParseValue::String(item) => vec![item.clone()],
+                        _ => Vec::new(),
+                    })
+                    .collect();
+                args.push(
+                    param.var.clone(),
+                    positional_value(param, Some(&ParseValue::MultiString(items)))?,
+                );
+                continue;
+            }
+            found.drain(..).next()
+        } else {
+            parsed
+                .args
+                .iter()
+                .find(|(arg, _)| arg.name == param.usage_name)
+                .map(|(_, value)| value)
+        };
         args.push(param.var.clone(), positional_value(param, found)?);
     }
     let mut flags = Record::new();
     for param in &command.flags {
-        let found = parsed
-            .flags
-            .iter()
-            .find(|(flag, _)| flag.name == param.usage_name)
-            .map(|(_, value)| value);
+        let found = if param.clause {
+            instance_flags.clone().find_map(|instance| {
+                instance
+                    .iter()
+                    .find(|(flag, _)| flag.name == param.usage_name)
+                    .map(|(_, value)| value)
+            })
+        } else {
+            parsed
+                .flags
+                .iter()
+                .find(|(flag, _)| flag.name == param.usage_name)
+                .map(|(_, value)| value)
+        };
         flags.push(param.var.clone(), flag_value(param, found)?);
     }
     let mut record = Record::new();

@@ -123,20 +123,28 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
             })
         })
         .collect::<Result<Vec<_>, SyntaxError>>()?;
+    // A clause's flags go before every instance of its positionals, the rest after them.
     let mut flags = Vec::new();
+    let mut scoped = Vec::new();
     for param in &command.flags {
-        flags.push((flag_word(param), Expr::Var(Ident::new(&param.var)?)));
+        let into = if param.clause {
+            &mut scoped
+        } else {
+            &mut flags
+        };
+        into.push((flag_word(param), Expr::Var(Ident::new(&param.var)?)));
         if let Some(negate) = &param.negate {
-            flags.push((
+            into.push((
                 format!("--{negate}"),
                 Expr::Var(Ident::new(negate.replace('-', "_"))?),
             ));
         }
     }
-    let argv = call(
-        "nusage argv",
-        vec![Expr::List(positionals), Expr::Record(flags)],
-    )?;
+    let mut argv_args = vec![Expr::List(positionals), Expr::Record(flags)];
+    if !scoped.is_empty() {
+        argv_args.push(Expr::Record(scoped));
+    }
+    let argv = call("nusage argv", argv_args)?;
     let mut args: Vec<Expr> = command
         .path
         .words()

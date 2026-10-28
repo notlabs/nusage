@@ -29,14 +29,22 @@ pub fn attr_usage_alias() -> Result<Stmt, SyntaxError> {
     })
 }
 
-/// `about` as the description paragraph, `long_about` as the extra one.
+/// `about` as the description paragraph, `long_about` as the extra one. A `long_about` that
+/// opens with `about`, as usage's `help` and `long_help` conventionally do, is the whole
+/// description.
 pub fn doc_of(command: &Command) -> Vec<Vec<String>> {
+    let repeats = match (&command.about, &command.about_long) {
+        (Some(about), Some(long)) => long.starts_with(about.as_str()),
+        _ => false,
+    };
     let mut doc = Vec::new();
-    if let Some(about) = &command.about {
+    if let Some(about) = command.about.as_ref().filter(|_| !repeats) {
         doc.push(vec![about.clone()]);
     }
     if let Some(long) = &command.about_long {
-        doc.push(long.lines().map(str::to_string).collect());
+        for paragraph in long.split("\n\n") {
+            doc.push(paragraph.lines().map(str::to_string).collect());
+        }
     }
     doc
 }
@@ -87,6 +95,7 @@ pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxEr
         ParamKind::Rest => NuParam::Rest {
             name: Ident::new(&param.var)?,
             ty: Type::new(param.ty.as_str())?,
+            completer,
             doc,
         },
         // A switch takes no default: the shim applies a declared one when it builds `$usage`.

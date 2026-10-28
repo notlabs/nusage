@@ -9,11 +9,23 @@ def "nusage word" []: any -> string {
     }
 }
 
-# The argv for a wrapper's parameters: positionals in order, absent ones dropped, then each
-# flag by its value: a switch once when on, a count that many times, a list once per item
-# with its value, any other value once with its value; null and false add nothing.
-def "nusage argv" [positionals: list<any>, flags: record]: nothing -> list<string> {
-    let flags = $flags | transpose name value | each {|flag|
+# The argv for a wrapper's parameters: positionals in order, absent ones dropped, each
+# preceded by the clause-scoped flags, then the other flags. A flag goes by its value: a
+# switch once when on, a count that many times, a list once per item with its value, any
+# other value once with its value; null and false add nothing.
+def "nusage argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
+    let scoped = $scoped | nusage flag-words
+    let words = $positionals | compact | each { nusage word }
+    let instances = if ($words | is-empty) {
+        $scoped
+    } else {
+        $words | each {|word| $scoped ++ [$word] } | flatten
+    }
+    $instances ++ ($flags | nusage flag-words)
+}
+
+def "nusage flag-words" []: record -> list<string> {
+    $in | transpose name value | each {|flag|
         match ($flag.value | describe --detailed | get type) {
             bool => (if $flag.value { [$flag.name] } else { [] })
             int => (0..<$flag.value | each { $flag.name })
@@ -22,7 +34,6 @@ def "nusage argv" [positionals: list<any>, flags: record]: nothing -> list<strin
             _ => [$flag.name ($flag.value | nusage word)]
         }
     } | flatten
-    ($positionals | compact | each { nusage word }) ++ $flags
 }
 
 # Completions from usage's own completer, against the spec this module was generated
@@ -104,4 +115,17 @@ export def "demo events" [
     --verbose (-v): int,  # Say more
 ]: nothing -> table<at: datetime, kind: string> {
     ^demo events --json ...(nusage argv [] {--verbose: $verbose}) | from json --objects | into datetime at
+}
+
+# Tag items
+@usage 'clause "items" {
+        flag "-l --label <label>" help="Label for the item that follows"
+        arg "<item>" help="Item to tag"
+    }'
+export def "demo tag" [
+    ...item: string,       # Item to tag
+    --verbose (-v): int,   # Say more
+    --label (-l): string,  # Label for the item that follows
+]: nothing -> string {
+    ^demo tag ...(nusage argv [...$item] {--verbose: $verbose} {--label: $label})
 }
