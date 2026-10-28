@@ -1,6 +1,11 @@
 //! JSON documents held to a JSON Schema: the schema to its metaschema first, then each
 //! document to the schema. A binary's output is a contract the module's types rely on, and
 //! this is how a conformance suite checks the raw output before Nushell decodes it.
+//!
+//! A `format` is asserted, not only annotated as draft 2020-12 has it by default: the module
+//! converts a `date-time` string to a datetime after decoding, so a string that is not one
+//! fails the call, and a suite that let it through would hold the output to less than the
+//! module relies on.
 
 use std::io::Read;
 use std::path::Path;
@@ -19,7 +24,9 @@ pub fn validate(schema: &Path, documents: &[impl AsRef<Path>]) -> Result<Vec<Str
     if let Err(err) = jsonschema::meta::validate(&schema_json) {
         return Ok(vec![format!("{}: {err}", schema.display())]);
     }
-    let validator = jsonschema::validator_for(&schema_json)
+    let validator = jsonschema::options()
+        .should_validate_formats(true)
+        .build(&schema_json)
         .map_err(|err| format!("{}: {err}", schema.display()))?;
     let mut findings = Vec::new();
     let mut check = |name: &str, text: &str| {
@@ -95,6 +102,30 @@ mod tests {
         assert_eq!(findings.len(), 1, "{findings:?}");
         assert!(
             findings[0].starts_with(&format!("{}: ", faulty.display())),
+            "{findings:?}"
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_format_is_asserted() {
+        // The module would convert `at` to a datetime, and fail on the second document.
+        let dir =
+            std::env::temp_dir().join(format!("nusage-validate-format-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let schema = file(
+            &dir,
+            "event.schema.json",
+            r#"{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object",
+                "properties": {"at": {"type": "string", "format": "date-time"}}}"#,
+        );
+        let good = file(&dir, "good.json", r#"{"at": "2026-10-28T21:31:02+02:00"}"#);
+        let bad = file(&dir, "bad.json", r#"{"at": "yesterday"}"#);
+        assert_eq!(validate(&schema, &[&good]).unwrap(), Vec::<String>::new());
+        let findings = validate(&schema, &[&bad]).unwrap();
+        assert_eq!(findings.len(), 1, "{findings:?}");
+        assert!(
+            findings[0].starts_with(&format!("{}:/at: ", bad.display())),
             "{findings:?}"
         );
         std::fs::remove_dir_all(&dir).unwrap();
