@@ -12,6 +12,8 @@ use nusage_nu::{Decl, SyntaxError, signatures};
 use nusage_spec::{Assembled, Source};
 use usage::{Spec, SpecArg, SpecCommand, SpecFlag};
 
+use crate::common::restates;
+
 /// The findings for `module`, the text of the module written for `assembled` as
 /// `<name>.nu` in `dir`: empty when it conforms.
 pub fn conform(
@@ -254,7 +256,12 @@ impl Checker<'_> {
                 ));
             }
         }
-        if !decl.description.is_empty() && decl.extra_description.starts_with(&decl.description) {
+        let extra = decl
+            .extra_description
+            .split("\n\n")
+            .next()
+            .unwrap_or_default();
+        if !decl.description.is_empty() && restates(extra, &decl.description) {
             note("the description is repeated".to_string());
         }
     }

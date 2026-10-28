@@ -1,0 +1,29 @@
+# jj ships no spec: `spec` reads it from the clap command of jj-cli, the library the binary is
+# built from, which compiles jj-cli. So it runs once per version and the spec is committed; the
+# module is generated from the committed spec, and the check holds the spec to the jj on PATH.
+[tasks.spec]
+description = "Write the spec of the jj on PATH from jj-cli's clap command, when the spec describes another version"
+depends = ["//nusage:build"]
+run = "../clap/spec.nu spec --out jj.usage.kdl"
+
+[tasks.generate]
+description = "Generate the module from the spec"
+depends = ["//nusage:build"]
+sources = ["jj.usage.kdl", "../.bin/nusage"]
+outputs = ["generated/jj.nu"]
+file = "generate.nu"
+
+[tasks.install]
+description = "Generate the module and have every new interactive Nushell session load it"
+depends = [":generate"]
+file = "install.nu"
+
+# The extractor is checked by its formatting alone: anything more compiles jj-cli.
+[tasks.lint]
+description = "The extractor as rustfmt wants it"
+run = "rustfmt --check --edition 2024 spec/src/main.rs"
+
+[tasks.check]
+description = "Hold the module to jj's spec and the spec to the jj on PATH, and drive jj through the module"
+depends = [":generate", ":lint"]
+file = "check.nu"

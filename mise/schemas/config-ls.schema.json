@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string"
+      },
+      "tools": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "override": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "path",
+      "tools",
+      "override"
+    ],
+    "additionalProperties": false
+  }
+}
