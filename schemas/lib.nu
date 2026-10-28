@@ -109,6 +109,30 @@ export def validate-result [suite: record, case: record, result: record] {
     $checked
 }
 
+# The suite's schemas held to their metaschema, then documents read from the serializers
+# held to their output's schema: `{id, output, document, valid}`, where `valid: false` is a
+# shape the schema must refuse. A document is written on one line, as a JSON lines record is.
+export def check-examples [suite: record, examples: list<record>] {
+    for file in ($suite.outputs | get schema | uniq) {
+        let checked = ^nusage validate ($suite.directory | path join $file) | complete
+        if $checked.exit_code != 0 {
+            error make --unspanned {msg: ($checked.stderr | str trim)}
+        }
+    }
+    $examples | each {|example|
+        let case = {id: $example.id, output: $example.output, exit_codes: [0]}
+        let stdout = $example.document | to json --raw
+        let result = validate-result $suite $case {stdout: $stdout, stderr: "", exit_code: 0}
+        let ok = $result.ok == $example.valid
+        {
+            id: $example.id
+            ok: $ok
+            exit_code: 0
+            errors: (if $ok { [] } else { [$"Expected valid=($example.valid): ($result.errors | str join '; ')"] })
+        }
+    }
+}
+
 # The cases run from `cwd`; the caller has set the environment up.
 export def run-suite [suite: record, binary: path, cwd: path] {
     let binary = $binary | path expand
