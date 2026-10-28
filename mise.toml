@@ -2,7 +2,7 @@ min_version = "2026.9.2"
 monorepo_root = true
 
 [monorepo]
-config_roots = ["nusage", "mise", "clap", "jj"]
+config_roots = ["nusage", "mise", "clap", "jj", "schemas"]
 
 # The Cargo workspace is at the root, so its toolchain is: one pin for Cargo, the tasks and CI.
 [tools]
@@ -13,6 +13,8 @@ rust = { version = "1.99.1", profile = "minimal", components = [
 mr-boxington = "1.27.0"
 nu = "0.116.1"
 usage = "7.1.3"
+# Development-only JSON Schema validation for the integration fixtures.
+"pipx:check-jsonschema" = "0.39.0"
 jujutsu = "0.46.0"
 # The formatters `jj fix` runs and CI checks with: nufmt tracks the Nushell above.
 "github:nushell/nufmt" = "0.1.6"
