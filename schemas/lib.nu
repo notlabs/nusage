@@ -1,4 +1,4 @@
-# Shared development tooling. Tool-specific schemas and fixtures live with each integration.
+# The runner of a schema suite; an integration's schemas, manifest and fixtures live with it.
 export def load-suite [manifest: path] {
     let manifest = $manifest | path expand
     let suite = open $manifest
@@ -20,8 +20,8 @@ export def load-suite [manifest: path] {
     $suite | insert directory ($manifest | path dirname)
 }
 
-# Embed schema text so an overlay can be merged into a spec in a different directory.
-# The schema itself is still authored once, in the adjacent JSON file.
+# The overlay declares each attached output with its schema embedded, so where the overlay
+# and the spec sit cannot change how a schema file resolves.
 export def schema-overlay [suite: record] {
     $suite.outputs
     | where {|output| $output.attach? != false }
@@ -39,7 +39,7 @@ export def schema-overlay [suite: record] {
 }
 
 def validate-file [schema: path, instance: path] {
-    let result = ^check-jsonschema --schemafile $schema $instance | complete
+    let result = ^nusage validate $schema $instance | complete
     if $result.exit_code == 0 { [] } else {
         [
             ([$result.stdout $result.stderr] | str join (char nl) | str trim)
@@ -47,8 +47,8 @@ def validate-file [schema: path, instance: path] {
     }
 }
 
-# Validate original stdout, before Nushell decoding can fill fields or convert values.
-# A fixture's "expect" is another JSON Schema: assertions use the same vocabulary.
+# The binary's raw stdout, before anything decodes it, held to the output's schema and to
+# the case's `expect`, another JSON Schema.
 export def validate-result [suite: record, case: record, result: record] {
     let matches = $suite.outputs | where id == $case.output
     if ($matches | length) != 1 {
@@ -99,7 +99,7 @@ export def validate-result [suite: record, case: record, result: record] {
     $checked
 }
 
-# The caller owns fixture setup and environment; the runner knows no tool-specific paths.
+# The cases run from `cwd`; the caller has set the environment up.
 export def run-suite [suite: record, binary: path, cwd: path] {
     let binary = $binary | path expand
     $suite.cases | each {|case|

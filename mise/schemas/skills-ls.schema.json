@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mise skills ls --json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "tool": {
+        "type": "string"
+      },
+      "version": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "tool",
+      "version",
+      "path"
+    ],
+    "additionalProperties": false
+  }
+}

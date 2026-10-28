@@ -23,6 +23,7 @@ enum Commands {
     Check(Check),
     Overlay(Overlay),
     Parse(Parse),
+    Validate(Validate),
 }
 
 /// Write the module for a script, a tree of scripts, or a usage spec of a binary
@@ -145,6 +146,36 @@ impl Run for Overlay {
                 .map_err(|e| e.to_string())?;
         print!("{overlay}");
         Ok(())
+    }
+}
+
+/// Hold JSON documents to a JSON Schema
+///
+/// The schema is held to its metaschema first, then each document to the schema; `-` is
+/// standard input, and no document holds the schema alone. Every finding is a line,
+/// `<document>:<path>: <what>`, and any finding is exit code 1. What a binary prints for
+/// an `output` whose schema a spec or overlay declares can be held to that schema this way,
+/// before a module decodes it.
+#[derive(Args)]
+struct Validate {
+    /// The JSON Schema
+    schema: PathBuf,
+    /// The JSON documents, `-` for standard input
+    documents: Vec<PathBuf>,
+}
+
+impl Run for Validate {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        let findings = nusage::validate(&self.schema, &self.documents)?;
+        if findings.is_empty() {
+            return Ok(());
+        }
+        for finding in findings {
+            eprintln!("{finding}");
+        }
+        std::process::exit(1)
     }
 }
 
