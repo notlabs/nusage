@@ -8,10 +8,11 @@
 
 use usage::kdl::{KdlDocument, KdlNode};
 
-/// Merge `overlay` into `base`. A `cmd` merges into the `cmd` of the same name, its
-/// properties over the base's and its children recursively, or is added when there is none.
-/// Any other node replaces the base node with the same name and the same first argument, or
-/// is added; an `include` is always added.
+/// Merge `overlay` into `base`. A node merges into the base node with the same name and
+/// the same first argument: the overlay's arguments, annotations included, replace the
+/// base's, its properties go over the base's, and its children merge recursively; a node
+/// with no counterpart is added, and an `include` always is. So an overlay that states only
+/// a type on an output keeps the output's framing and selector.
 pub(crate) fn merge(base: &mut KdlDocument, overlay: &KdlDocument) {
     merge_nodes(base.nodes_mut(), overlay.nodes());
 }
@@ -22,30 +23,46 @@ fn merge_nodes(base: &mut Vec<KdlNode>, overlay: &[KdlNode]) {
         let first = first_arg(node);
         let same =
             |candidate: &KdlNode| candidate.name().value() == name && first_arg(candidate) == first;
-        if name == "cmd" {
-            if let Some(target) = base.iter_mut().find(|candidate| same(candidate)) {
-                for entry in node.entries().iter().filter(|entry| entry.name().is_some()) {
-                    let key = entry
-                        .name()
-                        .map(|k| k.value().to_string())
-                        .unwrap_or_default();
-                    match target.entry_mut(key.as_str()) {
-                        Some(existing) => *existing = entry.clone(),
-                        None => target.push(entry.clone()),
-                    }
-                }
-                if let Some(children) = node.children() {
-                    merge_nodes(target.ensure_children().nodes_mut(), children.nodes());
-                }
-                continue;
-            }
-        } else if name != "include"
-            && let Some(position) = base.iter().position(same)
-        {
-            base[position] = node.clone();
+        let target = if name == "include" {
+            None
+        } else {
+            base.iter_mut().find(|candidate| same(candidate))
+        };
+        let Some(target) = target else {
+            base.push(node.clone());
             continue;
+        };
+        // Arguments as a whole from the overlay, when it gives any: that is where a type
+        // annotation sits. Properties one by one over the base's.
+        let (args, props): (Vec<_>, Vec<_>) = node
+            .entries()
+            .iter()
+            .cloned()
+            .partition(|entry| entry.name().is_none());
+        if !args.is_empty() {
+            let mut entries = args;
+            entries.extend(
+                target
+                    .entries()
+                    .iter()
+                    .filter(|entry| entry.name().is_some())
+                    .cloned(),
+            );
+            *target.entries_mut() = entries;
         }
-        base.push(node.clone());
+        for entry in props {
+            let key = entry
+                .name()
+                .map(|k| k.value().to_string())
+                .unwrap_or_default();
+            match target.entry_mut(key.as_str()) {
+                Some(existing) => *existing = entry,
+                None => target.push(entry),
+            }
+        }
+        if let Some(children) = node.children() {
+            merge_nodes(target.ensure_children().nodes_mut(), children.nodes());
+        }
     }
 }
 
@@ -94,5 +111,32 @@ cmd "rm" {
         assert_eq!(ls.args[0].help.as_deref(), Some("Only this, by name"));
         assert_eq!(ls.outputs.len(), 1);
         assert!(spec.cmd.subcommands.contains_key("rm"));
+    }
+
+    #[test]
+    fn an_overlay_that_states_only_a_type_keeps_the_rest_of_the_node() {
+        let mut base: KdlDocument = r#"
+cmd "ls" {
+    flag "-J --json"
+    output "json" framing="json" select="--json" help="Rows"
+}
+"#
+        .parse()
+        .unwrap();
+        let overlay: KdlDocument = r#"
+cmd "ls" {
+    output ("table<name: string>")"json"
+}
+"#
+        .parse()
+        .unwrap();
+        merge(&mut base, &overlay);
+        let text = base.to_string();
+        assert!(
+            text.contains(
+                r#"output ("table<name: string>")"json" framing="json" select="--json" help="Rows""#
+            ),
+            "{text}"
+        );
     }
 }

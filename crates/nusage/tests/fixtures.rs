@@ -98,6 +98,11 @@ fn fixtures_parse_with_nu_parser() {
         let mut working_set = StateWorkingSet::new(&engine_state);
         let bin = module_file.file_stem().unwrap().to_str().unwrap();
         let wrapped = format!("module {bin} {{\n{source}\n}}\n");
+        // As `use` would, for `path self`.
+        working_set
+            .files
+            .push(module_file.clone(), Span::unknown())
+            .expect("the module's path");
         nu_parser::parse(
             &mut working_set,
             Some(&module_file.to_string_lossy()),

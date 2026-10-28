@@ -1,0 +1,7 @@
+# `--env` cannot be a Nushell parameter, since `$env` is Nushell's own: the wrapper spells it
+# `--env_` and the binary still receives `--env`. The count and the switch forward as usual.
+{
+    cmd: [install],
+    invoke: "demo install p --env_ prod -g",
+    argv: [install, p, --global, --env, prod],
+}

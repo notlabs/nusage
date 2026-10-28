@@ -20,6 +20,7 @@ struct Nusage {
 enum Commands {
     Generate(Generate),
     Spec(Spec),
+    Overlay(Overlay),
     Parse(Parse),
 }
 
@@ -81,6 +82,39 @@ impl Run for Spec {
     fn run(self) -> Self::Output {
         let spec = nusage::spec(&self.source, &self.overlay).map_err(|e| e.to_string())?;
         print!("{spec}");
+        Ok(())
+    }
+}
+
+/// Print an overlay declaring a framed output for every command that has a switch
+///
+/// For a binary whose spec has `--json` flags but no `output` declarations: every command
+/// with the switch gets `output "json" framing="json" select="--json"`, so its wrapper asks
+/// for and decodes that output. Save it and pass it to `generate --overlay`; a second overlay
+/// adds the types. A command already declaring such an output is left alone.
+#[derive(Args)]
+struct Overlay {
+    /// The `.kdl` spec file
+    source: PathBuf,
+    /// A usage KDL document merged onto the spec file first, as for `generate`
+    #[usage(long)]
+    overlay: Vec<PathBuf>,
+    /// The switch that selects the output
+    #[usage(long, default = "--json")]
+    switch: String,
+    /// The output's framing: `json` or `jsonl`
+    #[usage(long, default = "json")]
+    framing: String,
+}
+
+impl Run for Overlay {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        let overlay =
+            nusage::switch_overlay(&self.source, &self.overlay, &self.switch, &self.framing)
+                .map_err(|e| e.to_string())?;
+        print!("{overlay}");
         Ok(())
     }
 }

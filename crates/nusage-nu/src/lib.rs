@@ -12,7 +12,7 @@ mod literal;
 mod printer;
 mod syntax;
 
-pub use check::check_module;
+pub use check::{check_module, reserved_variable};
 pub use literal::{Value, check_default, default_text, nuon};
 pub use printer::print;
 pub use syntax::*;

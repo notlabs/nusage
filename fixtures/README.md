@@ -5,7 +5,8 @@ Each directory holds a source (`script.nu`, a `<bin>/` tree, or `<bin>.usage.kdl
 byte for byte (`expected/<bin>.nu`), the parsed signatures that module yields
 (`expected/signatures.nuon`), and cases (`cases/*.nuon`). `verify.nu` runs the cases against
 the Nushell that runs it, and a single script's cases also through the `nusage` interpreter
-when the binary is built.
+when the binary is built. A binary module completes through the `usage` CLI, so its completion
+checks need it on `PATH`.
 
 A script case is `{argv, invoke?, usage, output?, complete?}`: `argv` is what the interpreter
 receives, as `nusage <script> ...argv` parses it; `invoke` the Nushell spelling when it differs;

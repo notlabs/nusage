@@ -25,15 +25,19 @@ def "nusage argv" [positionals: list<any>, flags: record]: nothing -> list<strin
     ($positionals | compact | each { nusage word }) ++ $flags
 }
 
-def "complete plugin" [] {
-    ^sh -c "echo \"plugin-1
-plugin-2
-plugin-3\"" | lines
-}
-
-def "complete demo run task" [] {
-    ^sh -c "echo \"build:Build it
-test:Test it\"" | lines | parse "{value}:{description}"
+# Completions from usage's own completer, against the spec this module was generated
+# from, with the words typed so far. Nothing when the `usage` CLI is not installed.
+def "nusage complete" [place: record] {
+    const spec = (path self | path dirname | path join "../demo.usage.kdl")
+    if (which usage | is-empty) {
+        return []
+    }
+    let name = $place.command | first
+    let command = if $name == "main" { [demo] } else { $name | split row " " }
+    let words = $place.command | skip 1
+    (^usage complete-word -f $spec --shell nu -- ...$command ...$words | complete).stdout
+    | lines
+    | each {|line| $line | split column "	" value description | into record }
 }
 
 # A demo CLI
@@ -50,14 +54,21 @@ export def main [
 @usage 'arg "[version]" help="Version to install" default="latest"'
 @usage 'flag "-g --global" help="Install for every project"'
 @usage 'flag "-d --dir <dir>" help="Install into this directory"'
+@usage 'flag "--env <env>" help="Environment to install into"'
 export def "demo install" [
-    plugin: string@"complete plugin",  # Plugin to install
+    plugin: string@"nusage complete",  # Plugin to install
     version?: string,                  # Version to install
     --verbose (-v): int,               # Say more
     --global (-g),                     # Install for every project
     --dir (-d): path,                  # Install into this directory
+    --env_: string,                    # Environment to install into
 ]: nothing -> string {
-    ^demo install ...(nusage argv [$plugin $version] {--verbose: $verbose, --global: $global, --dir: $dir})
+    ^demo install ...(nusage argv [$plugin $version] {
+        --verbose: $verbose
+        --global: $global
+        --dir: $dir
+        --env: $env_
+    })
 }
 
 # Run a task
@@ -66,10 +77,10 @@ export def "demo install" [
 @usage 'flag "-e --set <var>" help="Variable to set, repeatable" var=#true'
 @usage 'complete "task" descriptions=#true run="echo \"build:Build it\ntest:Test it\""'
 export def "demo run" [
-    task: string@"complete demo run task",  # Task to run
-    ...args: string,                        # Arguments for the task
-    --verbose (-v): int,                    # Say more
-    --set (-e): list<string>,               # Variable to set, repeatable
+    task: string@"nusage complete",  # Task to run
+    ...args: string,                 # Arguments for the task
+    --verbose (-v): int,             # Say more
+    --set (-e): list<string>,        # Variable to set, repeatable
 ]: nothing -> string {
     ^demo run ...(nusage argv [$task ...$args] {--verbose: $verbose, --set: $set})
 }

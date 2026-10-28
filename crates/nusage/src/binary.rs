@@ -13,33 +13,30 @@ use nusage_nu::{
     CommandName, Def, Expr, Ident, Item, Module, Params, Stmt, SyntaxError, Type, word,
 };
 
-use crate::common::{Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
+use crate::common::{SPEC_COMPLETER, Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
 
 /// The fixed helpers every binary module carries.
 const HELPERS: &str = include_str!("binary-helpers.nu");
 
-/// The module for a binary: the helpers, completer helpers, then a wrapper per command.
-pub fn module(tree: &CommandTree) -> Result<Module, SyntaxError> {
+/// The module for a binary: the helpers, the completer when a parameter wants one, then a
+/// wrapper per command. `spec` is the spec file's path relative to the module's directory,
+/// for the completer, which runs usage's against it.
+pub fn module(tree: &CommandTree, spec: &str) -> Result<Module, SyntaxError> {
     let mut items = vec![Item::Verbatim(HELPERS.to_string())];
-    // A helper's name carries the command's full name when the completer is one command's
-    // own, so two helpers with one name run the same program: the spec's.
-    let mut helpers_done = Vec::new();
-    for command in &tree.commands {
-        for param in command.positionals.iter().chain(command.flags.iter()) {
-            if let Some(Completer::Shell {
-                name,
-                run,
-                descriptions,
-            }) = &param.completer
-                && !helpers_done.contains(name)
-            {
-                items.push(Item::Def(completer_helper(name, run, *descriptions)?));
-                helpers_done.push(name.clone());
-            }
-        }
+    let wants_completer = tree.commands.iter().any(|command| {
+        command
+            .positionals
+            .iter()
+            .chain(command.flags.iter())
+            .any(|param| param.completer == Some(Completer::Spec))
+    });
+    if wants_completer {
+        items.push(Item::Verbatim(spec_completer(&tree.bin, spec)));
     }
     for command in &tree.commands {
-        items.push(Item::Def(wrapper(tree, command)?));
+        let def = wrapper(tree, command)
+            .map_err(|err| SyntaxError(format!("`{} {}`: {err}", tree.bin, command.path)))?;
+        items.push(Item::Def(def));
     }
     Ok(Module {
         preamble: vec![attr_usage_alias()?],
@@ -47,35 +44,33 @@ pub fn module(tree: &CommandTree) -> Result<Module, SyntaxError> {
     })
 }
 
-/// `def "complete <name>" [] { ^sh -c <run> | lines }`, with `parse` when the lines carry
-/// descriptions, which is how usage reads them.
-fn completer_helper(name: &str, run: &str, descriptions: bool) -> Result<Def, SyntaxError> {
-    let mut stages = vec![
-        Expr::External {
-            name: "sh".into(),
-            args: vec![Expr::Str("-c".into()), Expr::Str(run.to_string())],
-        },
-        call("lines", vec![])?,
-    ];
-    if descriptions {
-        stages.push(call(
-            "parse",
-            vec![Expr::Str("{value}:{description}".into())],
-        )?);
-    }
-    Ok(Def {
-        export: false,
-        doc: vec![],
-        attrs: vec![],
-        name: CommandName::new(helper_command(name))?,
-        params: Params::default(),
-        io: None,
-        body: vec![Stmt::Pipeline(stages)],
-    })
-}
-
-pub fn helper_command(name: &str) -> String {
-    format!("complete {name}")
+/// usage's completer as a Nushell one: the words typed so far go to `usage complete-word`
+/// against the spec this module was generated from, which runs the spec's `complete`
+/// commands with their templates rendered and completes `type=` paths. Nothing when the
+/// `usage` CLI is not installed. Nushell hands a completer a record of where the cursor is;
+/// its `command` field is the words of the call so far, the one being completed last, with
+/// the call's name as one word: `demo install`, or `main` for the binary itself. usage wants
+/// the binary's words, so the name is split and `main` becomes the binary.
+fn spec_completer(bin: &str, spec: &str) -> String {
+    format!(
+        r#"# Completions from usage's own completer, against the spec this module was generated
+# from, with the words typed so far. Nothing when the `usage` CLI is not installed.
+def "{SPEC_COMPLETER}" [place: record] {{
+    const spec = (path self | path dirname | path join {spec})
+    if (which usage | is-empty) {{
+        return []
+    }}
+    let name = $place.command | first
+    let command = if $name == "main" {{ [{bin}] }} else {{ $name | split row " " }}
+    let words = $place.command | skip 1
+    (^usage complete-word -f $spec --shell nu -- ...$command ...$words | complete).stdout
+    | lines
+    | each {{|line| $line | split column "	" value description | into record }}
+}}
+"#,
+        bin = word(bin),
+        spec = word(spec)
+    )
 }
 
 fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
@@ -90,9 +85,23 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
     } else {
         format!("{} {}", tree.bin, command.path)
     };
-    let params = command
+    // A `def` has one rest parameter; a binary declaring several variadic positionals, as
+    // usage allows (`[ARGS]...` and `[-- MORE]...`), gets the first, which takes every
+    // remaining word anyway, since the binary parses them.
+    let mut rest_seen = false;
+    let positionals: Vec<&Param> = command
         .positionals
         .iter()
+        .filter(|param| {
+            if param.kind != ParamKind::Rest {
+                return true;
+            }
+            !std::mem::replace(&mut rest_seen, true)
+        })
+        .collect();
+    let params = positionals
+        .iter()
+        .copied()
         .chain(command.flags.iter())
         .map(|param| nu_params(param, Target::Binary))
         .collect::<Result<Vec<_>, _>>()?
@@ -104,8 +113,7 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
 
     // `^demo status --format json ...(nusage argv [$a ...$rest] {--flag: $flag})`: the
     // selector words come first, so a `--` the caller passes still comes after them.
-    let positionals = command
-        .positionals
+    let positionals = positionals
         .iter()
         .map(|param| {
             let var = Expr::Var(Ident::new(&param.var)?);

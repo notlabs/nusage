@@ -8,7 +8,8 @@ use nusage_nu::{
     SyntaxError, Type,
 };
 
-use crate::binary::helper_command;
+/// The binary module's completer, which runs usage's against the spec.
+pub const SPEC_COMPLETER: &str = "nusage complete";
 
 /// Which module a parameter is written for. In both, a counted flag is an `int` and a
 /// repeatable one a `list`, since a `def`'s flags cannot repeat.
@@ -58,14 +59,15 @@ pub fn usage_attrs(command: &Command) -> Result<Vec<Attr>, SyntaxError> {
 /// negates it when usage declares one.
 pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxError> {
     let completer = match &param.completer {
-        Some(Completer::Inline(items)) if items.is_empty() => None,
         Some(Completer::Inline(items)) => Some(NuCompleter::List(items.clone())),
         Some(Completer::Command(path)) => {
             Some(NuCompleter::Command(CommandName::new(path.to_string())?))
         }
-        Some(Completer::Shell { name, .. }) => Some(NuCompleter::Command(CommandName::new(
-            helper_command(name),
-        )?)),
+        // A script's bare `type=` says what the value is and completes nothing here.
+        Some(Completer::Spec) => match target {
+            Target::Binary => Some(NuCompleter::Command(CommandName::new(SPEC_COMPLETER)?)),
+            Target::Script => None,
+        },
         None => None,
     };
     let default = match target {
@@ -127,11 +129,11 @@ pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxEr
     Ok(params)
 }
 
+/// The flag as Nushell spells it; a flag with no long name is spelled by its usage name.
 fn flag_name(param: &Param) -> Result<FlagName, SyntaxError> {
     FlagName::new(
         param
-            .long
-            .clone()
+            .nushell_long()
             .unwrap_or_else(|| param.usage_name.clone()),
     )
 }

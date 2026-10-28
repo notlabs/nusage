@@ -72,7 +72,13 @@ def verify-fixture [dir: path, update: bool] {
             )
         }
         if ($case.complete? | is-not-empty) {
-            $rows | append (row $name complete $id (check-complete $import $case.complete))
+            # A binary module's completer runs usage's, through the `usage` CLI.
+            let outcome = if $is_binary and (which usage | is-empty) {
+                {ok: true, detail: "skipped: the usage CLI is not on PATH"}
+            } else {
+                check-complete $import $case.complete
+            }
+            $rows | append (row $name complete $id $outcome)
         } else {
             $rows
         }

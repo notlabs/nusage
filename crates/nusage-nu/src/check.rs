@@ -13,8 +13,9 @@ static ENGINE: LazyLock<EngineState> =
 /// Whether Nushell parses the module, as `use <name>.nu` would: the source is parsed inside
 /// `module <name> { }`, which is where Nushell also rejects a definition named after the
 /// module or a parser keyword, or a parameter named like a built-in variable. `dir` is where
-/// the module file lives, for paths the parser resolves at parse time such as `run`'s. The
-/// error names the line of generated Nushell at fault.
+/// the module file will live, for what the parser resolves at parse time: `run`'s path, and
+/// `path self`, which is the file's own. The error names the line of generated Nushell at
+/// fault.
 pub fn check_module(name: &str, source: &str, dir: Option<&Path>) -> Result<(), SyntaxError> {
     let mut engine_state = ENGINE.clone();
     // The parser resolves against `PWD` as an absolute path.
@@ -28,7 +29,18 @@ pub fn check_module(name: &str, source: &str, dir: Option<&Path>) -> Result<(), 
     );
     let mut working_set = StateWorkingSet::new(&engine_state);
     let wrapped = format!("module {name} {{\n{source}\n}}\n");
-    nu_parser::parse(&mut working_set, None, wrapped.as_bytes(), false);
+    // `use` pushes the module's file for `path self` to find; a bare parse must too.
+    let file = dir.join(format!("{name}.nu"));
+    working_set
+        .files
+        .push(file.clone(), Span::unknown())
+        .map_err(|err| SyntaxError(format!("cannot stage {}: {err}", file.display())))?;
+    nu_parser::parse(
+        &mut working_set,
+        Some(&file.to_string_lossy()),
+        wrapped.as_bytes(),
+        false,
+    );
     let Some(err) = working_set.parse_errors.first() else {
         return Ok(());
     };
@@ -42,9 +54,31 @@ pub fn check_module(name: &str, source: &str, dir: Option<&Path>) -> Result<(), 
     )))
 }
 
+/// Whether Nushell reserves the name for one of its own variables, such as `env`, `in` and
+/// `nu`, so that no parameter can be called that. nu-parser keeps the list private; it is
+/// asked through `let`.
+pub fn reserved_variable(name: &str) -> bool {
+    let mut working_set = StateWorkingSet::new(&ENGINE);
+    let source = format!("let {name} = 1");
+    nu_parser::parse(&mut working_set, None, source.as_bytes(), false);
+    working_set
+        .parse_errors
+        .iter()
+        .any(|err| matches!(err, nu_protocol::ParseError::NameIsBuiltinVar(..)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nushell_reserves_its_own_variables() {
+        assert!(reserved_variable("env"));
+        assert!(reserved_variable("in"));
+        assert!(reserved_variable("nu"));
+        assert!(!reserved_variable("environment"));
+        assert!(!reserved_variable("env_"));
+    }
 
     #[test]
     fn a_module_that_parses_passes() {

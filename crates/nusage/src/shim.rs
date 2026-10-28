@@ -80,7 +80,7 @@ fn usage_record(command: &Command) -> Result<Expr, SyntaxError> {
             .collect(),
     ));
     let field = |param: &Param| -> Result<(String, Expr), SyntaxError> {
-        Ok((param.var.clone(), param_value(param)?))
+        Ok((param.key.clone(), param_value(param)?))
     };
     let args = command
         .positionals

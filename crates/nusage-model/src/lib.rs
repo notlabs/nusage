@@ -96,12 +96,16 @@ pub enum Framing {
 pub struct Param {
     /// The name usage gave it: `target`, `dry-run`.
     pub usage_name: String,
-    /// The Nushell variable, in `snake_case`: `dry_run`. Also the key in `$usage`.
+    /// The key in `$usage`: the usage name in `snake_case`, `dry_run`.
+    pub key: String,
+    /// The Nushell variable: the key, with a trailing `_` when Nushell reserves the name for
+    /// itself (`env_` for `--env`), since no parameter can be called `env`.
     pub var: String,
     pub kind: ParamKind,
     /// The value's type. For `Rest` and `Repeated`, the element type.
     pub ty: NuType,
-    /// The flag's long name as typed, without dashes: `dry-run`. `None` for positionals.
+    /// The flag's long name as the binary spells it, without dashes: `dry-run`. `None` for
+    /// positionals. The Nushell spelling is [`Param::nushell_long`].
     pub long: Option<String>,
     pub short: Option<char>,
     pub completer: Option<Completer>,
@@ -115,6 +119,19 @@ pub struct Param {
     pub doc: Option<String>,
     /// Whether the flag is inherited from an ancestor's `global=#true`.
     pub inherited: bool,
+}
+
+impl Param {
+    /// The flag's long name as Nushell spells it: the binary's, with a trailing `_` when the
+    /// variable needed one (`--env_` for `--env`); the short form is untouched either way.
+    pub fn nushell_long(&self) -> Option<String> {
+        let long = self.long.as_ref()?;
+        Some(if self.var != self.key {
+            format!("{long}_")
+        } else {
+            long.clone()
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,14 +171,8 @@ pub enum Completer {
     Inline(Vec<String>),
     /// `choices run="./x.nu"` resolved to the command that is that script.
     Command(CommandPath),
-    /// A `complete "name" run="..."` or `choices run="..."` shell command: one value per line,
-    /// `value:description` lines when `descriptions` is set.
-    Shell {
-        /// A name unique within the spec, for the helper that runs it: the completer's name,
-        /// prefixed by the command path when the `complete` node is the command's or the
-        /// argument's own rather than the spec's.
-        name: String,
-        run: String,
-        descriptions: bool,
-    },
+    /// usage's own completer, run against the spec with the words typed so far: what a
+    /// `complete` node, a `choices run=` or a `type=` asks for, its commands run and its
+    /// templates rendered by usage. For a binary; a script's choices are a sibling provider.
+    Spec,
 }

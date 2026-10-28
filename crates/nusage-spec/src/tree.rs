@@ -236,9 +236,8 @@ fn assemble_spec_file(path: &Path, overlays: &[PathBuf]) -> Result<Assembled, Di
         &line_of,
         &mut headers,
     )?;
-    for header in headers.values() {
-        reject_mounts(header)?;
-    }
+    // A spec's `mount` runs the binary for the mounted commands; here they are unknown, and
+    // the node rides along as an attribute like any other.
     fill_headers(&spec.cmd, &CommandPath::root(), path, &mut headers);
     Ok(Assembled {
         spec,
@@ -375,8 +374,7 @@ fn reject_mounts(header: &Header) -> Result<(), Diagnostic> {
     if let Some(node) = header.nodes.iter().find(|node| node.name == "mount") {
         return Err(Diagnostic::new(
             &header.path,
-            "`mount` is not supported: a script tree's directory is the discovery, and a \
-             spec's mounts cannot be resolved without running the binary",
+            "`mount` is not supported in a script: a script tree's directory is the discovery",
         )
         .at_line(node.line));
     }

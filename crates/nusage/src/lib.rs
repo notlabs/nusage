@@ -9,6 +9,7 @@ mod binary;
 mod common;
 mod interpret;
 mod shim;
+mod switch_overlay;
 
 use std::path::{Path, PathBuf};
 
@@ -39,16 +40,15 @@ pub fn generate_with(
 ) -> Result<String, Diagnostic> {
     let assembled = nusage_spec::assemble_with(source, overlays)?;
     let tree = nusage_model::model(&assembled)?;
+    // Paths inside the module, a shim's `run` and a binary's spec, are relative to where it
+    // will be written.
+    let base = match out {
+        Some(out) => out.parent().map(Path::to_path_buf).unwrap_or_default(),
+        None => std::env::current_dir().map_err(|err| Diagnostic::new(source, err.to_string()))?,
+    };
     let module = match &assembled.source {
-        Source::Scripts { .. } => {
-            let base = match out {
-                Some(out) => out.parent().map(Path::to_path_buf).unwrap_or_default(),
-                None => std::env::current_dir()
-                    .map_err(|err| Diagnostic::new(source, err.to_string()))?,
-            };
-            shim::module(&tree, &base)
-        }
-        Source::Binary => binary::module(&tree),
+        Source::Scripts { .. } => shim::module(&tree, &base),
+        Source::Binary => binary::module(&tree, &common::relative(&base, source)),
     }
     .map_err(|err| Diagnostic::new(source, err.to_string()))?;
     let text = nusage_nu::print(&module);
@@ -65,4 +65,21 @@ pub fn generate_with(
 pub fn spec(source: &Path, overlays: &[PathBuf]) -> Result<String, Diagnostic> {
     let assembled = nusage_spec::assemble_with(source, overlays)?;
     Ok(assembled.spec.to_string())
+}
+
+/// An overlay declaring, for every command of the spec that has the switch, a framed output
+/// the switch selects, as usage KDL: what a binary with `--json` flags and no `output`
+/// declarations needs before its wrappers decode anything.
+pub fn switch_overlay(
+    source: &Path,
+    overlays: &[PathBuf],
+    switch: &str,
+    framing: &str,
+) -> Result<String, Diagnostic> {
+    let assembled = nusage_spec::assemble_with(source, overlays)?;
+    Ok(switch_overlay::switch_overlay(
+        &assembled.spec,
+        switch,
+        framing,
+    ))
 }

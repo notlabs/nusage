@@ -256,9 +256,11 @@ impl Context<'_> {
                 .map(|text| typed_default(text, &ty, level.header, node))
                 .transpose()?,
         };
+        let key = snake(&arg.name);
         Ok(Param {
             usage_name: arg.name.clone(),
-            var: snake(&arg.name),
+            var: variable(&key),
+            key,
             kind,
             ty,
             long: None,
@@ -322,9 +324,11 @@ impl Context<'_> {
                 }
             }
         };
+        let key = snake(&flag.name);
         Ok(Param {
             usage_name: flag.name.clone(),
-            var: snake(&flag.name),
+            var: variable(&key),
+            key,
             kind,
             ty,
             long,
@@ -355,14 +359,7 @@ impl Context<'_> {
         if let Some(choices) = &arg.choices {
             if let Some(run) = &choices.run {
                 return match self.assembled.source {
-                    Source::Binary => Ok(Some((
-                        Completer::Shell {
-                            name: self.scoped_name(path, param),
-                            run: run.clone(),
-                            descriptions: false,
-                        },
-                        None,
-                    ))),
+                    Source::Binary => Ok(Some((Completer::Spec, None))),
                     Source::Scripts { .. } => Err(Diagnostic::new(
                         &header.path,
                         format!(
@@ -382,80 +379,75 @@ impl Context<'_> {
                 return Ok(Some((Completer::Inline(choices.choices.clone()), None)));
             }
         }
-        // A `complete` on the argument or the command is that command's; one at the top level
-        // is shared by every command naming it. The helper's name says which.
+        // A `complete` on the argument, on the command, or at the top level; usage resolves
+        // them in that order too.
         let named = arg
             .complete
             .as_ref()
-            .map(|complete| (complete, self.scoped_name(path, param)))
-            .or_else(|| {
-                cmd.complete
-                    .get(&arg.name)
-                    .map(|complete| (complete, self.scoped_name(path, &arg.name)))
-            })
-            .or_else(|| {
-                self.assembled
-                    .spec
-                    .complete
-                    .get(&arg.name)
-                    .map(|complete| (complete, arg.name.clone()))
-            });
+            .or_else(|| cmd.complete.get(&arg.name))
+            .or_else(|| self.assembled.spec.complete.get(&arg.name));
         match named {
-            Some((complete, name)) => {
-                shell_completer(complete, name, header, &self.assembled.source)
-            }
+            Some(complete) => spec_completer(complete, &arg.name, header, &self.assembled.source),
             None => Ok(None),
         }
     }
 }
 
-impl Context<'_> {
-    /// The name of a helper that belongs to one command's parameter: the command's full name,
-    /// binary first, then the parameter. A spec-level completer's name is bare, so the root's
-    /// own completer for `value` is `demo value` and never the spec's `value`.
-    fn scoped_name(&self, path: &CommandPath, param: &str) -> String {
-        let bin = &self.assembled.spec.bin;
-        if path.is_root() {
-            format!("{bin} {param}")
-        } else {
-            format!("{bin} {path} {param}")
-        }
-    }
-}
-
-fn shell_completer(
+/// A `complete` node: usage completes it, for a binary. A script's choices come from a
+/// sibling provider, except a bare `type=`, which only says what the value is.
+fn spec_completer(
     complete: &SpecComplete,
-    name: String,
+    name: &str,
     header: &Header,
     source: &Source,
 ) -> Result<Found, Diagnostic> {
     let ty = complete.type_.clone();
-    let Some(run) = &complete.run else {
-        // Nothing to run, but a `type=` still says what the value is.
-        return Ok(ty.map(|ty| (Completer::Inline(Vec::new()), Some(ty))));
-    };
-    if let Source::Scripts { .. } = source {
-        return Err(Diagnostic::new(
+    match source {
+        Source::Binary => Ok(Some((Completer::Spec, ty))),
+        Source::Scripts { .. } if complete.run.is_none() => {
+            Ok(ty.map(|ty| (Completer::Spec, Some(ty))))
+        }
+        Source::Scripts { .. } => Err(Diagnostic::new(
             &header.path,
             format!(
                 "`complete \"{name}\" run=...` is not supported for scripts; name a sibling \
                  `.nu` provider with `choices run=` instead"
             ),
-        ));
+        )),
     }
-    Ok(Some((
-        Completer::Shell {
-            name,
-            run: run.clone(),
-            descriptions: complete.descriptions,
-        },
-        ty,
-    )))
 }
 
-/// usage's own `snake_case`, as its SDKs name arguments; a copy, since usage keeps it private.
+/// A usage name as a Nushell identifier: every run of characters an identifier cannot hold
+/// becomes one `_` (`dry-run` is `dry_run`, `TOOL@VERSION` is `TOOL_VERSION`), and a leading
+/// digit gets one in front. usage's own `snake_case` does the same for its SDKs; it is a
+/// copy, since usage keeps it private.
 fn snake(name: &str) -> String {
-    name.replace('-', "_")
+    let mut out = String::new();
+    let mut gap = false;
+    for c in name.chars() {
+        if c.is_ascii_alphanumeric() {
+            if gap && !out.is_empty() {
+                out.push('_');
+            }
+            gap = false;
+            out.push(c);
+        } else {
+            gap = true;
+        }
+    }
+    if out.starts_with(|c: char| c.is_ascii_digit()) {
+        out.insert(0, '_');
+    }
+    out
+}
+
+/// The Nushell variable for a key: the key, unless Nushell reserves it, then with `_`.
+fn variable(key: &str) -> String {
+    if nusage_nu::reserved_variable(key) {
+        format!("{key}_")
+    } else {
+        key.to_string()
+    }
 }
 
 /// usage's conventions: `<file>` and `<dir>` complete as paths, as does an argument whose
@@ -754,6 +746,15 @@ mod tests {
         );
         let err = typed_default("1", &NuType("widget".into()), &h, None).unwrap_err();
         assert!(err.message.contains("widget"), "{err:?}");
+    }
+
+    #[test]
+    fn names_become_identifiers() {
+        assert_eq!(snake("dry-run"), "dry_run");
+        assert_eq!(snake("TOOL@VERSION"), "TOOL_VERSION");
+        assert_eq!(snake("a.b/c"), "a_b_c");
+        assert_eq!(snake("1st"), "_1st");
+        assert_eq!(snake("--x"), "x");
     }
 
     #[test]
