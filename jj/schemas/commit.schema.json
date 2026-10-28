@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A commit, one line of `jj log`",
+  "$ref": "#/$defs/commit",
+  "$defs": {
+    "commit_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]+$"
+    },
+    "signature": {
+      "type": "object",
+      "required": [
+        "name",
+        "email",
+        "timestamp"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "commit": {
+      "type": "object",
+      "required": [
+        "commit_id",
+        "parents",
+        "change_id",
+        "description",
+        "author",
+        "committer"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "commit_id": {
+          "$ref": "#/$defs/commit_id"
+        },
+        "parents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/commit_id"
+          }
+        },
+        "change_id": {
+          "type": "string",
+          "pattern": "^[k-z]+$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "author": {
+          "$ref": "#/$defs/signature"
+        },
+        "committer": {
+          "$ref": "#/$defs/signature"
+        }
+      }
+    }
+  }
+}

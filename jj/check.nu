@@ -3,7 +3,7 @@
 use std/assert
 use generated/jj.nu *
 
-^nusage check jj.usage.kdl generated/jj.nu
+^nusage check jj.usage.kdl generated/jj.nu --overlay generated/jj.schemas.kdl
 
 # The spec is written once per version, and a jj of another version has another interface.
 let spec = open --raw jj.usage.kdl | parse --regex '(?m)^version "(?<version>[^"]+)"' | get 0.version
@@ -14,16 +14,31 @@ if $spec != $path {
     }
 }
 
-# A repository of its own, configured by global flags alone: a path that does not exist is
-# passed over, so no configuration of the user's is read.
+# A repository of its own, in a home of its own and configured by global flags alone: jj keeps
+# each repository's configuration under the user's configuration directory, reads the user's
+# files, and a path that does not exist is passed over.
 let dir = mktemp --directory
 let repo = $dir | path join repo
-with-env {JJ_CONFIG: ($dir | path join none.toml)} {
+let inherited = $env | columns | where {|name| $name | str starts-with "JJ_" }
+hide-env --ignore-errors ...$inherited
+with-env {HOME: $dir, XDG_CONFIG_HOME: ($dir | path join .config), JJ_CONFIG: ($dir | path join none.toml)} {
     let config = ['user.name="nusage"' 'user.email="nusage@example.com"']
     jj git init $repo
     jj describe --repository $repo --config $config --message ["through the module"]
-    let description = jj log --repository $repo --no-graph --revision ["@"] --template description
-    assert equal ($description | str trim) "through the module"
+    jj bookmark create --repository $repo --config $config --revision @ topic
+
+    # Each output is data: commits with their authors' times, bookmarks with their targets,
+    # operations back to the root one, which no workspace ran.
+    let commits = jj log --repository $repo --revision ["@"]
+    assert equal ($commits | length) 1
+    assert equal ($commits.0.description | str trim) "through the module"
+    assert equal $commits.0.author.name nusage
+    assert equal ($commits.0.author.timestamp | describe) datetime
+    let bookmarks = jj bookmark list --repository $repo
+    assert equal ($bookmarks | select name target) [{name: topic, target: [$commits.0.commit_id]}]
+    let operations = jj operation log --repository $repo
+    assert equal ($operations | last | get workspace_name) null
+    assert equal ($operations.0.time.start | describe) datetime
 }
 rm --recursive $dir
 

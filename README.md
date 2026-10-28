@@ -10,7 +10,8 @@ Early development.
 - `mise/`: the module for mise, generated from mise's own spec and the overlays there, with
   the schemas of its outputs under `schemas/`.
 - `jj/`: the module for jj, generated from the spec `clap/` reads from jj-cli, committed
-  since writing it compiles jj-cli; `mise run //jj:spec` writes it for a new jj.
+  since writing it compiles jj-cli, with the schemas of its JSON outputs under `schemas/`;
+  `mise run //jj:spec` writes the spec for a new jj.
 - `clap/`: the spec of a binary that ships none, read from the clap command its crate
   builds. Its README says how to add a binary.
 - `schemas/`: the runner of an output-schema suite and the overlay it declares, shared by
