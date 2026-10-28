@@ -1,9 +1,12 @@
 name: ci
 
+# The checks on every pull request, and on main, where the run fills the build cache that
+# pull requests read. Releasing waits on no check of its own: main takes a pull request only
+# with this check green.
 on:
   pull_request:
-  # release.yml runs these checks on every push to main, before anything is tagged.
-  workflow_call:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -13,10 +16,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # Mr Boxington keeps Cargo's target directory elsewhere; here Cargo's own is cached.
-  MBX_DISABLE: "1"
   # A check the environment cannot run is a failure, not a skip.
   CI: "true"
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
   check:
@@ -35,5 +38,9 @@ jobs:
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      # Mr Boxington's store, which every Cargo workspace here shares, from the Actions
+      # cache; the mbx mise installed is the one on PATH.
+      - uses: jdx/mr-boxington-action@88acf2bb50552c7c508cbac13e5f8c576b95b1de # v1.7.3
+        with:
+          github-cache-mode: objects
       - run: mise run '//...:check'
