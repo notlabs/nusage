@@ -85,7 +85,12 @@ def verify-fixture [dir: path, update: bool] {
 
 # `nusage check`: the module carries what the spec shows, as usage reads the spec, for
 # every command, its positionals, flags, completers and description.
-def check-conform [dir: path, module: path, bin: string, is_binary: bool] {
+def check-conform [
+    dir: path
+    module: path
+    bin: string
+    is_binary: bool
+] {
     if not ($env.NUSAGE_BIN | path exists) {
         return (skipped $"($env.NUSAGE_BIN) is not built")
     }
@@ -99,7 +104,10 @@ def check-conform [dir: path, module: path, bin: string, is_binary: bool] {
     let overlay = $dir | path join $"($bin).overlay.kdl"
     let overlays = if ($overlay | path exists) { [--overlay $overlay] } else { [] }
     let out = ^$env.NUSAGE_BIN check $source $module ...$overlays | complete
-    {ok: ($out.exit_code == 0), detail: ($out.stderr | str trim)}
+    {
+        ok: ($out.exit_code == 0)
+        detail: ($out.stderr | str trim)
+    }
 }
 
 def row [
@@ -148,7 +156,11 @@ def check-interpreter [dir: path, bin: string, case: record] {
 def check-invoke [dir: path, import: string, case: record] {
     let argv_file = mktemp
     let path = $env.PATH
-    let path = if ($path | describe | str starts-with list) { $path | str join (char esep) } else { $path }
+    let path = if ($path | describe | str starts-with list) {
+        $path | str join (char esep)
+    } else {
+        $path
+    }
     let out = run-nu $"($import); ($case.invoke) | to nuon" {
         PATH: $"($dir | path join fake)(char esep)($path)"
         NUSAGE_FAKE_STDOUT: ($case.stdout? | default "")
@@ -177,7 +189,11 @@ def check-invoke [dir: path, import: string, case: record] {
 # A check the environment cannot run: its own outcome, a failure in CI, where every check
 # has to run for a pass to mean anything.
 def skipped [why: string] {
-    {ok: (($env.CI? | default "") != "true"), skipped: true, detail: $"skipped: ($why)"}
+    {
+        ok: (($env.CI? | default "") != "true")
+        skipped: true
+        detail: $"skipped: ($why)"
+    }
 }
 
 # The interpreter entrypoint itself: `nusage <root script> ...argv` routes the call to the
@@ -192,22 +208,34 @@ def check-run [dir: path, bin: string, case: record] {
     let script = script-for $dir $bin []
     let ran = ^$env.NUSAGE_BIN $script ...$case.argv | complete
     if $ran.exit_code != 0 {
-        return {ok: false, detail: $"exit ($ran.exit_code): ($ran.stderr | str trim)"}
+        return {
+            ok: false
+            detail: $"exit ($ran.exit_code): ($ran.stderr | str trim)"
+        }
     }
     let shown = run-nu '$env.NUSAGE_EXPECTED | from nuon' {
         NUSAGE_EXPECTED: ((expected-output $case) | to nuon)
     }
     if ($ran.stdout | str trim) != $shown.detail {
-        return {ok: false, detail: $"printed:\n($ran.stdout | str trim)\nexpected:\n($shown.detail)"}
+        return {
+            ok: false
+            detail: $"printed:\n($ran.stdout | str trim)\nexpected:\n($shown.detail)"
+        }
     }
     let help = ^$env.NUSAGE_BIN $script --help | complete
     if $help.exit_code != 0 or not ($help.stdout | str contains "Usage:") {
-        return {ok: false, detail: $"--help: exit ($help.exit_code): ($help.stdout)($help.stderr)"}
+        return {
+            ok: false
+            detail: $"--help: exit ($help.exit_code): ($help.stdout)($help.stderr)"
+        }
     }
     let parsed = ^$env.NUSAGE_BIN parse $script -- | complete
     let bare = ^$env.NUSAGE_BIN $script | complete
     if $parsed.exit_code not-in [0 2] or $bare.exit_code != $parsed.exit_code {
-        return {ok: false, detail: $"without arguments, parse exited ($parsed.exit_code) and the run ($bare.exit_code): ($bare.stderr | str trim)"}
+        return {
+            ok: false
+            detail: $"without arguments, parse exited ($parsed.exit_code) and the run ($bare.exit_code): ($bare.stderr | str trim)"
+        }
     }
     {ok: true, detail: ""}
 }
@@ -219,9 +247,15 @@ def check-parse [dir: path, case: record] {
     let script = $dir | path join script.nu
     let out = ^$env.NUSAGE_BIN parse $script -- ...$case.argv | complete
     if $out.exit_code != 0 {
-        return {ok: false, detail: ($out.stderr | str trim)}
+        return {
+            ok: false
+            detail: ($out.stderr | str trim)
+        }
     }
-    {ok: true, detail: ($out.stdout | str trim)} | compare $case.usage
+    {
+        ok: true
+        detail: ($out.stdout | str trim)
+    } | compare $case.usage
 }
 
 def check-complete [import: string, complete: record] {
@@ -322,12 +356,18 @@ def check-signatures [
 }
 
 const root = path self | path dirname
-$env.NUSAGE_BIN = $env.NUSAGE_BIN? | default ($root | path dirname | path dirname | path join .bin nusage)
+$env.NUSAGE_BIN = $env.NUSAGE_BIN? | default (
+    $root
+    | path dirname
+    | path dirname
+    | path join .bin nusage
+)
 let fixtures = if ($usage.args.fixtures | is-empty) {
     ls $root | where type == dir | get name
 } else {
     $usage.args.fixtures | each { path expand }
 }
+
 let results = $fixtures | each {|dir| verify-fixture $dir $usage.flags.update_signatures } | flatten
 print ($results | select fixture check case ok skipped | table --expand)
 let failed = $results | where not ok

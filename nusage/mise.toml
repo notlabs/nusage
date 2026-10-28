@@ -38,7 +38,10 @@ run = "cargo test --workspace --locked"
 
 [tasks.lint]
 description = "Formatting and clippy, as CI checks them"
-run = ["cargo fmt --all --check", "cargo clippy --workspace --all-targets --locked -- -D warnings"]
+run = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets --locked -- -D warnings",
+]
 
 [tasks.verify-fixtures]
 description = "Run every fixture through its entrypoints, check completions and parsed signatures"

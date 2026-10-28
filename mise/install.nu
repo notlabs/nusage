@@ -4,6 +4,7 @@
 # starts; where that is depends on the platform and on how Nushell is configured, so the
 # Nushell on PATH is asked.
 const here = path self | path dirname
+
 let module = $here | path join generated mise.nu
 let dir = ^nu -n -c '$nu.user-autoload-dirs | first' | str trim
 mkdir $dir

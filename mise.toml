@@ -6,7 +6,10 @@ config_roots = ["nusage", "mise"]
 
 # The Cargo workspace is at the root, so its toolchain is: one pin for Cargo, the tasks and CI.
 [tools]
-rust = { version = "1.99.1", profile = "minimal", components = ["rustfmt", "clippy"], mr_boxington = true }
+rust = { version = "1.99.1", profile = "minimal", components = [
+  "rustfmt",
+  "clippy",
+], mr_boxington = true }
 mr-boxington = "1.27.0"
 nu = "0.116.1"
 usage = "7.1.3"

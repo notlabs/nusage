@@ -15,7 +15,9 @@ nusage-model = { path = "nusage/crates/nusage-model" }
 nusage-nu = { path = "nusage/crates/nusage-nu" }
 # `cli-help` renders the help page usage's parser returns for `--help`, which the
 # interpreter prints.
-usage = { package = "usage-lib", version = "7.1.3", default-features = false, features = ["cli-help"] }
+usage = { package = "usage-lib", version = "7.1.3", default-features = false, features = [
+  "cli-help",
+] }
 usage-rs = "7.1.3"
 thiserror = "2"
 indexmap = "2"
