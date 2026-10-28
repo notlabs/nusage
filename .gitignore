@@ -1,6 +1,7 @@
 /.jj/
-/target/
+target/
 /.bin/
 /mise/generated/
+/jj/generated/
 /mise.local.toml
 /.mise.local.toml
