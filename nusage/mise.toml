@@ -31,8 +31,10 @@ if ($link | path type) != symlink or (ls -l $link | get 0.target) != $built {
 }
 '''
 
+# After the build: both write the target directory's `nusage`, and the corpus test runs it.
 [tasks.test]
 description = "Rust tests: every fixture generating its expected module byte for byte, and usage's corpus through the parser"
+depends = [":build"]
 env = { NUSAGE_CORPUS = "{{ tools['usage-source'].path }}/corpus" }
 run = "cargo test --workspace --locked"
 
