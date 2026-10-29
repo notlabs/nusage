@@ -3598,7 +3598,7 @@ dependencies = [
 
 [[package]]
 name = "nusage"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "globset",
  "jsonschema",
@@ -3619,7 +3619,7 @@ dependencies = [
 
 [[package]]
 name = "nusage-model"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "nu-cmd-lang",
  "nu-parser",
@@ -3633,7 +3633,7 @@ dependencies = [
 
 [[package]]
 name = "nusage-nu"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "genco",
  "nu-cmd-lang",
@@ -3646,7 +3646,7 @@ dependencies = [
 
 [[package]]
 name = "nusage-spec"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "indexmap",
  "serde",
