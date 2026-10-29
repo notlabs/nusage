@@ -22,7 +22,9 @@ nusage runs it: Nushell knows `$usage` and its type, and holds each call of anot
 that script's header, and each `mise run` of a task whose file is one. Or leave the editor as it is and opt in through mise: after `mise dot
 apply`, with `MISE_ENV=nusage-lsp` in the environment the editor starts from, every `nu`
 mise starts is `nusage nu`, which serves `nusage lsp` when asked for `nu --lsp` and is
-Nushell for anything else. `MISE_ENV=nusage-lsp,nusage-kakehashi` installs
+Nushell for anything else. That `nusage` is the released one, so the environment wants a
+release that has `nusage nu`: an older one refuses it for every `nu` mise starts.
+`MISE_ENV=nusage-lsp,nusage-kakehashi` installs
 [kakehashi](https://github.com/atusy/kakehashi) too, and `nu --lsp` then also highlights a
 script's header as usage KDL and the scripts its `run=` names as Nushell or sh. A project's
 own `[wrappers.nu]` takes the place of this one; a project that wants a wrapper of its own,
