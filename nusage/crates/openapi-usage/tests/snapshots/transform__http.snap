@@ -1,0 +1,22 @@
+---
+source: nusage/crates/openapi-usage/tests/transform.rs
+expression: transformed.http
+---
+base "https://petstore.example.com/v1"
+auth "bearer"
+cmd "list-pets" method="get" path="/pets" {
+    query "limit" flag="limit"
+    query "status" flag="status"
+    query "tags" flag="tags"
+    header "X-Request-Id" flag="x-request-id"
+}
+cmd "create-pets" method="post" path="/pets" {
+    body "application/json" schema="schemas/create-pets.body.schema.json" required=#true
+}
+cmd "show-pet-by-id" method="get" path="/pets/{petId}" {
+    path "petId" arg="pet-id"
+}
+cmd "delete-pets-pet-id" method="delete" path="/pets/{petId}" {
+    path "petId" arg="pet-id"
+    query "force" flag="force"
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/notlabs/nusage/schema/nu/dialect",
+  "$vocabulary": {
+    "https://json-schema.org/draft/2020-12/vocab/core": true,
+    "https://json-schema.org/draft/2020-12/vocab/applicator": true,
+    "https://json-schema.org/draft/2020-12/vocab/unevaluated": true,
+    "https://json-schema.org/draft/2020-12/vocab/validation": true,
+    "https://json-schema.org/draft/2020-12/vocab/meta-data": true,
+    "https://json-schema.org/draft/2020-12/vocab/format-annotation": true,
+    "https://json-schema.org/draft/2020-12/vocab/content": true,
+    "https://github.com/notlabs/nusage/schema/nu/vocab": true
+  },
+  "$dynamicAnchor": "meta",
+  "title": "The Nushell dialect of JSON Schema",
+  "description": "Draft 2020-12 with the Nushell vocabulary: `x-nu` on a number says what it counts, so the value is read as a duration, a file size or a datetime.",
+  "allOf": [
+    {"$ref": "https://json-schema.org/draft/2020-12/schema"},
+    {"$ref": "https://github.com/notlabs/nusage/schema/nu/meta/vocab"}
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/notlabs/nusage/schema/nu/meta/vocab",
+  "$dynamicAnchor": "meta",
+  "title": "The Nushell vocabulary meta-schema",
+  "description": "`x-nu` names what a number counts: `{\"type\": \"duration\", \"unit\": \"ms\"}`, `{\"type\": \"filesize\", \"unit\": \"kB\"}` or `{\"type\": \"datetime\", \"unit\": \"sec\"}`, the unit spelled as a Nushell literal spells it. It goes on an `integer` or a `number`, and nowhere else.",
+  "type": ["object", "boolean"],
+  "properties": {
+    "x-nu": {
+      "type": "object",
+      "required": ["type", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {"enum": ["duration", "filesize", "datetime"]},
+        "unit": {"type": "string"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"type": {"const": "duration"}}},
+          "then": {"properties": {"unit": {"enum": ["ns", "us", "ms", "sec", "min", "hr", "day", "wk"]}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "datetime"}}},
+          "then": {"properties": {"unit": {"enum": ["ns", "us", "ms", "sec"]}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "filesize"}}},
+          "then": {"properties": {"unit": {"enum": ["b", "kB", "MB", "GB", "TB", "PB", "EB", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"]}}}
+        }
+      ]
+    }
+  },
+  "if": {"type": "object", "required": ["x-nu"]},
+  "then": {
+    "required": ["type"],
+    "properties": {"type": {"enum": ["integer", "number"]}}
+  }
+}

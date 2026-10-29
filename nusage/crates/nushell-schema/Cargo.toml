@@ -1,0 +1,25 @@
+[package]
+name = "nushell-schema"
+description = "A Nushell dialect of JSON Schema: the x-nu vocabulary, and a schema read as a Nushell type"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Not on crates.io yet; the version is the workspace's.
+publish = false
+
+[features]
+default = []
+# Documents held to a schema, and a schema to the dialect, with the `jsonschema` crate.
+validate = ["dep:jsonschema"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+nu-utils.workspace = true
+jsonschema = { workspace = true, optional = true }
+
+[lints]
+workspace = true

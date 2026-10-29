@@ -17,3 +17,6 @@ nu-utils.workspace = true
 nu-parser.workspace = true
 nu-cmd-lang.workspace = true
 nu-command.workspace = true
+
+[lints]
+workspace = true
