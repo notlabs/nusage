@@ -49,24 +49,37 @@ pub fn serve(args: &[String]) -> io::Result<i32> {
         })
     };
 
-    let mut stdin = BufReader::new(io::stdin().lock());
-    while let Some(message) = read_message(&mut stdin)? {
-        // An editor may keep its end open until the server is gone.
-        let exit = message.get("method").and_then(Json::as_str) == Some("exit");
-        let routed = state.lock().expect("state").editor_says(message);
-        for message in routed.to_editor {
-            write_message(&mut *editor.lock().expect("editor"), &message)?;
+    // Whether the editor said `exit`.
+    let exited = (|| -> io::Result<bool> {
+        let mut stdin = BufReader::new(io::stdin().lock());
+        while let Some(message) = read_message(&mut stdin)? {
+            // An editor may keep its end open until the server is gone.
+            let exit = message.get("method").and_then(Json::as_str) == Some("exit");
+            let routed = state.lock().expect("state").editor_says(message);
+            for message in routed.to_editor {
+                write_message(&mut *editor.lock().expect("editor"), &message)?;
+            }
+            if let Some(message) = routed.to_nu {
+                write_message(&mut to_nu, &message)?;
+            }
+            if exit {
+                return Ok(true);
+            }
         }
-        if let Some(message) = routed.to_nu {
-            write_message(&mut to_nu, &message)?;
-        }
-        if exit {
-            break;
-        }
-    }
+        Ok(false)
+    })();
     drop(to_nu);
-    answers.join().expect("the answering thread")?;
-    Ok(nu.wait()?.code().unwrap_or(1))
+    // Nushell's server waits for `exit` however its input ends, so one the editor left
+    // without saying it is stopped here.
+    if !matches!(exited, Ok(true)) {
+        // One that is gone already is as good.
+        nu.kill().ok();
+    }
+    let answered = answers.join().expect("the answering thread");
+    let code = nu.wait()?.code().unwrap_or(1);
+    exited?;
+    answered?;
+    Ok(code)
 }
 
 /// Where a message goes once it is read from the editor.

@@ -245,3 +245,51 @@ fn a_shebang_typed_or_taken_away_changes_what_nushell_sees() {
     };
     assert!(unknown(&taken), "{:?}", said(&taken));
 }
+
+#[test]
+fn an_editor_that_goes_without_saying_exit_ends_the_session() {
+    if Command::new("nu").arg("--version").output().is_err() {
+        assert!(
+            std::env::var("CI").as_deref() != Ok("true"),
+            "nu is not on PATH"
+        );
+        return;
+    }
+    // Nushell's own server would wait for `exit` with its input closed, and so would the
+    // server in front of it.
+    let document = uri(&caller());
+    let mut input = Vec::new();
+    for message in [
+        json!({"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"processId": null, "rootUri": null, "capabilities": {}}}),
+        json!({"jsonrpc": "2.0", "method": "initialized", "params": {}}),
+        json!({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {"textDocument": {"uri": document, "languageId": "nushell", "version": 1, "text": "let a = 1\n"}}}),
+    ] {
+        let body = serde_json::to_vec(&message).unwrap();
+        write!(input, "Content-Length: {}\r\n\r\n", body.len()).unwrap();
+        input.extend(body);
+    }
+    let home = std::env::temp_dir().join(format!("nusage-lsp-gone-{}", std::process::id()));
+    std::fs::create_dir_all(&home).unwrap();
+    let mut server = Command::new(env!("CARGO_BIN_EXE_nusage"))
+        .args(["lsp", "--", "-n"])
+        .env("HOME", &home)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .spawn()
+        .unwrap();
+    server.stdin.take().unwrap().write_all(&input).unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    let status = loop {
+        if let Some(status) = server.try_wait().unwrap() {
+            break status;
+        }
+        if std::time::Instant::now() > deadline {
+            server.kill().unwrap();
+            panic!("the server is still waiting for `exit`");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    };
+    std::fs::remove_dir_all(&home).unwrap();
+    // The protocol's code for a server that ends unasked.
+    assert_eq!(status.code(), Some(1));
+}
