@@ -26,40 +26,45 @@ def differs [committed: string, made: string]: nothing -> bool {
     true
 }
 
-# Whether the committed spec is the tool's on PATH: `current`, `stale` with what to run, or
-# `unknown` with why, when the tool is not there to ask.
+# Whether the committed spec is the tool's on PATH, by the entry's probe: `current`, `stale`
+# with what to run, or `unknown` with why, when the tool is not there to ask.
 def spec-state [entry: record, files: record]: nothing -> record {
     let name = $entry.name
-    match (spec-kind $entry) {
-        run => {
+    let refresh = $"`mise run spec ($name)` then `mise run generate ($name)` refresh it"
+    match (spec-probe $entry) {
+        export => {
             let fresh = try { export-spec $entry } catch {|err| return {state: unknown, note: $err.msg} }
             if $fresh == (open --raw $files.spec) {
                 {state: current}
             } else {
                 {
                     state: stale
-                    note: $"($files.spec | path relative-to (root)) is not what the tool prints; `mise run spec ($name)` then `mise run generate ($name)` refresh it"
+                    note: $"($files.spec | path relative-to (root)) is not what the tool prints; ($refresh)"
                 }
             }
         }
-        clap => {
-            let target = extractor $entry
-            let header = open --raw $files.spec | lines | first | parse --regex 'of (?<crate>\S+) (?<version>\S+)$'
-            let described = $header.0?.version? | default ""
-            let found = ^$target.bin --version | complete
+        version => {
+            let identity = spec-identity $files
+            if $identity.version == null {
+                error make --unspanned {
+                    msg: $"entry `($name)`: the spec declares no `version` to probe by; `probe = \"export\"` compares the whole spec"
+                }
+            }
+            let bin = $identity.bin | default $name
+            let found = ^$bin --version | complete
             if $found.exit_code != 0 {
                 return {
                     state: unknown
-                    note: $"($target.bin) is not on PATH to ask"
+                    note: $"($bin) is not on PATH to ask"
                 }
             }
             let version = $found.stdout | parse --regex '(?<version>\d+\.\d+\.\d+)' | get 0?.version? | default ""
-            if $described == $version {
+            if $identity.version == $version {
                 {state: current}
             } else {
                 {
                     state: stale
-                    note: $"($files.spec | path relative-to (root)) describes ($target.bin) ($described), and PATH has ($version); `mise run spec ($name)` writes it for ($version), then `mise run generate ($name)`"
+                    note: $"($files.spec | path relative-to (root)) describes ($bin) ($identity.version), and PATH has ($version); ($refresh)"
                 }
             }
         }
