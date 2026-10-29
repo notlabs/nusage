@@ -12,3 +12,6 @@ patterns = ["glob:'**/*.nu' ~ glob:'**/expected/*.nu'"]
 [fix.tools.taplo]
 command = ["taplo", "fmt", "-"]
 patterns = ["glob:'**/*.toml'"]
+
+[tasks.x]
+run   =   "true"
