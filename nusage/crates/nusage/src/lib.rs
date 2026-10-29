@@ -10,6 +10,7 @@ mod calls;
 mod common;
 mod conform;
 mod interpret;
+mod lsp;
 mod prelude;
 mod shim;
 mod switch_overlay;
@@ -124,6 +125,13 @@ pub fn prelude(script: &Path) -> Result<(String, Vec<String>), Diagnostic> {
         })
         .collect();
     Ok((line, findings))
+}
+
+/// Serve Nushell's language server for the scripts nusage runs, on standard input and
+/// output: `nu --lsp`, with `args` after it, sees a script whose shebang names nusage with
+/// the line [`prelude`] writes in place of its first. The exit code is Nushell's.
+pub fn lsp(args: &[String]) -> std::io::Result<i32> {
+    lsp::serve(args)
 }
 
 /// What the interpreter runs before the script: the shadows of the scripts it calls, which

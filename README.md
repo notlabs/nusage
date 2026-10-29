@@ -17,6 +17,10 @@ Early development.
 - `schemas/`: the runner of an output-schema suite and the overlay it declares, shared by
   the modules. Its README says what a suite is.
 
+An editor that runs `nusage lsp` where it would run `nu --lsp` checks a script nusage runs as
+nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to
+that script's header.
+
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nusage built here. `mise run //mise:install` and `mise run
 //jj:install` generate a module and have every new interactive Nushell session load it. `mise

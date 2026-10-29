@@ -5,7 +5,8 @@
 //! less the helpers they call. Replacing a line with a line keeps every other line where it
 //! was.
 
-use std::path::Path;
+use std::ops::Range;
+use std::path::{Path, PathBuf};
 
 use nusage_model::{Command, Param, ParamKind};
 use nusage_nu::{Item, Module, SyntaxError};
@@ -18,6 +19,8 @@ use crate::calls::{self, CALL_HELPER, Calls, Runner};
 #[derive(Debug, Clone)]
 pub struct Analysis {
     pub line: String,
+    /// Where on the line each shadow is defined, by byte range, and the script it runs.
+    pub shadows: Vec<(Range<usize>, PathBuf)>,
     /// What the script's calls of scripts get wrong.
     pub calls: Calls,
     /// Why the header cannot be read, when it cannot: the line then binds `$usage` with no
@@ -47,15 +50,19 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
         Err(err) => (format!("let usage = {value}"), Some(err)),
     };
     let calls = calls::scan(script, source, &texts);
+    let mut shadows = Vec::new();
     // Made for each check, never kept, so it can name the script where it is.
     for shadow in &calls.shadows {
         let def = calls::shadow_def(shadow, Runner::Absolute(Path::new("nusage")))
             .map_err(|err| syntax(script, err))?;
         line.push_str("; ");
+        let start = line.len();
         line.push_str(&nusage_nu::print_line(&def));
+        shadows.push((start..line.len(), shadow.target.clone()));
     }
     Ok(Analysis {
         line,
+        shadows,
         calls,
         header,
     })
