@@ -16,6 +16,8 @@ Early development.
   builds. Its README says how to add a binary.
 - `schemas/`: the runner of an output-schema suite and the overlay it declares, shared by
   the modules. Its README says what a suite is.
+- `intent/`: the direction, as claims that are checked where they can be; nothing there is
+  settled.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nusage built here. `mise run //mise:install` and `mise run

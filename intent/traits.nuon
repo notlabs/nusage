@@ -1,0 +1,35 @@
+# The properties a claim can name. Nothing infers or enforces them yet; each says what it
+# would take. The subset with guarantees is what `pure` and `reads` cover; `effect` stays
+# allowed, and says where the guarantees stop.
+[
+  {
+    name: pure
+    means: "Its value is a function of its arguments and its input; it reads and writes nothing else."
+    composes: "A call keeps the caller pure only if the callee is."
+    established: [inferred]
+  }
+  {
+    name: reads
+    means: "Its value is a function of its arguments, its input and named parts of a snapshot: files, filesets, environment variables, a jj operation."
+    composes: "A call adds the callee's reads to the caller's."
+    established: [inferred declared]
+  }
+  {
+    name: effect
+    means: "It does something no snapshot names: writes, the network, the clock, another process's state, a read it cannot name."
+    composes: "A call of one makes the caller one."
+    established: [inferred declared]
+  }
+  {
+    name: content-addressed
+    means: "It is named by a hash of what it holds, so two with one name are the same."
+    composes: "A tree's name is a function of its entries' names."
+    established: [enforced]
+  }
+  {
+    name: hermetic
+    means: "A run of it reads nothing its record does not name, so the record says what its outputs are a function of."
+    composes: "A run is hermetic only if every step of it is."
+    established: [enforced]
+  }
+]
