@@ -20,6 +20,8 @@ nusage-spec.workspace = true
 nusage-model.workspace = true
 nusage-nu.workspace = true
 usage-rs.workspace = true
+jsonschema.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 nu-parser.workspace = true

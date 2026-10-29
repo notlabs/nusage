@@ -11,10 +11,12 @@ mod conform;
 mod interpret;
 mod shim;
 mod switch_overlay;
+mod validate;
 
 use std::path::{Path, PathBuf};
 
 pub use interpret::{Parsed, interpret, parse};
+pub use validate::validate;
 
 pub use nusage_spec::Diagnostic;
 use nusage_spec::Source;

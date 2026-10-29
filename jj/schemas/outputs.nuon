@@ -1,0 +1,96 @@
+{
+    format: 1
+    tool: jj
+    baseline: {
+        version: "0.46.0"
+        repository: "https://github.com/jj-vcs/jj"
+        revision: "v0.46.0"
+    }
+    # Every output is JSON lines from a template, `json(self)` per line, so each is asked for
+    # with `--template`, and with `--no-graph` where a graph would frame the lines. A source
+    # names a crate's file at 0.46.0 on crates.io.
+    outputs: [
+        {
+            id: log
+            command: [log]
+            name: json
+            select: [--no-graph --template 'json(self) ++ "\n"']
+            framing: jsonl
+            schema: commit.schema.json
+            source: ["jj-lib src/commit.rs:47" "jj-core src/backend.rs:190" "jj-core src/backend.rs:164" "jj-core src/backend.rs:150" "jj-core src/object_id.rs:109"]
+        }
+        {
+            id: evolog
+            command: [evolog]
+            name: json
+            select: [--no-graph --template 'json(self) ++ "\n"']
+            framing: jsonl
+            schema: evolog.schema.json
+            source: ["jj-lib src/evolution.rs:46" "jj-lib src/operation.rs:40" "jj-core src/op_store.rs:295" "jj-core src/op_store.rs:357"]
+        }
+        {
+            id: operation-log
+            command: [operation log]
+            name: json
+            select: [--no-graph --template 'json(self) ++ "\n"']
+            framing: jsonl
+            schema: operation.schema.json
+            source: ["jj-lib src/operation.rs:40" "jj-core src/op_store.rs:295" "jj-core src/op_store.rs:357" "jj-core src/op_store.rs:275"]
+        }
+        {
+            id: bookmark-list
+            command: [bookmark list]
+            name: json
+            select: [--template 'json(self) ++ "\n"']
+            framing: jsonl
+            schema: ref.schema.json
+            source: ["jj-cli src/commit_templater.rs:1625" "jj-cli src/commit_templater.rs:1912" "jj-core src/op_store.rs:64" "jj-core src/merge.rs:186"]
+        }
+        {
+            id: tag-list
+            command: [tag list]
+            name: json
+            select: [--template 'json(self) ++ "\n"']
+            framing: jsonl
+            schema: ref.schema.json
+            source: ["jj-cli src/commit_templater.rs:1625" "jj-core src/op_store.rs:64"]
+        }
+        {
+            id: workspace-list
+            command: [workspace list]
+            name: json
+            select: [--template 'json(self) ++ "\n"']
+            framing: jsonl
+            schema: workspace.schema.json
+            source: ["jj-cli src/commit_templater.rs:1841" "jj-lib src/commit.rs:47"]
+        }
+        {
+            id: config-list
+            command: [config list]
+            name: json
+            select: [--template 'json(self) ++ "\n"']
+            framing: jsonl
+            schema: config.schema.json
+            source: ["jj-cli src/config.rs:111" "jj-cli src/config.rs:88" "jj-lib src/config.rs:301"]
+        }
+    ]
+    # The repository `check-schemas.nu` builds: `main` on an origin, a clone with a second
+    # commit under `feature` and the tag `v1`, a second workspace, and `main` deleted locally
+    # so its remote outlives it.
+    cases: [
+        {id: log-all, output: log, argv: [log --no-graph --template 'json(self) ++ "\n"' --revision 'all()'], exit_codes: [0], records: 4}
+        {id: log-root, output: log, argv: [log --no-graph --template 'json(self) ++ "\n"' --revision 'root()'], exit_codes: [0], records: 1, expect: {properties: {parents: {maxItems: 0}, author: {properties: {name: {const: ""}}}}}}
+        {id: evolog, output: evolog, argv: [evolog --no-graph --template 'json(self) ++ "\n"' --revision '@'], exit_codes: [0], expect: {properties: {operation: {type: object}}}}
+        {id: evolog-root, output: evolog, argv: [evolog --no-graph --template 'json(self) ++ "\n"' --revision 'root()'], exit_codes: [0], records: 1, expect: {properties: {operation: {type: "null"}}}}
+        # The whole log ends at the root operation, the one with no parents; operations
+        # outside a workspace, such as the clone's fetch, have a null `workspace_name` too.
+        {id: operation-log, output: operation-log, argv: [operation log --no-graph --template 'json(self) ++ "\n"'], exit_codes: [0]}
+        {id: bookmark-local, output: bookmark-list, argv: [bookmark list --template 'json(self) ++ "\n"' feature], exit_codes: [0], records: 1, expect: {not: {anyOf: [{required: [remote]} {required: [tracking_target]}]}}}
+        {id: bookmark-deleted, output: bookmark-list, argv: [bookmark list --all-remotes --template 'json(self) ++ "\n"' main], exit_codes: [0], records: 2, expect: {anyOf: [{required: [target], properties: {target: {const: [null]}}} {required: [tracking_target], properties: {tracking_target: {const: [null]}}}]}}
+        {id: tag-list, output: tag-list, argv: [tag list --template 'json(self) ++ "\n"'], exit_codes: [0], records: 1, expect: {properties: {name: {const: v1}}}}
+        {id: workspace-list, output: workspace-list, argv: [workspace list --template 'json(self) ++ "\n"'], exit_codes: [0], records: 2}
+        {id: config-cli, output: config-list, argv: [--config 'fixture.count=3' config list --template 'json(self) ++ "\n"' fixture.count], exit_codes: [0], records: 1, expect: {properties: {value: {const: 3}, source: {const: cli}, path: {type: "null"}}}}
+        {id: config-user, output: config-list, argv: [config list --template 'json(self) ++ "\n"' user.name], exit_codes: [0], records: 1, expect: {properties: {source: {const: user}, path: {type: string}}}}
+        {id: config-overridden, output: config-list, argv: [--config 'user.name="cli"' config list --include-overridden --template 'json(self) ++ "\n"' user.name], exit_codes: [0], records: 2}
+    ]
+}

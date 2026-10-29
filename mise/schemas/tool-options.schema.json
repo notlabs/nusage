@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mise tool --json --tool-options",
+  "type": "object",
+  "properties": {
+    "os": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "depends": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "install_env": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "integer",
+          "boolean"
+        ]
+      }
+    },
+    "lazy": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "lazy_bins": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "auto_update": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "os",
+    "depends",
+    "install_env",
+    "lazy",
+    "lazy_bins",
+    "auto_update"
+  ],
+  "additionalProperties": true,
+  "$comment": "Backend-specific flattened options are arbitrary TOML values; the core fields are always serialized."
+}

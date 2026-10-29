@@ -229,9 +229,48 @@ fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
 }
 
 fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
+    // A value under one that may be null, such as jj's `operation.time.start` under a null
+    // `operation`: the outer value is left alone when it is null, and the rest of the
+    // conversion runs on it when it is not.
+    if let Some(&at) = conversion.nullable.first()
+        && at < conversion.path.len()
+    {
+        let (outer, rest) = conversion.path.split_at(at);
+        let inner = Conversion {
+            path: rest.to_vec(),
+            nullable: conversion.nullable[1..].iter().map(|n| n - at).collect(),
+            ..conversion.clone()
+        };
+        let row = Ident::new("row")?;
+        let value = Expr::Cell {
+            var: row.clone(),
+            path: outer.to_vec(),
+        };
+        let nothing = || Expr::Literal(Value::nothing(Span::unknown()));
+        let body = Expr::If {
+            cond: Box::new(Expr::Infix {
+                lhs: Box::new(value.clone()),
+                op: Infix::Eq,
+                rhs: Box::new(nothing()),
+            }),
+            then: Box::new(nothing()),
+            otherwise: Box::new(Expr::Pipeline(vec![value, conversion_stage(&inner)?])),
+        };
+        return call(
+            "update",
+            vec![
+                Expr::Raw(cell_path(outer)),
+                Expr::ClosureWith {
+                    param: row,
+                    body: Box::new(body),
+                },
+            ],
+        );
+    }
+    let nullable = conversion.nullable.last() == Some(&conversion.path.len());
     let path = cell_path(&conversion.path);
     let plain = conversion.unit.is_none() && conversion.ty != "base64";
-    if plain && !conversion.nullable {
+    if plain && !nullable {
         let args = if conversion.path.is_empty() {
             vec![]
         } else {
@@ -285,7 +324,7 @@ fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
             )));
         }
     };
-    let body = if conversion.nullable {
+    let body = if nullable {
         Expr::If {
             cond: Box::new(Expr::Infix {
                 lhs: Box::new(value),
