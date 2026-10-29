@@ -116,7 +116,9 @@ export def check-examples [suite: record, examples: list<record>] {
     for file in ($suite.outputs | get schema | uniq) {
         let checked = ^nusage validate ($suite.directory | path join $file) | complete
         if $checked.exit_code != 0 {
-            error make --unspanned {msg: ($checked.stderr | str trim)}
+            error make --unspanned {
+                msg: ($checked.stderr | str trim)
+            }
         }
     }
     $examples | each {|example|
