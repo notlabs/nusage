@@ -3,13 +3,20 @@
 # obtain the tool's spec, and the switch that selects its structured output. mise ignores
 # the `_` table; tasks/catalog.nu reads it with `mise config get` and documents the layout.
 # The shared pieces sit beside the packages: clap/, the spec of a binary whose crate builds
-# its clap command, and schemas/, the runner of an output-schema suite.
+# its clap command, cobra/, the adapter-backed Go extractors, and schemas/, the runner of
+# an output-schema suite.
+[tools]
+docker-compose = "5.6.1"
+
 [_.nusage.catalog.mise]
 spec = { run = "mise usage" }
 switch = { flag = "--json", framing = "json" }
 
 [_.nusage.catalog.jj]
 spec = { clap = "spec" }
+
+[_.nusage.catalog.docker-compose]
+spec = { run = "mise run //catalog/cobra:compose" }
 
 # The catalog's own version, released apart from nusage's: a push to main that changes it
 # is the release, which release.yml tags `catalog/v<version>`, with the tarball `package`

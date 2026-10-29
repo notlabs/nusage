@@ -2,7 +2,13 @@ min_version = "2026.9.2"
 monorepo_root = true
 
 [monorepo]
-config_roots = ["nusage", "catalog", "catalog/clap", "catalog/schemas"]
+config_roots = [
+  "nusage",
+  "catalog",
+  "catalog/clap",
+  "catalog/cobra",
+  "catalog/schemas",
+]
 
 # The Cargo workspace is at the root, so its toolchain is: one pin for Cargo, the tasks and CI.
 [tools]

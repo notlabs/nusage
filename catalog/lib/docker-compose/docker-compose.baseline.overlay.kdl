@@ -1,0 +1,37 @@
+// Keep this first integration baseline to the two output paths described in README.md.
+// The complete adapter export remains in docker-compose.usage.kdl.
+cmd "alpha" hide=#true
+cmd "attach" hide=#true
+cmd "bridge" hide=#true
+cmd "build" hide=#true
+cmd "commit" hide=#true
+cmd "config" hide=#true
+cmd "cp" hide=#true
+cmd "create" hide=#true
+cmd "docker-cli-plugin-hooks" hide=#true
+cmd "down" hide=#true
+cmd "events" hide=#true
+cmd "exec" hide=#true
+cmd "export" hide=#true
+cmd "images" hide=#true
+cmd "kill" hide=#true
+cmd "logs" hide=#true
+cmd "pause" hide=#true
+cmd "port" hide=#true
+cmd "ps" hide=#true
+cmd "publish" hide=#true
+cmd "pull" hide=#true
+cmd "push" hide=#true
+cmd "restart" hide=#true
+cmd "rm" hide=#true
+cmd "run" hide=#true
+cmd "scale" hide=#true
+cmd "start" hide=#true
+cmd "stats" hide=#true
+cmd "stop" hide=#true
+cmd "top" hide=#true
+cmd "unpause" hide=#true
+cmd "up" hide=#true
+cmd "volumes" hide=#true
+cmd "wait" hide=#true
+cmd "watch" hide=#true

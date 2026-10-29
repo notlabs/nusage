@@ -1,0 +1,38 @@
+// Compose v5.6.1: cmd/compose/version.go and cmd/compose/list.go.
+// These switches take precedence over --format, so the structured wrappers omit them.
+// Use ^docker-compose for the original CLI's other output modes.
+cmd "version" {
+    flag "--short" hide=#true
+    output "pretty" default=#true
+    select "--format"
+    output "json" framing="json" {
+        schema #"""
+{
+  "type": "object",
+  "required": ["version"],
+  "properties": {"version": {"type": "string"}}
+}
+"""#
+    }
+}
+cmd "ls" {
+    flag "-q --quiet" hide=#true
+    output "table" default=#true
+    select "--format"
+    output "json" framing="json" {
+        schema #"""
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["Name", "Status", "ConfigFiles"],
+    "properties": {
+      "Name": {"type": "string"},
+      "Status": {"type": "string"},
+      "ConfigFiles": {"type": "string"}
+    }
+  }
+}
+"""#
+    }
+}
