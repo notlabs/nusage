@@ -3,3 +3,4 @@
 /.bin/
 /mise.local.toml
 /.mise.local.toml
+/catalog/dist/

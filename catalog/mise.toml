@@ -6,6 +6,12 @@
 spec = { run = "mise usage" }
 switch = { flag = "--json", framing = "json" }
 
+# The catalog's own version, released apart from nusage's: a push to main that changes it
+# is the release, which release.yml tags `catalog/v<version>`, with the tarball `package`
+# builds attached and the tasks pushed to GHCR as an OCI task catalog.
+[vars]
+catalog_version = "0.1.0"
+
 # The tasks run through the nusage built here. The generated files are committed, so `spec`
 # and `generate` are the two steps that change them, and `check` holds what is committed to
 # its inputs and to the tool on PATH: in CI that tool is the pinned mise, and a Renovate bump
@@ -29,3 +35,8 @@ file = "tasks/check.nu"
 description = "Generate the modules and have every new interactive Nushell session load them"
 depends = [":generate"]
 file = "tasks/install.nu"
+
+[tasks.package]
+description = "Package the catalog for a release: the tarball the nusage-catalog tool installs, and the directory the OCI task catalog is pushed from"
+depends = [":check"]
+file = "tasks/package.nu"
