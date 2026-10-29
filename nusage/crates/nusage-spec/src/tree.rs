@@ -226,7 +226,7 @@ fn assemble_spec_file(path: &Path, overlays: &[PathBuf]) -> Result<Assembled, Di
         })?;
         (merged, doc)
     };
-    // An output's `decode` node is nusage's: usage reads the document without it, and the
+    // An output's `nusage-decode` node is nusage's: usage reads the document without it, and the
     // declarations keep it. Only a document that had one is re-rendered, so a diagnostic's
     // line counts in the file as written otherwise.
     let mut for_usage = doc.clone();
@@ -515,7 +515,7 @@ mod tests {
         let path = dir.join("wc.usage.kdl");
         fs::write(
             &path,
-            "name \"wc\"\nbin \"wc\"\ncmd \"du\" {\n    output (\"table<size: filesize>\")\"text\" default=#true {\n        decode \"detect columns --no-headers\"\n    }\n}\n",
+            "name \"wc\"\nbin \"wc\"\ncmd \"du\" {\n    output (\"table<size: filesize>\")\"text\" default=#true {\n        nusage-decode \"detect columns --no-headers\"\n    }\n}\n",
         )
         .unwrap();
         let assembled = assemble(&path).unwrap();
@@ -526,7 +526,7 @@ mod tests {
             Some("detect columns --no-headers")
         );
         assert_eq!(output.value_type(), Some("table<size: filesize>"));
-        assert!(output.text.contains("decode"));
+        assert!(output.text.contains("nusage-decode"));
         // usage read the spec without the node: the output is there, as text.
         let cmd = &assembled.spec.cmd.subcommands["du"];
         assert_eq!(cmd.outputs.len(), 1);

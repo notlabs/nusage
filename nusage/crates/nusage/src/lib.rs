@@ -29,7 +29,7 @@ use nusage_spec::Source;
 /// `run`s it. A spec file gets the binary target: a `def` per command of the binary it
 /// describes that runs the binary with the argv its parameters say and decodes the output
 /// the call selected, with Nushell's reader for its media type or framing, or the pipeline
-/// its `decode` node states; written as `<bin>.nu`, `use <bin>.nu *` names the commands as
+/// its `nusage-decode` node states; written as `<bin>.nu`, `use <bin>.nu *` names the commands as
 /// the binary does. `out` is where the module will be written; `run` paths inside a shim are
 /// relative to that file's directory, or to the current directory with `None`. The result
 /// has been parsed by Nushell: what Nushell rejects is a diagnostic here, not at `use`.

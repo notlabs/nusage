@@ -129,13 +129,13 @@ pub enum Framing {
 
 /// How a wrapper decodes an output. An output has a decoder when its `media_type` names a
 /// format Nushell reads, when its framing is `json` or `jsonl`, or when its declaration
-/// carries a `decode` node; an output with none is text, which the wrapper returns as it is.
+/// carries a `nusage-decode` node; an output with none is text, which the wrapper returns as it is.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Decoder {
     /// `from <format>`: Nushell's reader for the media type, `json` for the JSON framings
     /// when no media type says otherwise, with `--objects` for one document per line.
     From { format: String, objects: bool },
-    /// The pipeline the output's `decode` node states, as written: what no reader covers,
+    /// The pipeline the output's `nusage-decode` node states, as written: what no reader covers,
     /// such as `lines | parse "{name} {size}"` or an external converter followed by
     /// `from json`.
     Pipeline(String),
@@ -150,7 +150,8 @@ impl Decoder {
 
 /// Nushell's `from` reader for an IANA media type, when it has one: `text/csv` reads with
 /// `from csv`. Parameters after `;` and case are ignored; JSON Lines types read as `json`,
-/// which the framing then takes line by line.
+/// which the framing then takes line by line. Not `application/json-seq`: RFC 7464 puts a
+/// record separator before each document, which `from json --objects` does not read.
 pub fn reader_for(media_type: &str) -> Option<&'static str> {
     let essence = media_type
         .split(';')
@@ -163,8 +164,7 @@ pub fn reader_for(media_type: &str) -> Option<&'static str> {
         | "application/jsonl"
         | "application/x-ndjson"
         | "application/jsonlines"
-        | "application/x-jsonlines"
-        | "application/json-seq" => "json",
+        | "application/x-jsonlines" => "json",
         "text/csv" => "csv",
         "text/tab-separated-values" | "text/tsv" => "tsv",
         "application/yaml" | "application/x-yaml" | "text/yaml" | "text/x-yaml" => "yaml",
@@ -277,6 +277,7 @@ mod tests {
         assert_eq!(reader_for("application/x-ndjson"), Some("json"));
         assert_eq!(reader_for("application/yaml"), Some("yaml"));
         assert_eq!(reader_for("text/plain"), None);
+        assert_eq!(reader_for("application/json-seq"), None);
         assert_eq!(reader_for("image/png"), None);
     }
 }

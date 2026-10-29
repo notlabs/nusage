@@ -39,8 +39,8 @@ prelude` writes them as the line that stands in for the script's first where Nus
 
 A binary's wrapper decodes the one output it asks for. An output is decoded when its
 `media_type` names a format Nushell reads (`text/csv`, `application/yaml`, ...), when its
-framing is `json` or `jsonl`, or when its declaration carries a `decode` child whose argument
+framing is `json` or `jsonl`, or when its declaration carries a `nusage-decode` child whose argument
 is the Nushell pipeline that turns the text into a value; the conversions the type declares
-follow. `decode` is nusage's own node, taken out before usage reads the spec, so it lives in an
+follow. `nusage-decode` is nusage's own node, taken out before usage reads the spec, so it lives in an
 overlay as readily as in a spec file. `binary-media` shows the readers, `binary-decode` the
 pipelines.

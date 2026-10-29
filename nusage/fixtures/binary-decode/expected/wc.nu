@@ -43,7 +43,7 @@ export def main []: nothing -> string {
 
 # List things, one per line as `name size`
 @usage 'output ("table<name: string, size: filesize>")"text" default=#true {
-    decode "lines | parse \"{name} {size}\""
+    nusage-decode "lines | parse \"{name} {size}\""
 }'
 export def "wc ls" []: nothing -> table<name: string, size: filesize> {
     ^wc ls ...(nusage argv [] {}) | lines | parse "{name} {size}" | into filesize size
@@ -51,7 +51,7 @@ export def "wc ls" []: nothing -> table<name: string, size: filesize> {
 
 # Disk use, one per line as `size path`
 @usage 'output ("table<size: filesize, path: string>")"text" default=#true {
-        decode "detect columns --no-headers | rename size path"
+        nusage-decode "detect columns --no-headers | rename size path"
     }'
 export def "wc du" []: nothing -> table<size: filesize, path: string> {
     ^wc du ...(nusage argv [] {}) | detect columns --no-headers | rename size path | into filesize size

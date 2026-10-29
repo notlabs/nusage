@@ -18,7 +18,7 @@
     }, [
       [name,  value];
       [usage, "output (\"table<size: filesize, path: string>\")\"text\" default=#true {
-        decode \"detect columns --no-headers | rename size path\"
+        nusage-decode \"detect columns --no-headers | rename size path\"
     }"]
     ]],
   ["wc ls", {
@@ -30,7 +30,7 @@
     }, [
       [name,  value];
       [usage, "output (\"table<name: string, size: filesize>\")\"text\" default=#true {
-    decode \"lines | parse \\\"{name} {size}\\\"\"
+    nusage-decode \"lines | parse \\\"{name} {size}\\\"\"
 }"]
     ]]
 ]

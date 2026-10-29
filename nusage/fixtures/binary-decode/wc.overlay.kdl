@@ -2,6 +2,6 @@
 // `output "text"` node the base declares, which the overlay merges into.
 cmd "ls" {
     output ("table<name: string, size: filesize>")"text" default=#true {
-        decode "lines | parse \"{name} {size}\""
+        nusage-decode "lines | parse \"{name} {size}\""
     }
 }

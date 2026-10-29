@@ -620,7 +620,7 @@ fn output_annotation(chain: &[Level<'_>], name: &str) -> Option<NuType> {
         .map(|ty| NuType(ty.to_string()))
 }
 
-/// How the output is decoded, when it is: the `decode` pipeline its declaration states, else
+/// How the output is decoded, when it is: the `nusage-decode` pipeline its declaration states, else
 /// Nushell's reader for its media type, else `from json` for the JSON framings.
 fn decoder_of(output: &SpecOutput, chain: &[Level<'_>]) -> Option<Decoder> {
     if let Some(pipeline) = output_node(chain, &output.name).and_then(|node| node.decode.clone()) {

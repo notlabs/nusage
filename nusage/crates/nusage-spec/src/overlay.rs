@@ -1,7 +1,7 @@
 //! An overlay: a usage KDL document merged onto a spec's document before usage reads it,
 //! so a spec one does not own, such as what a binary prints for `tool usage`, can be given
 //! what it lacks: `output` declarations, a `select`, type annotations on arguments, a
-//! `decode` pipeline on an output.
+//! `nusage-decode` pipeline on an output.
 //!
 //! usage itself has no merge: a redeclared `cmd` replaces the earlier one, and a `select`
 //! naming a flag the overlay does not repeat is rejected. Merging at the node level, before
@@ -112,7 +112,7 @@ mod tests {
         let overlay: KdlDocument = r#"
 cmd "ls" {
     output ("table<name: string>")"text" default=#true {
-        decode "lines | parse \"{name}\""
+        nusage-decode "lines | parse \"{name}\""
     }
 }
 "#
@@ -122,7 +122,7 @@ cmd "ls" {
         let output = base.nodes()[0].children().unwrap().nodes()[0].to_string();
         assert_eq!(
             output.trim(),
-            "output (\"table<name: string>\")\"text\" default=#true {\n    decode \"lines | parse \\\"{name}\\\"\"\n}"
+            "output (\"table<name: string>\")\"text\" default=#true {\n    nusage-decode \"lines | parse \\\"{name}\\\"\"\n}"
         );
     }
 

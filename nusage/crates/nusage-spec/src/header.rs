@@ -34,8 +34,9 @@ pub struct HeaderNode {
     pub ty: Option<String>,
     /// The annotation on a nested `arg` child's first argument, for `flag "--x" { arg (int)"<n>" }`.
     pub nested_arg_ty: Option<String>,
-    /// An `output`'s `decode` child: the Nushell pipeline that turns the output's text into
-    /// a value, as written, for an output no `from` reader decodes. nusage's own node, taken
+    /// An `output`'s `nusage-decode` child: the Nushell pipeline that turns the output's text
+    /// into a value, as written, for an output no `from` reader decodes. nusage's own node,
+    /// named as `nusage-args` is so that usage's grammar can grow without a collision, taken
     /// out before usage reads the spec.
     pub decode: Option<String>,
     /// 1-based line of the file where the node starts.
@@ -129,7 +130,7 @@ fn nested_arg_ty(node: &KdlNode) -> Option<String> {
 }
 
 /// The name of the child node that states how an output is decoded.
-pub(crate) const DECODE: &str = "decode";
+pub(crate) const DECODE: &str = "nusage-decode";
 
 fn decode_of(node: &KdlNode) -> Option<String> {
     if node.name().value() != "output" {
@@ -142,7 +143,7 @@ fn decode_of(node: &KdlNode) -> Option<String> {
         .and_then(|child| string_arg(child, 0))
 }
 
-/// Take every output's `decode` child out of the document, so that usage, which knows no
+/// Take every output's `nusage-decode` child out of the document, so that usage, which knows no
 /// such node, reads the rest. Whether any was there.
 pub(crate) fn strip_decodes(doc: &mut KdlDocument) -> bool {
     let mut stripped = false;

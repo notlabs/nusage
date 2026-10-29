@@ -1,4 +1,4 @@
-# The overlay's `decode` pipeline runs on the text, then `size` is converted to the filesize
+# The overlay's `nusage-decode` pipeline runs on the text, then `size` is converted to the filesize
 # the annotation declares. The output is the default, so the wrapper asks for nothing.
 {
     cmd: [ls],

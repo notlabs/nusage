@@ -1,4 +1,4 @@
-# A `decode` declared in the spec file itself.
+# A `nusage-decode` declared in the spec file itself.
 {
     cmd: [du],
     invoke: "wc du",
