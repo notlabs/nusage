@@ -11,6 +11,8 @@
 #                  the scripts it calls)
 #   - parse:       `nusage parse <script> -- <argv>`, for a single script, when
 #                  target/debug/nusage is built: the record usage's parser yields
+#   - prelude:     the record bound by the typed `let usage` that `nusage prelude <script>`
+#                  writes, which Nushell checks against the record as it runs
 # A binary fixture (a `<bin>.usage.kdl`) has no scripts: a case's `invoke` runs the module
 # against the fixture's `fake/<bin>`, which records the argv it received and prints what the
 # case says, so argv building and decoding are checked; then completions and signatures.
@@ -51,6 +53,7 @@ def verify-fixture [dir: path, update: bool] {
                 (row $name shim $id (check-shim $import $bin $case))
                 (row $name interpreter $id (check-interpreter $dir $bin $case))
                 (row $name run $id (check-run $dir $bin $case))
+                (row $name prelude $id (check-prelude $dir $bin $case))
             ] | append (
                 if ($dir | path join script.nu | path exists) {
                     [(row $name parse $id (check-parse $dir $case))]
@@ -140,9 +143,14 @@ def words-of [case: record] {
     $case.invoke? | default ($case.argv | str join ' ')
 }
 
+# The module's shadows run the scripts they call with the `nusage` on PATH: the one built here.
 def check-shim [import: string, bin: string, case: record] {
     let code = $"($import); ($bin) (words-of $case) | to nuon"
-    run-nu $code {} | after-printed $case | compare (expected-output $case)
+    run-nu $code {
+        PATH: (search-path [
+            ($env.NUSAGE_BIN | path dirname)
+        ])
+    } | after-printed $case | compare (expected-output $case)
 }
 
 def check-interpreter [dir: path, bin: string, case: record] {
@@ -165,14 +173,11 @@ def check-interpreter [dir: path, bin: string, case: record] {
 # PATH, as a module holds a failed decode to its schema through it.
 def check-invoke [dir: path, import: string, case: record] {
     let argv_file = mktemp
-    let path = $env.PATH
-    let path = if ($path | describe | str starts-with list) {
-        $path | str join (char esep)
-    } else {
-        $path
-    }
     let out = run-nu $"($import); ($case.invoke) | to nuon" {
-        PATH: $"($dir | path join fake)(char esep)($env.NUSAGE_BIN | path dirname)(char esep)($path)"
+        PATH: (search-path [
+            ($dir | path join fake)
+            ($env.NUSAGE_BIN | path dirname)
+        ])
         NUSAGE_FAKE_STDOUT: ($case.stdout? | default "")
         NUSAGE_FAKE_ARGV: $argv_file
     }
@@ -302,6 +307,37 @@ def script-for [dir: path, bin: string, cmd: list<string>] {
     } else {
         $base + '.nu'
     }
+}
+
+# PATH with the directories first, as an external reads it.
+def search-path [dirs: list<path>] {
+    let path = $env.PATH
+    let path = if ($path | describe | str starts-with list) {
+        $path | str join (char esep)
+    } else {
+        $path
+    }
+    $dirs | append $path | str join (char esep)
+}
+
+# The `$usage` type `nusage prelude` declares holds the record the script sees: the prelude's
+# typed `let` binds the case's record, and Nushell checks the binding as it runs, so the type
+# cannot drift from the record the shim and the interpreter build.
+def check-prelude [dir: path, bin: string, case: record] {
+    if not ($env.NUSAGE_BIN | path exists) {
+        return (skipped $"($env.NUSAGE_BIN) is not built")
+    }
+    let script = script-for $dir $bin $case.usage.cmd
+    let prelude = ^$env.NUSAGE_BIN prelude $script | complete
+    if $prelude.exit_code != 0 {
+        return {
+            ok: false
+            detail: ($prelude.stderr | str trim)
+        }
+    }
+    run-nu $"($prelude.stdout)\n$usage | to nuon" {
+        NUSAGE_USAGE: ($case.usage | to nuon)
+    } | compare $case.usage
 }
 
 def run-nu [code: string, env_vars: record] {
