@@ -2,7 +2,7 @@ min_version = "2026.9.2"
 monorepo_root = true
 
 [monorepo]
-config_roots = ["nusage", "mise", "clap", "jj", "schemas", "intent"]
+config_roots = ["nusage", "catalog", "catalog/clap", "catalog/schemas", "intent"]
 
 # The Cargo workspace is at the root, so its toolchain is: one pin for Cargo, the tasks and CI.
 [tools]
@@ -23,19 +23,13 @@ shellcheck = "0.11.0"
 release-plz = "0.4.2"
 
 # The repository's tasks run through the nusage built here, which `//nusage:build` links
-# into `.bin`, not through a release. jj reads the formatters from `jj.toml` here, after
+# into `.bin`, not through a release; the root's own are the files under `.mise/tasks`. jj
+# reads the formatters from `jj.toml` here, after
 # the user's own configuration files in the order jj itself reads them, from the home and
 # configuration directories of the platform; a path that does not exist is passed over.
 [env]
 _.path = ["{{config_root}}/.bin"]
 JJ_CONFIG = '{% if os() == "windows" %}{{ env.USERPROFILE }}\.jjconfig.toml;{{ env.APPDATA }}\jj\config.toml;{{ env.APPDATA }}\jj\conf.d;{{ config_root }}\jj.toml{% else %}{{ env.HOME }}/.jjconfig.toml:{{ xdg_config_home }}/jj/config.toml:{{ xdg_config_home }}/jj/conf.d:{{ config_root }}/jj.toml{% endif %}'
-
-# Unlabelled lines: GitHub reads an annotation only at the start of a line.
-[tasks.lint]
-description = "The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
-depends = ["//nusage:build"]
-output = "interleave"
-file = "lint.nu"
 
 [tasks.check]
 description = "The root's own checks"

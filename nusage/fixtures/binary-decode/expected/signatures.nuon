@@ -1,0 +1,36 @@
+[
+  [name,    signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                              attributes];
+  [wc,      {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          nothing,      false,       null,       null,        null,       null],
+        [null,           output,         string,       false,       null,       null,        null,       null]
+      ]
+    },                                                                            [
+
+    ]],
+  ["wc du", {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                          is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          nothing,                               false,       null,       null,        null,       null],
+        [null,           output,         "table<size: filesize, path: string>", false,       null,       null,        null,       null]
+      ]
+    }, [
+      [name,  value];
+      [usage, "output (\"table<size: filesize, path: string>\")\"text\" default=#true {
+        nusage-decode \"detect columns --no-headers | rename size path\"
+    }"]
+    ]],
+  ["wc ls", {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                          is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          nothing,                               false,       null,       null,        null,       null],
+        [null,           output,         "table<name: string, size: filesize>", false,       null,       null,        null,       null]
+      ]
+    }, [
+      [name,  value];
+      [usage, "output (\"table<name: string, size: filesize>\")\"text\" default=#true {
+    nusage-decode \"lines | parse \\\"{name} {size}\\\"\"
+}"]
+    ]]
+]
