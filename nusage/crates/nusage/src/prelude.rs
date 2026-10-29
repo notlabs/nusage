@@ -1,8 +1,9 @@
 //! What a script has before its first line. Where it runs, the interpreter defines the
 //! shadows of the scripts it calls ([`crate::calls`]) and binds `$usage`; where Nushell
 //! checks it, as an editor does, one line stands in for the script's first, the shebang,
-//! saying the same: `$usage` with its type, and each shadow's signature. Replacing a line
-//! with a line keeps every other line where it was.
+//! saying the same: `$usage` with its type, and the shadows as the interpreter defines them,
+//! less the helpers they call. Replacing a line with a line keeps every other line where it
+//! was.
 
 use std::path::Path;
 
@@ -30,8 +31,10 @@ pub fn line(script: &Path) -> Result<(String, Calls), Diagnostic> {
         "let usage: {} = ($env.NUSAGE_USAGE? | default \"{{}}\" | from nuon)",
         usage_type(&command)
     )];
+    // Made for each check, never kept, so it can name the script where it is.
     for shadow in &calls.shadows {
-        let def = calls::shadow_signature(shadow).map_err(|err| syntax(script, err))?;
+        let def = calls::shadow_def(shadow, Runner::Absolute(Path::new("nusage")))
+            .map_err(|err| syntax(script, err))?;
         parts.push(nusage_nu::print_line(&def));
     }
     Ok((parts.join("; "), calls))
@@ -50,7 +53,7 @@ pub fn runtime(script: &Path, nusage: &Path) -> Result<String, Diagnostic> {
         Item::Verbatim(CALL_HELPER.to_string()),
     ];
     for shadow in &calls.shadows {
-        let def = calls::shadow_def(shadow, Runner::Interpreter(nusage))
+        let def = calls::shadow_def(shadow, Runner::Absolute(nusage))
             .map_err(|err| syntax(script, err))?;
         items.push(Item::Def(def));
     }

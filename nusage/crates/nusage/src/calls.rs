@@ -243,8 +243,9 @@ pub enum Runner<'a> {
     /// From a module in this directory: the script relative to the module's file, and the
     /// `nusage` on `PATH`.
     Module(&'a Path),
-    /// From the interpreter: the script's absolute path, run by this `nusage`.
-    Interpreter(&'a Path),
+    /// The script by its absolute path, run by this `nusage`, a path or a name on `PATH`: for
+    /// the interpreter, and for the line that stands in for a script's first.
+    Absolute(&'a Path),
 }
 
 /// The shadow as a definition: the called command's parameters, as a wrapper of a binary
@@ -263,7 +264,7 @@ pub fn shadow_def(shadow: &Shadow, runner: Runner) -> Result<Def, SyntaxError> {
             });
             (Expr::Str("nusage".into()), Expr::Var(Ident::new("script")?))
         }
-        Runner::Interpreter(nusage) => (
+        Runner::Absolute(nusage) => (
             Expr::Str(nusage.to_string_lossy().into_owned()),
             Expr::Str(shadow.target.to_string_lossy().into_owned()),
         ),
@@ -286,23 +287,6 @@ pub fn shadow_def(shadow: &Shadow, runner: Runner) -> Result<Def, SyntaxError> {
         params: Params::new(params)?,
         io: io(&shadow.command)?,
         body,
-    })
-}
-
-/// The shadow's signature alone, for the line that stands in for a script's first one: its
-/// body is an `any` the output type accepts, since it never runs.
-pub fn shadow_signature(shadow: &Shadow) -> Result<Def, SyntaxError> {
-    let (params, _) = params_and_argv(&shadow.command, Target::Call)?;
-    Ok(Def {
-        export: false,
-        doc: Vec::new(),
-        attrs: Vec::new(),
-        name: CommandName::new(&shadow.name)?,
-        params: Params::new(params)?,
-        io: io(&shadow.command)?,
-        body: vec![Stmt::Pipeline(vec![Expr::Raw(
-            "$env.NUSAGE_PRELUDE?".into(),
-        )])],
     })
 }
 

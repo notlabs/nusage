@@ -39,9 +39,8 @@ pub fn print(module: &Module) -> String {
 }
 
 /// A definition on one line, for Nushell that must fit where one line stood: no comments,
-/// no attributes, the parameters separated by commas, the statements by semicolons. A
-/// statement that the printer breaks over lines, such as a long record, does not belong in
-/// one.
+/// no attributes, the parameters separated by commas, the statements by semicolons, and what
+/// the printer would break over lines, such as a long record, on one with spaces between.
 pub fn print_line(def: &Def) -> String {
     let params: Vec<String> = def.params.iter().map(param_text).collect();
     let io = match &def.io {
@@ -53,11 +52,14 @@ pub fn print_line(def: &Def) -> String {
         .iter()
         .map(|stmt| {
             let tokens: Tokens = quote!($(stmt_tokens(stmt)));
-            tokens
+            let text = tokens
                 .to_file_string()
-                .expect("formatting into a String cannot fail")
-                .trim_end()
-                .to_string()
+                .expect("formatting into a String cannot fail");
+            text.lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ")
         })
         .collect();
     format!(
@@ -445,12 +447,23 @@ export def main [
                     name: ident("target"),
                     value: Expr::Raw("path self x.nu".into()),
                 },
-                Stmt::Pipeline(vec![Expr::Var(ident("target"))]),
+                Stmt::Pipeline(vec![Expr::Call {
+                    name: CommandName::new("run").unwrap(),
+                    args: vec![
+                        Expr::Var(ident("target")),
+                        Expr::Record(
+                            ["a", "b", "c", "d"]
+                                .map(|key| (key.to_string(), Expr::Var(ident("count"))))
+                                .to_vec(),
+                        ),
+                    ],
+                }]),
             ],
         };
+        // A record of more than three fields is broken over lines elsewhere.
         assert_eq!(
             print_line(&def),
-            r#"def "./x.nu sub" [name: string@[a "b c"], --count (-c): int]: nothing -> list<int> { const target = path self x.nu; $target }"#
+            r#"def "./x.nu sub" [name: string@[a "b c"], --count (-c): int]: nothing -> list<int> { const target = path self x.nu; run $target { a: $count b: $count c: $count d: $count } }"#
         );
     }
 
