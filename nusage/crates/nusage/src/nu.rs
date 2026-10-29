@@ -12,6 +12,12 @@ use std::process::Command;
 /// Set for the `nu` a language server of nusage's starts: that one is Nushell's own.
 pub const SERVING: &str = "NUSAGE_LSP";
 
+/// Set on the `nu` this runs, to this process's id. Should that `nu` lead back here, through
+/// a shim or wrapper [`real_nu`] did not see for one, the `nusage nu` it reaches is this same
+/// process, as mise's shims and wrappers exec on unix, and it stops instead of going round
+/// for ever. A `nu` that Nushell starts in turn is a process of its own, and runs.
+const RAN: &str = "NUSAGE_NU_PID";
+
 /// nusage's layer for kakehashi: the queries it adds, by path under the layer.
 const LAYER: &[(&str, &str)] = &[
     (
@@ -26,8 +32,14 @@ const LAYER: &[(&str, &str)] = &[
 
 /// Run as `nu` with these arguments; the exit code is what ran's.
 pub fn run(args: &[String]) -> io::Result<i32> {
+    let pid = std::process::id().to_string();
+    if std::env::var(RAN).is_ok_and(|ran| ran == pid) {
+        return Err(io::Error::other(
+            "the `nu` on PATH leads back to `nusage nu`: there is no Nushell past it",
+        ));
+    }
     let Some(rest) = lsp_requested(args).filter(|_| std::env::var_os(SERVING).is_none()) else {
-        return replace_with(Command::new(real_nu()).args(args));
+        return replace_with(Command::new(real_nu()).args(args).env(RAN, pid));
     };
     let nusage = std::env::current_exe()?;
     match on_path("kakehashi") {
@@ -90,8 +102,9 @@ fn lsp_requested(args: &[String]) -> Option<Vec<String>> {
 }
 
 /// The `nu` to run: the first on PATH that is not one of mise's shims or wrappers, which would
-/// lead back here. Under mise's wrapper the PATH holds none of them, the toolset's `nu`
-/// instead.
+/// lead back here; they are links to mise itself. Under mise's wrapper the PATH holds none of
+/// them, mise takes their directories off it for the command, so the toolset's `nu` is first.
+/// Should either stop being so, [`RAN`] stops the loop.
 pub fn real_nu() -> PathBuf {
     let here = std::env::current_exe().and_then(std::fs::canonicalize).ok();
     let name = format!("nu{}", std::env::consts::EXE_SUFFIX);
@@ -206,12 +219,16 @@ fn cache_dir() -> PathBuf {
     std::env::temp_dir()
 }
 
-/// A name for the layer's contents.
+/// A name for the layer's contents, the same from one build of nusage to the next (FNV-1a),
+/// so the layers in the cache are as many as the contents they have had.
 fn digest(files: &[(&str, String)]) -> String {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    files.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for (path, text) in files {
+        for byte in path.bytes().chain([0]).chain(text.bytes()).chain([0]) {
+            hash = (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    format!("{hash:016x}")
 }
 
 /// Become the command, as a wrapper should: on unix the process is replaced, so signals,
@@ -248,6 +265,15 @@ mod tests {
         assert_eq!(lsp_requested(&words("-c foo --lsp")), Some(words("-c foo")));
         assert_eq!(lsp_requested(&words("--ide-check 10 x.nu")), None);
         assert_eq!(lsp_requested(&words("--mcp")), None);
+    }
+
+    #[test]
+    fn the_layers_name_is_its_contents() {
+        let files = |text: &str| vec![("a", text.to_string())];
+        assert_eq!(digest(&files("x")), digest(&files("x")));
+        assert_ne!(digest(&files("x")), digest(&files("y")));
+        // FNV-1a's own value for the empty input, so the name holds across builds.
+        assert_eq!(digest(&[]), "cbf29ce484222325");
     }
 
     #[test]
