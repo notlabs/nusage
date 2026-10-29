@@ -3,9 +3,13 @@
 "http:usage-source" = { version = "7.1.3", url = "https://github.com/jdx/usage/archive/refs/tags/v{% raw %}{{ version }}{% endraw %}.tar.gz", strip_components = 1, bin_path = "corpus" }
 
 # The released nusage for this user, pinned in a fragment of the global mise config that
-# `mise dot apply` links into place.
+# `mise dot apply` links into place, and in a folder beside it, what its environments add:
+# `MISE_ENV=nusage-lsp` makes every `nu` mise starts `nusage nu`, so `nu --lsp` is nusage's
+# language server, and `nusage-kakehashi` installs kakehashi to highlight with it.
 [dotfiles]
 "~/.config/mise/conf.d/nusage.toml" = { source = "conf.d/nusage.toml", mode = "symlink" }
+"~/.config/mise/conf.d/nusage/mise.nusage-lsp.toml" = { source = "conf.d/nusage/mise.nusage-lsp.toml", mode = "symlink" }
+"~/.config/mise/conf.d/nusage/mise.nusage-kakehashi.toml" = { source = "conf.d/nusage/mise.nusage-kakehashi.toml", mode = "symlink" }
 
 [task_config]
 shell = "nu -c"
