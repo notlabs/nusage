@@ -8,11 +8,11 @@
 //! target turns into a module; it names no Nushell syntax and performs no I/O.
 
 mod build;
-mod schema;
 
 pub use build::{Identifier, identifier, model, value_from_text};
 pub use nu_protocol::Value;
 pub use nusage_spec::{CommandPath, Diagnostic};
+pub use nushell_schema::{Conversion, Fill, NuType, Shape};
 
 use std::path::PathBuf;
 
@@ -83,35 +83,6 @@ pub struct Structured {
     /// What JSON cannot carry and the schema or annotation declares: each is converted
     /// after decoding, in this order.
     pub conversions: Vec<Conversion>,
-}
-
-/// A property the schema does not require, filled with `null` where its record leaves it
-/// out.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Fill {
-    /// The cell path of the field.
-    pub path: Vec<String>,
-    /// Where on the way to the record `null` may stand instead, as the lengths of the
-    /// prefixes of `path` that may be `null`, shortest first. A `null` is left as it is,
-    /// with no field under it to fill.
-    pub nullable: Vec<usize>,
-}
-
-/// A value JSON delivers as text or a number, converted to the declared type at a cell path
-/// (empty for the whole value).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Conversion {
-    pub path: Vec<String>,
-    /// `datetime`, `duration` or `filesize`; `binary` for text taken as bytes, `base64`
-    /// for text decoded.
-    pub ty: String,
-    /// For a number: what it counts, as the schema's `x-nu` says, spelled as in a Nushell
-    /// literal (`ms`, `sec`, `kB`). `None` for text, such as an ISO 8601 datetime.
-    pub unit: Option<String>,
-    /// Where on the way to the value `null` may stand instead, as the lengths of the
-    /// prefixes of `path` that may be `null`, shortest first: the whole path for the value
-    /// itself. A `null` is left as it is, with nothing under it to convert.
-    pub nullable: Vec<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -188,17 +159,6 @@ pub enum ParamKind {
     /// `flag "--x <v>" var=#true`: a `list` in `$usage`, since a `def`'s flags cannot repeat.
     /// An extern keeps the single value, since an external accepts `--x a --x b`.
     Repeated,
-}
-
-/// A Nushell type as text. From a KDL annotation when there is one, else from usage's
-/// conventions: `string`, `path` for `<file>` and `<dir>`, `bool`, `int`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NuType(pub String);
-
-impl NuType {
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

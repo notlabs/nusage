@@ -6,7 +6,9 @@ Early development.
 
 - `nusage/`: the tool. `nusage --help` for the CLI, `fixtures/` for the hand-written modules
   the generator reproduces and the contract a script relies on, `cargo doc --workspace
-  --no-deps` for the crates.
+  --no-deps` for the crates. Two of them stand on their own: `nushell-schema`, the Nushell
+  dialect of JSON Schema, and `openapi-usage`, an OpenAPI document as a usage spec with the
+  HTTP mapping beside it.
 - `mise/`: the module for mise, generated from mise's own spec and the overlays there, with
   the schemas of its outputs under `schemas/`.
 - `jj/`: the module for jj, generated from the spec `clap/` reads from jj-cli, committed
