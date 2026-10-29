@@ -16,3 +16,4 @@ if not ($file | path exists) or (open --raw $file) != $line {
 } else {
     print $"mise: ($file) is current"
 }
+let x = [1,2,  3]
