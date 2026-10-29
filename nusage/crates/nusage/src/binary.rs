@@ -145,7 +145,7 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         } else {
             &mut flags
         };
-        into.push((flag_word(param), Expr::Var(Ident::new(&param.var)?)));
+        into.push((flag_word(param), flag_value(param)?));
         if let Some(negate) = &param.negate {
             into.push((
                 format!("--{negate}"),
@@ -216,6 +216,20 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         io,
         body,
     })
+}
+
+/// A flag's value as `nusage argv` takes it. The helper spells a flag by its value's type,
+/// an `int` as a count and a `bool` as a switch, so a valued flag of a type other than text
+/// goes as the list of its value, empty when absent, which it spells `--flag value`.
+fn flag_value(param: &Param) -> Result<Expr, SyntaxError> {
+    let var = Expr::Var(Ident::new(&param.var)?);
+    if param.kind != ParamKind::Valued || matches!(param.ty.as_str(), "string" | "path") {
+        return Ok(var);
+    }
+    Ok(Expr::Group(Box::new(Expr::Pipeline(vec![
+        Expr::List(vec![var]),
+        call("compact", vec![])?,
+    ]))))
 }
 
 /// The flag as the binary spells it: `--dry-run`, or `-v` for a short-only flag.
