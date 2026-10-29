@@ -1,53 +1,99 @@
 #!/usr/bin/env nusage
 #USAGE about "The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
 # The formatters' own checks name a file and no more; a lint has to say what is wrong where,
-# so each file is formatted again and the difference printed, and as an annotation on the
-# file when run in GitHub Actions.
-let in_actions = ($env.GITHUB_ACTIONS? | default "") == "true"
-mut failed = []
-
-def annotate [file: string, message: string] {
-    print $"::error file=($file)::($message)"
+# so each file is formatted again and the difference printed, and in GitHub Actions each
+# hunk is an annotation on its lines, which the pull request shows inline.
+def in-actions [] {
+    ($env.GITHUB_ACTIONS? | default "") == "true"
 }
 
+# An annotation, as the workflow command spells it, with the message's line breaks encoded.
+def annotate [
+    file: string
+    line: int
+    end: int
+    title: string
+    message: string
+] {
+    let encoded = $message
+    | str replace --all "%" "%25"
+    | str replace --all "\r" "%0D"
+    | str replace --all "\n" "%0A"
+    print $"::error file=($file),line=($line),endLine=($end),title=($title)::($encoded)"
+}
+
+# The hunks of a unified diff: the lines each starts at and covers in the first file, and its
+# text.
+def hunks [diff: string] {
+    mut hunks = []
+    for line in ($diff | lines) {
+        let header = $line | parse --regex '^@@ -(?<line>\d+)(?:,(?<count>\d+))? '
+        if ($header | is-not-empty) {
+            let start = $header.0.line | into int
+            let count = if $header.0.count == "" {
+                1
+            } else {
+                $header.0.count | into int
+            }
+            $hunks = $hunks | append {line: $start, end: ($start + ([$count 1] | math max) - 1), body: ""}
+        } else if ($hunks | is-not-empty) {
+            $hunks = $hunks | update ($hunks | length | $in - 1) {|hunk| $hunk | update body ($hunk.body + $line + "\n") }
+        }
+    }
+    $hunks
+}
+
+# Whether a file is what its formatter writes for it; the difference printed when not.
+def formatted [file: string, formatter: string, format: closure] {
+    # A formatter reading standard input ends without the newline it writes to a file.
+    let content = open --raw $file | str trim --right --char (char nl)
+    let wanted = $content | do $format | str trim --right --char (char nl)
+    if $wanted == $content {
+        return true
+    }
+    let diff = $wanted + (char nl)
+    | ^diff --unified --label $file --label $"($file) as ($formatter) wants" $file -
+    | complete
+    print --no-newline $diff.stdout
+    if (in-actions) {
+        for hunk in (hunks $diff.stdout) {
+            (annotate
+                $file
+                $hunk.line
+                $hunk.end
+                $"($formatter): not formatted"
+                $"`jj fix` writes it:\n($hunk.body)"
+            )
+        }
+    }
+    false
+}
+
+mut failed = []
+
 print "$ jactionlint"
-let workflows = ^jactionlint | complete
+let workflows = if (in-actions) {
+    ^jactionlint --format github | complete
+} else {
+    ^jactionlint | complete
+}
 print --no-newline $workflows.stdout
 if $workflows.exit_code != 0 {
     $failed = $failed | append "jactionlint"
 }
 
 print "$ nufmt"
-let scripts = ^git ls-files "*.nu" | lines | where $it !~ "/expected/"
-for file in $scripts {
-    # nufmt ends what it reads from standard input without the newline it writes to a file.
-    let content = open --raw $file | str trim --right --char (char nl)
-    let formatted = $content | ^nufmt --stdin | str trim --right --char (char nl)
-    if $formatted != $content {
-        if $in_actions {
-            annotate $file "not formatted as nufmt wants; `jj fix` writes it"
-        }
-        $formatted + (char nl) | ^diff --unified --label $file --label $"($file) as nufmt wants" $file -
+for file in (^git ls-files "*.nu" | lines | where $it !~ "/expected/") {
+    if not (formatted $file nufmt { ^nufmt --stdin }) {
         $failed = $failed | append $"nufmt: ($file)"
     }
 }
 
-print "$ taplo fmt --check --diff"
-let toml = ^taplo fmt --check --diff | complete
-print --no-newline $toml.stdout
-if $toml.exit_code != 0 {
-    if $in_actions {
-        for file in (
-            $toml.stderr
-            | parse --regex "(?m)^(?:ERROR|error).*?(?<file>\\S+\\.toml)"
-            | get file
-            | uniq
-        ) {
-            annotate $file "not formatted as taplo wants; `jj fix` writes it"
-        }
+print "$ taplo"
+for file in (^git ls-files "*.toml" | lines) {
+    if not (formatted $file taplo { ^taplo fmt - }) {
+        $failed = $failed | append $"taplo: ($file)"
     }
-    print --no-newline $toml.stderr
-    $failed = $failed | append "taplo"
 }
 
 if ($failed | is-not-empty) {
