@@ -168,7 +168,10 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
     // Then `| from json | into datetime at` for a structured output.
     let mut stages = vec![run];
     if let Some(structured) = &command.structured {
-        stages.extend(decode_stages(structured)?);
+        stages.extend(decode_stages(
+            structured,
+            &format!("{} {} stdout", tree.bin, command.path),
+        )?);
     }
     let body = vec![Stmt::Pipeline(stages)];
     Ok(Def {
@@ -196,11 +199,48 @@ fn flag_word(param: &Param) -> String {
 /// read; then each conversion at its cell path, `into <ty> <path>` where the value is text
 /// or a count of bytes, else an `update` whose closure counts the unit and leaves `null`
 /// alone where the value may be one.
-fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
-    let mut stages = vec![match structured.framing {
-        Framing::Json => call("from json", vec![])?,
-        Framing::Jsonl => call("from json", vec![Expr::Str("--objects".into())])?,
-    }];
+fn decode_stages(structured: &Structured, source: &str) -> Result<Vec<Expr>, SyntaxError> {
+    let mut args = vec![
+        Expr::Str("validate".into()),
+        Expr::Str("--passthrough".into()),
+        Expr::Str("--nu".into()),
+        Expr::Str("--source".into()),
+        Expr::Str(source.into()),
+    ];
+    if let Some(schema) = &structured.schema {
+        // Compact the already parsed schema, keeping the generated command readable.
+        let schema: serde_json::Value =
+            serde_json::from_str(schema).map_err(|e| SyntaxError(e.to_string()))?;
+        args.extend([
+            Expr::Str("--schema-json".into()),
+            Expr::Str(schema.to_string()),
+        ]);
+    } else {
+        args.push(Expr::Str("--auto".into()));
+    }
+    if structured.framing == Framing::Jsonl {
+        args.push(Expr::Str("--jsonl".into()));
+    }
+    let mut stages = vec![
+        Expr::External {
+            name: "nusage".into(),
+            args,
+        },
+        match structured.framing {
+            Framing::Json => call("from json", vec![])?,
+            Framing::Jsonl => call("from json", vec![Expr::Str("--objects".into())])?,
+        },
+    ];
+    stages.push(match structured.framing {
+        Framing::Json => call("nusage validated", vec![])?,
+        Framing::Jsonl => call(
+            "each",
+            vec![
+                Expr::Str("--keep-empty".into()),
+                Expr::Closure(Box::new(call("nusage validated", vec![])?)),
+            ],
+        )?,
+    });
     for fill in &structured.fills {
         let (parent, field) = fill.split_at(fill.len() - 1);
         let default = call(

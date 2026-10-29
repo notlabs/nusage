@@ -13,3 +13,4 @@ publish = false
 usage.workspace = true
 thiserror.workspace = true
 indexmap.workspace = true
+serde.workspace = true

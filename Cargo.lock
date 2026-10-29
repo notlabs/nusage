@@ -3600,6 +3600,7 @@ dependencies = [
 name = "nusage"
 version = "0.1.0"
 dependencies = [
+ "globset",
  "jsonschema",
  "nu-cmd-lang",
  "nu-command",
@@ -3609,7 +3610,9 @@ dependencies = [
  "nusage-model",
  "nusage-nu",
  "nusage-spec",
+ "reqwest",
  "serde_json",
+ "url",
  "usage-lib",
  "usage-rs",
 ]
@@ -3646,6 +3649,7 @@ name = "nusage-spec"
 version = "0.1.0"
 dependencies = [
  "indexmap",
+ "serde",
  "thiserror 2.0.21",
  "usage-lib",
 ]

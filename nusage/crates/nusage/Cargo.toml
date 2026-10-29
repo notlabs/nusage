@@ -22,6 +22,9 @@ nusage-nu.workspace = true
 usage-rs.workspace = true
 jsonschema.workspace = true
 serde_json.workspace = true
+globset.workspace = true
+url.workspace = true
+reqwest.workspace = true
 
 [dev-dependencies]
 nu-parser.workspace = true

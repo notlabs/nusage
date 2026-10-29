@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use nusage::Diagnostic;
 use usage_rs::{Args, Cli, Run, Subcommands};
 
 /// Typed Nushell commands from usage-annotated scripts
@@ -52,15 +53,13 @@ struct Generate {
 }
 
 impl Run for Generate {
-    type Output = Result<(), String>;
+    type Output = Result<(), Diagnostic>;
 
     fn run(self) -> Self::Output {
-        let module = nusage::generate_with(&self.source, self.out.as_deref(), &self.overlay)
-            .map_err(|e| e.to_string())?;
+        let module = nusage::generate_with(&self.source, self.out.as_deref(), &self.overlay)?;
         match &self.out {
-            Some(out) => {
-                std::fs::write(out, module).map_err(|err| format!("{}: {err}", out.display()))
-            }
+            Some(out) => std::fs::write(out, module)
+                .map_err(|err| Diagnostic::new(out, err.to_string()).with_code("nusage::io")),
             None => {
                 print!("{module}");
                 Ok(())
@@ -82,10 +81,10 @@ struct Spec {
 }
 
 impl Run for Spec {
-    type Output = Result<(), String>;
+    type Output = Result<(), Diagnostic>;
 
     fn run(self) -> Self::Output {
-        let spec = nusage::spec(&self.source, &self.overlay).map_err(|e| e.to_string())?;
+        let spec = nusage::spec(&self.source, &self.overlay)?;
         print!("{spec}");
         Ok(())
     }
@@ -110,10 +109,10 @@ struct Check {
 }
 
 impl Run for Check {
-    type Output = Result<(), String>;
+    type Output = Result<(), Diagnostic>;
 
     fn run(self) -> Self::Output {
-        nusage::check(&self.source, &self.overlay, &self.module).map_err(|e| e.to_string())
+        nusage::check(&self.source, &self.overlay, &self.module)
     }
 }
 
@@ -140,42 +139,119 @@ struct Overlay {
 }
 
 impl Run for Overlay {
-    type Output = Result<(), String>;
+    type Output = Result<(), Diagnostic>;
 
     fn run(self) -> Self::Output {
         let overlay =
-            nusage::switch_overlay(&self.source, &self.overlay, &self.switch, &self.framing)
-                .map_err(|e| e.to_string())?;
+            nusage::switch_overlay(&self.source, &self.overlay, &self.switch, &self.framing)?;
         print!("{overlay}");
         Ok(())
     }
 }
 
-/// Hold JSON documents to a JSON Schema
+/// Validate JSON or JSONL, optionally passing checked data through
 ///
-/// The schema is held to its metaschema first, then each document to the schema; `-` is
-/// standard input, and no document holds the schema alone. Every finding is a line,
-/// `<document>:<path>: <what>`, and any finding is exit code 1. What a binary prints for
-/// an `output` whose schema a spec or overlay declares can be held to that schema this way,
-/// before a module decodes it.
+/// A schema file with no documents checks the schema alone. --auto discovers a schema
+/// from the data, and --passthrough releases valid bytes on stdout; either defaults to
+/// stdin. JSONL consumes a recognized inline NUON schema header and checks each record.
+/// NUSAGE_SCHEMA_ALLOW is a JSON list of allowed URLs/path globs. NUSAGE_VALIDATE=off
+/// bypasses pass-through checking. NUSAGE_DIAGNOSTICS=json selects JSON diagnostics.
 #[derive(Args)]
 struct Validate {
-    /// The JSON Schema
-    schema: PathBuf,
-    /// The JSON documents, `-` for standard input
+    /// The JSON Schema file; with --auto or --schema-json, the first input document
+    schema: Option<PathBuf>,
+    /// The JSON documents, '-' for standard input
     documents: Vec<PathBuf>,
+    /// An embedded schema, as used by generated modules
+    #[usage(long)]
+    schema_json: Option<String>,
+    /// Recognize schemas declared by the input; unknown declarations remain ordinary data
+    #[usage(long)]
+    auto: bool,
+    /// One JSON document per line; stop at the first invalid record
+    #[usage(long)]
+    jsonl: bool,
+    /// Write validated input to stdout, incrementally for JSONL
+    #[usage(long)]
+    passthrough: bool,
+    /// Label the source in diagnostics, for example a wrapped command's stdout
+    #[usage(long)]
+    source: Option<String>,
+    /// Diagnostic representation on stderr: human or json
+    #[usage(long)]
+    diagnostic_format: Option<String>,
+    /// Internal transport for generated modules; implies --passthrough
+    #[usage(long, hide)]
+    nu: bool,
 }
 
 impl Run for Validate {
-    type Output = Result<(), String>;
+    type Output = Result<(), Diagnostic>;
 
     fn run(self) -> Self::Output {
-        let findings = nusage::validate(&self.schema, &self.documents)?;
+        let format = self
+            .diagnostic_format
+            .or_else(|| std::env::var("NUSAGE_DIAGNOSTICS").ok())
+            .unwrap_or_else(|| "human".into());
+        let passthrough = self.passthrough || self.nu;
+        let mut documents = self.documents;
+        let schema = if self.auto || self.schema_json.is_some() {
+            if let Some(document) = self.schema {
+                documents.insert(0, document);
+            }
+            None
+        } else {
+            self.schema
+        };
+        let options = nusage::ValidationOptions {
+            schema,
+            schema_json: self.schema_json,
+            auto: self.auto,
+            jsonl: self.jsonl,
+            passthrough,
+            nu: self.nu,
+            disabled: passthrough && std::env::var("NUSAGE_VALIDATE").as_deref() == Ok("off"),
+            source: self.source,
+            allow: std::env::var("NUSAGE_SCHEMA_ALLOW").ok(),
+        };
+        let result = if !matches!(format.as_str(), "human" | "json") {
+            Err(
+                Diagnostic::new("NUSAGE_DIAGNOSTICS", "expected human or json")
+                    .with_code("nusage::diagnostic::format"),
+            )
+        } else {
+            match std::env::var("NUSAGE_VALIDATE").as_deref() {
+                Ok("off") if passthrough && !self.nu => {
+                    nusage::passthrough(&documents, &mut std::io::stdout().lock())
+                }
+                Ok("off" | "auto") | Err(_) => {
+                    nusage::validate_with(&options, &documents, &mut std::io::stdout().lock())
+                }
+                Ok(_) => Err(
+                    nusage::Diagnostic::new("NUSAGE_VALIDATE", "expected auto or off")
+                        .with_code("nusage::validation::options"),
+                ),
+            }
+        };
+        let findings = match result {
+            Ok(findings) => findings,
+            Err(d) if d.code == "nusage::io::broken_pipe" => return Ok(()),
+            Err(d) => vec![d],
+        };
         if findings.is_empty() {
             return Ok(());
         }
+        if self.nu {
+            if let Err(d) = nusage::write_packet(Err(&findings), &mut std::io::stdout().lock()) {
+                if d.code == "nusage::io::broken_pipe" {
+                    return Ok(());
+                }
+                return Err(d);
+            }
+            std::process::exit(1)
+        }
         for finding in findings {
-            eprintln!("{finding}");
+            report(&finding, Some(&format));
         }
         std::process::exit(1)
     }
@@ -194,10 +270,10 @@ struct Parse {
 }
 
 impl Run for Parse {
-    type Output = Result<(), String>;
+    type Output = Result<(), Diagnostic>;
 
     fn run(self) -> Self::Output {
-        match nusage::parse(&self.script, &self.args).map_err(|e| e.to_string())? {
+        match nusage::parse(&self.script, &self.args)? {
             nusage::Parsed::Record(record) => {
                 println!("{}", nusage_nu::nuon(&record));
                 Ok(())
@@ -208,7 +284,10 @@ impl Run for Parse {
             }
             // usage's refusal, with the exit code the interpreter gives it.
             nusage::Parsed::Rejected(why) => {
-                eprintln!("{why}");
+                report(
+                    &Diagnostic::new(&self.script, why).with_code("nusage::usage::arguments"),
+                    None,
+                );
                 std::process::exit(2)
             }
         }
@@ -225,7 +304,7 @@ fn main() -> ExitCode {
         return match nusage::interpret(std::path::Path::new(first), &argv[2..]) {
             Ok(code) => ExitCode::from(code.clamp(0, 255) as u8),
             Err(err) => {
-                eprintln!("nusage: {err}");
+                report(&err, None);
                 ExitCode::FAILURE
             }
         };
@@ -233,8 +312,21 @@ fn main() -> ExitCode {
     match Nusage::parse().command.run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
-            eprintln!("nusage: {message}");
+            report(&message, None);
             ExitCode::FAILURE
         }
+    }
+}
+
+/// Both the interpreter and subcommands render the same diagnostic record.
+fn report(diagnostic: &Diagnostic, format: Option<&str>) {
+    let env = std::env::var("NUSAGE_DIAGNOSTICS").ok();
+    if format.or(env.as_deref()) == Some("json") {
+        let text = serde_json::to_string(diagnostic).unwrap_or_else(|error| {
+            serde_json::json!({"code":"nusage::diagnostic::encode", "message":error.to_string()}).to_string()
+        });
+        eprintln!("{text}");
+    } else {
+        eprintln!("[{}] {diagnostic}", diagnostic.code);
     }
 }

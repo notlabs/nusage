@@ -1,5 +1,23 @@
 alias "attr usage" = echo
 
+# The validator's private Result envelope preserves failures across Nu's external-stream
+# boundary. Only successful values reach the caller or the schema's conversions.
+def "nusage validated" []: record -> any {
+    let result = $in
+    if "Err" in $result {
+        let errors = $result.Err | each {|d|
+            {
+                code: $d.code
+                msg: $d.message
+                help: $"($d.path):($d.line? | default ''):($d.instance_path? | default '') ($d.schema_uri? | default '')"
+            }
+        }
+        error make ($errors | first | merge {inner: ($errors | skip 1)})
+    } else {
+        $result.Ok
+    }
+}
+
 # A value as an argv word: a datetime in ISO 8601, anything else as Nushell writes it.
 def "nusage word" []: any -> string {
     if ($in | describe --detailed | get type) == datetime {
@@ -49,5 +67,5 @@ export def main []: nothing -> string {
 export def "tool ls" [
     name?: string,  # Only this one, by name
 ]: nothing -> table<name: string, size: filesize> {
-    ^tool ls --json ...(nusage argv [$name] {}) | from json | into filesize size
+    ^tool ls --json ...(nusage argv [$name] {}) | ^nusage validate --passthrough --nu --source "tool ls stdout" --auto | from json | nusage validated | into filesize size
 }

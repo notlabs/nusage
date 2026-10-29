@@ -68,6 +68,8 @@ pub enum Execution {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Structured {
     pub name: String,
+    /// The complete wire schema, retained for validation before fills and conversions.
+    pub schema: Option<String>,
     /// The words that ask for it, right after the command's: `--json`, or `--format json`;
     /// none when it is the default.
     pub args: Vec<String>,

@@ -694,6 +694,7 @@ fn structured_output<'a>(
     };
     Ok(Some(Structured {
         name: output.name.clone(),
+        schema: output.schema.clone(),
         args,
         framing: framing_of(output).expect("a candidate is framed"),
         ty,

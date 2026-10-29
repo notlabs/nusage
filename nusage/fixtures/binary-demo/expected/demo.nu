@@ -1,5 +1,23 @@
 alias "attr usage" = echo
 
+# The validator's private Result envelope preserves failures across Nu's external-stream
+# boundary. Only successful values reach the caller or the schema's conversions.
+def "nusage validated" []: record -> any {
+    let result = $in
+    if "Err" in $result {
+        let errors = $result.Err | each {|d|
+            {
+                code: $d.code
+                msg: $d.message
+                help: $"($d.path):($d.line? | default ''):($d.instance_path? | default '') ($d.schema_uri? | default '')"
+            }
+        }
+        error make ($errors | first | merge {inner: ($errors | skip 1)})
+    } else {
+        $result.Ok
+    }
+}
+
 # A value as an argv word: a datetime in ISO 8601, anything else as Nushell writes it.
 def "nusage word" []: any -> string {
     if ($in | describe --detailed | get type) == datetime {
@@ -104,7 +122,7 @@ export def "demo run" [
 export def "demo status" [
     --verbose (-v): int,  # Say more
 ]: nothing -> record<ok: bool, tasks: list<string>> {
-    ^demo status --format json ...(nusage argv [] {--verbose: $verbose}) | from json
+    ^demo status --format json ...(nusage argv [] {--verbose: $verbose}) | ^nusage validate --passthrough --nu --source "demo status stdout" --auto | from json | nusage validated
 }
 
 # Stream events
@@ -114,7 +132,7 @@ export def "demo status" [
 export def "demo events" [
     --verbose (-v): int,  # Say more
 ]: nothing -> table<at: datetime, kind: string> {
-    ^demo events --json ...(nusage argv [] {--verbose: $verbose}) | from json --objects | into datetime at
+    ^demo events --json ...(nusage argv [] {--verbose: $verbose}) | ^nusage validate --passthrough --nu --source "demo events stdout" --auto --jsonl | from json --objects | each --keep-empty { nusage validated } | into datetime at
 }
 
 # Tag items

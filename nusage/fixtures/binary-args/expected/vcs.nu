@@ -1,5 +1,23 @@
 alias "attr usage" = echo
 
+# The validator's private Result envelope preserves failures across Nu's external-stream
+# boundary. Only successful values reach the caller or the schema's conversions.
+def "nusage validated" []: record -> any {
+    let result = $in
+    if "Err" in $result {
+        let errors = $result.Err | each {|d|
+            {
+                code: $d.code
+                msg: $d.message
+                help: $"($d.path):($d.line? | default ''):($d.instance_path? | default '') ($d.schema_uri? | default '')"
+            }
+        }
+        error make ($errors | first | merge {inner: ($errors | skip 1)})
+    } else {
+        $result.Ok
+    }
+}
+
 # A value as an argv word: a datetime in ISO 8601, anything else as Nushell writes it.
 def "nusage word" []: any -> string {
     if ($in | describe --detailed | get type) == datetime {
@@ -58,7 +76,7 @@ export def "vcs log" [
     --repository (-R): string,      # Where to work
     --revision (-r): list<string>,  # Which revisions to show
 ]: nothing -> table<commit_id: string, author: record<name: string, timestamp: datetime>> {
-    ^vcs log --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [...$filesets] {--repository: $repository, --revision: $revision}) | from json --objects | into datetime author.timestamp
+    ^vcs log --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [...$filesets] {--repository: $repository, --revision: $revision}) | ^nusage validate --passthrough --nu --source "vcs log stdout" --schema-json "{\"type\":\"object\",\"required\":[\"commit_id\",\"author\"],\"properties\":{\"commit_id\":{\"type\":\"string\"},\"author\":{\"type\":\"object\",\"required\":[\"name\",\"timestamp\"],\"properties\":{\"name\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}}}}" --jsonl | from json --objects | each --keep-empty { nusage validated } | into datetime author.timestamp
 }
 
 # Show how a change evolved
@@ -70,5 +88,5 @@ export def "vcs log" [
 export def "vcs evolog" [
     --repository (-R): string,  # Where to work
 ]: nothing -> table<commit_id: string, operation: oneof<record<time: record<start: datetime>>, nothing>> {
-    ^vcs evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [] {--repository: $repository}) | from json --objects | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.start } }
+    ^vcs evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [] {--repository: $repository}) | ^nusage validate --passthrough --nu --source "vcs evolog stdout" --schema-json "{\"type\":\"object\",\"required\":[\"commit_id\",\"operation\"],\"properties\":{\"commit_id\":{\"type\":\"string\"},\"operation\":{\"anyOf\":[{\"type\":\"object\",\"required\":[\"time\"],\"properties\":{\"time\":{\"type\":\"object\",\"required\":[\"start\"],\"properties\":{\"start\":{\"type\":\"string\",\"format\":\"date-time\"}}}}},{\"type\":\"null\"}]}}}" --jsonl | from json --objects | each --keep-empty { nusage validated } | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.start } }
 }

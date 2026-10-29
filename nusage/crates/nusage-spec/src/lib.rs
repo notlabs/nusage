@@ -18,6 +18,6 @@ mod overlay;
 mod tree;
 
 pub use args::{NODE as ARGS_NODE, OutputArgs, flag_word};
-pub use error::Diagnostic;
+pub use error::{Diagnostic, DiagnosticLocation};
 pub use header::{Header, HeaderNode, ScriptHeader, read_header, read_subcommand_header};
 pub use tree::{Assembled, CommandPath, Provider, Source, assemble, assemble_with, command_at};

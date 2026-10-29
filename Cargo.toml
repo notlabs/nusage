@@ -29,6 +29,13 @@ nuon = "0.116.1"
 # Output schemas, and the corpus test's vectors. A schema's properties keep their order.
 jsonschema = { version = "0.60", default-features = false }
 serde_json = { version = "1", features = ["preserve_order"] }
+serde = { version = "1", features = ["derive"] }
+globset = "0.4"
+url = "2"
+reqwest = { version = "0.12", default-features = false, features = [
+  "blocking",
+  "rustls-tls",
+] }
 nu-protocol = { version = "0.116.1", default-features = false }
 nu-parser = "0.116.1"
 nu-cmd-lang = "0.116.1"

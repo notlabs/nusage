@@ -9,6 +9,7 @@ mod binary;
 mod common;
 mod conform;
 mod interpret;
+mod schema;
 mod shim;
 mod switch_overlay;
 mod validate;
@@ -16,7 +17,7 @@ mod validate;
 use std::path::{Path, PathBuf};
 
 pub use interpret::{Parsed, interpret, parse};
-pub use validate::validate;
+pub use validate::{ValidationOptions, passthrough, validate, validate_with, write_packet};
 
 pub use nusage_spec::Diagnostic;
 use nusage_spec::Source;
