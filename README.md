@@ -6,7 +6,9 @@ Early development.
 
 - `nusage/`: the tool. `nusage --help` for the CLI, `fixtures/` for the hand-written modules
   the generator reproduces and the contract a script relies on, `cargo doc --workspace
-  --no-deps` for the crates.
+  --no-deps` for the crates. Two of them stand on their own: `nushell-schema`, the Nushell
+  dialect of JSON Schema, and `openapi-usage`, an OpenAPI document as a usage spec with the
+  HTTP mapping beside it.
 - `catalog/`: the wrappers for other tools, a Nushell module package per tool under
   `catalog/lib/`, generated from each tool's spec, the schemas of its outputs and the
   overlays beside it. With `catalog/lib` on `$NU_LIB_DIRS`, `use mise *` names mise's

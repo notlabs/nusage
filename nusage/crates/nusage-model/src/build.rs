@@ -6,7 +6,6 @@ use nu_protocol::{Span, Type};
 use nusage_spec::{Assembled, CommandPath, Diagnostic, Header, HeaderNode, Source};
 use usage::{SpecArg, SpecCommand, SpecComplete, SpecFlag, SpecOutput};
 
-use crate::schema;
 use crate::{
     Command, CommandTree, Completer, Conversion, Decoder, Execution, Framing, NuType, Param,
     ParamKind, Structured, Value,
@@ -702,7 +701,7 @@ fn structured_output<'a>(
             ));
         }
         (Some(schema), None) => {
-            let shape = schema::shape(schema)
+            let shape = nushell_schema::shape(schema)
                 .map_err(|why| format!("the schema of output `{}`: {why}", output.name))?;
             // A schema describes one document; JSON lines are a list of them, a table when
             // they are objects, and the fills and conversions apply to every row.

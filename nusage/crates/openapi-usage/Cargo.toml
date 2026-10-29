@@ -1,0 +1,29 @@
+[package]
+name = "openapi-usage"
+description = "An OpenAPI document as a usage spec, with the HTTP mapping beside it"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Not on crates.io yet; the version is the workspace's.
+publish = false
+
+[[bin]]
+name = "openapi-usage"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+nushell-schema.workspace = true
+usage-rs.workspace = true
+
+[dev-dependencies]
+insta = { workspace = true, features = ["json"] }
+usage.workspace = true
+nushell-schema = { workspace = true, features = ["validate"] }
+
+[lints]
+workspace = true
