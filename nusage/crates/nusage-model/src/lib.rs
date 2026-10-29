@@ -68,19 +68,33 @@ pub enum Execution {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Structured {
     pub name: String,
+    /// The JSON Schema the output declares, as text, when it declares one rather than an
+    /// annotation: what the raw output is held to when the module's decoding fails.
+    pub schema: Option<String>,
     /// The words that ask for it, right after the command's: `--json`, or `--format json`;
     /// none when it is the default.
     pub args: Vec<String>,
     pub framing: Framing,
     /// The type, from the output's JSON Schema or its annotation, when it has one.
     pub ty: Option<NuType>,
-    /// Properties the schema does not require, at their cell paths: a record JSON leaves
-    /// one out of gets it as `null`, so the field is there to read, typed
-    /// `oneof<T, nothing>`.
-    pub fills: Vec<Vec<String>>,
+    /// Properties the schema does not require: a record JSON leaves one out of gets it as
+    /// `null`, so the field is there to read, typed `oneof<T, nothing>`.
+    pub fills: Vec<Fill>,
     /// What JSON cannot carry and the schema or annotation declares: each is converted
     /// after decoding, in this order.
     pub conversions: Vec<Conversion>,
+}
+
+/// A property the schema does not require, filled with `null` where its record leaves it
+/// out.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Fill {
+    /// The cell path of the field.
+    pub path: Vec<String>,
+    /// Where on the way to the record `null` may stand instead, as the lengths of the
+    /// prefixes of `path` that may be `null`, shortest first. A `null` is left as it is,
+    /// with no field under it to fill.
+    pub nullable: Vec<usize>,
 }
 
 /// A value JSON delivers as text or a number, converted to the declared type at a cell path
@@ -94,8 +108,10 @@ pub struct Conversion {
     /// For a number: what it counts, as the schema's `x-nu` says, spelled as in a Nushell
     /// literal (`ms`, `sec`, `kB`). `None` for text, such as an ISO 8601 datetime.
     pub unit: Option<String>,
-    /// Whether the value may be `null`, which is left as it is.
-    pub nullable: bool,
+    /// Where on the way to the value `null` may stand instead, as the lengths of the
+    /// prefixes of `path` that may be `null`, shortest first: the whole path for the value
+    /// itself. A `null` is left as it is, with nothing under it to convert.
+    pub nullable: Vec<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

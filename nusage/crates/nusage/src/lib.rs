@@ -6,15 +6,19 @@
 //! shell around it.
 
 mod binary;
+mod calls;
 mod common;
 mod conform;
 mod interpret;
+mod prelude;
 mod shim;
 mod switch_overlay;
+mod validate;
 
 use std::path::{Path, PathBuf};
 
 pub use interpret::{Parsed, interpret, parse};
+pub use validate::validate;
 
 pub use nusage_spec::Diagnostic;
 use nusage_spec::Source;
@@ -100,6 +104,32 @@ pub fn check(source: &Path, overlays: &[PathBuf], module: &Path) -> Result<(), D
             ),
         ))
     }
+}
+
+/// The line that stands in for a script's first where Nushell checks it, binding `$usage`
+/// with its type and defining the shadows of the scripts it calls, and what those calls get
+/// wrong, each as `<script>:<line>:<column>: <what>`.
+pub fn prelude(script: &Path) -> Result<(String, Vec<String>), Diagnostic> {
+    let (line, calls) = prelude::line(script)?;
+    let source = std::fs::read_to_string(script)
+        .map_err(|err| Diagnostic::new(script, format!("cannot read: {err}")))?;
+    let findings = calls
+        .findings
+        .iter()
+        .map(|finding| {
+            let before = &source[..finding.span.start];
+            let line = before.matches('\n').count() + 1;
+            let column = before.len() - before.rfind('\n').map_or(0, |at| at + 1) + 1;
+            format!("{}:{line}:{column}: {}", script.display(), finding.message)
+        })
+        .collect();
+    Ok((line, findings))
+}
+
+/// What the interpreter runs before the script: the shadows of the scripts it calls, which
+/// run them with `nusage`, and the helpers they use. Empty when it calls none.
+pub fn prelude_run(script: &Path, nusage: &Path) -> Result<String, Diagnostic> {
+    prelude::runtime(script, nusage)
 }
 
 /// The assembled spec as usage KDL, overlays merged, for every tool that reads usage specs.

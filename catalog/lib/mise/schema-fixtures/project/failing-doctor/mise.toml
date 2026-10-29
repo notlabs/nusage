@@ -1,0 +1,10 @@
+[doctor.checks.fixture]
+description = "Controlled failing diagnostic"
+run = "exit 1"
+hint = "This failure is intentional"
+timeout = "2s"
+
+[doctor.checks.blocked]
+run = "exit 0"
+depends = ["fixture"]
+timeout = "2s"

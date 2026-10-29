@@ -1,0 +1,6 @@
+# A number is a flag's value, not how many times to give the flag.
+{
+    cmd: [log],
+    invoke: "vcs log --limit 2",
+    argv: [log, --no-graph, --template, "json(self) ++ \"\\n\"", --limit, "2"],
+}

@@ -23,6 +23,39 @@
         schema file=\"events.schema.json\"
     }"]
     ]],
+  ["probe peer",   {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                                                                                                                                                                  is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          nothing,                                                                                                                                                                       false,       null,       null,        null,       null],
+        [null,           output,         "oneof<nothing, record<host: string, port: oneof<int, nothing>, since: oneof<datetime, nothing>, link: oneof<nothing, record<up: bool, latency: oneof<duration, nothing>>>>>", false,       null,       null,        null,       null]
+      ]
+    },                                                                                                                                                                                     [
+      [name,  value];
+      [usage, "output \"json\" framing=\"json\" default=#true {
+        schema #\"\"\"
+{
+  \"oneOf\": [
+    {\"type\": \"null\"},
+    {
+      \"type\": \"object\",
+      \"required\": [\"host\"],
+      \"properties\": {
+        \"host\": {\"type\": \"string\"},
+        \"port\": {\"type\": \"integer\"},
+        \"since\": {\"type\": \"string\", \"format\": \"date-time\"},
+        \"link\": {
+          \"oneOf\": [
+            {\"type\": \"null\"},
+            {\"type\": \"object\", \"required\": [\"up\"], \"properties\": {\"up\": {\"type\": \"boolean\"}, \"latency\": {\"type\": \"integer\", \"x-nu\": {\"type\": \"duration\", \"unit\": \"ms\"}}}}
+          ]
+        }
+      }
+    }
+  ]
+}
+\"\"\"#
+    }"]
+    ]],
   ["probe report", {
       nothing: [
         [parameter_name, parameter_type, syntax_shape,                                                                                                                                                                                                                              is_optional, short_flag, description, completion, parameter_default];
