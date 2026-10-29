@@ -1,6 +1,19 @@
 # The released nusage, with what it runs: the interpreter starts `nu`, and a generated
-# module's completions run `usage`.
+# module's completions run `usage`. Beside it the catalog, the typed commands for other tools,
+# released from the same repository under its own tags: `v<version>` is nusage's,
+# `catalog/v<version>` the catalog's, so each lists only its own.
+[tool_alias]
+nusage-catalog = "github:notlabs/nusage"
+
 [tools]
-"github:notlabs/nusage" = "latest"
+"github:notlabs/nusage" = { version = "latest", version_prefix = "v" }
+nusage-catalog = { version = "latest", version_prefix = "catalog/v", bin_path = "bin" }
 nu = "0.116.1"
 usage = "7.1.3"
+
+# The catalog's `lib` on `$NU_LIB_DIRS`, before whatever was there: `use mise *` then finds
+# the module in a script, at the prompt, and in a `nu --lsp` an editor starts under this
+# environment. Nushell reads the variable when it starts, so a session already open sees it
+# at its next start; `tools = true` resolves it once the catalog is installed.
+[env]
+NU_LIB_DIRS = { value = "{{ tools['nusage-catalog'].path }}/lib{% set more = env.NU_LIB_DIRS | default(value='') %}{% if more != '' %}{% if os() == 'windows' %};{% else %}:{% endif %}{{ more }}{% endif %}", tools = true }

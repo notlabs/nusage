@@ -14,7 +14,7 @@
   ],
   "packageRules": [
     {
-      "description": "The jj on PATH and the jj-cli its spec is read from move together; `mise run //jj:spec` then writes the spec for the new version",
+      "description": "The jj on PATH and the jj-cli its spec is read from move together; `mise run //catalog:spec jj` then writes the spec for the new version",
       "matchDepNames": ["jujutsu", "jj-cli"],
       "groupName": "jj"
     }
