@@ -9,7 +9,8 @@
 
 use nu_protocol::{Span, Value};
 use nusage_model::{
-    Command, CommandTree, Completer, Conversion, Execution, Framing, Param, ParamKind, Structured,
+    Command, CommandTree, Completer, Conversion, Execution, Fill, Framing, Param, ParamKind,
+    Structured,
 };
 use nusage_nu::{
     CommandName, Def, Expr, Ident, Infix, Item, Module, Params, Stmt, SyntaxError, Type, word,
@@ -237,25 +238,7 @@ fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
         Framing::Jsonl => call("from json", vec![Expr::Str("--objects".into())])?,
     }];
     for fill in &structured.fills {
-        let (parent, field) = fill.split_at(fill.len() - 1);
-        let default = call(
-            "default",
-            vec![
-                Expr::Literal(Value::nothing(Span::unknown())),
-                Expr::Str(field[0].clone()),
-            ],
-        )?;
-        stages.push(if parent.is_empty() {
-            default
-        } else {
-            call(
-                "update",
-                vec![
-                    Expr::Raw(cell_path(parent)),
-                    Expr::Closure(Box::new(default)),
-                ],
-            )?
-        });
+        stages.push(fill_stage(fill)?);
     }
     for conversion in &structured.conversions {
         stages.push(conversion_stage(conversion)?);
@@ -263,10 +246,72 @@ fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
     Ok(stages)
 }
 
+/// `default null <field>` on the fill's record: the whole value, or `update <record> {
+/// default null <field> }` below it; held off where a record on the way may be null.
+fn fill_stage(fill: &Fill) -> Result<Expr, SyntaxError> {
+    if let Some(&at) = fill.nullable.first() {
+        let (outer, rest) = fill.path.split_at(at);
+        let inner = Fill {
+            path: rest.to_vec(),
+            nullable: fill.nullable[1..].iter().map(|n| n - at).collect(),
+        };
+        return unless_null(outer, fill_stage(&inner)?);
+    }
+    let (parent, field) = fill.path.split_at(fill.path.len() - 1);
+    let default = call(
+        "default",
+        vec![
+            Expr::Literal(Value::nothing(Span::unknown())),
+            Expr::Str(field[0].clone()),
+        ],
+    )?;
+    if parent.is_empty() {
+        return Ok(default);
+    }
+    call(
+        "update",
+        vec![
+            Expr::Raw(cell_path(parent)),
+            Expr::Closure(Box::new(default)),
+        ],
+    )
+}
+
+/// `stage` on the value at `outer` where that may be null, such as jj's `operation` with
+/// `time.start` under it: a null is left as it is, and the stage runs on anything else.
+/// On the whole value when `outer` is empty.
+fn unless_null(outer: &[String], stage: Expr) -> Result<Expr, SyntaxError> {
+    let nothing = || Expr::Literal(Value::nothing(Span::unknown()));
+    let guarded = move |value: Expr| Expr::If {
+        cond: Box::new(Expr::Infix {
+            lhs: Box::new(value.clone()),
+            op: Infix::Eq,
+            rhs: Box::new(nothing()),
+        }),
+        then: Box::new(nothing()),
+        otherwise: Box::new(Expr::Pipeline(vec![value, stage])),
+    };
+    if outer.is_empty() {
+        return Ok(guarded(Expr::Var(Ident::new("in")?)));
+    }
+    let row = Ident::new("row")?;
+    let body = guarded(Expr::Cell {
+        var: row.clone(),
+        path: outer.to_vec(),
+    });
+    call(
+        "update",
+        vec![
+            Expr::Raw(cell_path(outer)),
+            Expr::ClosureWith {
+                param: row,
+                body: Box::new(body),
+            },
+        ],
+    )
+}
+
 fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
-    // A value under one that may be null, such as jj's `operation.time.start` under a null
-    // `operation`: the outer value is left alone when it is null, and the rest of the
-    // conversion runs on it when it is not.
     if let Some(&at) = conversion.nullable.first()
         && at < conversion.path.len()
     {
@@ -276,31 +321,7 @@ fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
             nullable: conversion.nullable[1..].iter().map(|n| n - at).collect(),
             ..conversion.clone()
         };
-        let row = Ident::new("row")?;
-        let value = Expr::Cell {
-            var: row.clone(),
-            path: outer.to_vec(),
-        };
-        let nothing = || Expr::Literal(Value::nothing(Span::unknown()));
-        let body = Expr::If {
-            cond: Box::new(Expr::Infix {
-                lhs: Box::new(value.clone()),
-                op: Infix::Eq,
-                rhs: Box::new(nothing()),
-            }),
-            then: Box::new(nothing()),
-            otherwise: Box::new(Expr::Pipeline(vec![value, conversion_stage(&inner)?])),
-        };
-        return call(
-            "update",
-            vec![
-                Expr::Raw(cell_path(outer)),
-                Expr::ClosureWith {
-                    param: row,
-                    body: Box::new(body),
-                },
-            ],
-        );
+        return unless_null(outer, conversion_stage(&inner)?);
     }
     let nullable = conversion.nullable.last() == Some(&conversion.path.len());
     let path = cell_path(&conversion.path);

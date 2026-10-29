@@ -17,14 +17,14 @@
 
 use serde_json::Value as Json;
 
-use crate::{Conversion, NuType};
+use crate::{Conversion, Fill, NuType};
 
 /// What a schema says about the value: its type, the optional properties to fill, and the
 /// conversions, as [`crate::Structured`] carries them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shape {
     pub ty: NuType,
-    pub fills: Vec<Vec<String>>,
+    pub fills: Vec<Fill>,
     pub conversions: Vec<Conversion>,
 }
 
@@ -46,7 +46,7 @@ pub fn shape(schema: &str) -> Result<Shape, String> {
 
 struct Reader<'a> {
     root: &'a Json,
-    fills: Vec<Vec<String>>,
+    fills: Vec<Fill>,
     conversions: Vec<Conversion>,
     /// The `$ref`s being followed, to stop at a cycle.
     refs: Vec<String>,
@@ -319,11 +319,20 @@ impl Reader<'_> {
         for (name, property) in properties {
             let optional = !required.contains(&name.as_str());
             let field = place.field(name, optional);
+            let filled = optional && field.reached();
+            if filled {
+                // Before anything under it, so the field is there when its own are filled;
+                // and only where the record is one: a `null` on the way, the record itself
+                // included, has no field to fill.
+                self.fills.push(Fill {
+                    path: field.path.clone(),
+                    nullable: place.nullable.clone(),
+                });
+            }
             let ty = self.node(property, &field)?;
             if !optional {
                 columns.push(format!("{}: {ty}", column(name)));
-            } else if field.reached() {
-                self.fills.push(field.path.clone());
+            } else if filled {
                 let ty = oneof(vec![ty, "nothing".to_string()]);
                 columns.push(format!("{}: {ty}", column(name)));
             }
@@ -503,7 +512,7 @@ mod tests {
         let schema = r#"{"type": "object", "properties": {"ok": {"type": "boolean"}, "name": {"type": "string"}}, "required": ["ok"]}"#;
         let shape = shape(schema).unwrap();
         assert_eq!(shape.ty.0, "record<ok: bool, name: oneof<string, nothing>>");
-        assert_eq!(shape.fills, vec![vec!["name".to_string()]]);
+        assert_eq!(shape.fills, vec![fill(&["name"], &[])]);
         let rows = format!(r#"{{"type": "array", "items": {schema}}}"#);
         assert_eq!(ty(&rows), "table<ok: bool, name: oneof<string, nothing>>");
         let referenced = format!(
@@ -535,10 +544,7 @@ mod tests {
             tabled.ty.0,
             "record<rows: table<id: int, note: oneof<string, nothing>>>"
         );
-        assert_eq!(
-            tabled.fills,
-            vec![vec!["rows".to_string(), "note".to_string()]]
-        );
+        assert_eq!(tabled.fills, vec![fill(&["rows", "note"], &[])]);
     }
 
     #[test]
@@ -556,7 +562,8 @@ mod tests {
         let converted = r#"{"oneOf": [{"type": "string"}, {"type": "object", "required": ["at"],
             "properties": {"at": {"type": "string", "format": "date-time"}}}]}"#;
         assert!(super::shape(converted).is_err());
-        // A shape or null is not such a union: the one shape is still filled.
+        // A shape or null is not such a union: the one shape is still filled, where it is
+        // not the null.
         let nullable = r#"{"oneOf": [{"type": "null"}, {"type": "object", "required": ["id"],
             "properties": {"id": {"type": "integer"}, "note": {"type": "string"}}}]}"#;
         let shape = super::shape(nullable).unwrap();
@@ -564,7 +571,33 @@ mod tests {
             shape.ty.0,
             "oneof<nothing, record<id: int, note: oneof<string, nothing>>>"
         );
-        assert_eq!(shape.fills, vec![vec!["note".to_string()]]);
+        assert_eq!(shape.fills, vec![fill(&["note"], &[0])]);
+    }
+
+    #[test]
+    fn a_fill_knows_what_may_be_null_on_the_way() {
+        // `peer` may be left out or null, and `port` left out of it: the fill of `port`
+        // is for the records that have a `peer`.
+        let schema = r#"{"type": "object", "properties": {"peer": {"oneOf": [{"type": "null"},
+            {"type": "object", "required": ["host"], "properties": {"host": {"type": "string"},
+            "port": {"type": "integer"}}}]}}}"#;
+        let shape = shape(schema).unwrap();
+        assert_eq!(
+            shape.ty.0,
+            "record<peer: oneof<nothing, record<host: string, port: oneof<int, nothing>>>>"
+        );
+        // The record's own field first: `peer` is there when `port` is filled under it.
+        assert_eq!(
+            shape.fills,
+            vec![fill(&["peer"], &[]), fill(&["peer", "port"], &[1])]
+        );
+    }
+
+    fn fill(path: &[&str], nullable: &[usize]) -> Fill {
+        Fill {
+            path: path.iter().map(|part| part.to_string()).collect(),
+            nullable: nullable.to_vec(),
+        }
     }
 
     #[test]

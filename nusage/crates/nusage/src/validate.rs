@@ -13,17 +13,17 @@ use std::path::Path;
 use serde_json::Value;
 
 /// The findings for `documents` against the schema at `schema`, as `<document>:<path>:
-/// <what>` lines; the schema's own faults first, as `<schema>: <what>`, and then nothing
-/// else, since a faulty schema judges nothing. A document named `-` is standard input;
-/// no documents holds the schema alone. Empty when everything conforms.
+/// <what>` lines; empty when every document conforms. A document named `-` is standard
+/// input; no documents holds the schema alone. The error is a check that did not run: a
+/// schema or document that cannot be read, or a schema its metaschema refuses, since a
+/// faulty schema judges nothing.
 pub fn validate(schema: &Path, documents: &[impl AsRef<Path>]) -> Result<Vec<String>, String> {
     let text =
         std::fs::read_to_string(schema).map_err(|err| format!("{}: {err}", schema.display()))?;
     let schema_json: Value =
         serde_json::from_str(&text).map_err(|err| format!("{}: {err}", schema.display()))?;
-    if let Err(err) = jsonschema::meta::validate(&schema_json) {
-        return Ok(vec![format!("{}: {err}", schema.display())]);
-    }
+    jsonschema::meta::validate(&schema_json)
+        .map_err(|err| format!("{}: {err}", schema.display()))?;
     let validator = jsonschema::options()
         .should_validate_formats(true)
         .build(&schema_json)
@@ -97,12 +97,12 @@ mod tests {
             "{findings:?}"
         );
 
+        // A faulty schema is no finding on the document: the check did not run.
         let faulty = file(&dir, "faulty.schema.json", r#"{"type": "whatever"}"#);
-        let findings = validate(&faulty, &[&good]).unwrap();
-        assert_eq!(findings.len(), 1, "{findings:?}");
+        let why = validate(&faulty, &[&good]).unwrap_err();
         assert!(
-            findings[0].starts_with(&format!("{}: ", faulty.display())),
-            "{findings:?}"
+            why.starts_with(&format!("{}: ", faulty.display())),
+            "{why:?}"
         );
         std::fs::remove_dir_all(&dir).unwrap();
     }

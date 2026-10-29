@@ -77,13 +77,24 @@ pub struct Structured {
     pub framing: Framing,
     /// The type, from the output's JSON Schema or its annotation, when it has one.
     pub ty: Option<NuType>,
-    /// Properties the schema does not require, at their cell paths: a record JSON leaves
-    /// one out of gets it as `null`, so the field is there to read, typed
-    /// `oneof<T, nothing>`.
-    pub fills: Vec<Vec<String>>,
+    /// Properties the schema does not require: a record JSON leaves one out of gets it as
+    /// `null`, so the field is there to read, typed `oneof<T, nothing>`.
+    pub fills: Vec<Fill>,
     /// What JSON cannot carry and the schema or annotation declares: each is converted
     /// after decoding, in this order.
     pub conversions: Vec<Conversion>,
+}
+
+/// A property the schema does not require, filled with `null` where its record leaves it
+/// out.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Fill {
+    /// The cell path of the field.
+    pub path: Vec<String>,
+    /// Where on the way to the record `null` may stand instead, as the lengths of the
+    /// prefixes of `path` that may be `null`, shortest first. A `null` is left as it is,
+    /// with no field under it to fill.
+    pub nullable: Vec<usize>,
 }
 
 /// A value JSON delivers as text or a number, converted to the declared type at a cell path
