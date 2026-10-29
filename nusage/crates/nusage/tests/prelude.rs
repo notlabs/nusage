@@ -79,3 +79,28 @@ fn only_a_script_nusage_runs_has_one() {
     let err = nusage::prelude(&callee.join("expected/caller.nu")).unwrap_err();
     assert!(err.to_string().contains("shebang"), "{err}");
 }
+
+#[test]
+fn a_run_of_a_script_nusage_runs_says_what_to_write() {
+    let dir = std::env::temp_dir().join(format!("nusage-prelude-run-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("chatty.nu"), "#!/usr/bin/env nusage\nprint hi\n").unwrap();
+    let caller = dir.join("caller.nu");
+    std::fs::write(
+        &caller,
+        "#!/usr/bin/env nusage\nrun ./chatty.nu\nrun chatty.nu\n",
+    )
+    .unwrap();
+    let found = nusage::prelude(&caller);
+    std::fs::remove_dir_all(&dir).unwrap();
+    let (_, findings) = found.unwrap();
+    let said = |line: usize, written: &str| {
+        format!(
+            "{}:{line}:5: `run {written}` hands the script this one's `$usage`, not the \
+             arguments after it; call it as `./chatty.nu` instead, without `run`, to have them \
+             parsed",
+            caller.display()
+        )
+    };
+    assert_eq!(findings, [said(2, "./chatty.nu"), said(3, "chatty.nu")]);
+}

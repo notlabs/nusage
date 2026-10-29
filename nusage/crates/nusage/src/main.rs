@@ -8,6 +8,12 @@ use usage_rs::{Args, Cli, Run, Subcommands};
 /// As an interpreter, `nusage <script> [args...]` runs a script whose first line is
 /// `#!/usr/bin/env nusage`: the arguments are parsed against its `#USAGE` header and the
 /// script runs in Nushell with its `$usage` record, as the generated module would run it.
+///
+/// Such a script calls another by its path, `./x.nu ...`, or as `nusage x.nu ...` or `nu x.nu
+/// ...`: the call is that script's typed command, which runs it and returns its value typed,
+/// while what it prints passes through. The path is the calling script's, not the working
+/// directory's: `./x.nu` is the script beside it, wherever it runs from. `^./x.nu` is the plain
+/// external, which returns text.
 #[derive(Cli)]
 #[usage(bin = "nusage", version)]
 struct Nusage {

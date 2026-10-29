@@ -30,6 +30,9 @@ declare a JSON Schema instead, inline or `schema file=`, which is read as a Nush
 A script that calls another by its path, `./x.nu`, or as `nusage x.nu` or `nu x.nu`, calls the
 shadow nusage defines for that call: the other script's typed command, named as the call
 writes it, which runs it through the interpreter and returns its value, typed as its output
-declares, while what it prints passes through. The interpreter and the module define the
-shadows before the script, and `nusage prelude` writes them as the line that stands in for the
-script's first where Nushell checks it. `script-calls` calls `callee.nu` the three ways.
+declares, while what it prints passes through. The path is the calling script's: `./x.nu`,
+`nusage x.nu` and `nu x.nu` all name the `x.nu` beside it, wherever it runs from, where the
+external call they replace would look in the working directory; `^./x.nu` is still that
+external. The interpreter and the module define the shadows before the script, and `nusage
+prelude` writes them as the line that stands in for the script's first where Nushell checks it.
+`script-calls` calls `callee.nu` the three ways.

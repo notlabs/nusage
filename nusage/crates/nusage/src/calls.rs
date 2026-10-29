@@ -82,8 +82,9 @@ pub fn scan(path: &Path, source: &str) -> Calls {
                     calls.findings.push(Finding {
                         span: named.span.clone(),
                         message: format!(
-                            "`run` hands {} this script's `$usage`, not the arguments after \
-                             it; call it by its path, `{}`, to have them parsed",
+                            "`run {}` hands the script this one's `$usage`, not the arguments \
+                             after it; call it as `{}` instead, without `run`, to have them \
+                             parsed",
                             named.text,
                             as_path(&named.text)
                         ),
@@ -139,11 +140,17 @@ fn named_script<'a>(head: &'a Word, args: &'a [Word]) -> Option<(String, &'a Wor
         .then(|| (format!("{} {}", head.text, script.text), script))
 }
 
-/// Whether Nushell runs the word as a path rather than looking it up as a name.
+/// Whether Nushell runs the word as a path rather than looking it up as a name: relative to
+/// here or to home, or absolute, and on Windows with a backslash too.
 fn is_path(word: &str) -> bool {
-    ["./", "../", "/", "~/"]
-        .iter()
-        .any(|prefix| word.starts_with(prefix))
+    let prefixes: &[&str] = if cfg!(windows) {
+        &["./", "../", "~/", ".\\", "..\\", "~\\"]
+    } else {
+        &["./", "../", "~/"]
+    };
+    prefixes.iter().any(|prefix| word.starts_with(prefix))
+        || word.starts_with('/')
+        || Path::new(word).is_absolute()
 }
 
 /// The word as a path call: `./x.nu` for `x.nu`.
@@ -158,7 +165,10 @@ fn as_path(word: &str) -> String {
 /// A path as the caller wrote it, against the caller's directory, folded without touching
 /// the filesystem: `~` is the home directory.
 fn resolve(dir: &Path, word: &str) -> PathBuf {
-    let joined = match word.strip_prefix("~/") {
+    let home = word
+        .strip_prefix("~/")
+        .or_else(|| word.strip_prefix("~\\").filter(|_| cfg!(windows)));
+    let joined = match home {
         Some(rest) => std::env::home_dir().unwrap_or_default().join(rest),
         None => dir.join(word),
     };
@@ -338,5 +348,17 @@ mod tests {
         assert_eq!(named("nu", &["-c", "x.nu"]), None);
         assert_eq!(as_path("x.nu"), "./x.nu");
         assert_eq!(as_path("../x.nu"), "../x.nu");
+    }
+
+    #[test]
+    fn a_backslash_makes_a_path_on_windows_alone() {
+        // Elsewhere it is a character of the name, which Nushell looks up on PATH.
+        for word in [".\\x.nu", "..\\x.nu", "~\\x.nu"] {
+            assert_eq!(is_path(word), cfg!(windows), "{word}");
+        }
+        assert!(is_path("/x.nu"));
+        if cfg!(windows) {
+            assert!(is_path("C:\\x.nu"));
+        }
     }
 }
