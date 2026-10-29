@@ -8,6 +8,12 @@ use usage_rs::{Args, Cli, Run, Subcommands};
 /// As an interpreter, `nusage <script> [args...]` runs a script whose first line is
 /// `#!/usr/bin/env nusage`: the arguments are parsed against its `#USAGE` header and the
 /// script runs in Nushell with its `$usage` record, as the generated module would run it.
+///
+/// Such a script calls another by its path, `./x.nu ...`, or as `nusage x.nu ...` or `nu x.nu
+/// ...`: the call is that script's typed command, which runs it and returns its value typed,
+/// while what it prints passes through. The path is the calling script's, not the working
+/// directory's: `./x.nu` is the script beside it, wherever it runs from. `^./x.nu` is the plain
+/// external, which returns text.
 #[derive(Cli)]
 #[usage(bin = "nusage", version)]
 struct Nusage {
@@ -23,6 +29,7 @@ enum Commands {
     Check(Check),
     Overlay(Overlay),
     Parse(Parse),
+    Prelude(Prelude),
     Validate(Validate),
 }
 
@@ -224,6 +231,45 @@ impl Run for Parse {
                 std::process::exit(2)
             }
         }
+    }
+}
+
+/// Print the line that stands in for a script's first where Nushell checks it
+///
+/// For an editor or a linter: with this line in place of the shebang, Nushell checks the
+/// script as nusage runs it. The line binds `$usage` with its type, and defines a shadow for
+/// each script the script calls by its path, as `./x.nu`, `nusage x.nu` or `nu x.nu`: that
+/// script's typed command, named as the call writes it, which the interpreter and the module
+/// define too. Every other line stays where it was. What the calls get wrong goes to
+/// standard error, a line each, `<script>:<line>:<column>: <what>`.
+#[derive(Args)]
+struct Prelude {
+    /// The script, whose shebang names nusage
+    script: PathBuf,
+    /// Print what the interpreter runs before the script instead: the shadows with their
+    /// bodies, and the helpers they build an argv with
+    #[usage(long)]
+    run: bool,
+}
+
+impl Run for Prelude {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        if self.run {
+            let nusage = std::env::current_exe().map_err(|err| err.to_string())?;
+            print!(
+                "{}",
+                nusage::prelude_run(&self.script, &nusage).map_err(|e| e.to_string())?
+            );
+            return Ok(());
+        }
+        let (line, findings) = nusage::prelude(&self.script).map_err(|e| e.to_string())?;
+        println!("{line}");
+        for finding in findings {
+            eprintln!("{finding}");
+        }
+        Ok(())
     }
 }
 

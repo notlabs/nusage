@@ -88,6 +88,7 @@ export def main [
 @usage 'flag "-r --revision <REVSETS>" var=#true help="Which revisions to show"'
 @usage 'flag "-T --template <TEMPLATE>" help="Render each revision with this"'
 @usage 'flag "-G --no-graph" help="A flat list, not a graph"'
+@usage 'flag "-n --limit" help="At most this many revisions" { arg (int)"<LIMIT>" }'
 @usage 'arg "[FILESETS]..." help="Only revisions touching these"'
 @usage 'output "text" default=#true'
 @usage 'output "json" framing="jsonl" {
@@ -97,8 +98,9 @@ export def "vcs log" [
     ...filesets: string,            # Only revisions touching these
     --repository (-R): string,      # Where to work
     --revision (-r): list<string>,  # Which revisions to show
+    --limit (-n): int,              # At most this many revisions
 ]: nothing -> table<commit_id: string, author: record<name: string, timestamp: datetime>> {
-    let text = ^vcs log --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [...$filesets] {--repository: $repository, --revision: $revision})
+    let text = ^vcs log --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [...$filesets] {--repository: $repository, --revision: $revision, --limit: ([$limit] | compact)})
     nusage decoded $text "{\"type\":\"object\",\"required\":[\"commit_id\",\"author\"],\"properties\":{\"commit_id\":{\"type\":\"string\"},\"author\":{\"type\":\"object\",\"required\":[\"name\",\"timestamp\"],\"properties\":{\"name\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}}}}" { from json --objects | into datetime author.timestamp } --lines
 }
 

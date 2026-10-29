@@ -6,6 +6,7 @@ cmd "log" help="Show revisions" {
     flag "-r --revision <REVSETS>" var=#true help="Which revisions to show"
     flag "-T --template <TEMPLATE>" help="Render each revision with this"
     flag "-G --no-graph" help="A flat list, not a graph"
+    flag "-n --limit" help="At most this many revisions" { arg (int)"<LIMIT>" }
     arg "[FILESETS]..." help="Only revisions touching these"
 }
 cmd "evolog" help="Show how a change evolved" {

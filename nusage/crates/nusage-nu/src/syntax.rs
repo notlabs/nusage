@@ -248,6 +248,10 @@ pub enum Stmt {
     },
     /// `let NAME = EXPR`
     Let { name: Ident, value: Expr },
+    /// `const NAME = EXPR`: evaluated where the parser reads it, as `path self` must be.
+    Const { name: Ident, value: Expr },
+    /// A definition inside a body, where only the rest of the body sees it.
+    Def(Box<Def>),
     /// `A | B | C`
     Pipeline(Vec<Expr>),
 }
