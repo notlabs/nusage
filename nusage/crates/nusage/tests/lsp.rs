@@ -368,3 +368,58 @@ fn anything_else_is_nu_itself() {
     assert!(output.status.success(), "{output:?}");
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "ab");
 }
+
+/// A `nu` first on PATH that runs `nusage nu` again, as a wrapper of mise's would that
+/// nusage cannot tell for one: the second time round, the same process stops.
+#[cfg(unix)]
+#[test]
+fn a_nu_that_leads_back_here_stops() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = std::env::temp_dir().join(format!("nusage-nu-loop-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let nu = dir.join("nu");
+    std::fs::write(&nu, "#!/bin/sh\nexec \"$NUSAGE_UNDER_TEST\" nu \"$@\"\n").unwrap();
+    std::fs::set_permissions(&nu, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_nusage"))
+        .args(["nu", "-c", "print hi"])
+        .env("PATH", &dir)
+        .env("NUSAGE_UNDER_TEST", env!("CARGO_BIN_EXE_nusage"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while child.try_wait().unwrap().is_none() {
+        if std::time::Instant::now() > deadline {
+            child.kill().unwrap();
+            panic!("`nusage nu` is still going round");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let output = child.wait_with_output().unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(!output.status.success(), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("leads back to `nusage nu`"),
+        "{output:?}"
+    );
+}
+
+#[test]
+fn a_nu_another_one_ran_runs() {
+    if Command::new("nu").arg("--version").output().is_err() {
+        assert!(
+            std::env::var("CI").as_deref() != Ok("true"),
+            "nu is not on PATH"
+        );
+        return;
+    }
+    // The mark of a `nusage nu` that ran this process's parent, as a `nu` Nushell starts has.
+    let output = Command::new(env!("CARGO_BIN_EXE_nusage"))
+        .args(["nu", "-n", "-c", "print inner"])
+        .env("NUSAGE_NU_PID", "1")
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "inner");
+}
