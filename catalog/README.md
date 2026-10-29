@@ -46,13 +46,14 @@ lines for a vendor autoload directory.
 
 An editor starts `nu --lsp` itself, before any shell. A mise command wrapper gives it the
 project's environment: it keeps the name `nu`, so the editor's configuration does not change,
-and routes through `env` because a wrapper may not run itself. `mise reshim` after adding it,
-and put mise's `command-wrappers/bin` directory, which `mise activate` adds to `PATH`, on the
-editor's `PATH`:
+and delegates to `nusage nu`, which serves nusage's language server for `--lsp` and runs the
+real `nu` for anything else, so a project wrapper and the global one nusage's conf.d fragment
+offers behave alike. `mise reshim` after adding it, and put mise's `command-wrappers/bin`
+directory, which `mise activate` adds to `PATH`, on the editor's `PATH`:
 
 ```toml
 [wrappers.nu]
-command = "env"
+command = "nusage"
 args = ["nu"]
 env = { NU_LIB_DIRS = "{{ [config_root, '.nusage', 'lib'] | join_path }}" }
 ```
@@ -80,7 +81,9 @@ digest, `@sha256:…`, where a moved tag must not pass unnoticed.
 1. Declare it in `mise.toml`: `spec = { run = "…" }` names a command line that prints the
    tool's usage spec, or `spec = { clap = "spec" }` an extractor under the package that
    `clap/spec.nu` builds and runs, as `clap/README.md` describes; `switch` names the flag
-   that selects structured output and its framing, when the spec declares no `output`.
+   that selects structured output and its framing, when the spec declares no `output`. A
+   `run` whose export builds something adds `probe = "version"`, so `check` compares the
+   spec's `version` to `<bin> --version` rather than exporting again.
 2. `mise run //catalog:spec <tool>` writes `lib/<tool>/<tool>.usage.kdl`.
 3. Add `lib/<tool>/*.overlay.kdl` for what the spec lacks: types, outputs, selectors. They
    merge in name order after the generated overlays. A suite under `lib/<tool>/schemas/`,
