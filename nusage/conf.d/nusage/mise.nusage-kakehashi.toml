@@ -1,0 +1,6 @@
+# `MISE_ENV=nusage-kakehashi`: kakehashi, which `nusage nu --lsp` runs in front of nusage's
+# language server when it is on PATH, to highlight a script's header as usage KDL and its
+# `run=` scripts as Nushell or sh. It installs the parsers it reads the first time it needs
+# them, which takes a C compiler.
+[tools]
+"github:atusy/kakehashi" = "latest"
