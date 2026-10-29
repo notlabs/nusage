@@ -11,7 +11,7 @@ use nusage_nu::{Item, Module, SyntaxError};
 use nusage_spec::Diagnostic;
 
 use crate::binary::HELPERS;
-use crate::calls::{self, Calls, Runner};
+use crate::calls::{self, CALL_HELPER, Calls, Runner};
 
 /// The line that stands in for the script's first, and what the script's calls of scripts
 /// got wrong. The script must be one nusage runs: its shebang names it.
@@ -45,7 +45,10 @@ pub fn runtime(script: &Path, nusage: &Path) -> Result<String, Diagnostic> {
     if calls.shadows.is_empty() {
         return Ok(String::new());
     }
-    let mut items = vec![Item::Verbatim(HELPERS.to_string())];
+    let mut items = vec![
+        Item::Verbatim(HELPERS.to_string()),
+        Item::Verbatim(CALL_HELPER.to_string()),
+    ];
     for shadow in &calls.shadows {
         let def = calls::shadow_def(shadow, Runner::Interpreter(nusage))
             .map_err(|err| syntax(script, err))?;

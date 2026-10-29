@@ -142,7 +142,7 @@ def words-of [case: record] {
 
 def check-shim [import: string, bin: string, case: record] {
     let code = $"($import); ($bin) (words-of $case) | to nuon"
-    run-nu $code {} | compare (expected-output $case)
+    run-nu $code {} | after-printed $case | compare (expected-output $case)
 }
 
 def check-interpreter [dir: path, bin: string, case: record] {
@@ -156,7 +156,7 @@ def check-interpreter [dir: path, bin: string, case: record] {
     let code = $"($prelude)\nlet usage = \($env.NUSAGE_ARGS | from nuon\); $in | run ($script | to nuon) | to nuon"
     run-nu $code {
         NUSAGE_ARGS: ($case.usage | to nuon)
-    } | compare (expected-output $case)
+    } | after-printed $case | compare (expected-output $case)
 }
 
 # A binary call against the fixture's fake binary: the argv it recorded must be the case's
@@ -235,7 +235,14 @@ def check-run [dir: path, bin: string, case: record] {
     let shown = run-nu '$env.NUSAGE_EXPECTED | from nuon' {
         NUSAGE_EXPECTED: ((expected-output $case) | to nuon)
     }
-    if ($ran.stdout | str trim) != $shown.detail {
+    let printed = {
+        ok: true
+        detail: ($ran.stdout | str trim)
+    } | after-printed $case
+    if not $printed.ok {
+        return $printed
+    }
+    if $printed.detail != $shown.detail {
         return {
             ok: false
             detail: $"printed:\n($ran.stdout | str trim)\nexpected:\n($shown.detail)"
@@ -309,6 +316,26 @@ def run-nu [code: string, env_vars: record] {
             ok: true
             detail: ($out.stdout | str trim)
         }
+    }
+}
+
+# What a call printed before its value: the case's `printed`, which must come first, is taken
+# off, so what follows is the value.
+def after-printed [case: record] {
+    let out = $in
+    let printed = $case.printed? | default ""
+    if not $out.ok or ($printed | is-empty) {
+        return $out
+    }
+    if not ($out.detail | str starts-with $printed) {
+        return {
+            ok: false
+            detail: $"expected ($printed | to nuon) printed first, got:\n($out.detail)"
+        }
+    }
+    {
+        ok: true
+        detail: ($out.detail | str substring ($printed | str length).. | str trim)
     }
 }
 

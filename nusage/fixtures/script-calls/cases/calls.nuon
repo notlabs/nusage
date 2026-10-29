@@ -1,6 +1,7 @@
-# The callee's value, typed, through each form of the call.
+# The callee's value, typed, through each form of the call, after what it printed.
 {
     argv: [ana],
+    printed: "callee: greeting ana",
     usage: {cmd: [], args: {who: ana}, flags: {}},
     output: {
         path: {greeting: "hello ana", times: 2, at: 2024-01-01T00:00:00Z},

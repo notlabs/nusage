@@ -36,6 +36,17 @@ def "nusage flag-words" []: record -> list<string> {
     } | flatten
 }
 
+# A script run as a call of it: the interpreter writes the script's value as NUON to the file
+# named here and the call reads it back once the script is done, so what the script prints
+# passes through as any command's does.
+def "nusage call" [nusage: string, script: path, ...args: string]: any -> any {
+    let file = $nu.temp-dir | path join $"nusage-(random uuid).nuon"
+    $in | with-env {NUSAGE_OUTPUT_FILE: $file} { ^$nusage $script ...$args }
+    let value = open --raw $file | from nuon
+    rm $file
+    $value
+}
+
 # Calls the script beside it, by its path and through nusage and nu
 @usage 'arg "<who>"'
 @usage 'output ("record<path: record<greeting: string, times: int, at: datetime>, nusage: string, nu: int, at: string>")"nuon" default=#true'
@@ -46,25 +57,28 @@ export def main [
         name: string,
         --loud (-l),
         --times: int,
+        --chatty,      # Say what it is doing, as a script does
     ]: nothing -> record<greeting: string, times: int, at: datetime> {
         const script = path self "../callee.nu"
-        with-env {NUSAGE_OUTPUT: nuon} { ^nusage $script ...(nusage argv [$name] {--loud: $loud, --times: ([$times] | compact)}) } | from nuon
+        $in | nusage call nusage $script ...(nusage argv [$name] {--loud: $loud, --times: ([$times] | compact), --chatty: $chatty})
     }
     def "nu callee.nu" [
         name: string,
         --loud (-l),
         --times: int,
+        --chatty,      # Say what it is doing, as a script does
     ]: nothing -> record<greeting: string, times: int, at: datetime> {
         const script = path self "../callee.nu"
-        with-env {NUSAGE_OUTPUT: nuon} { ^nusage $script ...(nusage argv [$name] {--loud: $loud, --times: ([$times] | compact)}) } | from nuon
+        $in | nusage call nusage $script ...(nusage argv [$name] {--loud: $loud, --times: ([$times] | compact), --chatty: $chatty})
     }
     def "nusage callee.nu" [
         name: string,
         --loud (-l),
         --times: int,
+        --chatty,      # Say what it is doing, as a script does
     ]: nothing -> record<greeting: string, times: int, at: datetime> {
         const script = path self "../callee.nu"
-        with-env {NUSAGE_OUTPUT: nuon} { ^nusage $script ...(nusage argv [$name] {--loud: $loud, --times: ([$times] | compact)}) } | from nuon
+        $in | nusage call nusage $script ...(nusage argv [$name] {--loud: $loud, --times: ([$times] | compact), --chatty: $chatty})
     }
     let usage = {
         cmd: []

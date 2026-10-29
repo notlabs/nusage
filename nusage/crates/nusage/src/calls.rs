@@ -4,11 +4,10 @@
 //! shebang names nusage is shadowed by a command named as the call writes it, which is that
 //! script's typed wrapper: its signature is the script's header, and it runs the script
 //! through the interpreter, which hands the value back as NUON, of the type the script's
-//! output declares. The shadows are defined where the script runs, by the interpreter and by
-//! the module, and stand in its first line where Nushell checks it, so what is checked is
-//! what runs. `^./x.nu` is still the external, and its text. What a script called this way
-//! prints to standard output is read as its value, so it says anything else on standard
-//! error.
+//! output declares. The value comes back through a file the call names, so what the script
+//! prints passes through as any command's does. The shadows are defined where the script
+//! runs, by the interpreter and by the module, and stand in its first line where Nushell
+//! checks it, so what is checked is what runs. `^./x.nu` is still the external, and its text.
 //!
 //! A path is the caller's: `./x.nu` names the script beside the caller, wherever it runs
 //! from. `run x.nu` cannot be shadowed, being Nushell's keyword, and hands a nusage script
@@ -27,9 +26,12 @@ use nusage_spec::Diagnostic;
 use crate::binary::params_and_argv;
 use crate::common::{Target, relative};
 
-/// The variable a shadow sets for the script it runs: the interpreter writes the script's
-/// value as NUON rather than for a reader, and does not pass the variable on.
-pub const OUTPUT_VAR: &str = "NUSAGE_OUTPUT";
+/// The variable a shadow sets for the script it runs: the file the interpreter writes the
+/// script's value to, as NUON. The interpreter does not pass it on.
+pub const OUTPUT_VAR: &str = "NUSAGE_OUTPUT_FILE";
+
+/// The helper a shadow runs its script with, which names that file and reads it back.
+pub const CALL_HELPER: &str = include_str!("script-call.nu");
 
 /// A command standing in for calls of one command of another script.
 #[derive(Debug, Clone)]
@@ -246,7 +248,7 @@ pub enum Runner<'a> {
 }
 
 /// The shadow as a definition: the called command's parameters, as a wrapper of a binary
-/// has them, and a body that runs the script through the interpreter and decodes its NUON.
+/// has them, and a body that hands its input and argv to [`CALL_HELPER`]'s `nusage call`.
 pub fn shadow_def(shadow: &Shadow, runner: Runner) -> Result<Def, SyntaxError> {
     let (params, argv) = params_and_argv(&shadow.command, Target::Call)?;
     let mut body = Vec::new();
@@ -259,31 +261,21 @@ pub fn shadow_def(shadow: &Shadow, runner: Runner) -> Result<Def, SyntaxError> {
                     word(&relative(base, &shadow.target))
                 )),
             });
-            ("nusage".to_string(), Expr::Var(Ident::new("script")?))
+            (Expr::Str("nusage".into()), Expr::Var(Ident::new("script")?))
         }
         Runner::Interpreter(nusage) => (
-            word(&nusage.to_string_lossy()),
+            Expr::Str(nusage.to_string_lossy().into_owned()),
             Expr::Str(shadow.target.to_string_lossy().into_owned()),
         ),
     };
-    let mut args = vec![script];
+    let mut args = vec![program, script];
     args.extend(shadow.words.iter().cloned().map(Expr::Str));
     args.push(Expr::Spread(Box::new(argv)));
-    let run = Expr::External {
-        name: program,
-        args,
-    };
     body.push(Stmt::Pipeline(vec![
+        Expr::Var(Ident::new("in")?),
         Expr::Call {
-            name: CommandName::new("with-env")?,
-            args: vec![
-                Expr::Record(vec![(OUTPUT_VAR.into(), Expr::Str("nuon".into()))]),
-                Expr::Closure(Box::new(run)),
-            ],
-        },
-        Expr::Call {
-            name: CommandName::new("from nuon")?,
-            args: vec![],
+            name: CommandName::new("nusage call")?,
+            args,
         },
     ]));
     Ok(Def {

@@ -9,9 +9,9 @@
 //! its ancestors' globals; a script on its own is its own root.
 //!
 //! Before the script, Nushell defines the shadows of the scripts it calls, which run them
-//! through this same interpreter ([`crate::calls`]). Run by one, with `NUSAGE_OUTPUT=nuon`,
-//! the interpreter writes the script's value as NUON for the shadow to decode, and the
-//! script's own calls do not see the variable.
+//! through this same interpreter ([`crate::calls`]). Run by one, with `NUSAGE_OUTPUT_FILE`
+//! naming a file, the interpreter writes the script's value there as NUON for the shadow to
+//! read, and the script's own calls do not see the variable.
 
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -113,10 +113,12 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
     let nusage = std::env::current_exe()
         .map_err(|err| Diagnostic::new(script, format!("cannot find nusage itself: {err}")))?;
     let prelude = crate::prelude::runtime(&path, &nusage)?;
-    let to_nuon = if std::env::var(crate::calls::OUTPUT_VAR).as_deref() == Ok("nuon") {
-        " | to nuon"
-    } else {
-        ""
+    let to_nuon = match std::env::var_os(crate::calls::OUTPUT_VAR) {
+        Some(file) if !file.is_empty() => format!(
+            " | to nuon | save --raw --force {}",
+            nusage_nu::word(&file.to_string_lossy())
+        ),
+        _ => String::new(),
     };
     let mut nu = Command::new("nu");
     let code = if cfg!(unix) {

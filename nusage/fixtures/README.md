@@ -8,10 +8,10 @@ the Nushell that runs it, and a single script's cases also through the `nusage` 
 when the binary is built. A binary module completes through the `usage` CLI, so its completion
 checks need it on `PATH`.
 
-A script case is `{argv, invoke?, usage, output?, complete?}`: `argv` is what the interpreter
-receives, as `nusage <script> ...argv` parses it; `invoke` the Nushell spelling when it differs;
-`usage` the record the script must see;
-`output` what the command returns when that is not the record; `complete` a line and the
+A script case is `{argv, invoke?, usage, output?, printed?, complete?}`: `argv` is what the
+interpreter receives, as `nusage <script> ...argv` parses it; `invoke` the Nushell spelling when
+it differs; `usage` the record the script must see; `output` what the command returns when that
+is not the record; `printed` what it prints before returning it; `complete` a line and the
 completions expected at its end. A binary case is `{cmd, complete?, invoke?, argv?, stdout?,
 output?, error?}`: `invoke` is a call run with the fixture's `fake/<bin>` on `PATH`, a stand-in
 that records the argv it received, compared with `argv`, and prints `stdout`; `output` is what
@@ -30,7 +30,6 @@ declare a JSON Schema instead, inline or `schema file=`, which is read as a Nush
 A script that calls another by its path, `./x.nu`, or as `nusage x.nu` or `nu x.nu`, calls the
 shadow nusage defines for that call: the other script's typed command, named as the call
 writes it, which runs it through the interpreter and returns its value, typed as its output
-declares.
-The interpreter and the module define the shadows before the script, and `nusage prelude`
-writes their signatures as the line that stands in for the script's first where Nushell
-checks it. `script-calls` calls `callee.nu` the three ways.
+declares, while what it prints passes through. The interpreter and the module define the
+shadows before the script, and `nusage prelude` writes them as the line that stands in for the
+script's first where Nushell checks it. `script-calls` calls `callee.nu` the three ways.

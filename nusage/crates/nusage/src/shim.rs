@@ -11,7 +11,7 @@ use nusage_nu::{
 };
 
 use crate::binary::HELPERS;
-use crate::calls::{self, Runner, shadow_def};
+use crate::calls::{self, CALL_HELPER, Runner, shadow_def};
 use crate::common::{Target, attr_usage_alias, doc_of, nu_params, relative, usage_attrs};
 
 /// The module for a command tree, with `run` paths relative to `base`.
@@ -21,12 +21,20 @@ pub fn module(tree: &CommandTree, base: &Path) -> Result<Module, SyntaxError> {
         .iter()
         .map(|command| def(command, base))
         .collect::<Result<Vec<_>, _>>()?;
-    // The shadows build their argv with the binary target's helpers.
+    // The shadows build their argv with the binary target's helpers, and run their scripts
+    // with the call's.
     let calls = defs
         .iter()
         .any(|def| def.body.iter().any(|stmt| matches!(stmt, Stmt::Def(_))));
-    let items = calls
-        .then(|| Item::Verbatim(HELPERS.to_string()))
+    let helpers = if calls {
+        vec![
+            Item::Verbatim(HELPERS.to_string()),
+            Item::Verbatim(CALL_HELPER.to_string()),
+        ]
+    } else {
+        Vec::new()
+    };
+    let items = helpers
         .into_iter()
         .chain(defs.into_iter().map(Item::Def))
         .collect();
