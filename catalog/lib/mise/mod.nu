@@ -51,6 +51,46 @@ def "nusage complete" [place: record] {
     | each {|line| $line | split column "	" value description | into record }
 }
 
+# A binary's output decoded as the module's closure decodes it. When that fails and the
+# `nusage` this module was generated with is on PATH, the output is held to the schema the
+# spec declares, line by line with `--lines`, so the error names what does not match it
+# rather than what failed to convert; what failed to convert follows, as the inner error.
+# The error is the decoding's own when the output matches or there is no `nusage` to ask,
+# and the inner one under why the output could not be held to its schema when the check
+# did not run.
+def "nusage decoded" [
+    text: string
+    schema: string
+    decode: closure
+    --lines
+]: nothing -> any {
+    try {
+        $text | do $decode
+    } catch {|err|
+        if (which nusage | is-empty) {
+            error make $err
+        }
+        let file = mktemp --tmpdir nusage-XXXXXX.schema.json
+        $schema | save --force $file
+        let flags = if $lines { [--lines] } else { [] }
+        let checked = $text | ^nusage validate $file - ...$flags | complete
+        rm $file
+        match $checked.exit_code {
+            0 => { error make $err }
+            1 => {
+                $err | error make --unspanned {
+                    msg: $"the output does not match its schema\n($checked.stderr | str trim)"
+                }
+            }
+            _ => {
+                $err | error make --unspanned {
+                    msg: $"the output could not be held to its schema: nusage validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
+                }
+            }
+        }
+    }
+}
+
 # Dev tools, env vars, and tasks in one CLI
 #
 # mise installs the development tools your projects need, sets their environment variables, and runs their tasks.
@@ -886,7 +926,9 @@ mise adds to PATH.
 @usage 'example "mise bin-paths" help="Print the bin directory of every active tool"'
 @usage r#'example "mise bin-paths node" help="Print only node's bin directory"'#
 @usage 'example "mise bin-paths --bin-names" help="List the executables the active tools provide"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise bin-paths --json\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"path\": {\n        \"type\": \"string\"\n      },\n      \"symlink\": {\n        \"type\": \"boolean\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"path\",\n      \"symlink\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
+}'
 export def "mise bin-paths" [
     ...tool_version: string@"nusage complete",  # Only list these tools, such as `ruby@3`
     --cd (-C): path@"nusage complete",          # Run as if mise were started in DIR
@@ -899,8 +941,8 @@ export def "mise bin-paths" [
     --locked,                                   # Require download URLs from the lockfile when installing
     --silent,                                   # Suppress all task output and mise non-error messages
     --bin-names,                                # Print executable names instead of bin directories
-] {
-    ^mise bin-paths --json ...(nusage argv [...$tool_version] {
+]: nothing -> table<name: string, path: string, symlink: bool> {
+    let text = ^mise bin-paths --json ...(nusage argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -911,7 +953,8 @@ export def "mise bin-paths" [
         --locked: $locked
         --silent: $silent
         --bin-names: $bin_names
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise bin-paths --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"symlink\":{\"type\":\"boolean\"}},\"required\":[\"name\",\"path\",\"symlink\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Set up this machine from your mise config
@@ -4242,7 +4285,9 @@ they use.
 """#
     }'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"path\": {\n        \"type\": \"string\"\n      },\n      \"tools\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"override\": {\n        \"type\": \"boolean\"\n      }\n    },\n    \"required\": [\n      \"path\",\n      \"tools\",\n      \"override\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
+}'
 export def "mise config" [
     --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
     --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
@@ -4257,8 +4302,8 @@ export def "mise config" [
     --no-truncate,                      # Turn off --truncate
     --no-header,                        # Do not print the table header
     --tracked-configs,                  # List every config file mise has loaded, in any project
-] {
-    ^mise config --json ...(nusage argv [] {
+]: nothing -> table<path: string, tools: list<string>, override: bool> {
+    let text = ^mise config --json ...(nusage argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4272,7 +4317,8 @@ export def "mise config" [
         --no-truncate: $no_truncate
         --no-header: $no_header
         --tracked-configs: $tracked_configs
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"tools\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"override\":{\"type\":\"boolean\"}},\"required\":[\"path\",\"tools\",\"override\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Describe each key in a mise TOML file
@@ -4324,7 +4370,9 @@ mise config explain
 @usage 'example "mise config explain tasks" help="Describe only the keys under [tasks]"'
 @usage 'complete file type=path'
 @usage 'complete key run="mise __complete_word__ --candidates key --line={{ words | shell_join | shell_quote }}"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise config explain --json\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"key\": {\n        \"type\": \"string\"\n      },\n      \"path\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"line\": {\n        \"type\": \"integer\",\n        \"minimum\": 0\n      },\n      \"description\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"deprecated\": {\n        \"type\": \"boolean\"\n      },\n      \"known\": {\n        \"type\": \"boolean\"\n      },\n      \"suggestion\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      }\n    },\n    \"required\": [\n      \"key\",\n      \"path\",\n      \"line\",\n      \"description\",\n      \"deprecated\",\n      \"known\",\n      \"suggestion\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
+}'
 export def "mise config explain" [
     key?: string@"nusage complete",       # Dotted key path to describe, with the keys under it; omit for the whole file
     --cd (-C): path@"nusage complete",    # Run as if mise were started in DIR
@@ -4340,8 +4388,8 @@ export def "mise config explain" [
     --global (-g),                        # Read the global config file
     --system,                             # Read the system config file
     --override,                           # Read the global override file, `config.override.toml`
-] {
-    ^mise config explain --json ...(nusage argv [$key] {
+]: nothing -> table<key: string, path: list<string>, line: int, description: oneof<string, nothing>, deprecated: bool, known: bool, suggestion: oneof<string, nothing>> {
+    let text = ^mise config explain --json ...(nusage argv [$key] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4355,7 +4403,8 @@ export def "mise config explain" [
         --global: $global
         --system: $system
         --override: $override
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise config explain --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"key\":{\"type\":\"string\"},\"path\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"line\":{\"type\":\"integer\",\"minimum\":0},\"description\":{\"type\":[\"string\",\"null\"]},\"deprecated\":{\"type\":\"boolean\"},\"known\":{\"type\":\"boolean\"},\"suggestion\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"key\",\"path\",\"line\",\"description\",\"deprecated\",\"known\",\"suggestion\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Print a value from one mise TOML file
@@ -4466,7 +4515,9 @@ Path                        Tools
 ~/.config/mise/config.toml  node, python
 ~/work/api/mise.toml        node, terraform
 """# help="List the loaded config files and the tools each one requests"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"path\": {\n        \"type\": \"string\"\n      },\n      \"tools\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"override\": {\n        \"type\": \"boolean\"\n      }\n    },\n    \"required\": [\n      \"path\",\n      \"tools\",\n      \"override\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
+}'
 export def "mise config ls" [
     --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
     --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
@@ -4481,8 +4532,8 @@ export def "mise config ls" [
     --no-truncate,                      # Turn off --truncate
     --no-header,                        # Do not print the table header
     --tracked-configs,                  # List every config file mise has loaded, in any project
-] {
-    ^mise config ls --json ...(nusage argv [] {
+]: nothing -> table<path: string, tools: list<string>, override: bool> {
+    let text = ^mise config ls --json ...(nusage argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4496,7 +4547,8 @@ export def "mise config ls" [
         --no-truncate: $no_truncate
         --no-header: $no_header
         --tracked-configs: $tracked_configs
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"tools\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"override\":{\"type\":\"boolean\"}},\"required\":[\"path\",\"tools\",\"override\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Set a value in one mise TOML file
@@ -7014,7 +7066,9 @@ https://mise.jdx.dev/configuration/project-diagnostics.html.
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'example "mise doctor project" help="Run every check and report pass or fail"'
 @usage 'example "mise doctor project --json" help="Print the report as JSON"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise doctor project --json\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"errors\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"checks\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"name\": {\n            \"type\": \"string\"\n          },\n          \"description\": {\n            \"type\": [\n              \"string\",\n              \"null\"\n            ]\n          },\n          \"source\": {\n            \"type\": [\n              \"string\",\n              \"null\"\n            ]\n          },\n          \"status\": {\n            \"enum\": [\n              \"pass\",\n              \"fail\",\n              \"error\",\n              \"skipped\",\n              \"blocked\"\n            ]\n          },\n          \"message\": {\n            \"type\": [\n              \"string\",\n              \"null\"\n            ]\n          },\n          \"hint\": {\n            \"type\": [\n              \"string\",\n              \"null\"\n            ]\n          }\n        },\n        \"required\": [\n          \"name\",\n          \"description\",\n          \"source\",\n          \"status\",\n          \"message\",\n          \"hint\"\n        ],\n        \"additionalProperties\": false\n      }\n    }\n  },\n  \"required\": [\n    \"errors\",\n    \"checks\"\n  ],\n  \"additionalProperties\": false\n}\n"
+}'
 export def "mise doctor project" [
     --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
     --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
@@ -7025,8 +7079,8 @@ export def "mise doctor project" [
     --raw,                              # Connect tasks and install commands directly to the terminal
     --locked,                           # Require download URLs from the lockfile when installing
     --silent,                           # Suppress all task output and mise non-error messages
-] {
-    ^mise doctor project --json ...(nusage argv [] {
+]: nothing -> record<errors: list<string>, checks: table<name: string, description: oneof<string, nothing>, source: oneof<string, nothing>, status: string, message: oneof<string, nothing>, hint: oneof<string, nothing>>> {
+    let text = ^mise doctor project --json ...(nusage argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7036,7 +7090,8 @@ export def "mise doctor project" [
         --raw: $raw
         --locked: $locked
         --silent: $silent
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise doctor project --json\",\"type\":\"object\",\"properties\":{\"errors\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"checks\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"description\":{\"type\":[\"string\",\"null\"]},\"source\":{\"type\":[\"string\",\"null\"]},\"status\":{\"enum\":[\"pass\",\"fail\",\"error\",\"skipped\",\"blocked\"]},\"message\":{\"type\":[\"string\",\"null\"]},\"hint\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"name\",\"description\",\"source\",\"status\",\"message\",\"hint\"],\"additionalProperties\":false}}},\"required\":[\"errors\",\"checks\"],\"additionalProperties\":false}" { from json }
 }
 
 # Start a subshell with mise's tools and environment
@@ -7143,7 +7198,9 @@ missing tools from the config are reported, not installed.
 @usage 'example "mise env --json" help="Print the variables as JSON"'
 @usage 'example "mise env --paths" help="List the PATH entries mise manages, such as tool bin directories"'
 @usage 'example "mise env --dotenv > .env" help="Write a dotenv file; it contains secret values"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\": \"object\",\n  \"additionalProperties\": {\n    \"type\": \"string\"\n  }\n}\n"
+}'
 export def "mise env" [
     ...tool_version: string@"nusage complete",                  # Tools to include in addition to those in the config, such as `node@24`
     --cd (-C): path@"nusage complete",                          # Run as if mise were started in DIR
@@ -7161,8 +7218,8 @@ export def "mise env" [
     --redacted,                                                 # Only include variables marked for redaction; their values are printed unmasked
     --values,                                                   # Only show values of environment variables
     --paths,                                                    # Print the PATH entries mise manages, in PATH order, one per line
-] {
-    ^mise env --json ...(nusage argv [...$tool_version] {
+]: nothing -> record {
+    let text = ^mise env --json ...(nusage argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7178,7 +7235,8 @@ export def "mise env" [
         --redacted: $redacted
         --values: $values
         --paths: $paths
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}" { from json }
 }
 
 # Run a command with mise's tools and environment
@@ -8507,7 +8565,9 @@ installations in a read-only shared installs directory (`shared`).
 @usage 'arg "[TOOL]…" help="Only show the installations of these tools" required=#false var=#true'
 @usage 'example "mise installs ls" help="List every installation in the identity layout"'
 @usage 'example "mise installs ls node --json" help="List the installations of node as JSON"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise installs ls --json\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"dir\": {\n        \"type\": \"string\"\n      },\n      \"backend\": {\n        \"type\": \"string\"\n      },\n      \"version\": {\n        \"type\": \"string\"\n      },\n      \"platform\": {\n        \"type\": \"string\"\n      },\n      \"mode\": {\n        \"enum\": [\n          \"fallback\",\n          \"resolved\"\n        ]\n      },\n      \"options\": {\n        \"type\": \"object\",\n        \"additionalProperties\": {\n          \"type\": \"string\"\n        }\n      },\n      \"requested_as\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"checksum\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"pinned\": {\n        \"type\": \"boolean\"\n      },\n      \"selected\": {\n        \"type\": \"boolean\"\n      },\n      \"shared\": {\n        \"type\": \"boolean\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"dir\",\n      \"backend\",\n      \"version\",\n      \"platform\",\n      \"mode\",\n      \"options\",\n      \"requested_as\",\n      \"checksum\",\n      \"pinned\",\n      \"selected\",\n      \"shared\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
+}'
 export def "mise installs ls" [
     ...tool: string@"nusage complete",  # Only show the installations of these tools
     --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
@@ -8520,8 +8580,8 @@ export def "mise installs ls" [
     --locked,                           # Require download URLs from the lockfile when installing
     --silent,                           # Suppress all task output and mise non-error messages
     --no-header,                        # Do not print the table header
-] {
-    ^mise installs ls --json ...(nusage argv [...$tool] {
+]: nothing -> table<name: string, dir: string, backend: string, version: string, platform: string, mode: string, options: record, requested_as: oneof<string, nothing>, checksum: oneof<string, nothing>, pinned: bool, selected: bool, shared: bool> {
+    let text = ^mise installs ls --json ...(nusage argv [...$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8532,7 +8592,8 @@ export def "mise installs ls" [
         --locked: $locked
         --silent: $silent
         --no-header: $no_header
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise installs ls --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"dir\":{\"type\":\"string\"},\"backend\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"platform\":{\"type\":\"string\"},\"mode\":{\"enum\":[\"fallback\",\"resolved\"]},\"options\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}},\"requested_as\":{\"type\":[\"string\",\"null\"]},\"checksum\":{\"type\":[\"string\",\"null\"]},\"pinned\":{\"type\":\"boolean\"},\"selected\":{\"type\":\"boolean\"},\"shared\":{\"type\":\"boolean\"}},\"required\":[\"name\",\"dir\",\"backend\",\"version\",\"platform\",\"mode\",\"options\",\"requested_as\",\"checksum\",\"pinned\",\"selected\",\"shared\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Reinstall legacy installations into the identity install layout
@@ -9044,7 +9105,9 @@ monorepo root's config. Uses the active MISE_ENV.
 @usage 'example "mise ls --all-sources" help="Include requests from every config file mise has seen"'
 @usage 'example "mise ls --backend go --backend cargo" help="Show only tools from the go or cargo backends"'
 @usage 'example "mise ls --grouped" help="List tools in a separate section for each backend"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"$defs\": {\n    \"source\": {\n      \"oneOf\": [\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \".tool-versions\",\n                \"mise.toml\",\n                \"mise.toml-daemon\",\n                \"idiomatic-version-file\",\n                \"tool-stub\"\n              ]\n            },\n            \"path\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"path\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \"argument\",\n                \"unknown\"\n              ]\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"environment\"\n            },\n            \"key\": {\n              \"type\": \"string\"\n            },\n            \"value\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"key\",\n            \"value\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"sourceWithRequest\": {\n      \"oneOf\": [\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \".tool-versions\",\n                \"mise.toml\",\n                \"mise.toml-daemon\",\n                \"idiomatic-version-file\",\n                \"tool-stub\"\n              ]\n            },\n            \"path\": {\n              \"type\": \"string\"\n            },\n            \"requested_version\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"path\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \"argument\",\n                \"unknown\"\n              ]\n            },\n            \"requested_version\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"environment\"\n            },\n            \"key\": {\n              \"type\": \"string\"\n            },\n            \"value\": {\n              \"type\": \"string\"\n            },\n            \"requested_version\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"key\",\n            \"value\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"version\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"version\": {\n          \"type\": \"string\"\n        },\n        \"requested_version\": {\n          \"type\": \"string\"\n        },\n        \"install_path\": {\n          \"type\": \"string\"\n        },\n        \"source\": {\n          \"$ref\": \"#/$defs/source\"\n        },\n        \"sources\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"$ref\": \"#/$defs/sourceWithRequest\"\n          }\n        },\n        \"symlinked_to\": {\n          \"type\": \"string\"\n        },\n        \"broken\": {\n          \"const\": true\n        },\n        \"scheduled_for_pruning\": {\n          \"const\": true\n        },\n        \"prune_after\": {\n          \"type\": \"string\"\n        },\n        \"installed\": {\n          \"type\": \"boolean\"\n        },\n        \"active\": {\n          \"type\": \"boolean\"\n        }\n      },\n      \"required\": [\n        \"version\",\n        \"install_path\",\n        \"installed\",\n        \"active\"\n      ],\n      \"additionalProperties\": false\n    },\n    \"filtered\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"$ref\": \"#/$defs/version\"\n      }\n    },\n    \"all\": {\n      \"type\": \"object\",\n      \"additionalProperties\": {\n        \"$ref\": \"#/$defs/filtered\"\n      }\n    }\n  },\n  \"oneOf\": [\n    {\n      \"$ref\": \"#/$defs/all\"\n    },\n    {\n      \"$ref\": \"#/$defs/filtered\"\n    }\n  ]\n}\n"
+}'
 export def "mise ls" [
     ...installed_tool: string@"nusage complete",     # Only show these tools
     --cd (-C): path@"nusage complete",               # Run as if mise were started in DIR
@@ -9071,8 +9134,8 @@ export def "mise ls" [
     --outdated,                                      # Show whether each version is outdated
     --prefix: string@"nusage complete",              # Only show versions starting with PREFIX (requires a tool argument)
     --prunable,                                      # List only tools that can be pruned with `mise prune`
-] {
-    ^mise ls --json ...(nusage argv [...$installed_tool] {
+]: nothing -> oneof<record, table<version: string, install_path: string, installed: bool, active: bool>> {
+    let text = ^mise ls --json ...(nusage argv [...$installed_tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9097,7 +9160,8 @@ export def "mise ls" [
         --outdated: $outdated
         --prefix: $prefix
         --prunable: $prunable
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$defs\":{\"source\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\".tool-versions\",\"mise.toml\",\"mise.toml-daemon\",\"idiomatic-version-file\",\"tool-stub\"]},\"path\":{\"type\":\"string\"}},\"required\":[\"type\",\"path\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"argument\",\"unknown\"]}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"environment\"},\"key\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"}},\"required\":[\"type\",\"key\",\"value\"],\"additionalProperties\":false}]},\"sourceWithRequest\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\".tool-versions\",\"mise.toml\",\"mise.toml-daemon\",\"idiomatic-version-file\",\"tool-stub\"]},\"path\":{\"type\":\"string\"},\"requested_version\":{\"type\":\"string\"}},\"required\":[\"type\",\"path\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"argument\",\"unknown\"]},\"requested_version\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"environment\"},\"key\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"},\"requested_version\":{\"type\":\"string\"}},\"required\":[\"type\",\"key\",\"value\"],\"additionalProperties\":false}]},\"version\":{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"},\"requested_version\":{\"type\":\"string\"},\"install_path\":{\"type\":\"string\"},\"source\":{\"$ref\":\"#/$defs/source\"},\"sources\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/sourceWithRequest\"}},\"symlinked_to\":{\"type\":\"string\"},\"broken\":{\"const\":true},\"scheduled_for_pruning\":{\"const\":true},\"prune_after\":{\"type\":\"string\"},\"installed\":{\"type\":\"boolean\"},\"active\":{\"type\":\"boolean\"}},\"required\":[\"version\",\"install_path\",\"installed\",\"active\"],\"additionalProperties\":false},\"filtered\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/version\"}},\"all\":{\"type\":\"object\",\"additionalProperties\":{\"$ref\":\"#/$defs/filtered\"}}},\"oneOf\":[{\"$ref\":\"#/$defs/all\"},{\"$ref\":\"#/$defs/filtered\"}]}" { from json }
 }
 
 # List tool versions available to install
@@ -9158,7 +9222,9 @@ without release dates, or an empty one. Requires --json and
 @usage 'example "mise ls-remote node@24" help="List node 24.x versions"'
 @usage 'example "mise ls-remote node --minimum-release-age 30d" help="Skip versions released in the last 30 days"'
 @usage 'example "mise ls-remote github:cli/cli --json" help="Include release dates, as JSON"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise ls-remote --json\",\n  \"$comment\": \"The --all mode omits release_url/rolling/checksum and always includes nullable prerelease. anyOf allows an empty list in either mode.\",\n  \"$defs\": {\n    \"single\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"version\": {\n          \"type\": \"string\"\n        },\n        \"created_at\": {\n          \"type\": \"string\"\n        },\n        \"release_url\": {\n          \"type\": \"string\"\n        },\n        \"rolling\": {\n          \"const\": true\n        },\n        \"checksum\": {\n          \"type\": \"string\"\n        },\n        \"prerelease\": {\n          \"type\": \"boolean\"\n        }\n      },\n      \"required\": [\n        \"version\"\n      ],\n      \"additionalProperties\": false\n    },\n    \"all\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"tool\": {\n          \"type\": \"string\"\n        },\n        \"version\": {\n          \"type\": \"string\"\n        },\n        \"created_at\": {\n          \"type\": \"string\"\n        },\n        \"prerelease\": {\n          \"type\": [\n            \"boolean\",\n            \"null\"\n          ]\n        }\n      },\n      \"required\": [\n        \"tool\",\n        \"version\",\n        \"prerelease\"\n      ],\n      \"additionalProperties\": false\n    }\n  },\n  \"anyOf\": [\n    {\n      \"type\": \"array\",\n      \"items\": {\n        \"$ref\": \"#/$defs/single\"\n      }\n    },\n    {\n      \"type\": \"array\",\n      \"items\": {\n        \"$ref\": \"#/$defs/all\"\n      }\n    }\n  ]\n}\n"
+}'
 export def "mise ls-remote" [
     tool_version?: string@"nusage complete",  # Tool to get versions for
     prefix?: string@"nusage complete",        # Version prefix to filter by; same as `TOOL@PREFIX`
@@ -9176,8 +9242,8 @@ export def "mise ls-remote" [
     --no-versions-host,                       # Fetch versions from the tool's upstream instead of mise's version mirror
     --prerelease,                             # Include prerelease versions
     --strict-metadata,                        # Exit with an error when release metadata cannot be fetched
-] {
-    ^mise ls-remote --json ...(nusage argv [$tool_version $prefix] {
+]: nothing -> oneof<table<version: string>, table<tool: string, version: string, prerelease: oneof<bool, nothing>>> {
+    let text = ^mise ls-remote --json ...(nusage argv [$tool_version $prefix] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9192,7 +9258,8 @@ export def "mise ls-remote" [
         --no-versions-host: $no_versions_host
         --prerelease: $prerelease
         --strict-metadata: $strict_metadata
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise ls-remote --json\",\"$comment\":\"The --all mode omits release_url/rolling/checksum and always includes nullable prerelease. anyOf allows an empty list in either mode.\",\"$defs\":{\"single\":{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"},\"created_at\":{\"type\":\"string\"},\"release_url\":{\"type\":\"string\"},\"rolling\":{\"const\":true},\"checksum\":{\"type\":\"string\"},\"prerelease\":{\"type\":\"boolean\"}},\"required\":[\"version\"],\"additionalProperties\":false},\"all\":{\"type\":\"object\",\"properties\":{\"tool\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"created_at\":{\"type\":\"string\"},\"prerelease\":{\"type\":[\"boolean\",\"null\"]}},\"required\":[\"tool\",\"version\",\"prerelease\"],\"additionalProperties\":false}},\"anyOf\":[{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/single\"}},{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/all\"}}]}" { from json }
 }
 
 # Run the language server for mise config files over stdin/stdout
@@ -10049,7 +10116,9 @@ mise outdated --json
 """# help="Print the same information as JSON"'
 @usage 'example "mise outdated --local" help="Skip tools that only the global config requests"'
 @usage r#'example "mise outdated --global claude --json" help="Check the global config's request for claude, even inside a project that sets its own"'#
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise outdated --json\",\n  \"$defs\": {\n    \"source\": {\n      \"oneOf\": [\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \".tool-versions\",\n                \"mise.toml\",\n                \"mise.toml-daemon\",\n                \"idiomatic-version-file\",\n                \"tool-stub\"\n              ]\n            },\n            \"path\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"path\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \"argument\",\n                \"unknown\"\n              ]\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"environment\"\n            },\n            \"key\": {\n              \"type\": \"string\"\n            },\n            \"value\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"key\",\n            \"value\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    }\n  },\n  \"type\": \"object\",\n  \"additionalProperties\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"requested\": {\n        \"type\": \"string\"\n      },\n      \"current\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"bump\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"latest\": {\n        \"type\": \"string\"\n      },\n      \"release_url\": {\n        \"type\": \"string\"\n      },\n      \"source\": {\n        \"$ref\": \"#/$defs/source\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"requested\",\n      \"current\",\n      \"bump\",\n      \"latest\",\n      \"source\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
+}'
 export def "mise outdated" [
     ...tool_version: string@"nusage complete",  # Tools to check, such as `node@20 python@3.10`
     --cd (-C): path@"nusage complete",          # Run as if mise were started in DIR
@@ -10066,8 +10135,8 @@ export def "mise outdated" [
     --global,                                   # Only check tools defined in the global config
     --local,                                    # Only check tools defined in project config files
     --no-header,                                # Do not print the table header
-] {
-    ^mise outdated --json ...(nusage argv [...$tool_version] {
+]: nothing -> record {
+    let text = ^mise outdated --json ...(nusage argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10082,7 +10151,8 @@ export def "mise outdated" [
         --global: $global
         --local: $local
         --no-header: $no_header
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise outdated --json\",\"$defs\":{\"source\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\".tool-versions\",\"mise.toml\",\"mise.toml-daemon\",\"idiomatic-version-file\",\"tool-stub\"]},\"path\":{\"type\":\"string\"}},\"required\":[\"type\",\"path\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"argument\",\"unknown\"]}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"environment\"},\"key\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"}},\"required\":[\"type\",\"key\",\"value\"],\"additionalProperties\":false}]}},\"type\":\"object\",\"additionalProperties\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"requested\":{\"type\":\"string\"},\"current\":{\"type\":[\"string\",\"null\"]},\"bump\":{\"type\":[\"string\",\"null\"]},\"latest\":{\"type\":\"string\"},\"release_url\":{\"type\":\"string\"},\"source\":{\"$ref\":\"#/$defs/source\"}},\"required\":[\"name\",\"requested\",\"current\",\"bump\",\"latest\",\"source\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Show the individuals supporting mise as Patron-tier members
@@ -10925,7 +10995,9 @@ aqua:jqlang/jq asdf:mise-plugins/asdf-jq
 """# help="Show the backends for one tool"'
 @usage 'example "mise registry --backend aqua" help="List the tools that have an aqua backend"'
 @usage 'example "mise registry --json" help="Print the registry as JSON"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise registry [tool] --json\",\n  \"$defs\": {\n    \"security\": {\n      \"oneOf\": [\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"checksum\"\n            },\n            \"algorithm\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"github_attestations\"\n            },\n            \"signer_workflow\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"slsa\"\n            },\n            \"level\": {\n              \"type\": \"integer\",\n              \"minimum\": 0,\n              \"maximum\": 255\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"minisign\"\n            },\n            \"public_key\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \"cosign\",\n                \"packslip\",\n                \"gpg\"\n              ]\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"tool\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"short\": {\n          \"type\": \"string\"\n        },\n        \"backends\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          }\n        },\n        \"bins\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          },\n          \"minItems\": 1\n        },\n        \"description\": {\n          \"type\": \"string\"\n        },\n        \"url\": {\n          \"type\": \"string\"\n        },\n        \"aliases\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          },\n          \"minItems\": 1\n        },\n        \"security\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"$ref\": \"#/$defs/security\"\n          },\n          \"minItems\": 1\n        }\n      },\n      \"required\": [\n        \"short\",\n        \"backends\"\n      ],\n      \"additionalProperties\": false\n    }\n  },\n  \"oneOf\": [\n    {\n      \"$ref\": \"#/$defs/tool\"\n    },\n    {\n      \"type\": \"array\",\n      \"items\": {\n        \"$ref\": \"#/$defs/tool\"\n      }\n    }\n  ]\n}\n"
+}'
 export def "mise registry" [
     name?: string,                             # Show only this tool's backends, in the order mise prefers them
     --cd (-C): path@"nusage complete",         # Run as if mise were started in DIR
@@ -10940,8 +11012,8 @@ export def "mise registry" [
     --backend (-b): string@"nusage complete",  # Show only tools for this backend
     --hide-aliased,                            # Hide names that are aliases of another registry tool
     --security,                                # Include security features for each tool's backends in JSON output
-] {
-    ^mise registry --json ...(nusage argv [$name] {
+]: nothing -> oneof<record<short: string, backends: list<string>>, table<short: string, backends: list<string>>> {
+    let text = ^mise registry --json ...(nusage argv [$name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10954,7 +11026,8 @@ export def "mise registry" [
         --backend: $backend
         --hide-aliased: $hide_aliased
         --security: $security
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise registry [tool] --json\",\"$defs\":{\"security\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"checksum\"},\"algorithm\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"github_attestations\"},\"signer_workflow\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"slsa\"},\"level\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":255}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"minisign\"},\"public_key\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"cosign\",\"packslip\",\"gpg\"]}},\"required\":[\"type\"],\"additionalProperties\":false}]},\"tool\":{\"type\":\"object\",\"properties\":{\"short\":{\"type\":\"string\"},\"backends\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"bins\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"description\":{\"type\":\"string\"},\"url\":{\"type\":\"string\"},\"aliases\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"security\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/security\"},\"minItems\":1}},\"required\":[\"short\",\"backends\"],\"additionalProperties\":false}},\"oneOf\":[{\"$ref\":\"#/$defs/tool\"},{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/tool\"}}]}" { from json }
 }
 
 # Create shims for executables provided by installed tools
@@ -12622,7 +12695,9 @@ Skill         Tool                        Version  Path
 hk-configure  packslip:github.com/jdx/hk  2.5.0    ~/.local/share/mise/installs/packslip-github-com-jdx-hk/2.5.0/skills/hk-configure
 hk-debug      packslip:github.com/jdx/hk  2.5.0    ~/.local/share/mise/installs/packslip-github-com-jdx-hk/2.5.0/skills/hk-debug
 """# help="List the skills of the active tools"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise skills ls --json\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"tool\": {\n        \"type\": \"string\"\n      },\n      \"version\": {\n        \"type\": \"string\"\n      },\n      \"path\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"tool\",\n      \"version\",\n      \"path\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
+}'
 export def "mise skills ls" [
     --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
     --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
@@ -12633,8 +12708,8 @@ export def "mise skills ls" [
     --raw,                              # Connect tasks and install commands directly to the terminal
     --locked,                           # Require download URLs from the lockfile when installing
     --silent,                           # Suppress all task output and mise non-error messages
-] {
-    ^mise skills ls --json ...(nusage argv [] {
+]: nothing -> table<name: string, tool: string, version: string, path: string> {
+    let text = ^mise skills ls --json ...(nusage argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12644,7 +12719,8 @@ export def "mise skills ls" [
         --raw: $raw
         --locked: $locked
         --silent: $silent
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise skills ls --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"tool\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"}},\"required\":[\"name\",\"tool\",\"version\",\"path\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Link the active tools' skills where an agent looks for them
@@ -12985,7 +13061,9 @@ With no subcommand, lists tasks like `mise tasks ls` and accepts the same flags.
 @usage 'example "mise tasks" help="List tasks"'
 @usage 'example "mise tasks build" help="Show the build task"'
 @usage 'example "mise tasks --hidden --sort source" help="Include hidden tasks, sorted by source"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise tasks [ls] --json\",\n  \"$defs\": {\n    \"dependency\": {\n      \"oneOf\": [\n        {\n          \"type\": \"string\"\n        },\n        {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          },\n          \"minItems\": 1\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"task\": {\n              \"type\": \"string\"\n            },\n            \"args\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              },\n              \"minItems\": 1\n            },\n            \"env\": {\n              \"type\": \"object\",\n              \"additionalProperties\": {\n                \"type\": \"string\"\n              },\n              \"minProperties\": 1\n            },\n            \"optional\": {\n              \"const\": true\n            }\n          },\n          \"required\": [\n            \"task\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"run\": {\n      \"oneOf\": [\n        {\n          \"type\": \"string\"\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"task\": {\n              \"type\": \"string\"\n            },\n            \"args\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              },\n              \"minItems\": 1\n            },\n            \"env\": {\n              \"type\": \"object\",\n              \"additionalProperties\": {\n                \"type\": \"string\"\n              },\n              \"minProperties\": 1\n            }\n          },\n          \"required\": [\n            \"task\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"tasks\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              }\n            }\n          },\n          \"required\": [\n            \"tasks\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    }\n  },\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"aliases\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"description\": {\n        \"type\": \"string\"\n      },\n      \"source\": {\n        \"type\": \"string\"\n      },\n      \"config_sources\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"depends\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"daemons\": {\n        \"oneOf\": [\n          {\n            \"type\": \"boolean\"\n          },\n          {\n            \"type\": \"string\"\n          },\n          {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"type\": \"null\"\n          }\n        ]\n      },\n      \"secrets\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"depends_post\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"wait_for\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"env\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"dir\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"hide\": {\n        \"type\": \"boolean\"\n      },\n      \"global\": {\n        \"type\": \"boolean\"\n      },\n      \"raw\": {\n        \"type\": \"boolean\"\n      },\n      \"interactive\": {\n        \"type\": \"boolean\"\n      },\n      \"sources\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"outputs\": {\n        \"oneOf\": [\n          {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"type\": \"object\",\n            \"properties\": {\n              \"auto\": {\n                \"const\": true\n              }\n            },\n            \"required\": [\n              \"auto\"\n            ],\n            \"additionalProperties\": false\n          }\n        ]\n      },\n      \"shell\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"quiet\": {\n        \"type\": \"boolean\"\n      },\n      \"silent\": {\n        \"oneOf\": [\n          {\n            \"type\": \"boolean\"\n          },\n          {\n            \"enum\": [\n              \"stdout\",\n              \"stderr\"\n            ]\n          }\n        ]\n      },\n      \"tools\": {\n        \"type\": \"object\",\n        \"additionalProperties\": {\n          \"oneOf\": [\n            {\n              \"type\": \"string\"\n            },\n            {\n              \"type\": \"object\",\n              \"properties\": {\n                \"version\": {\n                  \"type\": \"string\"\n                }\n              },\n              \"required\": [\n                \"version\"\n              ],\n              \"additionalProperties\": true\n            }\n          ]\n        }\n      },\n      \"usage\": {\n        \"type\": \"string\"\n      },\n      \"timeout\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"run\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/run\"\n        }\n      },\n      \"args\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"file\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"aliases\",\n      \"description\",\n      \"source\",\n      \"config_sources\",\n      \"depends\",\n      \"daemons\",\n      \"secrets\",\n      \"depends_post\",\n      \"wait_for\",\n      \"env\",\n      \"dir\",\n      \"hide\",\n      \"global\",\n      \"raw\",\n      \"interactive\",\n      \"sources\",\n      \"outputs\",\n      \"shell\",\n      \"quiet\",\n      \"silent\",\n      \"tools\",\n      \"usage\",\n      \"timeout\",\n      \"run\",\n      \"args\",\n      \"file\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
+}'
 export def "mise tasks" [
     task?: string@"nusage complete",                 # Task to show, as `mise tasks info` does
     --cd (-C): path@"nusage complete",               # Run as if mise were started in DIR
@@ -13006,8 +13084,8 @@ export def "mise tasks" [
     --no-header,                                     # Do not print the table header
     --sort: string@[name alias description source],  # Column to sort by (default: name)
     --sort-order: string@[asc desc],                 # Sort direction (default: asc)
-] {
-    ^mise tasks --json ...(nusage argv [$task] {
+]: nothing -> table<name: string, aliases: list<string>, description: string, source: string, config_sources: list<string>, depends: list<oneof<string, list<string>, record<task: string>>>, daemons: oneof<bool, string, list<string>, nothing>, secrets: list<string>, depends_post: list<oneof<string, list<string>, record<task: string>>>, wait_for: list<oneof<string, list<string>, record<task: string>>>, env: list<string>, dir: oneof<string, nothing>, hide: bool, global: bool, raw: bool, interactive: bool, sources: list<string>, outputs: oneof<list<string>, record<auto: bool>>, shell: oneof<string, nothing>, quiet: bool, silent: oneof<bool, string>, tools: record, usage: string, timeout: oneof<string, nothing>, run: list<oneof<string, record<task: string>, record<tasks: list<string>>>>, args: list<string>, file: oneof<string, nothing>> {
+    let text = ^mise tasks --json ...(nusage argv [$task] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13026,7 +13104,8 @@ export def "mise tasks" [
         --no-header: $no_header
         --sort: $sort
         --sort-order: $sort_order
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks [ls] --json\",\"$defs\":{\"dependency\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1},\"optional\":{\"const\":true}},\"required\":[\"task\"],\"additionalProperties\":false}]},\"run\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1}},\"required\":[\"task\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tasks\"],\"additionalProperties\":false}]}},\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"aliases\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"description\":{\"type\":\"string\"},\"source\":{\"type\":\"string\"},\"config_sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"daemons\":{\"oneOf\":[{\"type\":\"boolean\"},{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"null\"}]},\"secrets\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends_post\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"wait_for\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"env\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"dir\":{\"type\":[\"string\",\"null\"]},\"hide\":{\"type\":\"boolean\"},\"global\":{\"type\":\"boolean\"},\"raw\":{\"type\":\"boolean\"},\"interactive\":{\"type\":\"boolean\"},\"sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"outputs\":{\"oneOf\":[{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"object\",\"properties\":{\"auto\":{\"const\":true}},\"required\":[\"auto\"],\"additionalProperties\":false}]},\"shell\":{\"type\":[\"string\",\"null\"]},\"quiet\":{\"type\":\"boolean\"},\"silent\":{\"oneOf\":[{\"type\":\"boolean\"},{\"enum\":[\"stdout\",\"stderr\"]}]},\"tools\":{\"type\":\"object\",\"additionalProperties\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"}},\"required\":[\"version\"],\"additionalProperties\":true}]}},\"usage\":{\"type\":\"string\"},\"timeout\":{\"type\":[\"string\",\"null\"]},\"run\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/run\"}},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"file\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"name\",\"aliases\",\"description\",\"source\",\"config_sources\",\"depends\",\"daemons\",\"secrets\",\"depends_post\",\"wait_for\",\"env\",\"dir\",\"hide\",\"global\",\"raw\",\"interactive\",\"sources\",\"outputs\",\"shell\",\"quiet\",\"silent\",\"tools\",\"usage\",\"timeout\",\"run\",\"args\",\"file\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Add a task
@@ -13358,7 +13437,9 @@ See https://mise.jdx.dev/tasks/task-discovery.html
 @usage 'example "mise tasks ls --hidden" help="Include hidden tasks"'
 @usage 'example "mise tasks ls --all" help="List tasks from every monorepo project"'
 @usage 'example "mise tasks ls --name-only | fzf" help="Pick a task name interactively"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise tasks [ls] --json\",\n  \"$defs\": {\n    \"dependency\": {\n      \"oneOf\": [\n        {\n          \"type\": \"string\"\n        },\n        {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          },\n          \"minItems\": 1\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"task\": {\n              \"type\": \"string\"\n            },\n            \"args\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              },\n              \"minItems\": 1\n            },\n            \"env\": {\n              \"type\": \"object\",\n              \"additionalProperties\": {\n                \"type\": \"string\"\n              },\n              \"minProperties\": 1\n            },\n            \"optional\": {\n              \"const\": true\n            }\n          },\n          \"required\": [\n            \"task\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"run\": {\n      \"oneOf\": [\n        {\n          \"type\": \"string\"\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"task\": {\n              \"type\": \"string\"\n            },\n            \"args\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              },\n              \"minItems\": 1\n            },\n            \"env\": {\n              \"type\": \"object\",\n              \"additionalProperties\": {\n                \"type\": \"string\"\n              },\n              \"minProperties\": 1\n            }\n          },\n          \"required\": [\n            \"task\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"tasks\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              }\n            }\n          },\n          \"required\": [\n            \"tasks\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    }\n  },\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"aliases\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"description\": {\n        \"type\": \"string\"\n      },\n      \"source\": {\n        \"type\": \"string\"\n      },\n      \"config_sources\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"depends\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"daemons\": {\n        \"oneOf\": [\n          {\n            \"type\": \"boolean\"\n          },\n          {\n            \"type\": \"string\"\n          },\n          {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"type\": \"null\"\n          }\n        ]\n      },\n      \"secrets\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"depends_post\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"wait_for\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"env\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"dir\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"hide\": {\n        \"type\": \"boolean\"\n      },\n      \"global\": {\n        \"type\": \"boolean\"\n      },\n      \"raw\": {\n        \"type\": \"boolean\"\n      },\n      \"interactive\": {\n        \"type\": \"boolean\"\n      },\n      \"sources\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"outputs\": {\n        \"oneOf\": [\n          {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"type\": \"object\",\n            \"properties\": {\n              \"auto\": {\n                \"const\": true\n              }\n            },\n            \"required\": [\n              \"auto\"\n            ],\n            \"additionalProperties\": false\n          }\n        ]\n      },\n      \"shell\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"quiet\": {\n        \"type\": \"boolean\"\n      },\n      \"silent\": {\n        \"oneOf\": [\n          {\n            \"type\": \"boolean\"\n          },\n          {\n            \"enum\": [\n              \"stdout\",\n              \"stderr\"\n            ]\n          }\n        ]\n      },\n      \"tools\": {\n        \"type\": \"object\",\n        \"additionalProperties\": {\n          \"oneOf\": [\n            {\n              \"type\": \"string\"\n            },\n            {\n              \"type\": \"object\",\n              \"properties\": {\n                \"version\": {\n                  \"type\": \"string\"\n                }\n              },\n              \"required\": [\n                \"version\"\n              ],\n              \"additionalProperties\": true\n            }\n          ]\n        }\n      },\n      \"usage\": {\n        \"type\": \"string\"\n      },\n      \"timeout\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"run\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/run\"\n        }\n      },\n      \"args\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"file\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"aliases\",\n      \"description\",\n      \"source\",\n      \"config_sources\",\n      \"depends\",\n      \"daemons\",\n      \"secrets\",\n      \"depends_post\",\n      \"wait_for\",\n      \"env\",\n      \"dir\",\n      \"hide\",\n      \"global\",\n      \"raw\",\n      \"interactive\",\n      \"sources\",\n      \"outputs\",\n      \"shell\",\n      \"quiet\",\n      \"silent\",\n      \"tools\",\n      \"usage\",\n      \"timeout\",\n      \"run\",\n      \"args\",\n      \"file\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
+}'
 export def "mise tasks ls" [
     --cd (-C): path@"nusage complete",               # Run as if mise were started in DIR
     --env_ (-E): list<string>,                       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
@@ -13378,8 +13459,8 @@ export def "mise tasks ls" [
     --no-header,                                     # Do not print the table header
     --sort: string@[name alias description source],  # Column to sort by (default: name)
     --sort-order: string@[asc desc],                 # Sort direction (default: asc)
-] {
-    ^mise tasks ls --json ...(nusage argv [] {
+]: nothing -> table<name: string, aliases: list<string>, description: string, source: string, config_sources: list<string>, depends: list<oneof<string, list<string>, record<task: string>>>, daemons: oneof<bool, string, list<string>, nothing>, secrets: list<string>, depends_post: list<oneof<string, list<string>, record<task: string>>>, wait_for: list<oneof<string, list<string>, record<task: string>>>, env: list<string>, dir: oneof<string, nothing>, hide: bool, global: bool, raw: bool, interactive: bool, sources: list<string>, outputs: oneof<list<string>, record<auto: bool>>, shell: oneof<string, nothing>, quiet: bool, silent: oneof<bool, string>, tools: record, usage: string, timeout: oneof<string, nothing>, run: list<oneof<string, record<task: string>, record<tasks: list<string>>>>, args: list<string>, file: oneof<string, nothing>> {
+    let text = ^mise tasks ls --json ...(nusage argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13398,7 +13479,8 @@ export def "mise tasks ls" [
         --no-header: $no_header
         --sort: $sort
         --sort-order: $sort_order
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks [ls] --json\",\"$defs\":{\"dependency\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1},\"optional\":{\"const\":true}},\"required\":[\"task\"],\"additionalProperties\":false}]},\"run\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1}},\"required\":[\"task\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tasks\"],\"additionalProperties\":false}]}},\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"aliases\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"description\":{\"type\":\"string\"},\"source\":{\"type\":\"string\"},\"config_sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"daemons\":{\"oneOf\":[{\"type\":\"boolean\"},{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"null\"}]},\"secrets\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends_post\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"wait_for\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"env\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"dir\":{\"type\":[\"string\",\"null\"]},\"hide\":{\"type\":\"boolean\"},\"global\":{\"type\":\"boolean\"},\"raw\":{\"type\":\"boolean\"},\"interactive\":{\"type\":\"boolean\"},\"sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"outputs\":{\"oneOf\":[{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"object\",\"properties\":{\"auto\":{\"const\":true}},\"required\":[\"auto\"],\"additionalProperties\":false}]},\"shell\":{\"type\":[\"string\",\"null\"]},\"quiet\":{\"type\":\"boolean\"},\"silent\":{\"oneOf\":[{\"type\":\"boolean\"},{\"enum\":[\"stdout\",\"stderr\"]}]},\"tools\":{\"type\":\"object\",\"additionalProperties\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"}},\"required\":[\"version\"],\"additionalProperties\":true}]}},\"usage\":{\"type\":\"string\"},\"timeout\":{\"type\":[\"string\",\"null\"]},\"run\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/run\"}},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"file\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"name\",\"aliases\",\"description\",\"source\",\"config_sources\",\"depends\",\"daemons\",\"secrets\",\"depends_post\",\"wait_for\",\"env\",\"dir\",\"hide\",\"global\",\"raw\",\"interactive\",\"sources\",\"outputs\",\"shell\",\"quiet\",\"silent\",\"tools\",\"usage\",\"timeout\",\"run\",\"args\",\"file\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Check task definitions for errors
@@ -13421,7 +13503,9 @@ Exits 1 if any error is found, so you can run it in CI. Warnings are reported bu
 @usage 'example "mise tasks validate build test" help="Validate specific tasks"'
 @usage 'example "mise tasks validate --json" help="Output results as JSON"'
 @usage 'example "mise tasks validate --errors-only" help="Only show errors (skip warnings)"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise tasks validate --json\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"tasks_validated\": {\n      \"type\": \"integer\",\n      \"minimum\": 0\n    },\n    \"errors\": {\n      \"type\": \"integer\",\n      \"minimum\": 0\n    },\n    \"warnings\": {\n      \"type\": \"integer\",\n      \"minimum\": 0\n    },\n    \"issues\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"task\": {\n            \"type\": \"string\"\n          },\n          \"severity\": {\n            \"enum\": [\n              \"error\",\n              \"warning\",\n              \"info\"\n            ]\n          },\n          \"category\": {\n            \"type\": \"string\"\n          },\n          \"message\": {\n            \"type\": \"string\"\n          },\n          \"details\": {\n            \"type\": \"string\"\n          }\n        },\n        \"required\": [\n          \"task\",\n          \"severity\",\n          \"category\",\n          \"message\"\n        ],\n        \"additionalProperties\": false\n      }\n    }\n  },\n  \"required\": [\n    \"tasks_validated\",\n    \"errors\",\n    \"warnings\",\n    \"issues\"\n  ],\n  \"additionalProperties\": false\n}\n"
+}'
 export def "mise tasks validate" [
     ...tasks: string,                   # Tasks to validate (default: all tasks)
     --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
@@ -13434,8 +13518,8 @@ export def "mise tasks validate" [
     --locked,                           # Require download URLs from the lockfile when installing
     --silent,                           # Suppress all task output and mise non-error messages
     --errors-only,                      # Only show errors (skip warnings)
-] {
-    ^mise tasks validate --json ...(nusage argv [...$tasks] {
+]: nothing -> record<tasks_validated: int, errors: int, warnings: int, issues: table<task: string, severity: string, category: string, message: string, details: oneof<string, nothing>>> {
+    let text = ^mise tasks validate --json ...(nusage argv [...$tasks] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13446,7 +13530,8 @@ export def "mise tasks validate" [
         --locked: $locked
         --silent: $silent
         --errors-only: $errors_only
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks validate --json\",\"type\":\"object\",\"properties\":{\"tasks_validated\":{\"type\":\"integer\",\"minimum\":0},\"errors\":{\"type\":\"integer\",\"minimum\":0},\"warnings\":{\"type\":\"integer\",\"minimum\":0},\"issues\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"severity\":{\"enum\":[\"error\",\"warning\",\"info\"]},\"category\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"details\":{\"type\":\"string\"}},\"required\":[\"task\",\"severity\",\"category\",\"message\"],\"additionalProperties\":false}}},\"required\":[\"tasks_validated\",\"errors\",\"warnings\",\"issues\"],\"additionalProperties\":false}" { from json | update issues { default null details } }
 }
 
 # Test that a tool installs and runs
@@ -14840,7 +14925,9 @@ mise version
 2026.10.4 linux-x64 (2026-10-07)
 """# help="Show the version"'
 @usage 'example "mise version --json" help="Also show the latest release and the build time, as JSON"'
-@usage 'output json framing=json select=--json'
+@usage 'output "json" framing="json" select="--json" {
+    schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"version\": {\n      \"type\": \"string\"\n    },\n    \"latest\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"os\": {\n      \"type\": \"string\"\n    },\n    \"arch\": {\n      \"type\": \"string\"\n    },\n    \"build_time\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"version\",\n    \"latest\",\n    \"os\",\n    \"arch\",\n    \"build_time\"\n  ],\n  \"additionalProperties\": false\n}\n"
+}'
 export def "mise version" [
     --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
     --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
@@ -14851,8 +14938,8 @@ export def "mise version" [
     --raw,                              # Connect tasks and install commands directly to the terminal
     --locked,                           # Require download URLs from the lockfile when installing
     --silent,                           # Suppress all task output and mise non-error messages
-] {
-    ^mise version --json ...(nusage argv [] {
+]: nothing -> record<version: string, latest: oneof<string, nothing>, os: string, arch: string, build_time: string> {
+    let text = ^mise version --json ...(nusage argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14862,7 +14949,8 @@ export def "mise version" [
         --raw: $raw
         --locked: $locked
         --silent: $silent
-    }) | from json
+    })
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"},\"latest\":{\"type\":[\"string\",\"null\"]},\"os\":{\"type\":\"string\"},\"arch\":{\"type\":\"string\"},\"build_time\":{\"type\":\"string\"}},\"required\":[\"version\",\"latest\",\"os\",\"arch\",\"build_time\"],\"additionalProperties\":false}" { from json }
 }
 
 # Run tasks and rerun them when files change

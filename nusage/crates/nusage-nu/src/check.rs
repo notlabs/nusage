@@ -7,7 +7,7 @@ use nu_protocol::{DeclId, Span, Value};
 use crate::SyntaxError;
 
 /// Nushell's parser with its commands, so calls in a module resolve and type-check.
-static ENGINE: LazyLock<EngineState> =
+pub(crate) static ENGINE: LazyLock<EngineState> =
     LazyLock::new(|| nu_command::add_shell_command_context(nu_cmd_lang::create_default_context()));
 
 /// Whether Nushell parses the module, as `use <name>.nu` would: the source is parsed inside

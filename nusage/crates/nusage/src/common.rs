@@ -20,6 +20,10 @@ pub enum Target {
     /// A `def` that runs a binary: no defaults, since the binary applies its own, and the
     /// wrapper passes only what the call gave.
     Binary,
+    /// A `def` that runs another script through the interpreter, named as a call writes it:
+    /// as for a binary, and only static choices complete, since that script's providers
+    /// and usage's completer are not where the call is.
+    Call,
 }
 
 pub fn attr_usage_alias() -> Result<Stmt, SyntaxError> {
@@ -29,24 +33,31 @@ pub fn attr_usage_alias() -> Result<Stmt, SyntaxError> {
     })
 }
 
-/// `about` as the description paragraph, `long_about` as the extra one. A `long_about` that
-/// opens with `about`, as usage's `help` and `long_help` conventionally do, is the whole
-/// description.
+/// `about` as the description paragraph, `long_about` as the extra ones. A `long_about` whose
+/// first paragraph says `about` again, as usage's `help` and `long_help` conventionally do,
+/// gives only the rest.
 pub fn doc_of(command: &Command) -> Vec<Vec<String>> {
-    let repeats = match (&command.about, &command.about_long) {
-        (Some(about), Some(long)) => long.starts_with(about.as_str()),
-        _ => false,
-    };
     let mut doc = Vec::new();
-    if let Some(about) = command.about.as_ref().filter(|_| !repeats) {
+    if let Some(about) = &command.about {
         doc.push(vec![about.clone()]);
     }
     if let Some(long) = &command.about_long {
-        for paragraph in long.split("\n\n") {
-            doc.push(paragraph.lines().map(str::to_string).collect());
+        let mut paragraphs = long.split("\n\n").peekable();
+        if let (Some(about), Some(first)) = (&command.about, paragraphs.peek())
+            && restates(first, about)
+        {
+            paragraphs.next();
         }
+        doc.extend(paragraphs.map(|paragraph| paragraph.lines().map(str::to_string).collect()));
     }
     doc
+}
+
+/// Whether a paragraph says `about` again: word for word, or with the period clap takes off
+/// a doc comment's first paragraph to make `about` and keeps in `long_about`.
+pub fn restates(paragraph: &str, about: &str) -> bool {
+    let (paragraph, about) = (paragraph.trim(), about.trim());
+    paragraph == about || paragraph.strip_suffix('.') == Some(about)
 }
 
 /// One `@usage` attribute per header node carried verbatim.
@@ -68,19 +79,20 @@ pub fn usage_attrs(command: &Command) -> Result<Vec<Attr>, SyntaxError> {
 pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxError> {
     let completer = match &param.completer {
         Some(Completer::Inline(items)) => Some(NuCompleter::List(items.clone())),
+        Some(Completer::Command(_)) if target == Target::Call => None,
         Some(Completer::Command(path)) => {
             Some(NuCompleter::Command(CommandName::new(path.to_string())?))
         }
         // A script's bare `type=` says what the value is and completes nothing here.
         Some(Completer::Spec) => match target {
             Target::Binary => Some(NuCompleter::Command(CommandName::new(SPEC_COMPLETER)?)),
-            Target::Script => None,
+            Target::Script | Target::Call => None,
         },
         None => None,
     };
     let default = match target {
         Target::Script => param.default.clone(),
-        Target::Binary => None,
+        Target::Binary | Target::Call => None,
     };
     let doc = param.doc.clone();
     let main = match param.kind {
@@ -197,8 +209,51 @@ fn fold(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::relative;
+    use super::{doc_of, relative};
+    use nusage_model::{Command, CommandPath, Execution};
     use std::path::Path;
+
+    fn command(about: &str, long: &str) -> Command {
+        Command {
+            path: CommandPath::default(),
+            about: Some(about.to_string()),
+            about_long: Some(long.to_string()),
+            positionals: vec![],
+            flags: vec![],
+            output: None,
+            structured: None,
+            clause: None,
+            attributes: vec![],
+            execution: Execution::External,
+            is_provider: false,
+        }
+    }
+
+    #[test]
+    fn a_repeated_about_is_said_once() {
+        // usage's convention, and clap's: `about` is the doc comment's first paragraph with
+        // its period taken off.
+        for long in [
+            "Abandon a revision\n\nMore.",
+            "Abandon a revision.\n\nMore.",
+        ] {
+            assert_eq!(
+                doc_of(&command("Abandon a revision", long)),
+                [vec!["Abandon a revision"], vec!["More."]]
+            );
+        }
+        // A first paragraph that only opens with the same words says more than `about`.
+        assert_eq!(
+            doc_of(&command(
+                "Abandon a revision",
+                "Abandon a revision, rebasing descendants"
+            )),
+            [
+                vec!["Abandon a revision"],
+                vec!["Abandon a revision, rebasing descendants"]
+            ]
+        );
+    }
 
     #[test]
     fn relative_paths() {

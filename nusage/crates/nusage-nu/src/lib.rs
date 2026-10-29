@@ -7,12 +7,14 @@
 //! templates, one per shape of output. Values are Nushell's own `Value`, written by its
 //! `nuon` crate; words are quoted by Nushell's own rule from `nu-utils`.
 
+mod calls;
 mod check;
 mod literal;
 mod printer;
 mod syntax;
 
+pub use calls::{ScriptCall, Word, script_calls};
 pub use check::{Decl, DeclArg, DeclFlag, check_module, reserved_variable, signatures};
 pub use literal::{Value, check_default, default_text, nuon};
-pub use printer::print;
+pub use printer::{print, print_line};
 pub use syntax::*;

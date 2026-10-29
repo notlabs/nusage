@@ -8,9 +8,12 @@ Early development.
   the generator reproduces and the contract a script relies on, `cargo doc --workspace
   --no-deps` for the crates.
 - `catalog/`: the wrappers for other tools, a Nushell module package per tool under
-  `catalog/lib/`, generated from each tool's own spec and the overlays beside it. With
-  `catalog/lib` on `$NU_LIB_DIRS`, `use mise *` names mise's commands as mise does.
-  `catalog/mise.toml` declares the entries and `catalog/tasks/catalog.nu` the layout.
+  `catalog/lib/`, generated from each tool's spec, the schemas of its outputs and the
+  overlays beside it. With `catalog/lib` on `$NU_LIB_DIRS`, `use mise *` names mise's
+  commands as mise does, and `use jj *` jj's. `catalog/mise.toml` declares the entries and
+  `catalog/tasks/catalog.nu` the layout; `catalog/clap/` reads the spec of a binary whose
+  crate builds its clap command, as jj's is, and `catalog/schemas/` runs an output-schema
+  suite, as both packages keep one.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nusage built here. `mise run //catalog:install` has every new

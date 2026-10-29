@@ -198,15 +198,24 @@ impl Context<'_> {
             }
             Execution::External => {
                 let select = usage::effective_select_ref(&self.assembled.spec, &cmds);
-                let structured = structured_output(&outputs, select.as_deref(), &chain)
+                let args = |name: &str| self.assembled.output_args(&path, name);
+                let structured = structured_output(&outputs, select.as_deref(), &args, &chain)
                     .map_err(|message| Diagnostic::new(&header.path, message))?;
                 // The wrapper owns the selectors: a flag that picks an output is not a
                 // parameter, since the wrapper asks for its structured output itself and the
-                // binary alone, `^tool`, gives the others.
+                // binary alone, `^tool`, gives the others. That is every flag an output's
+                // `nusage-args` names too, `--template` in `--template json(self)`.
+                let named: Vec<&str> = outputs
+                    .iter()
+                    .filter_map(|output| args(&output.name))
+                    .flatten()
+                    .filter_map(|word| nusage_spec::flag_word(word))
+                    .collect();
                 let selectors: Vec<&str> = outputs
                     .iter()
                     .filter_map(|output| output.select.as_deref())
                     .chain(select.as_deref())
+                    .chain(named)
                     .collect();
                 let flags = flags
                     .into_iter()
@@ -638,11 +647,13 @@ fn flag_named(flag: &Param, selector: &str) -> bool {
 
 /// The structured output a wrapper asks for, among those that have a decoder: the default
 /// output, else the first `json` output that is selectable, else the first selectable one;
-/// `None` for a text command. An output is selectable when it is the default, has its own
-/// `select` switch, or the command has a `select` flag whose value names it.
-fn structured_output(
+/// `None` for a text command. An output is selectable when its `nusage-args` say how to ask
+/// for it, it is the default, has its own `select` switch, or the command has a `select` flag
+/// whose value names it.
+fn structured_output<'a>(
     outputs: &[SpecOutput],
     command_select: Option<&str>,
+    nusage_args: &dyn Fn(&str) -> Option<&'a [String]>,
     chain: &[Level<'_>],
 ) -> Result<Option<Structured>, String> {
     let framing_of = |output: &SpecOutput| match output.framing {
@@ -651,7 +662,9 @@ fn structured_output(
         usage::Framing::Text => Framing::Text,
     };
     let args_of = |output: &SpecOutput| -> Option<Vec<String>> {
-        if output.default {
+        if let Some(words) = nusage_args(&output.name) {
+            Some(words.to_vec())
+        } else if output.default {
             Some(Vec::new())
         } else if let Some(switch) = &output.select {
             Some(vec![switch.clone()])
@@ -710,6 +723,7 @@ fn structured_output(
     };
     Ok(Some(Structured {
         name: output.name.clone(),
+        schema: output.schema.clone(),
         args,
         framing: framing_of(output),
         decoder,
@@ -748,7 +762,7 @@ fn collect_conversions(
             path,
             ty: into.to_string(),
             unit: None,
-            nullable: false,
+            nullable: Vec::new(),
         });
         return Ok(());
     }

@@ -2,9 +2,14 @@
 # An entry under [_.nusage.catalog] says what the tasks cannot read off lib/<tool>/: how to
 # obtain the tool's spec, and the switch that selects its structured output. mise ignores
 # the `_` table; tasks/catalog.nu reads it with `mise config get` and documents the layout.
+# The shared pieces sit beside the packages: clap/, the spec of a binary whose crate builds
+# its clap command, and schemas/, the runner of an output-schema suite.
 [_.nusage.catalog.mise]
 spec = { run = "mise usage" }
 switch = { flag = "--json", framing = "json" }
+
+[_.nusage.catalog.jj]
+spec = { clap = "spec" }
 
 # The catalog's own version, released apart from nusage's: a push to main that changes it
 # is the release, which release.yml tags `catalog/v<version>`, with the tarball `package`
@@ -14,20 +19,20 @@ catalog_version = "0.1.0"
 
 # The tasks run through the nusage built here. The generated files are committed, so `spec`
 # and `generate` are the two steps that change them, and `check` holds what is committed to
-# its inputs and to the tool on PATH: in CI that tool is the pinned mise, and a Renovate bump
-# of it fails `check` until the spec and module are regenerated and reviewed with it.
+# its inputs and to the tool on PATH: in CI that tool is pinned, and a Renovate bump of it
+# fails `check` until the spec and module are regenerated and reviewed with it.
 [tasks.spec]
-description = "Export each entry's spec from the tool on PATH into its package, left untouched when unchanged"
+description = "Obtain each entry's spec into its package, as its tool prints it or from the clap command its crate builds"
 depends = ["//nusage:build"]
 file = "tasks/spec.nu"
 
 [tasks.generate]
-description = "Generate each entry's module from its spec and overlays"
+description = "Generate each entry's module from its spec, schema suite and overlays"
 depends = ["//nusage:build"]
 file = "tasks/generate.nu"
 
 [tasks.check]
-description = "Hold each entry's generated files to its spec and overlays, its spec to the tool on PATH, and drive the tool through its module"
+description = "Hold each entry's generated files to their inputs and its spec to the tool on PATH, its output to its schemas, and drive the tool through its module"
 depends = ["//nusage:build"]
 file = "tasks/check.nu"
 
