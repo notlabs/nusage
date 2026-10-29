@@ -685,25 +685,30 @@ fn file_uri(path: &Path) -> String {
 /// `Content-Length` says. `None` at the end of the stream.
 fn read_message(reader: &mut impl BufRead) -> io::Result<Option<Json>> {
     let mut length = None;
-    loop {
+    let mut headers = false;
+    let length = loop {
         let mut line = String::new();
         if reader.read_line(&mut line)? == 0 {
             return Ok(None);
         }
         let line = line.trim_end();
         if line.is_empty() {
-            if length.is_some() {
-                break;
+            match length {
+                Some(length) => break length,
+                // Without a length there is no telling where the body ends and the next
+                // message starts, so the stream can be read no further.
+                None if headers => return Ok(None),
+                None => continue,
             }
-            continue;
         }
+        headers = true;
         if let Some((name, value)) = line.split_once(':')
             && name.eq_ignore_ascii_case("content-length")
         {
             length = value.trim().parse::<usize>().ok();
         }
-    }
-    let mut body = vec![0; length.unwrap_or(0)];
+    };
+    let mut body = vec![0; length];
     // A stream may end partway through a message: `nu` that is told to exit can go before
     // its answer to `shutdown` is all written. That is the stream's end too.
     match reader.read_exact(&mut body) {
@@ -768,6 +773,19 @@ mod tests {
         let path = PathBuf::from("/a b/ç.nu");
         assert_eq!(file_uri(&path), "file:///a%20b/%C3%A7.nu");
         assert_eq!(path_of(&file_uri(&path)), Some(path));
+    }
+
+    #[test]
+    fn a_message_without_a_length_ends_the_stream() {
+        for headers in ["Content-Type: x", "Content-Length: many"] {
+            let mut stream = io::Cursor::new(format!(
+                "{headers}\r\n\r\n{{}}\r\nContent-Length: 2\r\n\r\n{{}}"
+            ));
+            assert_eq!(read_message(&mut stream).unwrap(), None, "{headers}");
+        }
+        // Blank lines before a message are not its headers.
+        let mut stream = io::Cursor::new("\r\nContent-Length: 2\r\n\r\n{}");
+        assert_eq!(read_message(&mut stream).unwrap(), Some(json!({})));
     }
 
     #[test]
