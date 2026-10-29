@@ -1,0 +1,121 @@
+# The subset with guarantees, by what a script does. A script outside it still runs, as an
+# effect, and the analysis says why; a header can declare what the analysis cannot see past.
+# Not every script is meant to fit: the subset is what can be established, and grows only
+# by what the analysis, a spec we own or the runtime can establish.
+[
+  {
+    id: subset-is-what-is-established
+    says: "A script is in the subset when the analysis establishes `pure` or `reads` for it; any other is an effect, with the reason given where the analysis stopped."
+    status: open
+    traits: [pure reads effect]
+  }
+  {
+    id: builtins-over-values
+    says: "A pipeline of Nushell's own commands over values is pure."
+    status: open
+    traits: [pure]
+    given: {source: "[3 1 2] | sort | math sum"}
+    expect: {traits: [pure]}
+    open: ["Which of Nushell's commands are pure is a table kept by command, not a rule: `random` and `date now` are not."]
+  }
+  {
+    id: local-mutation
+    says: "A `mut` that does not leave its scope keeps a script pure."
+    status: open
+    traits: [pure]
+    given: {
+      source: "mut total = 0
+for n in [1 2 3] { $total += $n }
+$total
+"
+    }
+    expect: {traits: [pure]}
+  }
+  {
+    id: literal-read
+    says: "`open` of a literal path is a read of that file in the snapshot."
+    status: open
+    traits: [reads]
+    given: {source: "open data.json | get version"}
+    expect: {traits: [reads], reads: ["file:data.json"]}
+  }
+  {
+    id: argument-read
+    says: "A read through a path argument the header declares is a read of whatever the caller passes, and the caller's analysis names it."
+    status: open
+    traits: [reads]
+    given: {
+      source: "#!/usr/bin/env nusage
+#USAGE arg \"<file>\"
+open $usage.args.file | lines | length
+"
+    }
+    expect: {traits: [reads], reads: ["arg:file"]}
+    open: ["What a caller's reads say when it passes a computed path: the read is then one it cannot name."]
+  }
+  {
+    id: environment-read
+    says: "`$env.NAME` is a read of that variable."
+    status: open
+    traits: [reads]
+    given: {source: "$env.HOME | path join notes"}
+    expect: {traits: [reads], reads: ["env:HOME"]}
+  }
+  {
+    id: unnamed-read
+    says: "A read whose path the analysis cannot name is an effect."
+    status: open
+    traits: [effect]
+    given: {source: "ls | each {|entry| open $entry.name }"}
+    expect: {traits: [effect]}
+    open: ["Whether `ls` or `glob` of a literal pattern is a read of a fileset, which would make this one a read."]
+  }
+  {
+    id: external-without-spec
+    says: "An external command whose spec says nothing of it is an effect."
+    status: open
+    traits: [effect]
+    given: {source: "^curl https://example.com"}
+    expect: {traits: [effect]}
+  }
+  {
+    id: external-with-spec
+    says: "An external whose spec declares a command read-only is a read of what the spec names, so the typed modules nusage generates carry it."
+    status: open
+    traits: [reads]
+    given: {source: "jj log --no-graph -r @"}
+    expect: {traits: [reads], reads: ["operation:current"]}
+    open: ["Where a spec declares it: a node of the usage spec, or the overlay beside it."]
+  }
+  {
+    id: call-carries
+    says: "A call of a script or a task carries the callee's traits into the caller."
+    status: open
+    traits: [pure reads effect]
+    given: {
+      script: caller.nu
+      files: {
+        "caller.nu": "#!/usr/bin/env nusage
+(./sum.nu 1 2) * 2
+"
+        "sum.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<a>\"
+#USAGE arg \"<b>\"
+#USAGE output (\"int\")\"nuon\" default=#true
+($usage.args.a | into int) + ($usage.args.b | into int)
+"
+      }
+    }
+    expect: {traits: [pure]}
+  }
+  {
+    id: declared-effect
+    says: "A header can declare an effect the analysis cannot see past; the script is then what it declares, and the declaration is where review looks, as Rust's `unsafe` is."
+    status: open
+    traits: [effect]
+    open: [
+      "The header's spelling for it."
+      "Whether a declaration can only add to what the analysis infers, never take away."
+    ]
+  }
+]

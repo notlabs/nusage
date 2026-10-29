@@ -6,8 +6,14 @@ config_roots = [
   "nusage",
   "catalog",
   "catalog/clap",
+config_roots = [
+  "nusage",
+  "catalog",
+  "catalog/clap",
   "catalog/cobra",
   "catalog/schemas",
+  "intent",
+]
 ]
 
 # The Cargo workspace is at the root, so its toolchain is: one pin for Cargo, the tasks and CI.

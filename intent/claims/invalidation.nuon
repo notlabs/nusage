@@ -1,0 +1,174 @@
+# When a script's analysis must be worked out again, said by what a change does to it, not
+# by how it is kept: an engine of revisions (Salsa), a memo by content, or a build engine
+# could each meet these. The checked ones hold today's `nusage prelude` to them.
+[
+  {
+    id: line-without-calls
+    says: "Editing a line that calls nothing leaves the script's analysis as it was."
+    status: checked
+    given: {
+      script: caller.nu
+      files: {
+        "caller.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<who>\"
+let greeting = ./callee.nu $usage.args.who
+print $greeting
+"
+        "callee.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<name>\"
+#USAGE output (\"string\")\"nuon\" default=#true
+$'hello ($usage.args.name)'
+"
+      }
+    }
+    change: {
+      files: {
+        "caller.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<who>\"
+let greeting = ./callee.nu $usage.args.who
+print ($greeting | str upcase)
+"
+      }
+    }
+    expect: {analysis: kept}
+  }
+  {
+    id: callee-header
+    says: "Changing the header of a script it calls changes the script's analysis."
+    status: checked
+    given: {
+      script: caller.nu
+      files: {
+        "caller.nu": "#!/usr/bin/env nusage
+./callee.nu world
+"
+        "callee.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<name>\"
+$'hello ($usage.args.name)'
+"
+      }
+    }
+    change: {
+      files: {
+        "callee.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<name>\"
+#USAGE flag \"--loud\"
+$'hello ($usage.args.name)'
+"
+      }
+    }
+    expect: {analysis: changed}
+  }
+  {
+    id: own-header
+    says: "Changing the script's own header changes its analysis."
+    status: checked
+    given: {
+      script: caller.nu
+      files: {
+        "caller.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<who>\"
+$usage.args.who
+"
+      }
+    }
+    change: {
+      files: {
+        "caller.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<who>\"
+#USAGE flag \"--twice\"
+$usage.args.who
+"
+      }
+    }
+    expect: {analysis: changed}
+  }
+  {
+    id: unreached-file
+    says: "Changing a file the script does not reach leaves its analysis as it was."
+    status: checked
+    given: {
+      script: caller.nu
+      files: {
+        "caller.nu": "#!/usr/bin/env nusage
+./callee.nu world
+"
+        "callee.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<name>\"
+$'hello ($usage.args.name)'
+"
+        "other.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<x>\"
+$usage.args.x
+"
+      }
+    }
+    change: {
+      files: {
+        "other.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<x>\"
+#USAGE flag \"--y\"
+$usage.args.x
+"
+      }
+    }
+    expect: {analysis: kept}
+  }
+  {
+    id: task-script-header
+    says: "Changing the header of the script a called task runs changes the analysis, as a called script's does."
+    status: open
+    given: {
+      script: caller.nu
+      files: {
+        "caller.nu": "#!/usr/bin/env nusage
+mise run greet world
+"
+        "mise-tasks/greet": "#!/usr/bin/env nusage
+#USAGE arg \"<name>\"
+$'hello ($usage.args.name)'
+"
+      }
+    }
+    change: {
+      files: {
+        "mise-tasks/greet": "#!/usr/bin/env nusage
+#USAGE arg \"<name>\"
+#USAGE flag \"--loud\"
+$'hello ($usage.args.name)'
+"
+      }
+    }
+    expect: {analysis: changed}
+    open: ["Checked once task calls (#30) are on main: the runner then needs mise and an executable task file."]
+  }
+  {
+    id: one-read-per-change
+    says: "Scripts that call one script read its header once for each change of it, not once each."
+    status: open
+    alternatives: [
+      "A query shared by key within a process, as Salsa's are."
+      "A memo keyed by the header file's content id, shared by anything that holds the store."
+    ]
+  }
+  {
+    id: stale-dropped
+    says: "An analysis a newer edit has made stale can be dropped unfinished rather than waited for."
+    status: open
+    alternatives: [
+      "Salsa's cancellation, which unwinds a query when an input it read is set."
+      "A generation counter the analysis checks between its steps."
+    ]
+  }
+  {
+    id: kept-across-processes
+    says: "What one process worked out can be used by the next when the content it read is the same."
+    status: open
+    traits: [content-addressed]
+    alternatives: [
+      "A store of results keyed by content id, beside an in-process engine that has none of its own."
+      "A build engine whose cache is keyed by content, used for analysis too."
+    ]
+    open: ["Where the store lives, what evicts it, and whether CI shares it."]
+  }
+]

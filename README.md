@@ -16,6 +16,8 @@ Early development.
   `catalog/tasks/catalog.nu` the layout; `catalog/clap/` reads the spec of a binary whose
   crate builds its clap command, as jj's is, and `catalog/schemas/` runs an output-schema
   suite, as both packages keep one.
+- `intent/`: the direction, as claims that are checked where they can be; nothing there is
+  settled.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nusage built here. `mise run //catalog:install` has every new

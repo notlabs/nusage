@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Traits",
+  "description": "The properties the analysis would give a script, a task, a query or a file: what each means, how it carries across a call, and what can establish it.",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "required": ["name", "means", "composes", "established"],
+    "additionalProperties": false,
+    "properties": {
+      "name": { "type": "string", "pattern": "^[a-z]+(-[a-z]+)*$" },
+      "means": { "type": "string", "minLength": 1 },
+      "composes": {
+        "type": "string",
+        "minLength": 1,
+        "description": "What a call of something with the trait makes of the caller."
+      },
+      "established": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "description": "inferred: the analysis works it out. declared: the author says so in the header, where review looks, as with Rust's unsafe. enforced: the runtime makes it so.",
+        "items": { "enum": ["inferred", "declared", "enforced"] }
+      }
+    }
+  }
+}
