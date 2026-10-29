@@ -10,10 +10,11 @@
 [task_config]
 shell = "nu -c"
 
-# The build, linked where the root's `[env] _.path` looks for it, from the path Cargo
-# reports: a build cache may keep the target directory elsewhere.
+# The build, copied where the root's `[env] _.path` looks for it, from the path Cargo
+# reports: a build cache may keep the target directory elsewhere, and Cargo rewrites the
+# binary there whenever another of its commands relinks it, under a task that is running it.
 [tasks.build]
-description = "Build the workspace and link nusage into the repository's bin directory"
+description = "Build the workspace and copy nusage into the repository's bin directory"
 sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
 outputs = ["../.bin/nusage"]
 run = '''
@@ -24,10 +25,10 @@ let built = ^cargo build --workspace --locked --message-format json-render-diagn
   | where reason == compiler-artifact and executable != null and target.name == nusage
   | get 0.executable
 let bin = "{{ config_root }}/../.bin" | path expand
-let link = $bin | path join nusage
+let copy = $bin | path join nusage
 mkdir $bin
-if ($link | path type) != symlink or (ls -l $link | get 0.target) != $built {
-    ^ln -sf $built $link
+if not ($copy | path exists) or (open --raw $built | hash sha256) != (open --raw $copy | hash sha256) {
+    cp $built $copy
 }
 '''
 
