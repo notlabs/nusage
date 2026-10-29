@@ -27,6 +27,9 @@ let built = ^cargo build --workspace --locked --message-format json-render-diagn
 let bin = "{{ config_root }}/../.bin" | path expand
 let copy = $bin | path join nusage
 mkdir $bin
+if ($copy | path type) == symlink {
+    rm $copy
+}
 if not ($copy | path exists) or (open --raw $built | hash sha256) != (open --raw $copy | hash sha256) {
     cp $built $copy
 }
