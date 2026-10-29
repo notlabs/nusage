@@ -152,7 +152,9 @@ def check-interpreter [dir: path, bin: string, case: record] {
 }
 
 # A binary call against the fixture's fake binary: the argv it recorded must be the case's
-# `argv`, and what the call returns the case's `output`, when the case gives them.
+# `argv`, and what the call returns the case's `output`, when the case gives them; a case
+# with `error` must fail instead, with a message containing it. The built `nusage` is on
+# PATH, as a module holds a failed decode to its schema through it.
 def check-invoke [dir: path, import: string, case: record] {
     let argv_file = mktemp
     let path = $env.PATH
@@ -162,12 +164,21 @@ def check-invoke [dir: path, import: string, case: record] {
         $path
     }
     let out = run-nu $"($import); ($case.invoke) | to nuon" {
-        PATH: $"($dir | path join fake)(char esep)($path)"
+        PATH: $"($dir | path join fake)(char esep)($env.NUSAGE_BIN | path dirname)(char esep)($path)"
         NUSAGE_FAKE_STDOUT: ($case.stdout? | default "")
         NUSAGE_FAKE_ARGV: $argv_file
     }
     let argv = open --raw $argv_file | lines
     rm $argv_file
+    if ($case.error? | is-not-empty) {
+        return (if $out.ok {
+            {ok: false, detail: $"expected an error containing ($case.error | to nuon), got ($out.detail)"}
+        } else if ($out.detail | str contains $case.error) {
+            {ok: true, detail: ''}
+        } else {
+            {ok: false, detail: $"expected an error containing ($case.error | to nuon), got:\n($out.detail)"}
+        })
+    }
     if not $out.ok {
         return $out
     }

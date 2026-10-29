@@ -13,9 +13,9 @@ receives, as `nusage <script> ...argv` parses it; `invoke` the Nushell spelling 
 `usage` the record the script must see;
 `output` what the command returns when that is not the record; `complete` a line and the
 completions expected at its end. A binary case is `{cmd, complete?, invoke?, argv?, stdout?,
-output?}`: `invoke` is a call run with the fixture's `fake/<bin>` on `PATH`, a stand-in that
-records the argv it received, compared with `argv`, and prints `stdout`; `output` is what the
-call returns.
+output?, error?}`: `invoke` is a call run with the fixture's `fake/<bin>` on `PATH`, a stand-in
+that records the argv it received, compared with `argv`, and prints `stdout`; `output` is what
+the call returns, or `error` text the failure must mention.
 
 The `$usage` record is `{cmd, args, flags}`. `cmd` is the subcommand path, `[]` at the root.
 `args` and `flags` are keyed by the usage name in `snake_case`, and every declared name is

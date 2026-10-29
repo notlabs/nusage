@@ -1,0 +1,8 @@
+# Output the schema rejects: decoding fails, and the error says what the schema found.
+{
+    cmd: [status],
+    invoke: "probe status",
+    argv: [status, --json],
+    stdout: "{\"ok\": true, \"took\": \"soon\", \"at\": \"2024-01-01T00:00:00Z\", \"size\": 3}",
+    error: "/took",
+}

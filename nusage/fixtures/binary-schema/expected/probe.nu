@@ -36,6 +36,28 @@ def "nusage flag-words" []: record -> list<string> {
     } | flatten
 }
 
+# A binary's output decoded as the module's closure decodes it. When that fails and the
+# `nusage` this module was generated with is on PATH, the output is held to the schema the
+# spec declares first, so the error names what does not match it rather than what failed
+# to convert.
+def "nusage decoded" [text: string, schema: string, decode: closure]: nothing -> any {
+    try {
+        $text | do $decode
+    } catch {|err|
+        if (which nusage | is-empty) {
+            error make --unspanned {msg: $err.msg}
+        }
+        let file = mktemp --tmpdir nusage-XXXXXX.schema.json
+        $schema | save --force $file
+        let checked = $text | ^nusage validate $file - | complete
+        rm $file
+        if $checked.exit_code == 0 {
+            error make --unspanned {msg: $err.msg}
+        }
+        error make --unspanned {msg: $"the output does not match its schema\n($checked.stderr | str trim)"}
+    }
+}
+
 # A CLI whose outputs declare JSON Schemas
 export def main []: nothing -> string {
     ^probe ...(nusage argv [] {})
@@ -61,7 +83,8 @@ export def main []: nothing -> string {
 """#
     }'
 export def "probe status" []: nothing -> record<ok: bool, took: duration, at: datetime, size: filesize, note: oneof<string, nothing>, seen: oneof<datetime, nothing>> {
-    ^probe status --json ...(nusage argv [] {}) | from json | default null note | default null seen | update took {|row| $row.took | into duration --unit ms } | into datetime at | update size {|row| $row.size * 1kB } | update seen {|row| if $row.seen == null { null } else { (1970-01-01T00:00:00Z) + ($row.seen | into duration --unit sec) } }
+    let text = ^probe status --json ...(nusage argv [] {})
+    nusage decoded $text "{\"type\":\"object\",\"required\":[\"ok\",\"took\",\"at\",\"size\"],\"properties\":{\"ok\":{\"type\":\"boolean\"},\"took\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"duration\",\"unit\":\"ms\"}},\"at\":{\"type\":\"string\",\"format\":\"date-time\"},\"size\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"filesize\",\"unit\":\"kB\"}},\"note\":{\"type\":\"string\"},\"seen\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"datetime\",\"unit\":\"sec\"}}}}" { from json | default null note | default null seen | update took {|row| $row.took | into duration --unit ms } | into datetime at | update size {|row| $row.size * 1kB } | update seen {|row| if $row.seen == null { null } else { (1970-01-01T00:00:00Z) + ($row.seen | into duration --unit sec) } } }
 }
 
 # Stream events
@@ -79,5 +102,6 @@ export def "probe events" []: nothing -> table<at: datetime, kind: string, detai
         schema file="report.schema.json"
     }'
 export def "probe report" []: nothing -> record<name: string, dependencies: table<name: string, version: string, optional: oneof<bool, nothing>>, meta: record<built: datetime, took: oneof<duration, nothing>>, tags: list<string>, icon: binary, score: oneof<float, nothing>> {
-    ^probe report ...(nusage argv [] {}) | from json | update dependencies { default null optional } | update meta { default null took } | default null score | into datetime meta.built | update meta.took {|row| if $row.meta.took == null { null } else { $row.meta.took | into duration --unit sec } } | update icon {|row| $row.icon | decode base64 }
+    let text = ^probe report ...(nusage argv [] {})
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$defs\":{\"dependency\":{\"type\":\"object\",\"required\":[\"name\",\"version\"],\"properties\":{\"name\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"optional\":{\"type\":\"boolean\"}}}},\"type\":\"object\",\"required\":[\"name\",\"dependencies\",\"meta\",\"tags\",\"icon\"],\"properties\":{\"name\":{\"type\":\"string\"},\"dependencies\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"meta\":{\"type\":\"object\",\"required\":[\"built\"],\"properties\":{\"built\":{\"type\":\"string\",\"format\":\"date-time\"},\"took\":{\"type\":\"number\",\"x-nu\":{\"type\":\"duration\",\"unit\":\"sec\"}}}},\"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"icon\":{\"type\":\"string\",\"contentEncoding\":\"base64\"},\"score\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}}}" { from json | update dependencies { default null optional } | update meta { default null took } | default null score | into datetime meta.built | update meta.took {|row| if $row.meta.took == null { null } else { $row.meta.took | into duration --unit sec } } | update icon {|row| $row.icon | decode base64 } }
 }

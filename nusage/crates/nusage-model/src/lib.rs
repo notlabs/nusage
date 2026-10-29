@@ -68,6 +68,9 @@ pub enum Execution {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Structured {
     pub name: String,
+    /// The JSON Schema the output declares, as text, when it declares one rather than an
+    /// annotation: what the raw output is held to when the module's decoding fails.
+    pub schema: Option<String>,
     /// The words that ask for it, right after the command's: `--json`, or `--format json`;
     /// none when it is the default.
     pub args: Vec<String>,

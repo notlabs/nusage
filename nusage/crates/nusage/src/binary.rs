@@ -19,6 +19,9 @@ use crate::common::{SPEC_COMPLETER, Target, attr_usage_alias, doc_of, nu_params,
 
 /// The fixed helpers every binary module carries.
 const HELPERS: &str = include_str!("binary-helpers.nu");
+/// The helper that holds a failed decode to the output's schema, carried when a wrapper
+/// decodes a JSON document that has one.
+const DECODED: &str = include_str!("binary-decoded.nu");
 
 /// The module for a binary: the helpers, the completer when a parameter wants one, then a
 /// wrapper per command. `spec` is the spec file's path relative to the module's directory,
@@ -34,6 +37,13 @@ pub fn module(tree: &CommandTree, spec: &str) -> Result<Module, SyntaxError> {
     });
     if wants_completer {
         items.push(Item::Verbatim(spec_completer(&tree.bin, spec)));
+    }
+    if tree.commands.iter().any(|command| {
+        command.structured.as_ref().is_some_and(|structured| {
+            structured.framing == Framing::Json && structured.schema.is_some()
+        })
+    }) {
+        items.push(Item::Verbatim(DECODED.to_string()));
     }
     for command in &tree.commands {
         let def = wrapper(tree, command)
@@ -165,12 +175,37 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         args,
     };
 
-    // Then `| from json | into datetime at` for a structured output.
-    let mut stages = vec![run];
-    if let Some(structured) = &command.structured {
-        stages.extend(decode_stages(structured)?);
-    }
-    let body = vec![Stmt::Pipeline(stages)];
+    // Then `| from json | into datetime at` for a structured output. One JSON document
+    // with a schema is decoded by `nusage decoded`, which holds the output to the schema
+    // when decoding fails; a stream of them is decoded as it arrives.
+    let body = match &command.structured {
+        Some(structured) if structured.framing == Framing::Json && structured.schema.is_some() => {
+            let schema: serde_json::Value =
+                serde_json::from_str(structured.schema.as_deref().unwrap_or_default())
+                    .map_err(|err| SyntaxError(format!("the output's schema: {err}")))?;
+            let text = Ident::new("text")?;
+            vec![
+                Stmt::Let {
+                    name: text.clone(),
+                    value: run,
+                },
+                Stmt::Pipeline(vec![call(
+                    "nusage decoded",
+                    vec![
+                        Expr::Var(text),
+                        Expr::Str(schema.to_string()),
+                        Expr::Closure(Box::new(Expr::Pipeline(decode_stages(structured)?))),
+                    ],
+                )?]),
+            ]
+        }
+        Some(structured) => {
+            let mut stages = vec![run];
+            stages.extend(decode_stages(structured)?);
+            vec![Stmt::Pipeline(stages)]
+        }
+        None => vec![Stmt::Pipeline(vec![run])],
+    };
     Ok(Def {
         export: true,
         doc: doc_of(command),
