@@ -23,9 +23,10 @@ use crate::prelude::{self, Analysis};
 /// Serve on standard input and output, with `nu --lsp` and `args` behind; the exit code is
 /// Nushell's.
 pub fn serve(args: &[String]) -> io::Result<i32> {
-    let mut nu = Command::new("nu")
+    let mut nu = Command::new(crate::nu::real_nu())
         .arg("--lsp")
         .args(args)
+        .env(crate::nu::SERVING, "1")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())

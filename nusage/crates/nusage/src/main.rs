@@ -29,6 +29,7 @@ enum Commands {
     Check(Check),
     Overlay(Overlay),
     Lsp(Lsp),
+    Nu(Nu),
     Parse(Parse),
     Prelude(Prelude),
     Validate(Validate),
@@ -297,10 +298,42 @@ impl Run for Lsp {
     }
 }
 
+/// Run as `nu`, as mise's command wrapper does
+///
+/// In the `nusage-lsp` environment mise starts every `nu` as `nusage nu`, so an editor that
+/// starts `nu --lsp` gets nusage's language server unasked: kakehashi with nusage's layer when
+/// kakehashi is on PATH, which highlights a script's header and bridges the script to `nusage
+/// lsp`, else `nusage lsp` alone. Anything else is `nu` itself, as it was asked for. The
+/// arguments are Nushell's, flags included.
+#[derive(Args)]
+struct Nu {
+    /// Nushell's arguments
+    args: Vec<String>,
+}
+
+impl Run for Nu {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        let code = nusage::nu(&self.args).map_err(|err| err.to_string())?;
+        std::process::exit(code)
+    }
+}
+
 fn main() -> ExitCode {
+    let argv: Vec<String> = std::env::args().collect();
+    // `nusage nu ...`: the arguments are Nushell's, flags and all, for no parser of ours.
+    if argv.get(1).map(String::as_str) == Some("nu") {
+        return match nusage::nu(&argv[2..]) {
+            Ok(code) => ExitCode::from(code.clamp(0, 255) as u8),
+            Err(err) => {
+                eprintln!("nusage: {err}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     // `nusage <script> [args...]`, the shebang form: the first argument names a file. The
     // subcommands are words, never files.
-    let argv: Vec<String> = std::env::args().collect();
     if let Some(first) = argv.get(1)
         && std::path::Path::new(first).is_file()
     {
