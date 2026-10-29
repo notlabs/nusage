@@ -16,6 +16,8 @@ Early development.
   `catalog/tasks/catalog.nu` the layout; `catalog/clap/` reads the spec of a binary whose
   crate builds its clap command, as jj's is, and `catalog/schemas/` runs an output-schema
   suite, as both packages keep one.
+- `intent/`: the direction, as claims that are checked where they can be; nothing there is
+  settled.
 
 An editor that runs `nusage lsp` where it would run `nu --lsp` checks a script nusage runs as
 nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to

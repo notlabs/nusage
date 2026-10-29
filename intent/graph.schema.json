@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Graph fragment",
+  "description": "Scripts, tasks, modules and what they read, as one graph: the words its claims use. A node is named by its kind and what names it; an edge by the kinds it joins.",
+  "type": "object",
+  "required": ["nodes", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^(script|task|module|file|fileset|env|operation):.+$" },
+          "kind": { "enum": ["script", "task", "module", "file", "fileset", "env", "operation"] }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "kind": {
+            "enum": ["calls", "runs", "executes", "depends", "imports", "reads"],
+            "description": "calls: a script calls a script. runs: a script runs a task. executes: a task's run is a script. depends: a task needs another first. imports: a script uses a module. reads: anything reads a file, fileset, variable or operation."
+          }
+        }
+      }
+    }
+  }
+}

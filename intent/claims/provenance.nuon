@@ -1,0 +1,42 @@
+# What a run can say about itself. Which code ran is cheap to say once the code is read
+# from a snapshot; that the same code gives the same outputs is a further claim, and holds
+# only for a run that reads nothing its record leaves out.
+[
+  {
+    id: run-record
+    says: "A run's record names the snapshot it read (a jj operation and commit), the graph's id, the tools it used and the environment it read, which says which code ran."
+    status: open
+    traits: [content-addressed]
+    open: ["Whether the tools are named by mise's lock or by their own hashes."]
+  }
+  {
+    id: snapshot-not-working-copy
+    says: "A recorded run reads its files from the snapshot's tree, not the working directory, so an edit made while it runs is not in it."
+    status: open
+    alternatives: [
+      "A jj workspace checked out at the commit."
+      "A read-only projection of the tree: a virtual filesystem over jj's store."
+      "An export of the tree to a directory of its own."
+    ]
+  }
+  {
+    id: record-is-not-determinism
+    says: "One record gives one set of outputs only for a hermetic run; a run that reads outside its record says so in it."
+    status: open
+    traits: [hermetic effect]
+    open: ["What makes a run hermetic: a sandbox the runtime enforces, or the analysis showing it reads nothing else."]
+  }
+  {
+    id: query-at-operation
+    says: "A revset or fileset is a function of its expression and a jj operation, so its value is named by the two."
+    status: open
+    traits: [reads content-addressed]
+  }
+  {
+    id: query-at-parse-time
+    says: "The editor evaluates a script's queries against the current operation, for completion and checking; a recorded run pins its operation, so what the editor showed and what ran agree, or the record says they differ."
+    status: open
+    traits: [reads]
+    open: ["How a script names its operation: an argument of its own, or the record's, passed as `--at-op`."]
+  }
+]
