@@ -1,0 +1,38 @@
+[
+  [name,         signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               attributes];
+  [sizes,        {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          nothing,      false,       null,       null,        null,       null],
+        [null,           output,         string,       false,       null,       null,        null,       null]
+      ]
+    },                                                                                                                                                                                                                             [
+
+    ]],
+  ["sizes info", {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                            is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          nothing,                                 false,       null,       null,        null,       null],
+        [name,           positional,     string,                                  false,       null,       "The thing", null,       null],
+        [null,           output,         "record<name: string, built: datetime>", false,       null,       null,        null,       null]
+      ]
+    }, [
+      [name,  value];
+      [usage, "arg \"<name>\" help=\"The thing\""],
+      [usage, "flag \"--yaml\" help=\"Print YAML\""],
+      [usage, "output \"text\" default=#true"],
+      [usage, "output (\"record<name: string, built: datetime>\")\"yaml\" media_type=\"application/yaml\" select=\"--yaml\" help=\"As YAML\""]
+    ]],
+  ["sizes ls",   {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                          is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          nothing,                               false,       null,       null,        null,       null],
+        [null,           output,         "table<name: string, size: filesize>", false,       null,       null,        null,       null]
+      ]
+    },                                                                                                                                                  [
+      [name,  value];
+      [usage, "flag \"--csv\" help=\"Print CSV\""],
+      [usage, "output \"text\" default=#true"],
+      [usage, "output (\"table<name: string, size: filesize>\")\"csv\" media_type=\"text/csv\" select=\"--csv\" help=\"One row per thing\""]
+    ]]
+]

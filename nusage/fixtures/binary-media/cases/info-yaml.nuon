@@ -1,0 +1,8 @@
+# `application/yaml` reads with `from yaml`; `built` is converted to the datetime declared.
+{
+    cmd: [info],
+    invoke: "sizes info a",
+    argv: [info, --yaml, a],
+    stdout: "name: a\nbuilt: 2024-01-02T03:04:05Z",
+    output: {name: a, built: 2024-01-02T03:04:05Z},
+}
