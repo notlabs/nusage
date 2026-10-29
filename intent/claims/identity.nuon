@@ -1,0 +1,63 @@
+# What a thing is named by. The direction names by content, so that a name says what was
+# read and a result keyed by names can be kept for as long as they hold.
+[
+  {
+    id: blob-by-content
+    says: "One content has one id wherever it is found."
+    status: open
+    traits: [content-addressed]
+    alternatives: [
+      "Git's blob hash, which jj's git backend already has for every committed file."
+      "BLAKE3 over the bytes, for content no commit holds."
+    ]
+    open: ["Whether two hashes can coexist, mapped where content crosses from one to the other."]
+  }
+  {
+    id: tree-by-entries
+    says: "A directory's id changes exactly when something under it does, so what is worked out from a tree is kept by the tree's id."
+    status: open
+    traits: [content-addressed]
+  }
+  {
+    id: buffer-is-content
+    says: "An editor's unsaved text is content like a file's: a snapshot is a tree with the editor's buffers over it, and gets an id the same way."
+    status: open
+    traits: [content-addressed]
+  }
+  {
+    id: result-by-reads
+    says: "An analysis result is named by the analyzer's own id and the ids of what it read, so it is the same result wherever and whenever those are."
+    status: open
+    traits: [content-addressed]
+    open: ["What the analyzer's own id is: its version, or the hash of its build."]
+  }
+  {
+    id: relocation
+    says: "Moving a tree changes the analysis of a script in it only in the directory the analysis names."
+    status: checked
+    given: {
+      script: caller.nu
+      files: {
+        "caller.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<who>\"
+./callee.nu $usage.args.who
+"
+        "callee.nu": "#!/usr/bin/env nusage
+#USAGE arg \"<name>\"
+#USAGE output (\"string\")\"nuon\" default=#true
+$'hello ($usage.args.name)'
+"
+      }
+    }
+    change: {moved: true}
+    expect: {analysis: relocated}
+  }
+  {
+    id: paths-from-the-root
+    says: "What an analysis names is named from the snapshot's root, so moving the tree leaves the analysis as it was."
+    status: open
+    open: [
+      "Today the analysis names absolute paths (relocation holds, this does not); a shadow needs an absolute path only where it runs, not where it is named."
+    ]
+  }
+]
