@@ -43,10 +43,12 @@ env = { NUSAGE_CORPUS = "{{ tools['usage-source'].path }}/corpus" }
 run = "cargo test --workspace --locked"
 
 [tasks.lint]
-description = "Formatting and clippy, as CI checks them"
+description = "Formatting, clippy and rustdoc, as CI checks them"
+env = { RUSTDOCFLAGS = "-D warnings" }
 run = [
   "cargo fmt --all --check",
   "cargo clippy --workspace --all-targets --locked -- -D warnings",
+  "cargo doc --workspace --no-deps --locked",
 ]
 
 [tasks.verify-fixtures]

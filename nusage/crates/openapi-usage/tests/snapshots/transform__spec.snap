@@ -1,0 +1,39 @@
+---
+source: nusage/crates/openapi-usage/tests/transform.rs
+expression: transformed.spec
+---
+name "swagger-petstore"
+bin "swagger-petstore"
+about "Swagger Petstore"
+long_about "A sample API that uses a petstore as an example.\n\nThe long story."
+version "1.0.0"
+cmd "list-pets" help="List all pets" {
+    flag "--limit" help="How many items to return at one time (max 100)" {
+        arg (int)"<LIMIT>"
+    }
+    flag "--status" {
+        arg "<STATUS>" {
+            choices "available" "sold"
+        }
+    }
+    flag "--tags" help="Only pets with these tags" var=#true {
+        arg "<TAGS>"
+    }
+    flag "--x-request-id" {
+        arg "<X_REQUEST_ID>"
+    }
+    output "json" framing="json" default=#true {
+        schema file="schemas/list-pets.schema.json"
+    }
+}
+cmd "create-pets" help="Create a pet"
+cmd "show-pet-by-id" help="Info for a specific pet" {
+    arg (int)"<pet-id>" help="The id of the pet"
+    output "json" framing="json" default=#true {
+        schema file="schemas/show-pet-by-id.schema.json"
+    }
+}
+cmd "delete-pets-pet-id" help="Remove a pet." deprecated=#true {
+    flag "--force" required=#true
+    arg (int)"<pet-id>" help="The id of the pet"
+}
