@@ -1,31 +1,38 @@
 name: release
 
-# Every push to main: the checks, then release-plz tags the version Cargo.toml declares when
-# no tag for it exists, with the changelog's section as the draft release's notes; the
-# binaries are built for that tag and attached, and the release is published. The version
-# and the changelog are committed beforehand (`mise run release`), so the push that bumps
-# them is the release. The workflow's own token is enough: a tag it pushes runs no other
+# Every push to main: release-plz tags the version Cargo.toml declares when no tag for it
+# exists, with the changelog's section as the draft release's notes; the Linux binary is
+# built for that tag and attached, and the release is published. The version and the
+# changelog are committed beforehand (`mise run release`), so the push that bumps them is
+# the release, and main takes a pull request only with the checks green, so nothing is
+# checked again here. The workflow's own token is enough: a tag it pushes runs no other
 # workflow, and none has to run.
+#
+# The other targets are built on demand: run this workflow with the tag and the targets,
+# `all` or a comma-separated list, and they are attached to that release.
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release to attach binaries to, such as v0.1.1
+        required: true
+        type: string
+      targets:
+        description: The targets to build, `all` or comma-separated
+        required: true
+        default: all
+        type: string
 
 permissions: {}
 
 concurrency:
   group: release
 
-env:
-  MBX_DISABLE: "1"
-
 jobs:
-  check:
-    uses: ./.github/workflows/ci.yml
-    permissions:
-      contents: read
-
   tag:
-    needs: check
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -56,21 +63,64 @@ jobs:
           tag=$(jq -r '.[] | select(.package_name == "nusage") | .tag' <<< "${RELEASES:-[]}")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-  assets:
+  # The tag and the targets: on a push, the tag release-plz made and Linux x86_64; on a
+  # dispatch, the given tag and targets.
+  plan:
     needs: tag
-    if: needs.tag.outputs.tag != ''
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || needs.tag.outputs.tag != '') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          PUSHED_TAG: ${{ needs.tag.outputs.tag }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_TARGETS: ${{ inputs.targets }}
+          ALL: |
+            [
+              {"target": "x86_64-unknown-linux-gnu", "os": "ubuntu-latest", "build-tool": "cargo"},
+              {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-latest", "build-tool": "cross"},
+              {"target": "aarch64-unknown-linux-gnu", "os": "ubuntu-24.04-arm", "build-tool": "cargo"},
+              {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-24.04-arm", "build-tool": "cross"},
+              {"target": "x86_64-apple-darwin", "os": "macos-latest", "build-tool": "cargo"},
+              {"target": "aarch64-apple-darwin", "os": "macos-latest", "build-tool": "cargo"},
+              {"target": "x86_64-pc-windows-msvc", "os": "windows-latest", "build-tool": "cargo"},
+              {"target": "aarch64-pc-windows-msvc", "os": "windows-latest", "build-tool": "cargo"}
+            ]
+        run: |
+          if [ "$EVENT" = push ]; then
+            tag=$PUSHED_TAG
+            targets=x86_64-unknown-linux-gnu
+          else
+            tag=$INPUT_TAG
+            targets=$INPUT_TARGETS
+          fi
+          if [ "$targets" = all ]; then
+            matrix=$(jq -c '.' <<< "$ALL")
+          else
+            matrix=$(jq -c --arg targets "$targets" \
+              '[.[] | select(.target as $t | ($targets | split(",") | map(gsub("\\s"; "")) | index($t)) != null)]' \
+              <<< "$ALL")
+          fi
+          if [ "$(jq 'length' <<< "$matrix")" = 0 ]; then
+            echo "::error::no target in '$targets' is known"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  assets:
+    needs: plan
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, build-tool: cargo }
-          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, build-tool: cross }
-          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, build-tool: cross }
-          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, build-tool: cross }
-          - { target: x86_64-apple-darwin, os: macos-latest, build-tool: cargo }
-          - { target: aarch64-apple-darwin, os: macos-latest, build-tool: cargo }
-          - { target: x86_64-pc-windows-msvc, os: windows-latest, build-tool: cargo }
-          - { target: aarch64-pc-windows-msvc, os: windows-latest, build-tool: cargo }
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
@@ -80,13 +130,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ needs.tag.outputs.tag }}
+          ref: refs/tags/${{ needs.plan.outputs.tag }}
           persist-credentials: false
       # No cache: what is published is built from the checkout alone.
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
           cache: false
+        env:
+          MBX_DISABLE: "1"
       - run: rustup target add ${{ matrix.target }}
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         if: matrix.build-tool == 'cross'
@@ -101,8 +153,10 @@ jobs:
           archive: $bin-$tag-$target
           checksum: sha256
           locked: true
-          ref: refs/tags/${{ needs.tag.outputs.tag }}
+          ref: refs/tags/${{ needs.plan.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          MBX_DISABLE: "1"
       # Attestations for a private repository need GitHub Enterprise Cloud.
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         if: ${{ !github.event.repository.private }}
@@ -110,13 +164,14 @@ jobs:
           subject-path: ${{ steps.upload.outputs.tar || steps.upload.outputs.zip }}
 
   publish:
-    needs: [tag, assets]
+    needs: [plan, assets]
+    if: ${{ !cancelled() && needs.assets.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      TAG: ${{ needs.tag.outputs.tag }}
+      TAG: ${{ needs.plan.outputs.tag }}
     steps:
       - run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
