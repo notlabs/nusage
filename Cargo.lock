@@ -2175,6 +2175,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "insta"
+version = "1.49.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b67d3d2e287e4b86c10b3f3b641033d1f89b74bdb39d05f34952e2b9a6fe21cd"
+dependencies = [
+ "console",
+ "once_cell",
+ "serde",
+ "similar",
+ "tempfile",
+]
+
+[[package]]
 name = "intl-memoizer"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3600,7 +3613,6 @@ dependencies = [
 name = "nusage"
 version = "0.1.1"
 dependencies = [
- "jsonschema",
  "nu-cmd-lang",
  "nu-command",
  "nu-parser",
@@ -3609,6 +3621,7 @@ dependencies = [
  "nusage-model",
  "nusage-nu",
  "nusage-spec",
+ "nushell-schema",
  "serde_json",
  "usage-lib",
  "usage-rs",
@@ -3624,6 +3637,7 @@ dependencies = [
  "nuon",
  "nusage-nu",
  "nusage-spec",
+ "nushell-schema",
  "serde_json",
  "usage-lib",
 ]
@@ -3648,6 +3662,17 @@ dependencies = [
  "indexmap",
  "thiserror 2.0.21",
  "usage-lib",
+]
+
+[[package]]
+name = "nushell-schema"
+version = "0.1.1"
+dependencies = [
+ "jsonschema",
+ "nu-utils",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -3789,6 +3814,19 @@ checksum = "8d8c8b8e725ad26404d6896eb2f064294a0a7b4f1d9120210d85544684c4ca95"
 dependencies = [
  "is-wsl",
  "libc",
+]
+
+[[package]]
+name = "openapi-usage"
+version = "0.1.1"
+dependencies = [
+ "insta",
+ "nushell-schema",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "usage-lib",
+ "usage-rs",
 ]
 
 [[package]]
@@ -5000,6 +5038,12 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
+name = "similar"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
 
 [[package]]
 name = "siphasher"

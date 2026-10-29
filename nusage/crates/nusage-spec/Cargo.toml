@@ -13,3 +13,6 @@ publish = false
 usage.workspace = true
 thiserror.workspace = true
 indexmap.workspace = true
+
+[lints]
+workspace = true

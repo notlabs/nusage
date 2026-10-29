@@ -1,42 +1,179 @@
-//! A JSON Schema as a Nushell type, with what JSON cannot carry: the schema an `output`
-//! declares says what a binary writes, and this reads it the way a signature needs it. The
-//! mapping is the obvious one: an object is a `record` of its properties in their order, an
-//! array of objects a `table`, any other array a `list`, `integer` is `int`, `number` is
-//! `float`, and a property the schema does not require is `oneof<T, nothing>`, filled with
-//! `null` when absent so it is there to read. In the items of a list that is not a table,
-//! where no cell path reaches to fill it, such a property is left out of the type instead,
-//! since the type of a record says what every record has. A string with `format: date-time`
-//! becomes a datetime, one with `contentEncoding: base64` becomes binary, and a number with
-//! an `x-nu` vocabulary entry (`{"type": "duration", "unit": "ms"}`, also `filesize` and
-//! `datetime`) becomes that, counting its unit. `anyOf`, `oneOf` and a list of types are
-//! `oneof<…>`; inside one with more than one member besides `null`, nothing is filled or
-//! converted either, since what is done to the value must hold for every member: an
-//! optional property is left out of the type as in a list, and a conversion is an error.
-//! `enum` and `const` take the type of their values; a local `$ref` is followed. What this
-//! does not read is `any`: `allOf`, `not`, conditionals, `patternProperties`.
+//! A schema read as a Nushell type, with what JSON cannot carry: the fields to fill and the
+//! conversions to run after decoding. The crate's documentation says how a schema maps to a
+//! type.
 
+use serde::Serialize;
 use serde_json::Value as Json;
 
-use crate::{Conversion, Fill, NuType};
+/// A Nushell type as text: `record<id: int, at: datetime>`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct NuType(pub String);
+
+impl NuType {
+    /// The type as text.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// A property the schema does not require, filled with `null` where its record leaves it
+/// out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Fill {
+    /// The cell path of the field.
+    pub path: Vec<String>,
+    /// Where on the way to the record `null` may stand instead, as the lengths of the
+    /// prefixes of `path` that may be `null`, shortest first. A `null` is left as it is,
+    /// with no field under it to fill.
+    pub nullable: Vec<usize>,
+}
+
+/// A value JSON delivers as text or a number, converted to the declared type at a cell path
+/// (empty for the whole value).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Conversion {
+    /// The cell path of the value.
+    pub path: Vec<String>,
+    /// `datetime`, `duration` or `filesize`; `binary` for text taken as bytes, `base64`
+    /// for text decoded.
+    pub ty: String,
+    /// For a number: what it counts, as the schema's `x-nu` says, spelled as in a Nushell
+    /// literal (`ms`, `sec`, `kB`). `None` for text, such as an ISO 8601 datetime.
+    pub unit: Option<String>,
+    /// Where on the way to the value `null` may stand instead, as the lengths of the
+    /// prefixes of `path` that may be `null`, shortest first: the whole path for the value
+    /// itself. A `null` is left as it is, with nothing under it to convert.
+    pub nullable: Vec<usize>,
+}
 
 /// What a schema says about the value: its type, the optional properties to fill, and the
-/// conversions, as [`crate::Structured`] carries them.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// conversions, in the order to run them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Shape {
+    /// The Nushell type.
     pub ty: NuType,
+    /// The fills, a record's own field before the fields under it.
     pub fills: Vec<Fill>,
+    /// The conversions, in schema order.
     pub conversions: Vec<Conversion>,
 }
 
-pub fn shape(schema: &str) -> Result<Shape, String> {
-    let root: Json = serde_json::from_str(schema).map_err(|err| format!("not JSON: {err}"))?;
+/// Why a schema cannot be read as a shape.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// The text is not JSON.
+    #[error("not JSON: {0}")]
+    Json(String),
+    /// A `type` the dialect does not have.
+    #[error("{place}: unknown type `{ty}`")]
+    UnknownType {
+        /// Where in the value.
+        place: String,
+        /// The type as written.
+        ty: String,
+    },
+    /// A `$ref` into another document.
+    #[error("{place}: `$ref` {reference:?} is not local; only `#/...` is followed")]
+    ForeignReference {
+        /// Where in the value.
+        place: String,
+        /// The reference as written.
+        reference: String,
+    },
+    /// A `$ref` that names nothing in the document.
+    #[error("{place}: `$ref` {reference:?} points nowhere")]
+    DanglingReference {
+        /// Where in the value.
+        place: String,
+        /// The reference as written.
+        reference: String,
+    },
+    /// A conversion inside a union of several shapes, where which shape the value has is
+    /// not known after decoding.
+    #[error(
+        "{place}: a {what} inside a union of several shapes cannot be converted after \
+         decoding; which shape the value has is not known"
+    )]
+    ConvertedInUnion {
+        /// Where in the value.
+        place: String,
+        /// The conversion's type.
+        what: String,
+    },
+    /// A conversion inside a list that is not a table, where no cell path reaches.
+    #[error(
+        "{place}: a {what} inside a list cannot be converted after decoding; JSON delivers \
+         it as it is"
+    )]
+    ConvertedInList {
+        /// Where in the value.
+        place: String,
+        /// The conversion's type.
+        what: String,
+    },
+    /// An `x-nu` the vocabulary does not allow.
+    #[error("{place}: {why}")]
+    Counted {
+        /// Where in the value.
+        place: String,
+        /// What is wrong with it.
+        why: CountedError,
+    },
+}
+
+/// What an `x-nu` got wrong.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum CountedError {
+    /// No `type`.
+    #[error("`x-nu` names no type")]
+    NoType,
+    /// No `unit`.
+    #[error("`x-nu` names no unit")]
+    NoUnit,
+    /// On a schema that is not a number's.
+    #[error("`x-nu` converts a number, and this is {0}")]
+    NotANumber(String),
+    /// A `type` that is not duration, filesize or datetime.
+    #[error("`x-nu` type `{0}` is not duration, filesize or datetime")]
+    UnknownKind(String),
+    /// A `unit` the type does not count in.
+    #[error("`{unit}` is not a unit of a {kind}; one of {}", units.join(", "))]
+    UnknownUnit {
+        /// The `x-nu` type.
+        kind: String,
+        /// The unit as written.
+        unit: String,
+        /// The units the type counts in.
+        units: Vec<String>,
+    },
+}
+
+/// The units a duration counts in, as Nushell spells them.
+pub const UNITS_OF_DURATION: &[&str] = &["ns", "us", "ms", "sec", "min", "hr", "day", "wk"];
+/// The units a datetime counts in, since the Unix epoch.
+pub const UNITS_OF_DATETIME: &[&str] = &["ns", "us", "ms", "sec"];
+/// The units a file size counts in, as Nushell spells them.
+pub const UNITS_OF_FILESIZE: &[&str] = &[
+    "b", "kB", "MB", "GB", "TB", "PB", "EB", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB",
+];
+
+/// The shape of the schema given as JSON text.
+pub fn shape(schema: &str) -> Result<Shape, Error> {
+    let root: Json = serde_json::from_str(schema).map_err(|err| Error::Json(err.to_string()))?;
+    shape_of(&root)
+}
+
+/// The shape of the schema.
+pub fn shape_of(schema: &Json) -> Result<Shape, Error> {
     let mut reader = Reader {
-        root: &root,
+        root: schema,
         fills: Vec::new(),
         conversions: Vec::new(),
         refs: Vec::new(),
     };
-    let ty = reader.node(&root, &Place::top())?;
+    let ty = reader.node(schema, &Place::top())?;
     Ok(Shape {
         ty: NuType(ty),
         fills: reader.fills,
@@ -51,7 +188,6 @@ struct Reader<'a> {
     /// The `$ref`s being followed, to stop at a cycle.
     refs: Vec<String>,
 }
-
 /// Where in the value a schema node sits: its cell path, whether a list or a union of
 /// several shapes stands between it and the top (where no cell path reaches, or not for
 /// every value), and the prefixes of its path that may be null, by length, itself or what
@@ -136,7 +272,7 @@ impl Place {
 }
 
 impl Reader<'_> {
-    fn node(&mut self, schema: &Json, place: &Place) -> Result<String, String> {
+    fn node(&mut self, schema: &Json, place: &Place) -> Result<String, Error> {
         let Some(object) = schema.as_object() else {
             // `true` and `false` schemas, or nonsense.
             return Ok("any".to_string());
@@ -200,19 +336,22 @@ impl Reader<'_> {
             Some("number") => Ok("float".to_string()),
             Some("boolean") => Ok("bool".to_string()),
             Some("null") => Ok("nothing".to_string()),
-            Some(other) => Err(format!("{}: unknown type `{other}`", place.describe())),
+            Some(other) => Err(Error::UnknownType {
+                place: place.describe(),
+                ty: other.to_string(),
+            }),
             None if object.contains_key("properties") => self.object(object, place),
             None if object.contains_key("items") => self.array(object, place),
             None => Ok("any".to_string()),
         }
     }
 
-    fn reference(&mut self, reference: &str, place: &Place) -> Result<String, String> {
+    fn reference(&mut self, reference: &str, place: &Place) -> Result<String, Error> {
         let Some(pointer) = reference.strip_prefix('#') else {
-            return Err(format!(
-                "{}: `$ref` {reference:?} is not local; only `#/...` is followed",
-                place.describe()
-            ));
+            return Err(Error::ForeignReference {
+                place: place.describe(),
+                reference: reference.to_string(),
+            });
         };
         if self.refs.iter().any(|seen| seen == reference) {
             // A recursive schema: the value has no finite type.
@@ -221,7 +360,10 @@ impl Reader<'_> {
         let target = self
             .root
             .pointer(pointer)
-            .ok_or_else(|| format!("{}: `$ref` {reference:?} points nowhere", place.describe()))?
+            .ok_or_else(|| Error::DanglingReference {
+                place: place.describe(),
+                reference: reference.to_string(),
+            })?
             .clone();
         self.refs.push(reference.to_string());
         let ty = self.node(&target, place);
@@ -229,7 +371,7 @@ impl Reader<'_> {
         ty
     }
 
-    fn union(&mut self, members: &[Json], place: &Place) -> Result<String, String> {
+    fn union(&mut self, members: &[Json], place: &Place) -> Result<String, Error> {
         let is_null = |member: &Json| member.get("type").and_then(Json::as_str) == Some("null");
         let nullable = members.iter().any(is_null);
         let place = place.or_null(nullable);
@@ -249,54 +391,48 @@ impl Reader<'_> {
     }
 
     /// A conversion inside a union of several shapes would run on every member.
-    fn converted_in_union(&self, place: &Place, before: usize) -> Result<(), String> {
+    fn converted_in_union(&self, place: &Place, before: usize) -> Result<(), Error> {
         if place.in_union && self.conversions.len() > before {
             let what = self.conversions[before].ty.clone();
-            return Err(format!(
-                "{}: a {what} inside a union of several shapes cannot be converted after \
-                 decoding; which shape the value has is not known",
-                place.describe()
-            ));
+            return Err(Error::ConvertedInUnion {
+                place: place.describe(),
+                what,
+            });
         }
         Ok(())
     }
 
     /// `x-nu`: a number counting units of a duration, a file size or a datetime.
-    fn counted(&mut self, nu: &Json, ty: Option<&str>, place: &Place) -> Result<String, String> {
+    fn counted(&mut self, nu: &Json, ty: Option<&str>, place: &Place) -> Result<String, Error> {
+        let counted = |why| Error::Counted {
+            place: place.describe(),
+            why,
+        };
         let kind = nu
             .get("type")
             .and_then(Json::as_str)
-            .ok_or_else(|| format!("{}: `x-nu` names no type", place.describe()))?;
+            .ok_or_else(|| counted(CountedError::NoType))?;
         let unit = nu
             .get("unit")
             .and_then(Json::as_str)
-            .ok_or_else(|| format!("{}: `x-nu` names no unit", place.describe()))?;
+            .ok_or_else(|| counted(CountedError::NoUnit))?;
         if !matches!(ty, Some("integer" | "number")) {
-            return Err(format!(
-                "{}: `x-nu` converts a number, and this is {}",
-                place.describe(),
-                ty.unwrap_or("untyped")
-            ));
+            return Err(counted(CountedError::NotANumber(
+                ty.unwrap_or("untyped").to_string(),
+            )));
         }
-        let units: &[&str] = match kind {
-            "duration" => &["ns", "us", "ms", "sec", "min", "hr", "day", "wk"],
-            "datetime" => &["ns", "us", "ms", "sec"],
-            "filesize" => &[
-                "b", "kB", "MB", "GB", "TB", "PB", "EB", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB",
-            ],
-            other => {
-                return Err(format!(
-                    "{}: `x-nu` type `{other}` is not duration, filesize or datetime",
-                    place.describe()
-                ));
-            }
+        let units = match kind {
+            "duration" => UNITS_OF_DURATION,
+            "datetime" => UNITS_OF_DATETIME,
+            "filesize" => UNITS_OF_FILESIZE,
+            other => return Err(counted(CountedError::UnknownKind(other.to_string()))),
         };
         if !units.contains(&unit) {
-            return Err(format!(
-                "{}: `{unit}` is not a unit of a {kind}; one of {}",
-                place.describe(),
-                units.join(", ")
-            ));
+            return Err(counted(CountedError::UnknownUnit {
+                kind: kind.to_string(),
+                unit: unit.to_string(),
+                units: units.iter().map(|unit| unit.to_string()).collect(),
+            }));
         }
         self.convert(place, kind, Some(unit));
         Ok(kind.to_string())
@@ -306,7 +442,7 @@ impl Reader<'_> {
         &mut self,
         object: &serde_json::Map<String, Json>,
         place: &Place,
-    ) -> Result<String, String> {
+    ) -> Result<String, Error> {
         let Some(properties) = object.get("properties").and_then(Json::as_object) else {
             return Ok("record".to_string());
         };
@@ -346,7 +482,7 @@ impl Reader<'_> {
         &mut self,
         object: &serde_json::Map<String, Json>,
         place: &Place,
-    ) -> Result<String, String> {
+    ) -> Result<String, Error> {
         let Some(items) = object.get("items") else {
             return Ok("list<any>".to_string());
         };
@@ -362,11 +498,10 @@ impl Reader<'_> {
         let ty = self.node(items, &item_place)?;
         if !item_place.reached() && self.conversions.len() > before {
             let what = self.conversions[before].ty.clone();
-            return Err(format!(
-                "{}: a {what} inside a list cannot be converted after decoding; JSON delivers \
-                 it as it is",
-                place.describe()
-            ));
+            return Err(Error::ConvertedInList {
+                place: place.describe(),
+                what,
+            });
         }
         Ok(if rows {
             ty.replacen("record<", "table<", 1)
@@ -483,7 +618,11 @@ fn literal_type(value: &Json) -> String {
 
 /// A record column as a type writes it: bare when it is a word, else quoted.
 fn column(name: &str) -> String {
-    nusage_nu::word(name)
+    if nu_utils::needs_quoting(name) {
+        nu_utils::escape_quote_string(name)
+    } else {
+        name.to_string()
+    }
 }
 
 #[cfg(test)]
