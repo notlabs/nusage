@@ -1,0 +1,9 @@
+# The overlay's `decode` pipeline runs on the text, then `size` is converted to the filesize
+# the annotation declares. The output is the default, so the wrapper asks for nothing.
+{
+    cmd: [ls],
+    invoke: "wc ls",
+    argv: [ls],
+    stdout: "a 2048\nb 4096",
+    output: [[name, size]; [a, 2048b], [b, 4096b]],
+}

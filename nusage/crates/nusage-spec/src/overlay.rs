@@ -1,12 +1,13 @@
 //! An overlay: a usage KDL document merged onto a spec's document before usage reads it,
 //! so a spec one does not own, such as what a binary prints for `tool usage`, can be given
-//! what it lacks: `output` declarations, a `select`, type annotations on arguments.
+//! what it lacks: `output` declarations, a `select`, type annotations on arguments, a
+//! `decode` pipeline on an output.
 //!
 //! usage itself has no merge: a redeclared `cmd` replaces the earlier one, and a `select`
 //! naming a flag the overlay does not repeat is rejected. Merging at the node level, before
 //! usage parses, keeps the overlay in usage's grammar and lets usage validate the whole.
 
-use usage::kdl::{KdlDocument, KdlNode};
+use usage::kdl::{KdlDocument, KdlDocumentFormat, KdlNode, KdlNodeFormat};
 
 /// Merge `overlay` into `base`. A node merges into the base node with the same name and
 /// the same first argument: the overlay's arguments, annotations included, replace the
@@ -61,9 +62,35 @@ fn merge_nodes(base: &mut Vec<KdlNode>, overlay: &[KdlNode]) {
             }
         }
         if let Some(children) = node.children() {
+            let opened = target.children().is_none();
             merge_nodes(target.ensure_children().nodes_mut(), children.nodes());
+            if opened {
+                open_block(target);
+            }
         }
     }
+}
+
+/// Lay out a block the overlay opened on a node that had none, as it would be written: a
+/// space before `{`, each child on its own line indented by four, `}` on its own. The node's
+/// text is what a module carries as an attribute, and the children brought the whitespace
+/// of the overlay file with them.
+fn open_block(node: &mut KdlNode) {
+    if let Some(format) = node.format_mut() {
+        format.before_children = " ".into();
+    }
+    let children = node.ensure_children();
+    for child in children.nodes_mut() {
+        child.set_format(KdlNodeFormat {
+            leading: "    ".into(),
+            terminator: "\n".into(),
+            ..Default::default()
+        });
+    }
+    children.set_format(KdlDocumentFormat {
+        leading: "\n".into(),
+        trailing: String::new(),
+    });
 }
 
 fn first_arg(node: &KdlNode) -> Option<String> {
@@ -76,6 +103,28 @@ fn first_arg(node: &KdlNode) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_block_the_overlay_opens_reads_as_written() {
+        let mut base: KdlDocument = "cmd \"ls\" {\n    output \"text\" default=#true\n}\n"
+            .parse()
+            .unwrap();
+        let overlay: KdlDocument = r#"
+cmd "ls" {
+    output ("table<name: string>")"text" default=#true {
+        decode "lines | parse \"{name}\""
+    }
+}
+"#
+        .parse()
+        .unwrap();
+        merge(&mut base, &overlay);
+        let output = base.nodes()[0].children().unwrap().nodes()[0].to_string();
+        assert_eq!(
+            output.trim(),
+            "output (\"table<name: string>\")\"text\" default=#true {\n    decode \"lines | parse \\\"{name}\\\"\"\n}"
+        );
+    }
 
     #[test]
     fn commands_merge_and_other_nodes_replace_by_name_and_first_argument() {

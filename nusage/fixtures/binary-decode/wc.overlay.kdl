@@ -1,0 +1,7 @@
+// What the base lacks: the type of `ls`'s output and the pipeline that decodes it, on the
+// `output "text"` node the base declares, which the overlay merges into.
+cmd "ls" {
+    output ("table<name: string, size: filesize>")"text" default=#true {
+        decode "lines | parse \"{name} {size}\""
+    }
+}

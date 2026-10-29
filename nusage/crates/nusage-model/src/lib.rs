@@ -62,9 +62,9 @@ pub enum Execution {
 }
 
 /// The one output a binary command's wrapper asks for and decodes, as a Nushell command
-/// returns data and the binary itself, `^tool`, returns text: the default output when it is
-/// framed, else the first `json` output a selector can ask for, else the first `jsonl` one.
-/// The selector flags are the wrapper's, not the caller's.
+/// returns data and the binary itself, `^tool`, returns text: among the outputs that have a
+/// decoder, the default one, else the first `json` one a selector can ask for, else the first
+/// that can be asked for. The selector flags are the wrapper's, not the caller's.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Structured {
     pub name: String,
@@ -72,6 +72,8 @@ pub struct Structured {
     /// none when it is the default.
     pub args: Vec<String>,
     pub framing: Framing,
+    /// What turns the output's text into a value, before the conversions.
+    pub decoder: Decoder,
     /// The type, from the output's JSON Schema or its annotation, when it has one.
     pub ty: Option<NuType>,
     /// Properties the schema does not require, at their cell paths: a record JSON leaves
@@ -98,12 +100,63 @@ pub struct Conversion {
     pub nullable: bool,
 }
 
+/// usage's `framing`: the stream contract of an output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Framing {
+    /// One document, read to its end; usage's default.
+    Text,
     /// One JSON document.
     Json,
     /// One JSON document per line.
     Jsonl,
+}
+
+/// How a wrapper decodes an output. An output has a decoder when its `media_type` names a
+/// format Nushell reads, when its framing is `json` or `jsonl`, or when its declaration
+/// carries a `decode` node; an output with none is text, which the wrapper returns as it is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Decoder {
+    /// `from <format>`: Nushell's reader for the media type, `json` for the JSON framings
+    /// when no media type says otherwise, with `--objects` for one document per line.
+    From { format: String, objects: bool },
+    /// The pipeline the output's `decode` node states, as written: what no reader covers,
+    /// such as `lines | parse "{name} {size}"` or an external converter followed by
+    /// `from json`.
+    Pipeline(String),
+}
+
+impl Decoder {
+    /// Whether this is `from json`, the one reader a JSON Schema describes the input of.
+    pub fn is_json(&self) -> bool {
+        matches!(self, Decoder::From { format, .. } if format == "json")
+    }
+}
+
+/// Nushell's `from` reader for an IANA media type, when it has one: `text/csv` reads with
+/// `from csv`. Parameters after `;` and case are ignored; JSON Lines types read as `json`,
+/// which the framing then takes line by line.
+pub fn reader_for(media_type: &str) -> Option<&'static str> {
+    let essence = media_type
+        .split(';')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase();
+    Some(match essence.as_str() {
+        "application/json"
+        | "application/jsonl"
+        | "application/x-ndjson"
+        | "application/jsonlines"
+        | "application/x-jsonlines"
+        | "application/json-seq" => "json",
+        "text/csv" => "csv",
+        "text/tab-separated-values" | "text/tsv" => "tsv",
+        "application/yaml" | "application/x-yaml" | "text/yaml" | "text/x-yaml" => "yaml",
+        "application/toml" | "text/toml" => "toml",
+        "application/xml" | "text/xml" => "xml",
+        "application/nuon" | "text/nuon" => "nuon",
+        _ => return None,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -195,4 +248,19 @@ pub enum Completer {
     /// `complete` node, a `choices run=` or a `type=` asks for, its commands run and its
     /// templates rendered by usage. For a binary; a script's choices are a sibling provider.
     Spec,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::reader_for;
+
+    #[test]
+    fn readers_follow_the_media_type() {
+        assert_eq!(reader_for("text/csv"), Some("csv"));
+        assert_eq!(reader_for("Application/JSON; charset=utf-8"), Some("json"));
+        assert_eq!(reader_for("application/x-ndjson"), Some("json"));
+        assert_eq!(reader_for("application/yaml"), Some("yaml"));
+        assert_eq!(reader_for("text/plain"), None);
+        assert_eq!(reader_for("image/png"), None);
+    }
 }

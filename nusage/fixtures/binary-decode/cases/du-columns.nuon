@@ -1,0 +1,8 @@
+# A `decode` declared in the spec file itself.
+{
+    cmd: [du],
+    invoke: "wc du",
+    argv: [du],
+    stdout: "2048 a\n4096 b",
+    output: [[size, path]; [2048b, a], [4096b, b]],
+}

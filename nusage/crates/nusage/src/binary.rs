@@ -9,7 +9,7 @@
 
 use nu_protocol::{Span, Value};
 use nusage_model::{
-    Command, CommandTree, Completer, Conversion, Execution, Framing, Param, ParamKind, Structured,
+    Command, CommandTree, Completer, Conversion, Decoder, Execution, Param, ParamKind, Structured,
 };
 use nusage_nu::{
     CommandName, Def, Expr, Ident, Infix, Item, Module, Params, Stmt, SyntaxError, Type, word,
@@ -191,15 +191,23 @@ fn flag_word(param: &Param) -> String {
     }
 }
 
-/// `from json`, then what the schema or annotation declares and JSON cannot carry: first
+/// The decoder, `from json` or the reader for the media type or the pipeline the output
+/// states; then what the schema or annotation declares and the text cannot carry: first
 /// `default null` for each property the schema does not require, so the field is there to
 /// read; then each conversion at its cell path, `into <ty> <path>` where the value is text
 /// or a count of bytes, else an `update` whose closure counts the unit and leaves `null`
 /// alone where the value may be one.
 fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
-    let mut stages = vec![match structured.framing {
-        Framing::Json => call("from json", vec![])?,
-        Framing::Jsonl => call("from json", vec![Expr::Str("--objects".into())])?,
+    let mut stages = vec![match &structured.decoder {
+        Decoder::From { format, objects } => {
+            let args = if *objects {
+                vec![Expr::Str("--objects".into())]
+            } else {
+                vec![]
+            };
+            call(&format!("from {format}"), args)?
+        }
+        Decoder::Pipeline(pipeline) => Expr::Raw(pipeline.clone()),
     }];
     for fill in &structured.fills {
         let (parent, field) = fill.split_at(fill.len() - 1);

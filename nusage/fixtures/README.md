@@ -26,3 +26,11 @@ first. A KDL type annotation on an arg or output is its Nushell type;
 without one a value is `string`, or `path` for `<file>` and `<dir>`. A binary's output may
 declare a JSON Schema instead, inline or `schema file=`, which is read as a Nushell type:
 `binary-schema` shows what it reads, and what it converts after decoding.
+
+A binary's wrapper decodes the one output it asks for. An output is decoded when its
+`media_type` names a format Nushell reads (`text/csv`, `application/yaml`, ...), when its
+framing is `json` or `jsonl`, or when its declaration carries a `decode` child whose argument
+is the Nushell pipeline that turns the text into a value; the conversions the type declares
+follow. `decode` is nusage's own node, taken out before usage reads the spec, so it lives in an
+overlay as readily as in a spec file. `binary-media` shows the readers, `binary-decode` the
+pipelines.
