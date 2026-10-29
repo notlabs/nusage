@@ -5,9 +5,6 @@
 # The shared pieces sit beside the packages: clap/, the spec of a binary whose crate builds
 # its clap command, cobra/, the adapter-backed Go extractors, and schemas/, the runner of
 # an output-schema suite.
-[tools]
-docker-compose = "5.6.1"
-
 [_.nusage.catalog.mise]
 spec = { run = "mise usage" }
 switch = { flag = "--json", framing = "json" }
@@ -16,7 +13,7 @@ switch = { flag = "--json", framing = "json" }
 spec = { clap = "spec" }
 
 [_.nusage.catalog.docker-compose]
-spec = { run = "mise run //catalog/cobra:compose" }
+spec = { run = "mise run //catalog/cobra:compose", probe = "version" }
 
 # The catalog's own version, released apart from nusage's: a push to main that changes it
 # is the release, which release.yml tags `catalog/v<version>`, with the tarball `package`
@@ -42,6 +39,7 @@ file = "tasks/generate.nu"
 description = "Hold each entry's generated files to their inputs and its spec to the tool on PATH, its output to its schemas, and drive the tool through its module"
 depends = ["//nusage:build"]
 file = "tasks/check.nu"
+tools = { docker-compose = "5.6.1" }
 
 [tasks.install]
 description = "Generate the modules and have every new interactive Nushell session load them"

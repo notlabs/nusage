@@ -13,6 +13,10 @@
 #
 # `spec` names one way to obtain the spec: `run` for a tool that prints its own, `clap` for a
 # binary whose crate builds its clap command, the directory of the extractor under the package.
+# `check` asks whether the committed spec is the tool's on PATH with a `probe`: `export` runs
+# `run` again and compares, the default for a `run` entry whose export is cheap; `version`
+# compares the spec's own `version` to `<bin> --version`, the default for `clap`, and the
+# choice for a `run` whose export builds something, `probe = "version"`.
 #
 # The entry's package is `lib/<tool>/`, a Nushell module directory: with `lib` on
 # `$NU_LIB_DIRS`, `use <tool> *` names the commands as the tool does. It holds
@@ -81,6 +85,26 @@ export def spec-kind [entry: record]: nothing -> string {
         }
     }
     $kinds.0
+}
+
+# How `check` asks whether the committed spec is current: `export` or `version`.
+export def spec-probe [entry: record]: nothing -> string {
+    let probe = $entry.spec.probe? | default (if (spec-kind $entry) == clap { "version" } else { "export" })
+    if $probe not-in [export version] {
+        error make --unspanned {
+            msg: $"entry `($entry.name)`: `spec.probe` is `export` or `version`, not `($probe)`"
+        }
+    }
+    $probe
+}
+
+# What the committed spec says of itself: its `bin`, and the `version` it describes, when it
+# declares one.
+export def spec-identity [files: record]: nothing -> record {
+    let lines = open --raw $files.spec | lines
+    let bin = $lines | parse --regex '^bin\s+"?(?<bin>[^"\s]+)"?\s*$' | get 0?.bin?
+    let version = $lines | parse --regex '^version\s+"?(?<version>[^"\s]+)"?\s*$' | get 0?.version?
+    {bin: $bin, version: $version}
 }
 
 # The spec as a `run` entry's tool prints it now.

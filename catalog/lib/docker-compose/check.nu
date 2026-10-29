@@ -5,4 +5,4 @@ use docker-compose *
 
 let version = docker-compose version
 assert equal ($version | describe) 'record<version: string>'
-assert equal $version.version 'v5.6.1'
+assert ($version.version | str starts-with 'v')

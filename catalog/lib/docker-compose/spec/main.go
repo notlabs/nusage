@@ -36,6 +36,7 @@ func main() {
 	// Usage requires defaults to be strings. Newlines within help are escaped by
 	// the adapter, so this suffix cannot match inside a quoted description.
 	// Remove this shim when the adapter quotes these defaults itself.
+	// Upstream report and reproducer: https://github.com/jdx/usage/issues/1594
 	defaults := regexp.MustCompile(`(?m)( default=)(true|false|null|[+-][0-9][^ \t\r\n]*)( \{)?$`)
 	spec := defaults.ReplaceAllString(cobrausage.Generate(cmd), `${1}"${2}"${3}`)
 	fmt.Print(spec)

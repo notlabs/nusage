@@ -13,9 +13,10 @@ docker-compose ls | select Name Status ConfigFiles  # requires a Docker daemon
 ```
 
 The package calls the official standalone `docker-compose` binary on PATH. A Docker CLI
-plugin installation alone does not supply that executable. The development configuration
-pins it to the same version as the extractor. The standalone binary is used so the generated
-spec has a single executable name; this does not model Docker's own global/plugin flags.
+plugin installation alone does not supply that executable. The catalog check task
+pins it to the same version as the extractor; exporting and generating do not install it.
+The standalone binary is used so the generated spec has a single executable name; this does
+not model Docker's own global/plugin flags.
 
 ## Regenerate
 
@@ -29,8 +30,9 @@ mise run //catalog/cobra:check
 ```
 
 The first command builds the pinned upstream Go packages; subsequent runs use Go's build
-cache. The catalog's ordinary freshness and signature checks apply. The small `check.nu`
-runs only `version`, offline. It does not start containers or connect to a daemon. The
+cache. The catalog's ordinary freshness and signature checks apply. Its version probe compares
+the spec with the installed binary; the full Go export belongs to `//catalog/cobra:check`.
+The small `check.nu` runs only `version`, offline. It does not start containers or connect to a daemon. The
 `ls` declaration is based on its serializer; its live Docker behavior has not been exercised
 here. A conformance suite and wider command coverage are later work.
 
@@ -49,7 +51,9 @@ Two small compatibility fixes are explicit in the extractor: trim short-help whi
 and quote reserved words/signed numeric defaults that Usage v7.1.3's
 [KDL renderer](https://github.com/jdx/usage/blob/v7.1.3/integrations/cobra/kdl.go) emits bare.
 For example, the unmodified exporter writes `default=true` and `default=-1`; Usage rejects
-both as string defaults. Remove the quoting shim when the upstream renderer is fixed.
+both as string defaults. [Upstream issue #1594](https://github.com/jdx/usage/issues/1594)
+tracks the bug with minimal reproducers. Remove the quoting shim when the upstream renderer
+is fixed.
 
 The adapter is a useful starting point, not complete input fidelity. Its
 [conversion](https://github.com/jdx/usage/blob/v7.1.3/integrations/cobra/convert.go) drops bare
