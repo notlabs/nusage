@@ -47,4 +47,6 @@ jobs:
           github-cache-mode: objects
           isolate-objects-cache: true
           clean-target-before-export: true
+      # rustc's and clippy's findings as annotations, through mise's task prefix.
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: mise run '//...:check'
