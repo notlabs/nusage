@@ -54,7 +54,9 @@ def "nusage decoded" [text: string, schema: string, decode: closure]: nothing ->
         if $checked.exit_code == 0 {
             error make --unspanned {msg: $err.msg}
         }
-        error make --unspanned {msg: $"the output does not match its schema\n($checked.stderr | str trim)"}
+        error make --unspanned {
+            msg: $"the output does not match its schema\n($checked.stderr | str trim)"
+        }
     }
 }
 
