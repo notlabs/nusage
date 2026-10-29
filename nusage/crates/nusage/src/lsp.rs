@@ -691,7 +691,12 @@ fn read_message(reader: &mut impl BufRead) -> io::Result<Option<Json>> {
         }
     }
     let mut body = vec![0; length.unwrap_or(0)];
-    reader.read_exact(&mut body)?;
+    // A stream may end partway through a message: `nu` that is told to exit can go before
+    // its answer to `shutdown` is all written. That is the stream's end too.
+    match reader.read_exact(&mut body) {
+        Err(err) if err.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
+        read => read?,
+    }
     serde_json::from_slice(&body)
         .map(Some)
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
@@ -750,5 +755,13 @@ mod tests {
         let path = PathBuf::from("/a b/ç.nu");
         assert_eq!(file_uri(&path), "file:///a%20b/%C3%A7.nu");
         assert_eq!(path_of(&file_uri(&path)), Some(path));
+    }
+
+    #[test]
+    fn a_stream_that_ends_partway_through_a_message_has_ended() {
+        let whole = "Content-Length: 2\r\n\r\n{}";
+        let mut stream = io::Cursor::new(format!("{whole}Content-Length: 40\r\n\r\n{{\"id\""));
+        assert_eq!(read_message(&mut stream).unwrap(), Some(json!({})));
+        assert_eq!(read_message(&mut stream).unwrap(), None);
     }
 }
