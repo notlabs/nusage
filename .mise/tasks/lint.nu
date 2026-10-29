@@ -1,5 +1,9 @@
 #!/usr/bin/env nusage
 #USAGE about "The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
+#MISE description="The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
+#MISE depends=["//nusage:build"]
+#MISE output="interleave"
+# Unlabelled lines: GitHub reads an annotation only at the start of a line.
 # The formatters' own checks name a file and no more; a lint has to say what is wrong where,
 # so each file is formatted again and the difference printed, and in GitHub Actions each
 # hunk is an annotation on its lines, which the pull request shows inline.
@@ -83,7 +87,11 @@ if $workflows.exit_code != 0 {
 }
 
 print "$ nufmt"
-for file in (^git ls-files "*.nu" | lines | where $it !~ "/expected/") {
+for file in (
+    ^git ls-files "*.nu"
+    | lines
+    | where $it !~ "/expected/" and $it !~ '^catalog/lib/[^/]+/mod\.nu$'
+) {
     if not (formatted $file nufmt { ^nufmt --stdin }) {
         $failed = $failed | append $"nufmt: ($file)"
     }

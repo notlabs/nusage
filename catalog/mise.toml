@@ -1,0 +1,31 @@
+# The catalog: a module package per wrapped tool under lib/, and the tasks that make them.
+# An entry under [_.nusage.catalog] says what the tasks cannot read off lib/<tool>/: how to
+# obtain the tool's spec, and the switch that selects its structured output. mise ignores
+# the `_` table; tasks/catalog.nu reads it with `mise config get` and documents the layout.
+[_.nusage.catalog.mise]
+spec = { run = "mise usage" }
+switch = { flag = "--json", framing = "json" }
+
+# The tasks run through the nusage built here. The generated files are committed, so `spec`
+# and `generate` are the two steps that change them, and `check` holds what is committed to
+# its inputs and to the tool on PATH: in CI that tool is the pinned mise, and a Renovate bump
+# of it fails `check` until the spec and module are regenerated and reviewed with it.
+[tasks.spec]
+description = "Export each entry's spec from the tool on PATH into its package, left untouched when unchanged"
+depends = ["//nusage:build"]
+file = "tasks/spec.nu"
+
+[tasks.generate]
+description = "Generate each entry's module from its spec and overlays"
+depends = ["//nusage:build"]
+file = "tasks/generate.nu"
+
+[tasks.check]
+description = "Hold each entry's generated files to its spec and overlays, its spec to the tool on PATH, and drive the tool through its module"
+depends = ["//nusage:build"]
+file = "tasks/check.nu"
+
+[tasks.install]
+description = "Generate the modules and have every new interactive Nushell session load them"
+depends = [":generate"]
+file = "tasks/install.nu"
