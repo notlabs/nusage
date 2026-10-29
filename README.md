@@ -19,7 +19,7 @@ Early development.
 
 An editor that runs `nusage lsp` where it would run `nu --lsp` checks a script nusage runs as
 nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to
-that script's header. Or leave the editor as it is and opt in through mise: after `mise dot
+that script's header, and each `mise run` of a task whose file is one. Or leave the editor as it is and opt in through mise: after `mise dot
 apply`, with `MISE_ENV=nusage-lsp` in the environment the editor starts from, every `nu`
 mise starts is `nusage nu`, which serves `nusage lsp` when asked for `nu --lsp` and is
 Nushell for anything else. `MISE_ENV=nusage-lsp,nusage-kakehashi` installs

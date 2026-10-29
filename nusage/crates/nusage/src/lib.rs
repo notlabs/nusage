@@ -15,6 +15,7 @@ mod nu;
 mod prelude;
 mod shim;
 mod switch_overlay;
+mod tasks;
 mod validate;
 
 use std::path::{Path, PathBuf};

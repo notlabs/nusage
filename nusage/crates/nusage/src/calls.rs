@@ -12,6 +12,15 @@
 //! A path is the caller's: `./x.nu` names the script beside the caller, wherever it runs
 //! from. `run x.nu` cannot be shadowed, being Nushell's keyword, and hands a nusage script
 //! the caller's `$usage` rather than the arguments after it; it is reported, not shadowed.
+//!
+//! A task of mise's is called the same way, `mise run <task> ...` or `mise r <task> ...`:
+//! when the file it runs is a script nusage runs, the call is shadowed too, and the shadow
+//! runs the task through mise, with its dependencies, its environment and its tools, from
+//! the caller's directory, which is where mise is asked what the name means
+//! ([`crate::tasks`]). A task mise finds up to date does not run and returns nothing.
+//! `^mise run` is still the external, and so is a call with mise's own flags before the
+//! task; one that runs more tasks after `:::` needs the caret, or the shadow takes them for
+//! the script's arguments.
 
 use std::collections::BTreeMap;
 use std::ops::Range;
@@ -30,6 +39,11 @@ use crate::common::{Target, relative};
 /// script's value to, as NUON. The interpreter does not pass it on.
 pub const OUTPUT_VAR: &str = "NUSAGE_OUTPUT_FILE";
 
+/// The variable naming the script whose value the file is for: a program that runs it, as
+/// mise does a task, may run other scripts before or after it. The interpreter does not pass
+/// it on either.
+pub const OUTPUT_SCRIPT_VAR: &str = "NUSAGE_OUTPUT_SCRIPT";
+
 /// The helper a shadow runs its script with, which names that file and reads it back.
 pub const CALL_HELPER: &str = include_str!("script-call.nu");
 
@@ -40,10 +54,21 @@ pub struct Shadow {
     pub name: String,
     /// The script the call names.
     pub target: PathBuf,
+    /// What runs it.
+    pub through: Through,
     /// The subcommand's words, which select it after the script on the interpreter's argv.
     pub words: Vec<String>,
     /// The command, as the module for the script's tree would define it.
     pub command: Command,
+}
+
+/// What a shadow runs its script through.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Through {
+    /// The interpreter, with the script's path.
+    Nusage,
+    /// mise, as the task of this name, asked from the caller's directory.
+    Mise { dir: PathBuf, task: String },
 }
 
 /// Something about a call that a reader should know, at its byte range in the script.
@@ -66,18 +91,49 @@ pub struct Calls {
 /// here.
 pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
     let mut calls = Calls::default();
-    // Every call of a script names a `.nu` file; most scripts have none to parse for.
-    if !source.contains(".nu") {
+    // Every call of a script names a `.nu` file or mise; most scripts have none to parse for.
+    if !source.contains(".nu") && !source.contains("mise") {
         return calls;
     }
     let dir = path.parent().unwrap_or(Path::new(""));
     let mut shadows = BTreeMap::new();
     for call in nusage_nu::script_calls(source, path) {
-        let (name, named) = match &call {
-            ScriptCall::External { head, args } => match named_script(head, args) {
-                Some(found) => found,
-                None => continue,
-            },
+        let (name, named, target, through) = match &call {
+            ScriptCall::External { head, args } => {
+                if let Some((name, named)) = named_script(head, args) {
+                    let target = resolve(dir, &named.text);
+                    if !target.is_file() && !texts.contains_key(&target) {
+                        calls.findings.push(Finding {
+                            span: named.span.clone(),
+                            message: format!("{} is not a file", target.display()),
+                        });
+                        continue;
+                    }
+                    (name, named, target, Through::Nusage)
+                } else if let Some((name, named)) = named_task(head, args) {
+                    match crate::tasks::task(dir, &named.text) {
+                        Ok(Some(task)) => (
+                            name,
+                            named,
+                            task.file,
+                            Through::Mise {
+                                dir: dir.to_path_buf(),
+                                task: task.name,
+                            },
+                        ),
+                        Ok(None) => continue,
+                        Err(message) => {
+                            calls.findings.push(Finding {
+                                span: named.span.clone(),
+                                message,
+                            });
+                            continue;
+                        }
+                    }
+                } else {
+                    continue;
+                }
+            }
             ScriptCall::Run { path: named } => {
                 if runs_with_nusage(&resolve(dir, &named.text), texts) {
                     calls.findings.push(Finding {
@@ -94,14 +150,6 @@ pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
                 continue;
             }
         };
-        let target = resolve(dir, &named.text);
-        if !target.is_file() && !texts.contains_key(&target) {
-            calls.findings.push(Finding {
-                span: named.span.clone(),
-                message: format!("{} is not a file", target.display()),
-            });
-            continue;
-        }
         if !runs_with_nusage(&target, texts) {
             continue;
         }
@@ -115,6 +163,7 @@ pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
                     shadows.entry(name.clone()).or_insert(Shadow {
                         name,
                         target: target.clone(),
+                        through: through.clone(),
                         words,
                         command,
                     });
@@ -139,6 +188,19 @@ fn named_script<'a>(head: &'a Word, args: &'a [Word]) -> Option<(String, &'a Wor
     let script = args.first().filter(|arg| arg.text.ends_with(".nu"))?;
     matches!(head.text.as_str(), "nusage" | "nu")
         .then(|| (format!("{} {}", head.text, script.text), script))
+}
+
+/// The call's name and the word naming its task, for `mise run <task>` and `mise r <task>`:
+/// the task first after `run`, before any flag of mise's own.
+fn named_task<'a>(head: &'a Word, args: &'a [Word]) -> Option<(String, &'a Word)> {
+    let [run, task, ..] = args else {
+        return None;
+    };
+    let named = head.text == "mise"
+        && matches!(run.text.as_str(), "run" | "r")
+        && !task.text.starts_with('-')
+        && task.text != ":::";
+    named.then(|| (format!("mise {} {}", run.text, task.text), task))
 }
 
 /// Whether Nushell runs the word as a path rather than looking it up as a name: relative to
@@ -262,7 +324,7 @@ pub fn place_in_tree(script: &Path) -> Result<(PathBuf, CommandPath), Diagnostic
 #[derive(Debug, Clone, Copy)]
 pub enum Runner<'a> {
     /// From a module in this directory: the script relative to the module's file, and the
-    /// `nusage` on `PATH`.
+    /// `nusage` and mise on `PATH`.
     Module(&'a Path),
     /// The script by its absolute path, run by this `nusage`, a path or a name on `PATH`: for
     /// the interpreter, and for the line that stands in for a script's first.
@@ -274,23 +336,36 @@ pub enum Runner<'a> {
 pub fn shadow_def(shadow: &Shadow, runner: Runner) -> Result<Def, SyntaxError> {
     let (params, argv) = params_and_argv(&shadow.command, Target::Call)?;
     let mut body = Vec::new();
-    let (program, script) = match runner {
-        Runner::Module(base) => {
-            body.push(Stmt::Const {
-                name: Ident::new("script")?,
-                value: Expr::Raw(format!(
-                    "path self {}",
-                    word(&relative(base, &shadow.target))
-                )),
-            });
-            (Expr::Str("nusage".into()), Expr::Var(Ident::new("script")?))
-        }
-        Runner::Absolute(nusage) => (
-            Expr::Str(nusage.to_string_lossy().into_owned()),
-            Expr::Str(shadow.target.to_string_lossy().into_owned()),
-        ),
+    // A path from the module's directory, as the module's own file has it.
+    let mut from_module = |name: &str, path: &Path| -> Result<Expr, SyntaxError> {
+        let Runner::Module(base) = runner else {
+            return Ok(Expr::Str(path.to_string_lossy().into_owned()));
+        };
+        body.push(Stmt::Const {
+            name: Ident::new(name)?,
+            value: Expr::Raw(format!("path self {}", word(&relative(base, path)))),
+        });
+        Ok(Expr::Var(Ident::new(name)?))
     };
-    let mut args = vec![program, script];
+    let script = from_module("script", &shadow.target)?;
+    let mut args = vec![script.clone()];
+    match &shadow.through {
+        Through::Nusage => args.extend([
+            Expr::Str(match runner {
+                Runner::Module(_) => "nusage".into(),
+                Runner::Absolute(nusage) => nusage.to_string_lossy().into_owned(),
+            }),
+            script,
+        ]),
+        Through::Mise { dir, task } => args.extend([
+            Expr::Str("mise".into()),
+            // Quoted: bare, it would be a flag of `nusage call`'s own.
+            Expr::Raw(r#""-C""#.into()),
+            from_module("dir", dir)?,
+            Expr::Str("run".into()),
+            Expr::Str(task.clone()),
+        ]),
+    }
     args.extend(shadow.words.iter().cloned().map(Expr::Str));
     args.push(Expr::Spread(Box::new(argv)));
     body.push(Stmt::Pipeline(vec![
@@ -359,6 +434,68 @@ mod tests {
         assert_eq!(named("nu", &["-c", "x.nu"]), None);
         assert_eq!(as_path("x.nu"), "./x.nu");
         assert_eq!(as_path("../x.nu"), "../x.nu");
+    }
+
+    #[test]
+    fn the_forms_that_run_a_task() {
+        let word = |text: &str| Word {
+            text: text.into(),
+            span: 0..text.len(),
+        };
+        let named = |head: &str, args: &[&str]| {
+            let args: Vec<Word> = args.iter().map(|arg| word(arg)).collect();
+            named_task(&word(head), &args).map(|(name, task)| (name, task.text.clone()))
+        };
+        assert_eq!(
+            named("mise", &["run", "build", "--release"]),
+            Some(("mise run build".into(), "build".into()))
+        );
+        assert_eq!(
+            named("mise", &["r", "//app:test"]),
+            Some(("mise r //app:test".into(), "//app:test".into()))
+        );
+        // mise's own flags before the task, no task, or another command of mise's.
+        assert_eq!(named("mise", &["run", "-q", "build"]), None);
+        assert_eq!(named("mise", &["run"]), None);
+        assert_eq!(named("mise", &["tasks", "build"]), None);
+        assert_eq!(named("nu", &["run", "build"]), None);
+    }
+
+    #[test]
+    fn a_task_runs_through_mise_from_the_callers_directory() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/script-calls");
+        let callee = fixture.join("callee.nu");
+        let (words, command) = commands_of(&callee, &Texts::new()).unwrap().remove(0);
+        let shadow = Shadow {
+            name: "mise run greet".into(),
+            target: callee.clone(),
+            through: Through::Mise {
+                dir: fixture.clone(),
+                task: "greet".into(),
+            },
+            words,
+            command,
+        };
+        let module = nusage_nu::print_line(
+            &shadow_def(&shadow, Runner::Module(&fixture.join("expected"))).unwrap(),
+        );
+        assert!(
+            module.contains(
+                r#"const script = path self "../callee.nu"; const dir = path self ".."; $in | nusage call $script mise "-C" $dir run greet ...(nusage argv"#
+            ),
+            "{module}"
+        );
+        let absolute = nusage_nu::print_line(
+            &shadow_def(&shadow, Runner::Absolute(Path::new("/bin/nusage"))).unwrap(),
+        );
+        assert!(
+            absolute.contains(&format!(
+                "nusage call {} mise \"-C\" {} run greet ...(",
+                word(&callee.to_string_lossy()),
+                word(&fixture.to_string_lossy())
+            )),
+            "{absolute}"
+        );
     }
 
     #[test]
