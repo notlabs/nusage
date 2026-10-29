@@ -8,7 +8,8 @@ use usage::kdl::{KdlDocument, KdlNode};
 
 use crate::args::OutputArgs;
 use crate::header::header_node;
-use crate::{Diagnostic, Header, read_header, read_subcommand_header};
+use crate::header::{read_header_in, read_subcommand_header_in};
+use crate::{Diagnostic, Header, Texts};
 
 /// A command's place in the tree: subcommand names outermost first, empty at the root.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -118,6 +119,20 @@ pub fn assemble(source: &Path) -> Result<Assembled, Diagnostic> {
 /// same name and any other node replacing the one with the same name and first argument.
 /// Scripts take no overlay; their headers are their own.
 pub fn assemble_with(source: &Path, overlays: &[PathBuf]) -> Result<Assembled, Diagnostic> {
+    assemble_from(source, overlays, &Texts::new())
+}
+
+/// [`assemble`] for a script or a tree, reading each script from the text `texts` holds for
+/// it when it holds one: as an editor has the scripts, saved or not.
+pub fn assemble_in(source: &Path, texts: &Texts) -> Result<Assembled, Diagnostic> {
+    assemble_from(source, &[], texts)
+}
+
+fn assemble_from(
+    source: &Path,
+    overlays: &[PathBuf],
+    texts: &Texts,
+) -> Result<Assembled, Diagnostic> {
     if source.is_file() {
         return if source.extension().and_then(|ext| ext.to_str()) == Some("kdl") {
             assemble_spec_file(source, overlays)
@@ -127,7 +142,7 @@ pub fn assemble_with(source: &Path, overlays: &[PathBuf]) -> Result<Assembled, D
                 "an overlay applies to a spec file; a script declares its own header",
             ))
         } else {
-            assemble_single(source)
+            assemble_single(source, texts)
         };
     }
     if let Some(overlay) = overlays.first() {
@@ -142,7 +157,7 @@ pub fn assemble_with(source: &Path, overlays: &[PathBuf]) -> Result<Assembled, D
     let mut bodies = BTreeMap::new();
     let mut headers = BTreeMap::new();
     let root = CommandPath::root();
-    let root_header = group_header(source)?;
+    let root_header = group_header(source, texts)?;
     reject_mounts(&root_header.header)?;
     let mut spec = root_header.spec.clone();
     if spec.name.is_empty() {
@@ -151,7 +166,7 @@ pub fn assemble_with(source: &Path, overlays: &[PathBuf]) -> Result<Assembled, D
         spec.bin = name;
     }
     spec.cmd.name = spec.bin.clone();
-    spec.cmd.subcommands = children(source, &root, &mut bodies, &mut headers)?;
+    spec.cmd.subcommands = children(source, &root, &mut bodies, &mut headers, texts)?;
     bodies.insert(root.clone(), source.join("mod.nu"));
     headers.insert(root, root_header.header);
     spec.restamp();
@@ -172,8 +187,8 @@ pub fn assemble_with(source: &Path, overlays: &[PathBuf]) -> Result<Assembled, D
     Ok(out)
 }
 
-fn assemble_single(path: &Path) -> Result<Assembled, Diagnostic> {
-    let script = read_header(path)?;
+fn assemble_single(path: &Path, texts: &Texts) -> Result<Assembled, Diagnostic> {
+    let script = read_header_in(path, texts)?;
     reject_mounts(&script.header)?;
     let mut spec = script.spec.clone();
     if spec.name.is_empty() {
@@ -336,7 +351,7 @@ fn collect_cmd_headers(
     Ok(())
 }
 
-fn group_header(dir: &Path) -> Result<crate::ScriptHeader, Diagnostic> {
+fn group_header(dir: &Path, texts: &Texts) -> Result<crate::ScriptHeader, Diagnostic> {
     let mod_nu = dir.join("mod.nu");
     if !mod_nu.is_file() {
         return Err(Diagnostic::new(
@@ -344,7 +359,7 @@ fn group_header(dir: &Path) -> Result<crate::ScriptHeader, Diagnostic> {
             "a command directory needs a `mod.nu` with the group's header",
         ));
     }
-    read_header(&mod_nu)
+    read_header_in(&mod_nu, texts)
 }
 
 /// The subcommands under `dir`, in name order: `x.nu` is the command `x`, a subdirectory with
@@ -354,6 +369,7 @@ fn children(
     parent: &CommandPath,
     bodies: &mut BTreeMap<CommandPath, PathBuf>,
     headers: &mut BTreeMap<CommandPath, Header>,
+    texts: &Texts,
 ) -> Result<indexmap::IndexMap<String, SpecCommand>, Diagnostic> {
     let mut entries: Vec<PathBuf> = fs::read_dir(dir)
         .map_err(|err| Diagnostic::new(dir, format!("cannot list: {err}")))?
@@ -368,14 +384,14 @@ fn children(
                 continue;
             }
             (
-                read_subcommand_header(&entry, &name)?,
+                read_subcommand_header_in(&entry, &name, texts)?,
                 entry.clone(),
                 indexmap::IndexMap::new(),
             )
         } else if entry.is_dir() && entry.join("mod.nu").is_file() {
-            let script = read_subcommand_header(&entry.join("mod.nu"), &name)?;
+            let script = read_subcommand_header_in(&entry.join("mod.nu"), &name, texts)?;
             let path = parent.child(&name);
-            let nested = children(&entry, &path, bodies, headers)?;
+            let nested = children(&entry, &path, bodies, headers, texts)?;
             (script, entry.join("mod.nu"), nested)
         } else {
             continue;

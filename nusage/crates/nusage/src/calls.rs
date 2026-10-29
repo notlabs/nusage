@@ -21,7 +21,7 @@ use nusage_model::{Command, CommandPath};
 use nusage_nu::{
     CommandName, Def, Expr, Ident, Params, ScriptCall, Stmt, SyntaxError, Type, Word, word,
 };
-use nusage_spec::Diagnostic;
+use nusage_spec::{Diagnostic, Texts};
 
 use crate::binary::params_and_argv;
 use crate::common::{Target, relative};
@@ -60,10 +60,11 @@ pub struct Calls {
     pub findings: Vec<Finding>,
 }
 
-/// The calls of scripts in `source`, the text of the script at `path`. A call whose script
-/// cannot be read as a nusage script is left the external it is: running it says why, and
-/// so does a finding here.
-pub fn scan(path: &Path, source: &str) -> Calls {
+/// The calls of scripts in `source`, the text of the script at `path`, with each script it
+/// calls read from `texts` when that holds it. A call whose script cannot be read as a
+/// nusage script is left the external it is: running it says why, and so does a finding
+/// here.
+pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
     let mut calls = Calls::default();
     // Every call of a script names a `.nu` file; most scripts have none to parse for.
     if !source.contains(".nu") {
@@ -78,7 +79,7 @@ pub fn scan(path: &Path, source: &str) -> Calls {
                 None => continue,
             },
             ScriptCall::Run { path: named } => {
-                if is_nusage_script(&resolve(dir, &named.text)) {
+                if runs_with_nusage(&resolve(dir, &named.text), texts) {
                     calls.findings.push(Finding {
                         span: named.span.clone(),
                         message: format!(
@@ -94,17 +95,17 @@ pub fn scan(path: &Path, source: &str) -> Calls {
             }
         };
         let target = resolve(dir, &named.text);
-        if !target.is_file() {
+        if !target.is_file() && !texts.contains_key(&target) {
             calls.findings.push(Finding {
                 span: named.span.clone(),
                 message: format!("{} is not a file", target.display()),
             });
             continue;
         }
-        if !is_nusage_script(&target) {
+        if !runs_with_nusage(&target, texts) {
             continue;
         }
-        match commands_of(&target) {
+        match commands_of(&target, texts) {
             Ok(commands) => {
                 for (words, command) in commands {
                     let name = std::iter::once(name.as_str())
@@ -188,9 +189,11 @@ fn resolve(dir: &Path, word: &str) -> PathBuf {
 
 /// Whether the file is a script run by nusage: its shebang names it.
 pub fn is_nusage_script(path: &Path) -> bool {
-    let Ok(source) = std::fs::read_to_string(path) else {
-        return false;
-    };
+    std::fs::read_to_string(path).is_ok_and(|source| names_nusage(&source))
+}
+
+/// Whether a script's text opens with a shebang naming nusage.
+pub fn names_nusage(source: &str) -> bool {
     source.lines().next().is_some_and(|line| {
         line.strip_prefix("#!").is_some_and(|line| {
             line.split_whitespace()
@@ -199,11 +202,19 @@ pub fn is_nusage_script(path: &Path) -> bool {
     })
 }
 
+/// [`is_nusage_script`], for the text `texts` holds for the file when it holds one.
+fn runs_with_nusage(path: &Path, texts: &Texts) -> bool {
+    match texts.get(path) {
+        Some(text) => names_nusage(text),
+        None => is_nusage_script(path),
+    }
+}
+
 /// The command the script is in its tree, and the commands below it, each with the words
 /// that select it after the script.
-fn commands_of(script: &Path) -> Result<Vec<(Vec<String>, Command)>, Diagnostic> {
+fn commands_of(script: &Path, texts: &Texts) -> Result<Vec<(Vec<String>, Command)>, Diagnostic> {
     let (root, path) = place_in_tree(script)?;
-    let assembled = nusage_spec::assemble(&root)?;
+    let assembled = nusage_spec::assemble_in(&root, texts)?;
     let tree = nusage_model::model(&assembled)?;
     let depth = path.words().len();
     Ok(tree
