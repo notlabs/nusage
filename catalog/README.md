@@ -59,7 +59,8 @@ env = { NU_LIB_DIRS = "{{ [config_root, '.nusage', 'lib'] | join_path }}" }
 ```
 
 A wrapper's values see `config_root`, `vars` and the environment, not the installed tools,
-so point it at a directory the project owns.
+so point it at a directory the project owns. The wrapper needs a nusage release that has
+`nusage nu`; an older one rejects the subcommand, and with it every `nu` the wrapper starts.
 
 ### The tasks elsewhere
 
