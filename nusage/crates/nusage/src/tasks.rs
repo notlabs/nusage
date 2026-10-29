@@ -26,7 +26,7 @@ pub fn task(dir: &Path, name: &str) -> Result<Option<Task>, String> {
         .output()
         .map_err(|err| format!("cannot ask mise for its task `{name}`: {err}"))?;
     if !output.status.success() {
-        let said = String::from_utf8_lossy(&output.stderr);
+        let said = plain(&String::from_utf8_lossy(&output.stderr));
         let first = said
             .lines()
             .map(|line| line.trim_start_matches("mise ERROR").trim())
@@ -43,6 +43,22 @@ pub fn task(dir: &Path, name: &str) -> Result<Option<Task>, String> {
         name: info["name"].as_str().unwrap_or(name).to_string(),
         file: config_root(Path::new(source)).join(file),
     }))
+}
+
+/// Text without the terminal's colours, which mise writes when its own task runs this.
+fn plain(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c == '\u{1b}' && chars.clone().next() == Some('[') {
+            chars
+                .by_ref()
+                .find(|c| ('@'..='~').contains(c) && *c != '[');
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 /// The directory a config's relative paths are read from, as mise has it: the config's own,
@@ -77,6 +93,14 @@ fn config_root(source: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn colours_are_taken_out() {
+        assert_eq!(
+            plain("\u{1b}[31mmise\u{1b}[0m \u{1b}[31mERROR\u{1b}[0m Task not found: nope"),
+            "mise ERROR Task not found: nope"
+        );
+    }
 
     #[test]
     fn a_configs_paths_are_its_projects() {
