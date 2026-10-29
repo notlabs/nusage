@@ -1,5 +1,7 @@
 //! The shim target: one `export def` per command whose body builds `$usage` and `run`s the
-//! script.
+//! script, after defining the shadows of the scripts that script calls ([`crate::calls`]):
+//! inside the body, since a call's path is its script's, and `run` reads a script's calls
+//! where it first parses it.
 
 use std::path::Path;
 
@@ -8,15 +10,26 @@ use nusage_nu::{
     CommandName, Def, Expr, Ident, Infix, Item, Module, Params, Stmt, SyntaxError, Type, Value,
 };
 
+use crate::binary::HELPERS;
+use crate::calls::{self, Runner, shadow_def};
 use crate::common::{Target, attr_usage_alias, doc_of, nu_params, relative, usage_attrs};
 
 /// The module for a command tree, with `run` paths relative to `base`.
 pub fn module(tree: &CommandTree, base: &Path) -> Result<Module, SyntaxError> {
-    let items = tree
+    let defs = tree
         .commands
         .iter()
-        .map(|command| def(command, base).map(Item::Def))
+        .map(|command| def(command, base))
         .collect::<Result<Vec<_>, _>>()?;
+    // The shadows build their argv with the binary target's helpers.
+    let calls = defs
+        .iter()
+        .any(|def| def.body.iter().any(|stmt| matches!(stmt, Stmt::Def(_))));
+    let items = calls
+        .then(|| Item::Verbatim(HELPERS.to_string()))
+        .into_iter()
+        .chain(defs.into_iter().map(Item::Def))
+        .collect();
     Ok(Module {
         preamble: vec![attr_usage_alias()?],
         items,
@@ -46,7 +59,19 @@ fn def(command: &Command, base: &Path) -> Result<Def, SyntaxError> {
         Some(output) => Some((Type::new("nothing")?, Type::new(output.as_str())?)),
         None => None,
     };
-    let body = vec![
+    let source = std::fs::read_to_string(body_path)
+        .map_err(|err| SyntaxError(format!("cannot read {}: {err}", body_path.display())))?;
+    let mut body = calls::scan(body_path, &source)
+        .shadows
+        .iter()
+        .map(|shadow| {
+            Ok(Stmt::Def(Box::new(shadow_def(
+                shadow,
+                Runner::Module(base),
+            )?)))
+        })
+        .collect::<Result<Vec<_>, SyntaxError>>()?;
+    body.extend([
         Stmt::Let {
             name: Ident::new("usage")?,
             value: usage_record(command)?,
@@ -58,7 +83,7 @@ fn def(command: &Command, base: &Path) -> Result<Def, SyntaxError> {
                 args: vec![Expr::Str(relative(base, body_path))],
             },
         ]),
-    ];
+    ]);
     Ok(Def {
         export: true,
         doc: doc_of(command),

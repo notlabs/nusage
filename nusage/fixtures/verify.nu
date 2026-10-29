@@ -6,7 +6,9 @@
 # A script fixture's cases go through both entrypoints and must return the same value:
 #   - shim:        `use expected/<bin>.nu; <bin> <words>`        (Nushell types the arguments)
 #   - interpreter: `let usage = ($env.NUSAGE_ARGS | from nuon); $in | run <script>`
-#                                                                  (the record is handed in as NUON)
+#                                                                  (the record is handed in as NUON,
+#                  after what `nusage prelude --run <script>` says precedes it: the shadows of
+#                  the scripts it calls)
 #   - parse:       `nusage parse <script> -- <argv>`, for a single script, when
 #                  target/debug/nusage is built: the record usage's parser yields
 # A binary fixture (a `<bin>.usage.kdl`) has no scripts: a case's `invoke` runs the module
@@ -145,7 +147,13 @@ def check-shim [import: string, bin: string, case: record] {
 
 def check-interpreter [dir: path, bin: string, case: record] {
     let script = script-for $dir $bin $case.usage.cmd
-    let code = $"let usage = \($env.NUSAGE_ARGS | from nuon\); $in | run ($script | to nuon) | to nuon"
+    # The shadows of the scripts it calls, which only the built nusage knows.
+    let prelude = if ($env.NUSAGE_BIN | path exists) {
+        ^$env.NUSAGE_BIN prelude --run $script
+    } else {
+        ""
+    }
+    let code = $"($prelude)\nlet usage = \($env.NUSAGE_ARGS | from nuon\); $in | run ($script | to nuon) | to nuon"
     run-nu $code {
         NUSAGE_ARGS: ($case.usage | to nuon)
     } | compare (expected-output $case)

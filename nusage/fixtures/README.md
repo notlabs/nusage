@@ -26,3 +26,11 @@ first. A KDL type annotation on an arg or output is its Nushell type;
 without one a value is `string`, or `path` for `<file>` and `<dir>`. A binary's output may
 declare a JSON Schema instead, inline or `schema file=`, which is read as a Nushell type:
 `binary-schema` shows what it reads, and what it converts after decoding.
+
+A script that calls another by its path, `./x.nu`, or as `nusage x.nu` or `nu x.nu`, calls the
+shadow nusage defines for that call: the other script's typed command, named as the call
+writes it, which runs it through the interpreter and returns its value, typed as its output
+declares.
+The interpreter and the module define the shadows before the script, and `nusage prelude`
+writes their signatures as the line that stands in for the script's first where Nushell
+checks it. `script-calls` calls `callee.nu` the three ways.

@@ -19,8 +19,9 @@ use nusage_nu::{
 
 use crate::common::{SPEC_COMPLETER, Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
 
-/// The fixed helpers every binary module carries.
-const HELPERS: &str = include_str!("binary-helpers.nu");
+/// The fixed helpers every binary module carries, and every module whose scripts call
+/// scripts.
+pub(crate) const HELPERS: &str = include_str!("binary-helpers.nu");
 /// The helper that holds a failed decode to the output's schema, carried when a wrapper
 /// decodes a JSON document that has one.
 const DECODED: &str = include_str!("binary-decoded.nu");
@@ -171,7 +172,10 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
 /// $flag}`. A `def` has one rest parameter; a command declaring several variadic
 /// positionals, as usage allows (`[ARGS]...` and `[-- MORE]...`), gets the first, which takes
 /// every remaining word anyway, since the command parses them.
-fn params_and_argv(command: &Command, target: Target) -> Result<(Vec<NuParam>, Expr), SyntaxError> {
+pub(crate) fn params_and_argv(
+    command: &Command,
+    target: Target,
+) -> Result<(Vec<NuParam>, Expr), SyntaxError> {
     let mut rest_seen = false;
     let positionals: Vec<&Param> = command
         .positionals

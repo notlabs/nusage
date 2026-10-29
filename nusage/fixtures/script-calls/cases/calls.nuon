@@ -1,0 +1,11 @@
+# The callee's value, typed, through each form of the call.
+{
+    argv: [ana],
+    usage: {cmd: [], args: {who: ana}, flags: {}},
+    output: {
+        path: {greeting: "hello ana", times: 2, at: 2024-01-01T00:00:00Z},
+        nusage: "HELLO ANA",
+        nu: 1,
+        at: datetime,
+    },
+}

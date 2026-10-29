@@ -7,6 +7,11 @@
 //! as the shim does: `let usage = ...; $in | run <script>`. A script inside a tree (a
 //! `mod.nu` beside it) is parsed as that tree's command, with its siblings as providers and
 //! its ancestors' globals; a script on its own is its own root.
+//!
+//! Before the script, Nushell defines the shadows of the scripts it calls, which run them
+//! through this same interpreter ([`crate::calls`]). Run by one, with `NUSAGE_OUTPUT=nuon`,
+//! the interpreter writes the script's value as NUON for the shadow to decode, and the
+//! script's own calls do not see the variable.
 
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -14,7 +19,7 @@ use std::process::{Command, Stdio};
 
 use nu_protocol::{Record, Span, Value};
 use nusage_model::{Execution, Param, ParamKind, value_from_text};
-use nusage_spec::{CommandPath, Diagnostic};
+use nusage_spec::Diagnostic;
 use usage::parse::{ParseOutput, ParseValue};
 
 /// What usage made of a script's arguments.
@@ -37,7 +42,7 @@ pub fn parse(script: &Path, args: &[String]) -> Result<Parsed, Diagnostic> {
 
 /// [`parse`], with the script of the command the arguments selected.
 fn parse_routed(script: &Path, args: &[String]) -> Result<(Parsed, PathBuf), Diagnostic> {
-    let (root, path) = place_in_tree(script)?;
+    let (root, path) = crate::calls::place_in_tree(script)?;
     let assembled = nusage_spec::assemble(&root)?;
     let tree = nusage_model::model(&assembled)?;
     let command = tree
@@ -105,24 +110,34 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
     // on unix a pipe or a file is opened as a stream through `/dev/stdin` instead. A
     // terminal, a socket or a closed descriptor gives the script no input.
     let script_word = nusage_nu::word(&path.to_string_lossy());
+    let nusage = std::env::current_exe()
+        .map_err(|err| Diagnostic::new(script, format!("cannot find nusage itself: {err}")))?;
+    let prelude = crate::prelude::runtime(&path, &nusage)?;
+    let to_nuon = if std::env::var(crate::calls::OUTPUT_VAR).as_deref() == Ok("nuon") {
+        " | to nuon"
+    } else {
+        ""
+    };
     let mut nu = Command::new("nu");
     let code = if cfg!(unix) {
         if stdin_is_stream() {
             format!(
-                "let usage = ($env.NUSAGE_USAGE | from nuon); open --raw /dev/stdin | run {script_word}"
+                "let usage = ($env.NUSAGE_USAGE | from nuon); open --raw /dev/stdin | run {script_word}{to_nuon}"
             )
         } else {
-            format!("let usage = ($env.NUSAGE_USAGE | from nuon); run {script_word}")
+            format!("let usage = ($env.NUSAGE_USAGE | from nuon); run {script_word}{to_nuon}")
         }
     } else {
         if !std::io::stdin().is_terminal() {
             nu.arg("--stdin");
         }
-        format!("let usage = ($env.NUSAGE_USAGE | from nuon); $in | run {script_word}")
+        format!("let usage = ($env.NUSAGE_USAGE | from nuon); $in | run {script_word}{to_nuon}")
     };
+    let code = format!("{prelude}{code}");
     let status = nu
         .args(["-c", &code])
         .env("NUSAGE_USAGE", nusage_nu::nuon(&record))
+        .env_remove(crate::calls::OUTPUT_VAR)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -143,39 +158,6 @@ fn stdin_is_stream() -> bool {
 #[cfg(not(unix))]
 fn stdin_is_stream() -> bool {
     false
-}
-
-/// Where the script stands: the root of the tree it belongs to and its path in it, or the
-/// script itself and the root path when no `mod.nu` lies beside it. The tree's root is the
-/// outermost directory that has a `mod.nu` in each directory down to the script's.
-fn place_in_tree(script: &Path) -> Result<(PathBuf, CommandPath), Diagnostic> {
-    let script = std::path::absolute(script)
-        .map_err(|err| Diagnostic::new(script, format!("cannot resolve: {err}")))?;
-    let Some(mut dir) = script.parent().filter(|dir| dir.join("mod.nu").is_file()) else {
-        return Ok((script, CommandPath::root()));
-    };
-    while let Some(parent) = dir
-        .parent()
-        .filter(|parent| parent.join("mod.nu").is_file())
-    {
-        dir = parent;
-    }
-    let mut words: Vec<String> = script
-        .strip_prefix(dir)
-        .map_err(|_| Diagnostic::new(&script, "not inside its tree"))?
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect();
-    // `db/migrate.nu` is `db migrate`; `db/mod.nu` is `db`.
-    if let Some(last) = words.pop()
-        && last != "mod.nu"
-    {
-        words.push(last.trim_end_matches(".nu").to_string());
-    }
-    let path = words
-        .iter()
-        .fold(CommandPath::root(), |path, word| path.child(word));
-    Ok((dir.to_path_buf(), path))
 }
 
 /// The `$usage` record: `{cmd, args, flags}`, as the shim builds it.
