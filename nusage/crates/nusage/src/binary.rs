@@ -13,7 +13,8 @@ use nusage_model::{
     Structured,
 };
 use nusage_nu::{
-    CommandName, Def, Expr, Ident, Infix, Item, Module, Params, Stmt, SyntaxError, Type, word,
+    CommandName, Def, Expr, Ident, Infix, Item, Module, Param as NuParam, Params, Stmt,
+    SyntaxError, Type, word,
 };
 
 use crate::common::{SPEC_COMPLETER, Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
@@ -98,27 +99,7 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
     } else {
         format!("{} {}", tree.bin, command.path)
     };
-    // A `def` has one rest parameter; a binary declaring several variadic positionals, as
-    // usage allows (`[ARGS]...` and `[-- MORE]...`), gets the first, which takes every
-    // remaining word anyway, since the binary parses them.
-    let mut rest_seen = false;
-    let positionals: Vec<&Param> = command
-        .positionals
-        .iter()
-        .filter(|param| {
-            if param.kind != ParamKind::Rest {
-                return true;
-            }
-            !std::mem::replace(&mut rest_seen, true)
-        })
-        .collect();
-    let params = positionals
-        .iter()
-        .copied()
-        .chain(command.flags.iter())
-        .map(|param| nu_params(param, Target::Binary))
-        .collect::<Result<Vec<_>, _>>()?
-        .concat();
+    let (params, argv) = params_and_argv(command, Target::Binary)?;
     let io = match &command.output {
         Some(output) => Some((Type::new("nothing")?, Type::new(output.as_str())?)),
         None => None,
@@ -126,38 +107,6 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
 
     // `^demo status --format json ...(nusage argv [$a ...$rest] {--flag: $flag})`: the
     // selector words come first, so a `--` the caller passes still comes after them.
-    let positionals = positionals
-        .iter()
-        .map(|param| {
-            let var = Expr::Var(Ident::new(&param.var)?);
-            Ok(match param.kind {
-                ParamKind::Rest => Expr::Spread(Box::new(var)),
-                _ => var,
-            })
-        })
-        .collect::<Result<Vec<_>, SyntaxError>>()?;
-    // A clause's flags go before every instance of its positionals, the rest after them.
-    let mut flags = Vec::new();
-    let mut scoped = Vec::new();
-    for param in &command.flags {
-        let into = if param.clause {
-            &mut scoped
-        } else {
-            &mut flags
-        };
-        into.push((flag_word(param), flag_value(param)?));
-        if let Some(negate) = &param.negate {
-            into.push((
-                format!("--{negate}"),
-                Expr::Var(Ident::new(negate.replace('-', "_"))?),
-            ));
-        }
-    }
-    let mut argv_args = vec![Expr::List(positionals), Expr::Record(flags)];
-    if !scoped.is_empty() {
-        argv_args.push(Expr::Record(scoped));
-    }
-    let argv = call("nusage argv", argv_args)?;
     let mut args: Vec<Expr> = command
         .path
         .words()
@@ -216,6 +165,63 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         io,
         body,
     })
+}
+
+/// A wrapper's parameters, and the argv they make: `nusage argv [$a ...$rest] {--flag:
+/// $flag}`. A `def` has one rest parameter; a command declaring several variadic
+/// positionals, as usage allows (`[ARGS]...` and `[-- MORE]...`), gets the first, which takes
+/// every remaining word anyway, since the command parses them.
+fn params_and_argv(command: &Command, target: Target) -> Result<(Vec<NuParam>, Expr), SyntaxError> {
+    let mut rest_seen = false;
+    let positionals: Vec<&Param> = command
+        .positionals
+        .iter()
+        .filter(|param| {
+            if param.kind != ParamKind::Rest {
+                return true;
+            }
+            !std::mem::replace(&mut rest_seen, true)
+        })
+        .collect();
+    let params = positionals
+        .iter()
+        .copied()
+        .chain(command.flags.iter())
+        .map(|param| nu_params(param, target))
+        .collect::<Result<Vec<_>, _>>()?
+        .concat();
+    let positionals = positionals
+        .iter()
+        .map(|param| {
+            let var = Expr::Var(Ident::new(&param.var)?);
+            Ok(match param.kind {
+                ParamKind::Rest => Expr::Spread(Box::new(var)),
+                _ => var,
+            })
+        })
+        .collect::<Result<Vec<_>, SyntaxError>>()?;
+    // A clause's flags go before every instance of its positionals, the rest after them.
+    let mut flags = Vec::new();
+    let mut scoped = Vec::new();
+    for param in &command.flags {
+        let into = if param.clause {
+            &mut scoped
+        } else {
+            &mut flags
+        };
+        into.push((flag_word(param), flag_value(param)?));
+        if let Some(negate) = &param.negate {
+            into.push((
+                format!("--{negate}"),
+                Expr::Var(Ident::new(negate.replace('-', "_"))?),
+            ));
+        }
+    }
+    let mut argv_args = vec![Expr::List(positionals), Expr::Record(flags)];
+    if !scoped.is_empty() {
+        argv_args.push(Expr::Record(scoped));
+    }
+    Ok((params, call("nusage argv", argv_args)?))
 }
 
 /// A flag's value as `nusage argv` takes it. The helper spells a flag by its value's type,
