@@ -1,0 +1,11 @@
+name "wc"
+bin "wc"
+about "A tool with text outputs no reader covers: each declares the pipeline that decodes it"
+cmd "ls" help="List things, one per line as `name size`" {
+    output "text" default=#true
+}
+cmd "du" help="Disk use, one per line as `size path`" {
+    output ("table<size: filesize, path: string>")"text" default=#true {
+        nusage-decode "detect columns --no-headers | rename size path"
+    }
+}

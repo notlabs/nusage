@@ -7,8 +7,7 @@ use usage::SpecCommand;
 use usage::kdl::{KdlDocument, KdlNode};
 
 use crate::args::OutputArgs;
-use crate::header::header_node;
-use crate::header::{read_header_in, read_subcommand_header_in};
+use crate::header::{header_node, read_header_in, read_subcommand_header_in, strip_decodes};
 use crate::{Diagnostic, Header, Texts};
 
 /// A command's place in the tree: subcommand names outermost first, empty at the root.
@@ -241,7 +240,16 @@ fn assemble_spec_file(path: &Path, overlays: &[PathBuf]) -> Result<Assembled, Di
         })?;
         (merged, doc)
     };
-    let mut spec = usage::Spec::parse_str_with_path(&text, path)
+    // An output's `nusage-decode` node is nusage's: usage reads the document without it, and the
+    // declarations keep it. Only a document that had one is re-rendered, so a diagnostic's
+    // line counts in the file as written otherwise.
+    let mut for_usage = doc.clone();
+    let usage_text = if strip_decodes(&mut for_usage) {
+        for_usage.to_string()
+    } else {
+        text.clone()
+    };
+    let mut spec = usage::Spec::parse_str_with_path(&usage_text, path)
         .map_err(|err| Diagnostic::new(path, format!("usage rejects the spec: {err}")))?;
     if spec.name.is_empty() {
         let stem = file_stem(path)?.trim_end_matches(".usage").to_string();
@@ -509,4 +517,34 @@ fn dir_name(path: &Path) -> Result<String, Diagnostic> {
         .and_then(|name| name.to_str())
         .map(str::to_string)
         .ok_or_else(|| Diagnostic::new(path, "directory name is not valid UTF-8"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_outputs_decode_node_stays_on_the_declaration_and_usage_never_sees_it() {
+        let dir = std::env::temp_dir().join(format!("nusage-spec-tree-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("wc.usage.kdl");
+        fs::write(
+            &path,
+            "name \"wc\"\nbin \"wc\"\ncmd \"du\" {\n    output (\"table<size: filesize>\")\"text\" default=#true {\n        nusage-decode \"detect columns --no-headers\"\n    }\n}\n",
+        )
+        .unwrap();
+        let assembled = assemble(&path).unwrap();
+        let du = &assembled.headers[&CommandPath(vec!["du".into()])];
+        let output = du.nodes.iter().find(|node| node.name == "output").unwrap();
+        assert_eq!(
+            output.decode.as_deref(),
+            Some("detect columns --no-headers")
+        );
+        assert_eq!(output.value_type(), Some("table<size: filesize>"));
+        assert!(output.text.contains("nusage-decode"));
+        // usage read the spec without the node: the output is there, as text.
+        let cmd = &assembled.spec.cmd.subcommands["du"];
+        assert_eq!(cmd.outputs.len(), 1);
+        assert_eq!(cmd.outputs[0].framing, usage::Framing::Text);
+    }
 }

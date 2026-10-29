@@ -1,0 +1,9 @@
+# The csv output's media type is `text/csv`, so the wrapper asks for it and reads it with
+# `from csv`, then converts `size` to the filesize the annotation declares.
+{
+    cmd: [ls],
+    invoke: "sizes ls",
+    argv: [ls, --csv],
+    stdout: "name,size\na,2048\nb,4096",
+    output: [[name, size]; [a, 2048b], [b, 4096b]],
+}

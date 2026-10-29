@@ -35,6 +35,11 @@ pub struct HeaderNode {
     pub ty: Option<String>,
     /// The annotation on a nested `arg` child's first argument, for `flag "--x" { arg (int)"<n>" }`.
     pub nested_arg_ty: Option<String>,
+    /// An `output`'s `nusage-decode` child: the Nushell pipeline that turns the output's text
+    /// into a value, as written, for an output no `from` reader decodes. nusage's own node,
+    /// named as `nusage-args` is so that usage's grammar can grow without a collision, taken
+    /// out before usage reads the spec.
+    pub decode: Option<String>,
     /// 1-based line of the file where the node starts.
     pub line: usize,
 }
@@ -125,6 +130,41 @@ fn nested_arg_ty(node: &KdlNode) -> Option<String> {
         .and_then(first_arg_ty)
 }
 
+/// The name of the child node that states how an output is decoded.
+pub(crate) const DECODE: &str = "nusage-decode";
+
+fn decode_of(node: &KdlNode) -> Option<String> {
+    if node.name().value() != "output" {
+        return None;
+    }
+    node.children()?
+        .nodes()
+        .iter()
+        .find(|child| child.name().value() == DECODE)
+        .and_then(|child| string_arg(child, 0))
+}
+
+/// Take every output's `nusage-decode` child out of the document, so that usage, which knows no
+/// such node, reads the rest. Whether any was there.
+pub(crate) fn strip_decodes(doc: &mut KdlDocument) -> bool {
+    let mut stripped = false;
+    for node in doc.nodes_mut() {
+        if node.name().value() == "output"
+            && let Some(children) = node.children_mut()
+        {
+            let before = children.nodes().len();
+            children
+                .nodes_mut()
+                .retain(|child| child.name().value() != DECODE);
+            stripped |= children.nodes().len() != before;
+        }
+        if let Some(children) = node.children_mut() {
+            stripped |= strip_decodes(children);
+        }
+    }
+    stripped
+}
+
 /// The [`HeaderNode`] of a parsed node, with `text` sliced from the source it was parsed
 /// from and `line` looked up through `line_of`.
 pub(crate) fn header_node(
@@ -141,6 +181,7 @@ pub(crate) fn header_node(
         first: string_arg(node, 0),
         ty: first_arg_ty(node),
         nested_arg_ty: nested_arg_ty(node),
+        decode: decode_of(node),
         line: line_of(start),
     }
 }

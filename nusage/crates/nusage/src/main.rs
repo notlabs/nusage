@@ -51,10 +51,10 @@ struct Generate {
     out: Option<PathBuf>,
     /// A usage KDL document merged onto the spec file first: a `cmd` merges into the command
     /// of the same name, any other node replaces the one with the same name and first
-    /// argument. For outputs, selectors, schemas and type annotations a spec one does not
-    /// own lacks; an `output`'s `nusage-args` child holds the words that ask for it where a
-    /// `select` cannot, such as `--no-graph --template 'json(self)'`, and the wrapper owns
-    /// the flags they name
+    /// argument. For outputs, selectors, media types, schemas, type annotations and `nusage-decode`
+    /// pipelines a spec one does not own lacks; an `output`'s `nusage-args` child holds the
+    /// words that ask for it where a `select` cannot, such as `--no-graph --template
+    /// 'json(self)'`, and the wrapper owns the flags they name
     #[usage(long)]
     overlay: Vec<PathBuf>,
 }

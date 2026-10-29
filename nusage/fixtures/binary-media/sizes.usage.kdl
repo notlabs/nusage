@@ -1,0 +1,14 @@
+name "sizes"
+bin "sizes"
+about "A tool whose outputs name their media type: Nushell's reader for it decodes them"
+cmd "ls" help="List things" {
+    flag "--csv" help="Print CSV"
+    output "text" default=#true
+    output ("table<name: string, size: filesize>")"csv" media_type="text/csv" select="--csv" help="One row per thing"
+}
+cmd "info" help="Describe one thing" {
+    arg "<name>" help="The thing"
+    flag "--yaml" help="Print YAML"
+    output "text" default=#true
+    output ("record<name: string, built: datetime>")"yaml" media_type="application/yaml" select="--yaml" help="As YAML"
+}
