@@ -1,0 +1,35 @@
+[tools]
+go = "1.27.3"
+
+[tasks.compose]
+description = "Export the pinned Compose command tree through Usage's Cobra adapter"
+dir = "../lib/docker-compose/spec"
+run = "go run -mod=readonly ."
+
+[task_config]
+shell = "nu -c"
+
+[tasks.check]
+description = "Check Go formatting and reproduce the spec despite environment overrides"
+dir = "../lib/docker-compose/spec"
+run = '''
+let unformatted = ^gofmt -l main.go
+if ($unformatted | str trim | is-not-empty) {
+    error make {msg: $"gofmt: ($unformatted)"}
+}
+let exported = with-env {
+    COMPOSE_ENV_FILES: "/tmp/catalog-example.env"
+    COMPOSE_PROGRESS: "plain"
+    COMPOSE_REMOVE_ORPHANS: "true"
+    BUILDX_BUILDER: "catalog-example"
+    DOCKER_HOST: "unix:///tmp/catalog-example.sock"
+} {
+    ^go run -mod=readonly . | complete
+}
+if $exported.exit_code != 0 {
+    error make {msg: $exported.stderr}
+}
+if $exported.stdout != (open --raw ../docker-compose.usage.kdl) {
+    error make {msg: "The isolated Cobra export differs from the committed spec"}
+}
+'''

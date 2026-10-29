@@ -6,6 +6,7 @@ config_roots = [
   "nusage",
   "catalog",
   "catalog/clap",
+  "catalog/cobra",
   "catalog/schemas",
   "intent",
 ]

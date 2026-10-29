@@ -1,0 +1,6 @@
+{
+    name: "docker-compose",
+    type: "module",
+    description: "A Compose catalog baseline extracted through Usage's Cobra adapter",
+    license: "MIT",
+}
