@@ -1,0 +1,8 @@
+# A nullable record: the null is left as it is, with nothing to fill or convert under it.
+{
+    cmd: [peer],
+    invoke: "probe peer",
+    argv: [peer],
+    stdout: "null",
+    output: null,
+}

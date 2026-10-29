@@ -9,7 +9,8 @@
 
 use nu_protocol::{Span, Value};
 use nusage_model::{
-    Command, CommandTree, Completer, Conversion, Execution, Framing, Param, ParamKind, Structured,
+    Command, CommandTree, Completer, Conversion, Execution, Fill, Framing, Param, ParamKind,
+    Structured,
 };
 use nusage_nu::{
     CommandName, Def, Expr, Ident, Infix, Item, Module, Params, Stmt, SyntaxError, Type, word,
@@ -19,6 +20,9 @@ use crate::common::{SPEC_COMPLETER, Target, attr_usage_alias, doc_of, nu_params,
 
 /// The fixed helpers every binary module carries.
 const HELPERS: &str = include_str!("binary-helpers.nu");
+/// The helper that holds a failed decode to the output's schema, carried when a wrapper
+/// decodes a JSON document that has one.
+const DECODED: &str = include_str!("binary-decoded.nu");
 
 /// The module for a binary: the helpers, the completer when a parameter wants one, then a
 /// wrapper per command. `spec` is the spec file's path relative to the module's directory,
@@ -34,6 +38,13 @@ pub fn module(tree: &CommandTree, spec: &str) -> Result<Module, SyntaxError> {
     });
     if wants_completer {
         items.push(Item::Verbatim(spec_completer(&tree.bin, spec)));
+    }
+    if tree.commands.iter().any(|command| {
+        command.structured.as_ref().is_some_and(|structured| {
+            structured.framing == Framing::Json && structured.schema.is_some()
+        })
+    }) {
+        items.push(Item::Verbatim(DECODED.to_string()));
     }
     for command in &tree.commands {
         let def = wrapper(tree, command)
@@ -165,12 +176,37 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         args,
     };
 
-    // Then `| from json | into datetime at` for a structured output.
-    let mut stages = vec![run];
-    if let Some(structured) = &command.structured {
-        stages.extend(decode_stages(structured)?);
-    }
-    let body = vec![Stmt::Pipeline(stages)];
+    // Then `| from json | into datetime at` for a structured output. One JSON document
+    // with a schema is decoded by `nusage decoded`, which holds the output to the schema
+    // when decoding fails; a stream of them is decoded as it arrives.
+    let body = match &command.structured {
+        Some(structured) if structured.framing == Framing::Json && structured.schema.is_some() => {
+            let schema: serde_json::Value =
+                serde_json::from_str(structured.schema.as_deref().unwrap_or_default())
+                    .map_err(|err| SyntaxError(format!("the output's schema: {err}")))?;
+            let text = Ident::new("text")?;
+            vec![
+                Stmt::Let {
+                    name: text.clone(),
+                    value: run,
+                },
+                Stmt::Pipeline(vec![call(
+                    "nusage decoded",
+                    vec![
+                        Expr::Var(text),
+                        Expr::Str(schema.to_string()),
+                        Expr::Closure(Box::new(Expr::Pipeline(decode_stages(structured)?))),
+                    ],
+                )?]),
+            ]
+        }
+        Some(structured) => {
+            let mut stages = vec![run];
+            stages.extend(decode_stages(structured)?);
+            vec![Stmt::Pipeline(stages)]
+        }
+        None => vec![Stmt::Pipeline(vec![run])],
+    };
     Ok(Def {
         export: true,
         doc: doc_of(command),
@@ -202,25 +238,7 @@ fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
         Framing::Jsonl => call("from json", vec![Expr::Str("--objects".into())])?,
     }];
     for fill in &structured.fills {
-        let (parent, field) = fill.split_at(fill.len() - 1);
-        let default = call(
-            "default",
-            vec![
-                Expr::Literal(Value::nothing(Span::unknown())),
-                Expr::Str(field[0].clone()),
-            ],
-        )?;
-        stages.push(if parent.is_empty() {
-            default
-        } else {
-            call(
-                "update",
-                vec![
-                    Expr::Raw(cell_path(parent)),
-                    Expr::Closure(Box::new(default)),
-                ],
-            )?
-        });
+        stages.push(fill_stage(fill)?);
     }
     for conversion in &structured.conversions {
         stages.push(conversion_stage(conversion)?);
@@ -228,10 +246,72 @@ fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
     Ok(stages)
 }
 
+/// `default null <field>` on the fill's record: the whole value, or `update <record> {
+/// default null <field> }` below it; held off where a record on the way may be null.
+fn fill_stage(fill: &Fill) -> Result<Expr, SyntaxError> {
+    if let Some(&at) = fill.nullable.first() {
+        let (outer, rest) = fill.path.split_at(at);
+        let inner = Fill {
+            path: rest.to_vec(),
+            nullable: fill.nullable[1..].iter().map(|n| n - at).collect(),
+        };
+        return unless_null(outer, fill_stage(&inner)?);
+    }
+    let (parent, field) = fill.path.split_at(fill.path.len() - 1);
+    let default = call(
+        "default",
+        vec![
+            Expr::Literal(Value::nothing(Span::unknown())),
+            Expr::Str(field[0].clone()),
+        ],
+    )?;
+    if parent.is_empty() {
+        return Ok(default);
+    }
+    call(
+        "update",
+        vec![
+            Expr::Raw(cell_path(parent)),
+            Expr::Closure(Box::new(default)),
+        ],
+    )
+}
+
+/// `stage` on the value at `outer` where that may be null, such as jj's `operation` with
+/// `time.start` under it: a null is left as it is, and the stage runs on anything else.
+/// On the whole value when `outer` is empty.
+fn unless_null(outer: &[String], stage: Expr) -> Result<Expr, SyntaxError> {
+    let nothing = || Expr::Literal(Value::nothing(Span::unknown()));
+    let guarded = move |value: Expr| Expr::If {
+        cond: Box::new(Expr::Infix {
+            lhs: Box::new(value.clone()),
+            op: Infix::Eq,
+            rhs: Box::new(nothing()),
+        }),
+        then: Box::new(nothing()),
+        otherwise: Box::new(Expr::Pipeline(vec![value, stage])),
+    };
+    if outer.is_empty() {
+        return Ok(guarded(Expr::Var(Ident::new("in")?)));
+    }
+    let row = Ident::new("row")?;
+    let body = guarded(Expr::Cell {
+        var: row.clone(),
+        path: outer.to_vec(),
+    });
+    call(
+        "update",
+        vec![
+            Expr::Raw(cell_path(outer)),
+            Expr::ClosureWith {
+                param: row,
+                body: Box::new(body),
+            },
+        ],
+    )
+}
+
 fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
-    // A value under one that may be null, such as jj's `operation.time.start` under a null
-    // `operation`: the outer value is left alone when it is null, and the rest of the
-    // conversion runs on it when it is not.
     if let Some(&at) = conversion.nullable.first()
         && at < conversion.path.len()
     {
@@ -241,31 +321,7 @@ fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
             nullable: conversion.nullable[1..].iter().map(|n| n - at).collect(),
             ..conversion.clone()
         };
-        let row = Ident::new("row")?;
-        let value = Expr::Cell {
-            var: row.clone(),
-            path: outer.to_vec(),
-        };
-        let nothing = || Expr::Literal(Value::nothing(Span::unknown()));
-        let body = Expr::If {
-            cond: Box::new(Expr::Infix {
-                lhs: Box::new(value.clone()),
-                op: Infix::Eq,
-                rhs: Box::new(nothing()),
-            }),
-            then: Box::new(nothing()),
-            otherwise: Box::new(Expr::Pipeline(vec![value, conversion_stage(&inner)?])),
-        };
-        return call(
-            "update",
-            vec![
-                Expr::Raw(cell_path(outer)),
-                Expr::ClosureWith {
-                    param: row,
-                    body: Box::new(body),
-                },
-            ],
-        );
+        return unless_null(outer, conversion_stage(&inner)?);
     }
     let nullable = conversion.nullable.last() == Some(&conversion.path.len());
     let path = cell_path(&conversion.path);

@@ -155,9 +155,10 @@ impl Run for Overlay {
 ///
 /// The schema is held to its metaschema first, then each document to the schema; `-` is
 /// standard input, and no document holds the schema alone. Every finding is a line,
-/// `<document>:<path>: <what>`, and any finding is exit code 1. What a binary prints for
-/// an `output` whose schema a spec or overlay declares can be held to that schema this way,
-/// before a module decodes it.
+/// `<document>:<path>: <what>`, and any finding is exit code 1; a check that did not run,
+/// for a schema or document that cannot be read or a schema its metaschema refuses, is
+/// exit code 2. What a binary prints for an `output` whose schema a spec or overlay
+/// declares can be held to that schema this way, before a module decodes it.
 #[derive(Args)]
 struct Validate {
     /// The JSON Schema
@@ -170,7 +171,14 @@ impl Run for Validate {
     type Output = Result<(), String>;
 
     fn run(self) -> Self::Output {
-        let findings = nusage::validate(&self.schema, &self.documents)?;
+        let findings = match nusage::validate(&self.schema, &self.documents) {
+            Ok(findings) => findings,
+            // Not a finding: nothing was held to anything, as the exit code says.
+            Err(why) => {
+                eprintln!("nusage: {why}");
+                std::process::exit(2)
+            }
+        };
         if findings.is_empty() {
             return Ok(());
         }

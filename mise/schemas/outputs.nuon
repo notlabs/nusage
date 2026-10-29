@@ -18,7 +18,6 @@
             framing: json
             schema: ls.schema.json
             source: ["src/cli/ls.rs:229" "src/cli/ls.rs:550" "src/toolset/tool_source.rs:49"]
-            attach: false
         }
         {
             id: "bin-paths"
@@ -101,7 +100,6 @@
             framing: "json"
             schema: "registry.schema.json"
             source: ["src/cli/registry.rs:69","src/cli/registry.rs:94","src/cli/registry.rs:181","src/backend/mod.rs:568"]
-            attach: false
         }
         {
             id: "outdated"
@@ -120,7 +118,6 @@
             framing: "json"
             schema: "ls-remote.schema.json"
             source: ["src/backend/mod.rs:501","src/cli/ls_remote.rs:15","src/cli/ls_remote.rs:185","src/cli/ls_remote.rs:218"]
-            attach: false
         }
         {
             id: "installs-ls"
