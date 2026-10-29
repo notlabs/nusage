@@ -30,9 +30,11 @@ release-plz = "0.4.2"
 _.path = ["{{config_root}}/.bin"]
 JJ_CONFIG = '{% if os() == "windows" %}{{ env.USERPROFILE }}\.jjconfig.toml;{{ env.APPDATA }}\jj\config.toml;{{ env.APPDATA }}\jj\conf.d;{{ config_root }}\jj.toml{% else %}{{ env.HOME }}/.jjconfig.toml:{{ xdg_config_home }}/jj/config.toml:{{ xdg_config_home }}/jj/conf.d:{{ config_root }}/jj.toml{% endif %}'
 
+# Unlabelled lines: GitHub reads an annotation only at the start of a line.
 [tasks.lint]
 description = "The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
 depends = ["//nusage:build"]
+output = "interleave"
 file = "lint.nu"
 
 [tasks.check]
