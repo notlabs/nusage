@@ -38,6 +38,37 @@ pub fn print(module: &Module) -> String {
         .expect("formatting into a String cannot fail")
 }
 
+/// A definition on one line, for Nushell that must fit where one line stood: no comments,
+/// no attributes, the parameters separated by commas, the statements by semicolons. A
+/// statement that the printer breaks over lines, such as a long record, does not belong in
+/// one.
+pub fn print_line(def: &Def) -> String {
+    let params: Vec<String> = def.params.iter().map(param_text).collect();
+    let io = match &def.io {
+        Some((input, output)) => format!(": {} -> {}", input.as_str(), output.as_str()),
+        None => String::new(),
+    };
+    let body: Vec<String> = def
+        .body
+        .iter()
+        .map(|stmt| {
+            let tokens: Tokens = quote!($(stmt_tokens(stmt)));
+            tokens
+                .to_file_string()
+                .expect("formatting into a String cannot fail")
+                .trim_end()
+                .to_string()
+        })
+        .collect();
+    format!(
+        "{}def {} [{}]{io} {{ {} }}",
+        if def.export { "export " } else { "" },
+        def.name.printed(),
+        params.join(", "),
+        body.join("; ")
+    )
+}
+
 /// The comment paragraphs and attribute lines above a definition.
 fn head(doc: &[Vec<String>], attrs: &[Attr]) -> Tokens {
     quote! {
@@ -202,6 +233,10 @@ fn stmt_tokens(stmt: &Stmt) -> Tokens {
     match stmt {
         Stmt::Alias { name, target } => quote!(alias $(name.printed()) = $(target.printed())),
         Stmt::Let { name, value } => quote!(let $(name.as_str()) = $(expr_tokens(value, true))),
+        Stmt::Const { name, value } => {
+            quote!(const $(name.as_str()) = $(expr_tokens(value, true)))
+        }
+        Stmt::Def(def) => def_tokens(def),
         Stmt::Pipeline(stages) => {
             quote!($(for stage in stages join ( | ) => $(expr_tokens(stage, false))))
         }
@@ -373,6 +408,50 @@ export def main [
 }
 "#;
         assert_eq!(print(&module), expected);
+    }
+
+    #[test]
+    fn prints_a_def_on_one_line() {
+        let def = Def {
+            export: false,
+            doc: vec![vec!["Dropped".into()]],
+            attrs: vec![],
+            name: CommandName::new("./x.nu sub").unwrap(),
+            params: Params::new(vec![
+                Param::Positional {
+                    name: ident("name"),
+                    ty: Type::new("string").unwrap(),
+                    optional: false,
+                    default: None,
+                    completer: Some(Completer::List(vec!["a".into(), "b c".into()])),
+                    doc: Some("Dropped too".into()),
+                },
+                Param::Flag {
+                    long: FlagName::new("count").unwrap(),
+                    short: Some('c'),
+                    ty: Some(Type::new("int").unwrap()),
+                    default: None,
+                    completer: None,
+                    doc: None,
+                },
+            ])
+            .unwrap(),
+            io: Some((
+                Type::new("nothing").unwrap(),
+                Type::new("list<int>").unwrap(),
+            )),
+            body: vec![
+                Stmt::Const {
+                    name: ident("target"),
+                    value: Expr::Raw("path self x.nu".into()),
+                },
+                Stmt::Pipeline(vec![Expr::Var(ident("target"))]),
+            ],
+        };
+        assert_eq!(
+            print_line(&def),
+            r#"def "./x.nu sub" [name: string@[a "b c"], --count (-c): int]: nothing -> list<int> { const target = path self x.nu; $target }"#
+        );
     }
 
     #[test]
