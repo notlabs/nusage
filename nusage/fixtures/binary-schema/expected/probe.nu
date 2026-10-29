@@ -38,11 +38,17 @@ def "nusage flag-words" []: record -> list<string> {
 
 # A binary's output decoded as the module's closure decodes it. When that fails and the
 # `nusage` this module was generated with is on PATH, the output is held to the schema the
-# spec declares, so the error names what does not match it rather than what failed to
-# convert; what failed to convert follows, as the inner error. The error is the decoding's
-# own when the output matches or there is no `nusage` to ask, and the inner one under why
-# the output could not be held to its schema when the check did not run.
-def "nusage decoded" [text: string, schema: string, decode: closure]: nothing -> any {
+# spec declares, line by line with `--lines`, so the error names what does not match it
+# rather than what failed to convert; what failed to convert follows, as the inner error.
+# The error is the decoding's own when the output matches or there is no `nusage` to ask,
+# and the inner one under why the output could not be held to its schema when the check
+# did not run.
+def "nusage decoded" [
+    text: string
+    schema: string
+    decode: closure
+    --lines
+]: nothing -> any {
     try {
         $text | do $decode
     } catch {|err|
@@ -51,7 +57,8 @@ def "nusage decoded" [text: string, schema: string, decode: closure]: nothing ->
         }
         let file = mktemp --tmpdir nusage-XXXXXX.schema.json
         $schema | save --force $file
-        let checked = $text | ^nusage validate $file - | complete
+        let flags = if $lines { [--lines] } else { [] }
+        let checked = $text | ^nusage validate $file - ...$flags | complete
         rm $file
         match $checked.exit_code {
             0 => { error make $err }
@@ -105,7 +112,8 @@ export def "probe status" []: nothing -> record<ok: bool, took: duration, at: da
         schema file="events.schema.json"
     }'
 export def "probe events" []: nothing -> table<at: datetime, kind: string, detail: oneof<string, nothing>> {
-    ^probe events --json ...(nusage argv [] {}) | from json --objects | default null detail | update at {|row| (1970-01-01T00:00:00Z) + ($row.at | into duration --unit sec) }
+    let text = ^probe events --json ...(nusage argv [] {})
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"required\":[\"at\",\"kind\"],\"properties\":{\"at\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"datetime\",\"unit\":\"sec\"}},\"kind\":{\"enum\":[\"start\",\"stop\"]},\"detail\":{\"type\":[\"string\",\"null\"]}}}" { from json --objects | default null detail | update at {|row| (1970-01-01T00:00:00Z) + ($row.at | into duration --unit sec) } } --lines
 }
 
 # Describe the project
@@ -144,5 +152,5 @@ export def "probe report" []: nothing -> record<name: string, dependencies: tabl
     }'
 export def "probe peer" []: nothing -> oneof<nothing, record<host: string, port: oneof<int, nothing>, since: oneof<datetime, nothing>, link: oneof<nothing, record<up: bool, latency: oneof<duration, nothing>>>>> {
     let text = ^probe peer ...(nusage argv [] {})
-    nusage decoded $text "{\"oneOf\":[{\"type\":\"null\"},{\"type\":\"object\",\"required\":[\"host\"],\"properties\":{\"host\":{\"type\":\"string\"},\"port\":{\"type\":\"integer\"},\"since\":{\"type\":\"string\",\"format\":\"date-time\"},\"link\":{\"oneOf\":[{\"type\":\"null\"},{\"type\":\"object\",\"required\":[\"up\"],\"properties\":{\"up\":{\"type\":\"boolean\"},\"latency\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"duration\",\"unit\":\"ms\"}}}}]}}}]}" { from json | if $in == null { null } else { $in | default null port } | if $in == null { null } else { $in | default null since } | if $in == null { null } else { $in | default null link } | if $in == null { null } else { $in | update link {|row| if $row.link == null { null } else { $row.link | default null latency } } } | if $in == null { null } else { $in | update since {|row| if $row.since == null { null } else { $row.since | into datetime } } } | if $in == null { null } else { $in | update link {|row| if $row.link == null { null } else { $row.link | update latency {|row| if $row.latency == null { null } else { $row.latency | into duration --unit ms } } } } } }
+    nusage decoded $text "{\"oneOf\":[{\"type\":\"null\"},{\"type\":\"object\",\"required\":[\"host\"],\"properties\":{\"host\":{\"type\":\"string\"},\"port\":{\"type\":\"integer\"},\"since\":{\"type\":\"string\",\"format\":\"date-time\"},\"link\":{\"oneOf\":[{\"type\":\"null\"},{\"type\":\"object\",\"required\":[\"up\"],\"properties\":{\"up\":{\"type\":\"boolean\"},\"latency\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"duration\",\"unit\":\"ms\"}}}}]}}}]}" { from json | if $in == null { null } else { $in | default null port | default null since | default null link | update link {|row| if $row.link == null { null } else { $row.link | default null latency } } | update since {|row| if $row.since == null { null } else { $row.since | into datetime } } | update link {|row| if $row.link == null { null } else { $row.link | update latency {|row| if $row.latency == null { null } else { $row.latency | into duration --unit ms } } } } } }
 }

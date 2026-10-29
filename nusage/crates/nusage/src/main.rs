@@ -166,13 +166,17 @@ struct Validate {
     schema: PathBuf,
     /// The JSON documents, `-` for standard input
     documents: Vec<PathBuf>,
+    /// Read each document as JSON lines: every line that is not blank is a document of its
+    /// own, and a finding names the line, `<document>:<line>:<path>: <what>`
+    #[usage(long)]
+    lines: bool,
 }
 
 impl Run for Validate {
     type Output = Result<(), String>;
 
     fn run(self) -> Self::Output {
-        let findings = match nusage::validate(&self.schema, &self.documents) {
+        let findings = match nusage::validate(&self.schema, &self.documents, self.lines) {
             Ok(findings) => findings,
             // Not a finding: nothing was held to anything, as the exit code says.
             Err(why) => {
