@@ -1,0 +1,9 @@
+# The record without its optional properties: filled where it is a record, and its nullable
+# `link` left out is filled as null, with nothing under it.
+{
+    cmd: [peer],
+    invoke: "probe peer",
+    argv: [peer],
+    stdout: "{\"host\": \"h\"}",
+    output: {host: h, port: null, since: null, link: null},
+}

@@ -1,0 +1,9 @@
+# The oldest entry has no operation: the time inside one is converted where there is one, and
+# a null operation stays null rather than failing the call.
+{
+    cmd: [evolog],
+    invoke: "vcs evolog",
+    argv: [evolog, --no-graph, --template, "json(self) ++ \"\\n\""],
+    stdout: "{\"commit_id\": \"a1\", \"operation\": {\"time\": {\"start\": \"2026-10-28T21:31:02Z\"}}}\n{\"commit_id\": \"z0\", \"operation\": null}",
+    output: [[commit_id, operation]; [a1, {time: {start: 2026-10-28T21:31:02+00:00}}], [z0, null]],
+}

@@ -1,0 +1,8 @@
+# A line the schema rejects: decoding fails, and the error says which line and what.
+{
+    cmd: [events],
+    invoke: "probe events",
+    argv: [events, --json],
+    stdout: "{\"at\": 0, \"kind\": \"start\"}\n{\"at\": \"soon\", \"kind\": \"stop\"}",
+    error: ":2:/at",
+}

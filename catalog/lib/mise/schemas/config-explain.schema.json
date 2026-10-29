@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mise config explain --json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string"
+      },
+      "path": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "line": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "description": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "deprecated": {
+        "type": "boolean"
+      },
+      "known": {
+        "type": "boolean"
+      },
+      "suggestion": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "key",
+      "path",
+      "line",
+      "description",
+      "deprecated",
+      "known",
+      "suggestion"
+    ],
+    "additionalProperties": false
+  }
+}

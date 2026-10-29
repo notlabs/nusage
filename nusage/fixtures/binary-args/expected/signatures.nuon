@@ -1,0 +1,51 @@
+[
+  [name,         signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      attributes];
+  [vcs,          {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,     completion, parameter_default];
+        [null,           input,          nothing,      false,       null,       null,            null,       null],
+        [repository,     named,          string,       true,        R,          "Where to work", null,       null],
+        [null,           output,         string,       false,       null,       null,            null,       null]
+      ]
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    [
+      [name,  value];
+      [usage, "flag \"-R --repository <REPOSITORY>\" help=\"Where to work\" global=#true"]
+    ]],
+  ["vcs evolog", {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                                                                                 is_optional, short_flag, description,     completion, parameter_default];
+        [null,           input,          nothing,                                                                                      false,       null,       null,            null,       null],
+        [repository,     named,          string,                                                                                       true,        R,          "Where to work", null,       null],
+        [null,           output,         "table<commit_id: string, operation: oneof<record<time: record<start: datetime>>, nothing>>", false,       null,       null,            null,       null]
+      ]
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    [
+      [name,  value];
+      [usage, "flag \"-T --template <TEMPLATE>\" help=\"Render each entry with this\""],
+      [usage, "flag \"-G --no-graph\" help=\"A flat list, not a graph\""],
+      [usage, "output \"json\" framing=\"jsonl\" {
+        schema #\"{\"type\": \"object\", \"required\": [\"commit_id\", \"operation\"], \"properties\": {\"commit_id\": {\"type\": \"string\"}, \"operation\": {\"anyOf\": [{\"type\": \"object\", \"required\": [\"time\"], \"properties\": {\"time\": {\"type\": \"object\", \"required\": [\"start\"], \"properties\": {\"start\": {\"type\": \"string\", \"format\": \"date-time\"}}}}}, {\"type\": \"null\"}]}}}\"#
+    }"]
+    ]],
+  ["vcs log",    {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                                                                  is_optional, short_flag, description,                     completion, parameter_default];
+        [null,           input,          nothing,                                                                       false,       null,       null,                            null,       null],
+        [filesets,       rest,           string,                                                                        true,        null,       "Only revisions touching these", null,       null],
+        [repository,     named,          string,                                                                        true,        R,          "Where to work",                 null,       null],
+        [revision,       named,          list<string>,                                                                  true,        r,          "Which revisions to show",       null,       null],
+        [limit,          named,          int,                                                                           true,        n,          "At most this many revisions",   null,       null],
+        [null,           output,         "table<commit_id: string, author: record<name: string, timestamp: datetime>>", false,       null,       null,                            null,       null]
+      ]
+    }, [
+      [name,  value];
+      [usage, "flag \"-r --revision <REVSETS>\" var=#true help=\"Which revisions to show\""],
+      [usage, "flag \"-T --template <TEMPLATE>\" help=\"Render each revision with this\""],
+      [usage, "flag \"-G --no-graph\" help=\"A flat list, not a graph\""],
+      [usage, "flag \"-n --limit\" help=\"At most this many revisions\" { arg (int)\"<LIMIT>\" }"],
+      [usage, "arg \"[FILESETS]...\" help=\"Only revisions touching these\""],
+      [usage, "output \"text\" default=#true"],
+      [usage, "output \"json\" framing=\"jsonl\" {
+        schema #\"{\"type\": \"object\", \"required\": [\"commit_id\", \"author\"], \"properties\": {\"commit_id\": {\"type\": \"string\"}, \"author\": {\"type\": \"object\", \"required\": [\"name\", \"timestamp\"], \"properties\": {\"name\": {\"type\": \"string\"}, \"timestamp\": {\"type\": \"string\", \"format\": \"date-time\"}}}}}\"#
+    }"]
+    ]]
+]

@@ -1,0 +1,4 @@
+#!/bin/sh
+#MISE description="A hidden file task"
+#MISE hide=true
+exit 0

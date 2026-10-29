@@ -9,16 +9,22 @@
 
 use nu_protocol::{Span, Value};
 use nusage_model::{
-    Command, CommandTree, Completer, Conversion, Execution, Framing, Param, ParamKind, Structured,
+    Command, CommandTree, Completer, Conversion, Execution, Fill, Framing, Param, ParamKind,
+    Structured,
 };
 use nusage_nu::{
-    CommandName, Def, Expr, Ident, Infix, Item, Module, Params, Stmt, SyntaxError, Type, word,
+    CommandName, Def, Expr, Ident, Infix, Item, Module, Param as NuParam, Params, Stmt,
+    SyntaxError, Type, word,
 };
 
 use crate::common::{SPEC_COMPLETER, Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
 
-/// The fixed helpers every binary module carries.
-const HELPERS: &str = include_str!("binary-helpers.nu");
+/// The fixed helpers every binary module carries, and every module whose scripts call
+/// scripts.
+pub(crate) const HELPERS: &str = include_str!("binary-helpers.nu");
+/// The helper that holds a failed decode to the output's schema, carried when a wrapper
+/// decodes a JSON document that has one.
+const DECODED: &str = include_str!("binary-decoded.nu");
 
 /// The module for a binary: the helpers, the completer when a parameter wants one, then a
 /// wrapper per command. `spec` is the spec file's path relative to the module's directory,
@@ -34,6 +40,14 @@ pub fn module(tree: &CommandTree, spec: &str) -> Result<Module, SyntaxError> {
     });
     if wants_completer {
         items.push(Item::Verbatim(spec_completer(&tree.bin, spec)));
+    }
+    if tree.commands.iter().any(|command| {
+        command
+            .structured
+            .as_ref()
+            .is_some_and(|s| s.schema.is_some())
+    }) {
+        items.push(Item::Verbatim(DECODED.to_string()));
     }
     for command in &tree.commands {
         let def = wrapper(tree, command)
@@ -87,9 +101,83 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
     } else {
         format!("{} {}", tree.bin, command.path)
     };
-    // A `def` has one rest parameter; a binary declaring several variadic positionals, as
-    // usage allows (`[ARGS]...` and `[-- MORE]...`), gets the first, which takes every
-    // remaining word anyway, since the binary parses them.
+    let (params, argv) = params_and_argv(command, Target::Binary)?;
+    let io = match &command.output {
+        Some(output) => Some((Type::new("nothing")?, Type::new(output.as_str())?)),
+        None => None,
+    };
+
+    // `^demo status --format json ...(nusage argv [$a ...$rest] {--flag: $flag})`: the
+    // selector words come first, so a `--` the caller passes still comes after them.
+    let mut args: Vec<Expr> = command
+        .path
+        .words()
+        .iter()
+        .chain(
+            command
+                .structured
+                .iter()
+                .flat_map(|structured| structured.args.iter()),
+        )
+        .map(|w| Expr::Str(w.clone()))
+        .collect();
+    args.push(Expr::Spread(Box::new(argv)));
+    let run = Expr::External {
+        name: tree.bin.clone(),
+        args,
+    };
+
+    // Then `| from json | into datetime at` for a structured output. An output with a
+    // schema is decoded by `nusage decoded`, which holds the output to the schema when
+    // decoding fails, line by line for JSON lines.
+    let body = match &command.structured {
+        Some(structured) if structured.schema.is_some() => {
+            let schema: serde_json::Value =
+                serde_json::from_str(structured.schema.as_deref().unwrap_or_default())
+                    .map_err(|err| SyntaxError(format!("the output's schema: {err}")))?;
+            let text = Ident::new("text")?;
+            let mut args = vec![
+                Expr::Var(text.clone()),
+                Expr::Str(schema.to_string()),
+                Expr::Closure(Box::new(Expr::Pipeline(decode_stages(structured)?))),
+            ];
+            if structured.framing == Framing::Jsonl {
+                args.push(Expr::Str("--lines".into()));
+            }
+            vec![
+                Stmt::Let {
+                    name: text,
+                    value: run,
+                },
+                Stmt::Pipeline(vec![call("nusage decoded", args)?]),
+            ]
+        }
+        Some(structured) => {
+            let mut stages = vec![run];
+            stages.extend(decode_stages(structured)?);
+            vec![Stmt::Pipeline(stages)]
+        }
+        None => vec![Stmt::Pipeline(vec![run])],
+    };
+    Ok(Def {
+        export: true,
+        doc: doc_of(command),
+        attrs: usage_attrs(command)?,
+        name: CommandName::new(name)?,
+        params: Params::new(params)?,
+        io,
+        body,
+    })
+}
+
+/// A wrapper's parameters, and the argv they make: `nusage argv [$a ...$rest] {--flag:
+/// $flag}`. A `def` has one rest parameter; a command declaring several variadic
+/// positionals, as usage allows (`[ARGS]...` and `[-- MORE]...`), gets the first, which takes
+/// every remaining word anyway, since the command parses them.
+pub(crate) fn params_and_argv(
+    command: &Command,
+    target: Target,
+) -> Result<(Vec<NuParam>, Expr), SyntaxError> {
     let mut rest_seen = false;
     let positionals: Vec<&Param> = command
         .positionals
@@ -105,16 +193,9 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         .iter()
         .copied()
         .chain(command.flags.iter())
-        .map(|param| nu_params(param, Target::Binary))
+        .map(|param| nu_params(param, target))
         .collect::<Result<Vec<_>, _>>()?
         .concat();
-    let io = match &command.output {
-        Some(output) => Some((Type::new("nothing")?, Type::new(output.as_str())?)),
-        None => None,
-    };
-
-    // `^demo status --format json ...(nusage argv [$a ...$rest] {--flag: $flag})`: the
-    // selector words come first, so a `--` the caller passes still comes after them.
     let positionals = positionals
         .iter()
         .map(|param| {
@@ -134,7 +215,7 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         } else {
             &mut flags
         };
-        into.push((flag_word(param), Expr::Var(Ident::new(&param.var)?)));
+        into.push((flag_word(param), flag_value(param)?));
         if let Some(negate) = &param.negate {
             into.push((
                 format!("--{negate}"),
@@ -146,40 +227,21 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
     if !scoped.is_empty() {
         argv_args.push(Expr::Record(scoped));
     }
-    let argv = call("nusage argv", argv_args)?;
-    let mut args: Vec<Expr> = command
-        .path
-        .words()
-        .iter()
-        .chain(
-            command
-                .structured
-                .iter()
-                .flat_map(|structured| structured.args.iter()),
-        )
-        .map(|w| Expr::Str(w.clone()))
-        .collect();
-    args.push(Expr::Spread(Box::new(argv)));
-    let run = Expr::External {
-        name: tree.bin.clone(),
-        args,
-    };
+    Ok((params, call("nusage argv", argv_args)?))
+}
 
-    // Then `| from json | into datetime at` for a structured output.
-    let mut stages = vec![run];
-    if let Some(structured) = &command.structured {
-        stages.extend(decode_stages(structured)?);
+/// A flag's value as `nusage argv` takes it. The helper spells a flag by its value's type,
+/// an `int` as a count and a `bool` as a switch, so a valued flag of a type other than text
+/// goes as the list of its value, empty when absent, which it spells `--flag value`.
+fn flag_value(param: &Param) -> Result<Expr, SyntaxError> {
+    let var = Expr::Var(Ident::new(&param.var)?);
+    if param.kind != ParamKind::Valued || matches!(param.ty.as_str(), "string" | "path") {
+        return Ok(var);
     }
-    let body = vec![Stmt::Pipeline(stages)];
-    Ok(Def {
-        export: true,
-        doc: doc_of(command),
-        attrs: usage_attrs(command)?,
-        name: CommandName::new(name)?,
-        params: Params::new(params)?,
-        io,
-        body,
-    })
+    Ok(Expr::Group(Box::new(Expr::Pipeline(vec![
+        Expr::List(vec![var]),
+        call("compact", vec![])?,
+    ]))))
 }
 
 /// The flag as the binary spells it: `--dry-run`, or `-v` for a short-only flag.
@@ -201,37 +263,125 @@ fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
         Framing::Json => call("from json", vec![])?,
         Framing::Jsonl => call("from json", vec![Expr::Str("--objects".into())])?,
     }];
-    for fill in &structured.fills {
-        let (parent, field) = fill.split_at(fill.len() - 1);
-        let default = call(
-            "default",
-            vec![
-                Expr::Literal(Value::nothing(Span::unknown())),
-                Expr::Str(field[0].clone()),
-            ],
-        )?;
-        stages.push(if parent.is_empty() {
-            default
+    // A value that may itself be null, with fields to fill or convert under it: asked
+    // once, and everything under it runs on anything else.
+    let under_null = |nullable: &[usize]| nullable.first() == Some(&0);
+    let nullable_value = structured.fills.iter().any(|f| under_null(&f.nullable))
+        || structured
+            .conversions
+            .iter()
+            .any(|c| under_null(&c.nullable) && !c.path.is_empty());
+    let within = |nullable: &[usize]| -> Vec<usize> {
+        if nullable_value {
+            nullable.iter().copied().filter(|&n| n != 0).collect()
         } else {
-            call(
-                "update",
-                vec![
-                    Expr::Raw(cell_path(parent)),
-                    Expr::Closure(Box::new(default)),
-                ],
-            )?
-        });
+            nullable.to_vec()
+        }
+    };
+    let mut under = Vec::new();
+    for fill in &structured.fills {
+        under.push(fill_stage(&Fill {
+            path: fill.path.clone(),
+            nullable: within(&fill.nullable),
+        })?);
     }
     for conversion in &structured.conversions {
-        stages.push(conversion_stage(conversion)?);
+        under.push(conversion_stage(&Conversion {
+            nullable: within(&conversion.nullable),
+            ..conversion.clone()
+        })?);
+    }
+    if nullable_value {
+        stages.push(unless_null(&[], under)?);
+    } else {
+        stages.extend(under);
     }
     Ok(stages)
 }
 
+/// `default null <field>` on the fill's record: the whole value, or `update <record> {
+/// default null <field> }` below it; held off where a record on the way may be null.
+fn fill_stage(fill: &Fill) -> Result<Expr, SyntaxError> {
+    if let Some(&at) = fill.nullable.first() {
+        let (outer, rest) = fill.path.split_at(at);
+        let inner = Fill {
+            path: rest.to_vec(),
+            nullable: fill.nullable[1..].iter().map(|n| n - at).collect(),
+        };
+        return unless_null(outer, vec![fill_stage(&inner)?]);
+    }
+    let (parent, field) = fill.path.split_at(fill.path.len() - 1);
+    let default = call(
+        "default",
+        vec![
+            Expr::Literal(Value::nothing(Span::unknown())),
+            Expr::Str(field[0].clone()),
+        ],
+    )?;
+    if parent.is_empty() {
+        return Ok(default);
+    }
+    call(
+        "update",
+        vec![
+            Expr::Raw(cell_path(parent)),
+            Expr::Closure(Box::new(default)),
+        ],
+    )
+}
+
+/// `stages` on the value at `outer` where that may be null, such as jj's `operation` with
+/// `time.start` under it: a null is left as it is, and the stages run on anything else.
+/// On the whole value when `outer` is empty.
+fn unless_null(outer: &[String], stages: Vec<Expr>) -> Result<Expr, SyntaxError> {
+    let nothing = || Expr::Literal(Value::nothing(Span::unknown()));
+    let guarded = move |value: Expr| Expr::If {
+        cond: Box::new(Expr::Infix {
+            lhs: Box::new(value.clone()),
+            op: Infix::Eq,
+            rhs: Box::new(nothing()),
+        }),
+        then: Box::new(nothing()),
+        otherwise: Box::new(Expr::Pipeline(
+            std::iter::once(value).chain(stages).collect(),
+        )),
+    };
+    if outer.is_empty() {
+        return Ok(guarded(Expr::Var(Ident::new("in")?)));
+    }
+    let row = Ident::new("row")?;
+    let body = guarded(Expr::Cell {
+        var: row.clone(),
+        path: outer.to_vec(),
+    });
+    call(
+        "update",
+        vec![
+            Expr::Raw(cell_path(outer)),
+            Expr::ClosureWith {
+                param: row,
+                body: Box::new(body),
+            },
+        ],
+    )
+}
+
 fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
+    if let Some(&at) = conversion.nullable.first()
+        && at < conversion.path.len()
+    {
+        let (outer, rest) = conversion.path.split_at(at);
+        let inner = Conversion {
+            path: rest.to_vec(),
+            nullable: conversion.nullable[1..].iter().map(|n| n - at).collect(),
+            ..conversion.clone()
+        };
+        return unless_null(outer, vec![conversion_stage(&inner)?]);
+    }
+    let nullable = conversion.nullable.last() == Some(&conversion.path.len());
     let path = cell_path(&conversion.path);
     let plain = conversion.unit.is_none() && conversion.ty != "base64";
-    if plain && !conversion.nullable {
+    if plain && !nullable {
         let args = if conversion.path.is_empty() {
             vec![]
         } else {
@@ -285,7 +435,7 @@ fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
             )));
         }
     };
-    let body = if conversion.nullable {
+    let body = if nullable {
         Expr::If {
             cond: Box::new(Expr::Infix {
                 lhs: Box::new(value),

@@ -36,3 +36,30 @@ cmd "report" help="Describe the project" {
         schema file="report.schema.json"
     }
 }
+
+cmd "peer" help="Show the peer, when there is one" {
+    output "json" framing="json" default=#true {
+        schema #"""
+{
+  "oneOf": [
+    {"type": "null"},
+    {
+      "type": "object",
+      "required": ["host"],
+      "properties": {
+        "host": {"type": "string"},
+        "port": {"type": "integer"},
+        "since": {"type": "string", "format": "date-time"},
+        "link": {
+          "oneOf": [
+            {"type": "null"},
+            {"type": "object", "required": ["up"], "properties": {"up": {"type": "boolean"}, "latency": {"type": "integer", "x-nu": {"type": "duration", "unit": "ms"}}}}
+          ]
+        }
+      }
+    }
+  ]
+}
+"""#
+    }
+}

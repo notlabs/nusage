@@ -1,0 +1,9 @@
+# The overlay's words follow the command's, then the positionals and the caller's flags; each
+# line is decoded, and the author's timestamp converted to the datetime the schema declares.
+{
+    cmd: [log],
+    invoke: "vcs log --revision [@-] src",
+    argv: [log, --no-graph, --template, "json(self) ++ \"\\n\"", src, --revision, "@-"],
+    stdout: "{\"commit_id\": \"a1\", \"author\": {\"name\": \"x\", \"timestamp\": \"2026-10-28T21:31:02+02:00\"}}\n{\"commit_id\": \"b2\", \"author\": {\"name\": \"y\", \"timestamp\": \"2026-10-27T08:00:00Z\"}}",
+    output: [[commit_id, author]; [a1, {name: x, timestamp: 2026-10-28T21:31:02+02:00}], [b2, {name: y, timestamp: 2026-10-27T08:00:00+00:00}]],
+}

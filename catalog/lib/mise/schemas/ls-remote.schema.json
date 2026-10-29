@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mise ls-remote --json",
+  "$comment": "The --all mode omits release_url/rolling/checksum and always includes nullable prerelease. anyOf allows an empty list in either mode.",
+  "$defs": {
+    "single": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "release_url": {
+          "type": "string"
+        },
+        "rolling": {
+          "const": true
+        },
+        "checksum": {
+          "type": "string"
+        },
+        "prerelease": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "all": {
+      "type": "object",
+      "properties": {
+        "tool": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "prerelease": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "tool",
+        "version",
+        "prerelease"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "anyOf": [
+    {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/single"
+      }
+    },
+    {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/all"
+      }
+    }
+  ]
+}

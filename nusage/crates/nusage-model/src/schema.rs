@@ -3,23 +3,28 @@
 //! mapping is the obvious one: an object is a `record` of its properties in their order, an
 //! array of objects a `table`, any other array a `list`, `integer` is `int`, `number` is
 //! `float`, and a property the schema does not require is `oneof<T, nothing>`, filled with
-//! `null` when absent so it is there to read. A string with `format: date-time` becomes a
-//! datetime, one with `contentEncoding: base64` becomes binary, and a number with an `x-nu`
-//! vocabulary entry (`{"type": "duration", "unit": "ms"}`, also `filesize` and `datetime`)
-//! becomes that, counting its unit. `anyOf`, `oneOf` and a list of types are `oneof<…>`;
+//! `null` when absent so it is there to read. In the items of a list that is not a table,
+//! where no cell path reaches to fill it, such a property is left out of the type instead,
+//! since the type of a record says what every record has. A string with `format: date-time`
+//! becomes a datetime, one with `contentEncoding: base64` becomes binary, and a number with
+//! an `x-nu` vocabulary entry (`{"type": "duration", "unit": "ms"}`, also `filesize` and
+//! `datetime`) becomes that, counting its unit. `anyOf`, `oneOf` and a list of types are
+//! `oneof<…>`; inside one with more than one member besides `null`, nothing is filled or
+//! converted either, since what is done to the value must hold for every member: an
+//! optional property is left out of the type as in a list, and a conversion is an error.
 //! `enum` and `const` take the type of their values; a local `$ref` is followed. What this
 //! does not read is `any`: `allOf`, `not`, conditionals, `patternProperties`.
 
 use serde_json::Value as Json;
 
-use crate::{Conversion, NuType};
+use crate::{Conversion, Fill, NuType};
 
 /// What a schema says about the value: its type, the optional properties to fill, and the
 /// conversions, as [`crate::Structured`] carries them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shape {
     pub ty: NuType,
-    pub fills: Vec<Vec<String>>,
+    pub fills: Vec<Fill>,
     pub conversions: Vec<Conversion>,
 }
 
@@ -41,18 +46,21 @@ pub fn shape(schema: &str) -> Result<Shape, String> {
 
 struct Reader<'a> {
     root: &'a Json,
-    fills: Vec<Vec<String>>,
+    fills: Vec<Fill>,
     conversions: Vec<Conversion>,
     /// The `$ref`s being followed, to stop at a cycle.
     refs: Vec<String>,
 }
 
-/// Where in the value a schema node sits: its cell path, whether a list stands between it
-/// and the top (where no cell path reaches), and whether it may be null.
+/// Where in the value a schema node sits: its cell path, whether a list or a union of
+/// several shapes stands between it and the top (where no cell path reaches, or not for
+/// every value), and the prefixes of its path that may be null, by length, itself or what
+/// it sits in.
 struct Place {
     path: Vec<String>,
     in_list: bool,
-    nullable: bool,
+    in_union: bool,
+    nullable: Vec<usize>,
 }
 
 impl Place {
@@ -60,17 +68,42 @@ impl Place {
         Place {
             path: Vec::new(),
             in_list: false,
-            nullable: false,
+            in_union: false,
+            nullable: Vec::new(),
         }
+    }
+
+    /// Whether a cell path reaches this place in every value the schema describes.
+    fn reached(&self) -> bool {
+        !self.in_list && !self.in_union
     }
 
     fn field(&self, name: &str, nullable: bool) -> Self {
         let mut path = self.path.clone();
         path.push(name.to_string());
-        Place {
+        let mut place = Place {
             path,
             in_list: self.in_list,
-            nullable: self.nullable || nullable,
+            in_union: self.in_union,
+            nullable: self.nullable.clone(),
+        };
+        if nullable {
+            place.nullable.push(place.path.len());
+        }
+        place
+    }
+
+    /// The same place, where the value itself may be null.
+    fn or_null(&self, nullable: bool) -> Self {
+        let mut nulls = self.nullable.clone();
+        if nullable && nulls.last() != Some(&self.path.len()) {
+            nulls.push(self.path.len());
+        }
+        Place {
+            path: self.path.clone(),
+            in_list: self.in_list,
+            in_union: self.in_union,
+            nullable: nulls,
         }
     }
 
@@ -78,7 +111,18 @@ impl Place {
         Place {
             path: self.path.clone(),
             in_list: true,
-            nullable: false,
+            in_union: self.in_union,
+            nullable: Vec::new(),
+        }
+    }
+
+    /// The same place, as one member of a union of several shapes sees it.
+    fn member(&self) -> Self {
+        Place {
+            path: self.path.clone(),
+            in_list: self.in_list,
+            in_union: true,
+            nullable: self.nullable.clone(),
         }
     }
 
@@ -112,17 +156,20 @@ impl Reader<'_> {
         };
         if types.len() > 1 {
             let nullable = types.contains(&"null");
+            let place = place.or_null(nullable);
+            let place = if types.iter().filter(|ty| **ty != "null").count() > 1 {
+                place.member()
+            } else {
+                place
+            };
+            let before = self.conversions.len();
             let mut members = Vec::new();
             for ty in &types {
                 let mut one = object.clone();
                 one.insert("type".into(), Json::String(ty.to_string()));
-                let place = Place {
-                    path: place.path.clone(),
-                    in_list: place.in_list,
-                    nullable: place.nullable || nullable,
-                };
                 members.push(self.node(&Json::Object(one), &place)?);
             }
+            self.converted_in_union(&place, before)?;
             return Ok(oneof(members));
         }
         if let Some(values) = object.get("enum").and_then(Json::as_array) {
@@ -183,19 +230,35 @@ impl Reader<'_> {
     }
 
     fn union(&mut self, members: &[Json], place: &Place) -> Result<String, String> {
-        let nullable = members
-            .iter()
-            .any(|member| member.get("type").and_then(Json::as_str) == Some("null"));
-        let place = Place {
-            path: place.path.clone(),
-            in_list: place.in_list,
-            nullable: place.nullable || nullable,
+        let is_null = |member: &Json| member.get("type").and_then(Json::as_str) == Some("null");
+        let nullable = members.iter().any(is_null);
+        let place = place.or_null(nullable);
+        // A value or null is one shape; several shapes are a union nothing reaches into.
+        let place = if members.iter().filter(|member| !is_null(member)).count() > 1 {
+            place.member()
+        } else {
+            place
         };
+        let before = self.conversions.len();
         let mut types = Vec::new();
         for member in members {
             types.push(self.node(member, &place)?);
         }
+        self.converted_in_union(&place, before)?;
         Ok(oneof(types))
+    }
+
+    /// A conversion inside a union of several shapes would run on every member.
+    fn converted_in_union(&self, place: &Place, before: usize) -> Result<(), String> {
+        if place.in_union && self.conversions.len() > before {
+            let what = self.conversions[before].ty.clone();
+            return Err(format!(
+                "{}: a {what} inside a union of several shapes cannot be converted after \
+                 decoding; which shape the value has is not known",
+                place.describe()
+            ));
+        }
+        Ok(())
     }
 
     /// `x-nu`: a number counting units of a duration, a file size or a datetime.
@@ -256,14 +319,25 @@ impl Reader<'_> {
         for (name, property) in properties {
             let optional = !required.contains(&name.as_str());
             let field = place.field(name, optional);
-            let mut ty = self.node(property, &field)?;
-            if optional {
-                if !field.in_list {
-                    self.fills.push(field.path.clone());
-                }
-                ty = oneof(vec![ty, "nothing".to_string()]);
+            let filled = optional && field.reached();
+            if filled {
+                // Before anything under it, so the field is there when its own are filled;
+                // and only where the record is one: a `null` on the way, the record itself
+                // included, has no field to fill.
+                self.fills.push(Fill {
+                    path: field.path.clone(),
+                    nullable: place.nullable.clone(),
+                });
             }
-            columns.push(format!("{}: {ty}", column(name)));
+            let ty = self.node(property, &field)?;
+            if !optional {
+                columns.push(format!("{}: {ty}", column(name)));
+            } else if filled {
+                let ty = oneof(vec![ty, "nothing".to_string()]);
+                columns.push(format!("{}: {ty}", column(name)));
+            }
+            // An optional property no fill reaches is left out: a record may carry fields
+            // its type does not name, and must carry the ones it does.
         }
         Ok(format!("record<{}>", columns.join(", ")))
     }
@@ -276,9 +350,9 @@ impl Reader<'_> {
         let Some(items) = object.get("items") else {
             return Ok("list<any>".to_string());
         };
-        // A column of a table is a cell path, as a record's field is; the items of any
-        // other list are not.
-        let rows = self.is_object(items) && !place.in_list;
+        // A column of a table is a cell path, as a record's field is, where the table is
+        // reached; the items of any other list are not.
+        let rows = self.is_object(items);
         let item_place = if rows {
             place.field_less()
         } else {
@@ -286,7 +360,7 @@ impl Reader<'_> {
         };
         let before = self.conversions.len();
         let ty = self.node(items, &item_place)?;
-        if !rows && self.conversions.len() > before {
+        if !item_place.reached() && self.conversions.len() > before {
             let what = self.conversions[before].ty.clone();
             return Err(format!(
                 "{}: a {what} inside a list cannot be converted after decoding; JSON delivers \
@@ -327,18 +401,20 @@ impl Reader<'_> {
             path: place.path.clone(),
             ty: ty.to_string(),
             unit: unit.map(str::to_string),
-            nullable: place.nullable,
+            nullable: place.nullable.clone(),
         });
     }
 }
 
 impl Place {
-    /// The rows of a table: the same cell paths, nothing between them and the top.
+    /// The rows of a table: the same cell paths, nothing between them and the top but what
+    /// may be null on the way to the table.
     fn field_less(&self) -> Self {
         Place {
             path: self.path.clone(),
             in_list: self.in_list,
-            nullable: false,
+            in_union: self.in_union,
+            nullable: self.nullable.clone(),
         }
     }
 }
@@ -436,7 +512,7 @@ mod tests {
         let schema = r#"{"type": "object", "properties": {"ok": {"type": "boolean"}, "name": {"type": "string"}}, "required": ["ok"]}"#;
         let shape = shape(schema).unwrap();
         assert_eq!(shape.ty.0, "record<ok: bool, name: oneof<string, nothing>>");
-        assert_eq!(shape.fills, vec![vec!["name".to_string()]]);
+        assert_eq!(shape.fills, vec![fill(&["name"], &[])]);
         let rows = format!(r#"{{"type": "array", "items": {schema}}}"#);
         assert_eq!(ty(&rows), "table<ok: bool, name: oneof<string, nothing>>");
         let referenced = format!(
@@ -446,6 +522,82 @@ mod tests {
             ty(&referenced),
             "table<ok: bool, name: oneof<string, nothing>>"
         );
+    }
+
+    #[test]
+    fn an_optional_property_no_fill_reaches_is_left_out() {
+        // A list of strings or records, as mise writes a task's dependencies: the records
+        // are no table's rows, so `args` cannot be filled, and a type naming it would be
+        // wrong for every record that lacks it.
+        let schema = r#"{"type": "array", "items": {"anyOf": [{"type": "string"}, {"type": "object",
+            "required": ["task"], "properties": {"task": {"type": "string"},
+            "args": {"type": "array", "items": {"type": "string"}}}}]}}"#;
+        let listed = shape(schema).unwrap();
+        assert_eq!(listed.ty.0, "list<oneof<string, record<task: string>>>");
+        assert!(listed.fills.is_empty(), "{:?}", listed.fills);
+        // A table nested in a record is still filled, column by column.
+        let nested = r#"{"type": "object", "required": ["rows"], "properties": {"rows": {"type":
+            "array", "items": {"type": "object", "required": ["id"], "properties": {"id": {"type":
+            "integer"}, "note": {"type": "string"}}}}}}"#;
+        let tabled = shape(nested).unwrap();
+        assert_eq!(
+            tabled.ty.0,
+            "record<rows: table<id: int, note: oneof<string, nothing>>>"
+        );
+        assert_eq!(tabled.fills, vec![fill(&["rows", "note"], &[])]);
+    }
+
+    #[test]
+    fn a_union_of_shapes_is_filled_for_none_of_them() {
+        // A map of lists or a list, as `mise ls --json` writes with and without a tool: a
+        // fill for the rows' optional column would add it to the map as a key.
+        let schema = r##"{"$defs": {"version": {"type": "object", "required": ["version"],
+            "properties": {"version": {"type": "string"}, "source": {"type": "string"}}}},
+            "oneOf": [{"type": "object", "additionalProperties": {"type": "array", "items":
+            {"$ref": "#/$defs/version"}}}, {"type": "array", "items": {"$ref": "#/$defs/version"}}]}"##;
+        let shape = shape(schema).unwrap();
+        assert_eq!(shape.ty.0, "oneof<record, table<version: string>>");
+        assert!(shape.fills.is_empty(), "{:?}", shape.fills);
+        // A conversion in there would run on the wrong shape too.
+        let converted = r#"{"oneOf": [{"type": "string"}, {"type": "object", "required": ["at"],
+            "properties": {"at": {"type": "string", "format": "date-time"}}}]}"#;
+        assert!(super::shape(converted).is_err());
+        // A shape or null is not such a union: the one shape is still filled, where it is
+        // not the null.
+        let nullable = r#"{"oneOf": [{"type": "null"}, {"type": "object", "required": ["id"],
+            "properties": {"id": {"type": "integer"}, "note": {"type": "string"}}}]}"#;
+        let shape = super::shape(nullable).unwrap();
+        assert_eq!(
+            shape.ty.0,
+            "oneof<nothing, record<id: int, note: oneof<string, nothing>>>"
+        );
+        assert_eq!(shape.fills, vec![fill(&["note"], &[0])]);
+    }
+
+    #[test]
+    fn a_fill_knows_what_may_be_null_on_the_way() {
+        // `peer` may be left out or null, and `port` left out of it: the fill of `port`
+        // is for the records that have a `peer`.
+        let schema = r#"{"type": "object", "properties": {"peer": {"oneOf": [{"type": "null"},
+            {"type": "object", "required": ["host"], "properties": {"host": {"type": "string"},
+            "port": {"type": "integer"}}}]}}}"#;
+        let shape = shape(schema).unwrap();
+        assert_eq!(
+            shape.ty.0,
+            "record<peer: oneof<nothing, record<host: string, port: oneof<int, nothing>>>>"
+        );
+        // The record's own field first: `peer` is there when `port` is filled under it.
+        assert_eq!(
+            shape.fills,
+            vec![fill(&["peer"], &[]), fill(&["peer", "port"], &[1])]
+        );
+    }
+
+    fn fill(path: &[&str], nullable: &[usize]) -> Fill {
+        Fill {
+            path: path.iter().map(|part| part.to_string()).collect(),
+            nullable: nullable.to_vec(),
+        }
     }
 
     #[test]
@@ -461,19 +613,31 @@ mod tests {
             shape.ty.0,
             "record<took: duration, at: datetime, size: filesize, data: binary, seen: oneof<datetime, nothing>>"
         );
-        let conversions: Vec<(String, String, Option<String>, bool)> = shape
+        let conversions: Vec<(String, String, Option<String>, Vec<usize>)> = shape
             .conversions
             .iter()
-            .map(|c| (c.path.join("."), c.ty.clone(), c.unit.clone(), c.nullable))
+            .map(|c| {
+                (
+                    c.path.join("."),
+                    c.ty.clone(),
+                    c.unit.clone(),
+                    c.nullable.clone(),
+                )
+            })
             .collect();
         assert_eq!(
             conversions,
             vec![
-                ("took".into(), "duration".into(), Some("ms".into()), false),
-                ("at".into(), "datetime".into(), None, false),
-                ("size".into(), "filesize".into(), Some("kB".into()), false),
-                ("data".into(), "base64".into(), None, false),
-                ("seen".into(), "datetime".into(), Some("sec".into()), true),
+                ("took".into(), "duration".into(), Some("ms".into()), vec![]),
+                ("at".into(), "datetime".into(), None, vec![]),
+                ("size".into(), "filesize".into(), Some("kB".into()), vec![]),
+                ("data".into(), "base64".into(), None, vec![]),
+                (
+                    "seen".into(),
+                    "datetime".into(),
+                    Some("sec".into()),
+                    vec![1]
+                ),
             ]
         );
     }

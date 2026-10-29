@@ -1,0 +1,265 @@
+{
+    format: 1
+    tool: mise
+    baseline: {
+        version: "2026.10.21"
+        repository: "https://github.com/jdx/mise"
+        revision: "61eb04dbc806cb646821e342b7abbbdaf1581e84"
+    }
+    outputs: [
+        {id: version, command: [version], name: json, select: --json, framing: json, schema: version.schema.json, source: ["src/cli/version.rs:164"]}
+        {id: env, command: [env], name: json, select: --json, framing: json, schema: env.schema.json, source: ["src/cli/env.rs:156"]}
+        {id: config-ls, command: [config ls], name: json, select: --json, framing: json, schema: config-ls.schema.json, source: ["src/cli/config/ls.rs:123"]}
+        {
+            id: ls
+            command: [ls]
+            name: json
+            select: --json
+            framing: json
+            schema: ls.schema.json
+            source: ["src/cli/ls.rs:229" "src/cli/ls.rs:550" "src/toolset/tool_source.rs:49"]
+        }
+        {
+            id: "bin-paths"
+            command: [bin-paths]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "bin-paths.schema.json"
+            source: ["src/cli/bin_paths.rs:53","src/cli/bin_paths.rs:72"]
+        }
+        {
+            id: "env-extended"
+            command: [env]
+            name: "json-extended"
+            select: "--json-extended"
+            framing: "json"
+            schema: "env-extended.schema.json"
+            source: ["src/cli/env.rs:174"]
+            attach: false
+        }
+        {
+            id: "config"
+            command: [config]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "config-ls.schema.json"
+            source: ["src/cli/config/mod.rs","src/cli/config/ls.rs:123"]
+        }
+        {
+            id: "config-explain"
+            command: [config,explain]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "config-explain.schema.json"
+            source: ["src/cli/config/explain.rs:78","src/cli/config/explain.rs:135"]
+        }
+        {
+            id: "tasks-ls"
+            command: [tasks,ls]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "tasks-ls.schema.json"
+            source: ["src/cli/tasks/ls.rs:316","crates/mise-config/src/task.rs:96","crates/mise-config/src/task.rs:170","crates/mise-config/src/task.rs:409","crates/mise-config/src/task.rs:562","crates/mise-config/src/task/dep.rs:168","crates/mise-config/src/task/outputs.rs:114"]
+        }
+        {
+            id: "tasks"
+            command: [tasks]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "tasks-ls.schema.json"
+            source: ["src/cli/tasks/mod.rs","src/cli/tasks/ls.rs:316","crates/mise-config/src/task.rs:96","crates/mise-config/src/task.rs:170","crates/mise-config/src/task.rs:409","crates/mise-config/src/task.rs:562","crates/mise-config/src/task/dep.rs:168","crates/mise-config/src/task/outputs.rs:114"]
+        }
+        {
+            id: "tasks-validate"
+            command: [tasks,validate]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "tasks-validate.schema.json"
+            source: ["src/cli/tasks/validate.rs:64","src/cli/tasks/validate.rs:177"]
+        }
+        {
+            id: "doctor-project"
+            command: [doctor,project]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "doctor-project.schema.json"
+            source: ["src/cli/doctor/project.rs:40"]
+        }
+        {
+            id: "registry"
+            command: [registry]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "registry.schema.json"
+            source: ["src/cli/registry.rs:69","src/cli/registry.rs:94","src/cli/registry.rs:181","src/backend/mod.rs:568"]
+        }
+        {
+            id: "outdated"
+            command: [outdated]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "outdated.schema.json"
+            source: ["src/cli/outdated.rs:199","src/toolset/outdated_info.rs:16","src/toolset/tool_source.rs:49"]
+        }
+        {
+            id: "ls-remote"
+            command: [ls-remote]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "ls-remote.schema.json"
+            source: ["src/backend/mod.rs:501","src/cli/ls_remote.rs:15","src/cli/ls_remote.rs:185","src/cli/ls_remote.rs:218"]
+        }
+        {
+            id: "installs-ls"
+            command: [installs,ls]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "installs-ls.schema.json"
+            source: ["src/cli/installs/ls.rs:53","src/install_layout/resolver.rs:1663"]
+        }
+        {
+            id: "skills-ls"
+            command: [skills,ls]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "skills-ls.schema.json"
+            source: ["src/cli/skills/ls.rs:51","src/packslip.rs:783"]
+        }
+        {
+            id: "tool"
+            command: [tool]
+            name: "json"
+            select: "--json"
+            framing: "json"
+            schema: "tool.schema.json"
+            source: ["src/cli/tool.rs:149","src/cli/tool.rs:328","src/backend/mod.rs:568","src/toolset/tool_version_options.rs:218","crates/mise-config/src/tools.rs:246","crates/mise-config/src/env_value.rs:4","src/toolset/tool_source.rs:49"]
+            attach: false
+        }
+        {
+            id: "tool-backend"
+            command: [tool]
+            name: "json-backend"
+            select: "--json"
+            framing: "json"
+            schema: "tool-string.schema.json"
+            source: ["src/cli/tool.rs:149","src/cli/tool.rs:328","src/backend/mod.rs:568","src/toolset/tool_version_options.rs:218","crates/mise-config/src/tools.rs:246","crates/mise-config/src/env_value.rs:4","src/toolset/tool_source.rs:49"]
+            attach: false
+        }
+        {
+            id: "tool-description"
+            command: [tool]
+            name: "json-description"
+            select: "--json"
+            framing: "json"
+            schema: "tool-string.schema.json"
+            source: ["src/cli/tool.rs:149","src/cli/tool.rs:328","src/backend/mod.rs:568","src/toolset/tool_version_options.rs:218","crates/mise-config/src/tools.rs:246","crates/mise-config/src/env_value.rs:4","src/toolset/tool_source.rs:49"]
+            attach: false
+        }
+        {
+            id: "tool-url"
+            command: [tool]
+            name: "json-url"
+            select: "--json"
+            framing: "json"
+            schema: "tool-string.schema.json"
+            source: ["src/cli/tool.rs:149","src/cli/tool.rs:328","src/backend/mod.rs:568","src/toolset/tool_version_options.rs:218","crates/mise-config/src/tools.rs:246","crates/mise-config/src/env_value.rs:4","src/toolset/tool_source.rs:49"]
+            attach: false
+        }
+        {
+            id: "tool-installed"
+            command: [tool]
+            name: "json-installed"
+            select: "--json"
+            framing: "json"
+            schema: "tool-versions.schema.json"
+            source: ["src/cli/tool.rs:149","src/cli/tool.rs:328","src/backend/mod.rs:568","src/toolset/tool_version_options.rs:218","crates/mise-config/src/tools.rs:246","crates/mise-config/src/env_value.rs:4","src/toolset/tool_source.rs:49"]
+            attach: false
+        }
+        {
+            id: "tool-active"
+            command: [tool]
+            name: "json-active"
+            select: "--json"
+            framing: "json"
+            schema: "tool-versions.schema.json"
+            source: ["src/cli/tool.rs:149","src/cli/tool.rs:328","src/backend/mod.rs:568","src/toolset/tool_version_options.rs:218","crates/mise-config/src/tools.rs:246","crates/mise-config/src/env_value.rs:4","src/toolset/tool_source.rs:49"]
+            attach: false
+        }
+        {
+            id: "tool-requested"
+            command: [tool]
+            name: "json-requested"
+            select: "--json"
+            framing: "json"
+            schema: "tool-versions.schema.json"
+            source: ["src/cli/tool.rs:149","src/cli/tool.rs:328","src/backend/mod.rs:568","src/toolset/tool_version_options.rs:218","crates/mise-config/src/tools.rs:246","crates/mise-config/src/env_value.rs:4","src/toolset/tool_source.rs:49"]
+            attach: false
+        }
+        {
+            id: "tool-config-source"
+            command: [tool]
+            name: "json-config-source"
+            select: "--json"
+            framing: "json"
+            schema: "tool-source.schema.json"
+            source: ["src/cli/tool.rs:149","src/cli/tool.rs:328","src/backend/mod.rs:568","src/toolset/tool_version_options.rs:218","crates/mise-config/src/tools.rs:246","crates/mise-config/src/env_value.rs:4","src/toolset/tool_source.rs:49"]
+            attach: false
+        }
+        {
+            id: "tool-tool-options"
+            command: [tool]
+            name: "json-tool-options"
+            select: "--json"
+            framing: "json"
+            schema: "tool-options.schema.json"
+            source: ["src/cli/tool.rs:149","src/cli/tool.rs:328","src/backend/mod.rs:568","src/toolset/tool_version_options.rs:218","crates/mise-config/src/tools.rs:246","crates/mise-config/src/env_value.rs:4","src/toolset/tool_source.rs:49"]
+            attach: false
+        }
+    ]
+    cases: [
+        {id: version, output: version, argv: [version --json], exit_codes: [0], expect: {properties: {version: {pattern: '^[0-9]{4}[.][0-9]+[.][0-9]+'}}}}
+        {id: env-populated, output: env, argv: [env --json], exit_codes: [0], expect: {required: [NUSAGE_SCHEMA_FIXTURE], properties: {NUSAGE_SCHEMA_FIXTURE: {const: "present"}}}}
+        {id: config-populated, output: config-ls, argv: [config ls --json], exit_codes: [0], expect: {minItems: 1, contains: {properties: {tools: {contains: {const: "node"}}}, required: [tools]}}}
+        {id: ls-map, output: ls, argv: [ls --json --offline], exit_codes: [0], expect: {type: object, minProperties: 1, additionalProperties: {minItems: 2}}}
+        {id: ls-filtered, output: ls, argv: [ls node --json --offline], exit_codes: [0], expect: {type: array, minItems: 2, allOf: [{contains: {required: [source requested_version], properties: {installed: {const: false}}}} {contains: {properties: {installed: {const: true}}}}]}}
+        {id:bin-paths-populated,output:bin-paths,argv:[bin-paths,node,--json],exit_codes:[0],expect:{minItems:1,contains:{required:[name],properties:{name:{const:node},symlink:{const:false}}}}}
+        {id:env-extended-source,output:env-extended,argv:[env,--json-extended],exit_codes:[0],expect:{required:[NUSAGE_SCHEMA_FIXTURE],properties:{NUSAGE_SCHEMA_FIXTURE:{required:[source],properties:{value:{const:present},source:{pattern:"mise[.]toml$"}}}}}}
+        {id:config-shortcut,output:config,argv:[config,--json],exit_codes:[0],expect:{minItems:1}}
+        {id:config-explain-populated,output:config-explain,argv:[config,explain,--json],exit_codes:[0],expect:{minItems:1,contains:{properties:{key:{const:"tools.node"},known:{const:true}}}}}
+        {id:tasks-populated,output:tasks-ls,argv:[tasks,ls,--json],exit_codes:[0],expect:{minItems:4,contains:{properties:{name:{const:fixture},aliases:{contains:{const:f}},outputs:{const:{auto:true}},silent:{const:stderr},run:{minItems:2},depends:{minItems:2}}}}}
+        {id:tasks-shortcut,output:tasks,argv:[tasks,--json],exit_codes:[0],expect:{minItems:4,contains:{properties:{name:{const:fixture},aliases:{contains:{const:f}},outputs:{const:{auto:true}},silent:{const:stderr},run:{minItems:2},depends:{minItems:2}}}}}
+        {id:tasks-file,output:tasks-ls,argv:[tasks,ls,--hidden,--json],exit_codes:[0],expect:{contains:{properties:{name:{const:script},file:{type:string},hide:{const:true}},required:[name,file,hide]}}}
+        {id:tasks-valid,output:tasks-validate,argv:[tasks,validate,prepare,--json],exit_codes:[0],expect:{properties:{tasks_validated:{const:1},errors:{const:0}}}}
+        {id:tasks-invalid,output:tasks-validate,argv:[tasks,validate,invalid,--json,--cd,invalid-tasks],exit_codes:[1],expect:{properties:{errors:{minimum:1},issues:{minItems:1,contains:{properties:{severity:{const:error}},required:[details]}}}}}
+        {id:doctor-pass,output:doctor-project,argv:[doctor,project,--json],exit_codes:[0],expect:{properties:{errors:{maxItems:0},checks:{minItems:1,contains:{properties:{name:{const:fixture},status:{const:pass},message:{const:null}}}}}}}
+        {id:doctor-fail,output:doctor-project,argv:[doctor,project,--json,--cd,failing-doctor],exit_codes:[1],expect:{properties:{checks:{minItems:2,allOf:[[contains];[{properties:{status:{const:fail},hint:{type:string}}}],[{properties:{status:{const:blocked},message:{type:string}}}]]}}}}
+        {id:registry-one,output:registry,argv:[registry,node,--json],exit_codes:[0],expect:{type:object,required:[description],properties:{short:{const:node},backends:{minItems:1}}}}
+        {id:registry-list,output:registry,argv:[registry,--json,--backend,core],exit_codes:[0],expect:{type:array,minItems:1,contains:{properties:{short:{const:node}}}}}
+        {id:registry-security,output:registry,argv:[registry,node,--json,--security],exit_codes:[0],expect:{type:object,required:[security],properties:{security:{minItems:1}}}}
+        {id:remote-versions,output:ls-remote,argv:[ls-remote,schema-fixture,--json],exit_codes:[0],expect:{minItems:3,contains:{properties:{version:{const:"3.0.0"}}}}}
+        {id:outdated-populated,output:outdated,argv:[outdated,schema-fixture,--json,--bump],exit_codes:[0],expect:{minProperties:1,additionalProperties:{required:[source],properties:{latest:{const:"3.0.0"}}}}}
+        {id:installs-empty,output:installs-ls,argv:[installs,ls,--json,--cd,identity],exit_codes:[0],expect:{maxItems:0}}
+        {id:skills-empty,output:skills-ls,argv:[skills,ls,--json],exit_codes:[0],expect:{maxItems:0}}
+        {id:tool-record,output:tool,argv:[tool,node,--json],exit_codes:[0],expect:{properties:{backend:{const:"core:node"},installed_versions:{contains:{const:"22.0.0"}},requested_versions:{minItems:2},config_source:{required:[path]}}}}
+        {id:tool-backend,output:tool-backend,argv:[tool,node,--json,--backend],exit_codes:[0],expect:{const:"core:node"}}
+        {id:tool-description,output:tool-description,argv:[tool,node,--json,--description],exit_codes:[0],expect:{const:null}}
+        {id:tool-url,output:tool-url,argv:[tool,node,--json,--url],exit_codes:[0],expect:{const:null}}
+        {id:tool-installed,output:tool-installed,argv:[tool,node,--json,--installed],exit_codes:[0],expect:{type:array,contains:{const:"22.0.0"}}}
+        {id:tool-active,output:tool-active,argv:[tool,node,--json,--active],exit_codes:[0],expect:{type:array,minItems:2}}
+        {id:tool-requested,output:tool-requested,argv:[tool,node,--json,--requested],exit_codes:[0],expect:{type:array,minItems:2}}
+        {id:tool-source,output:tool-config-source,argv:[tool,node,--json,--config-source],exit_codes:[0],expect:{type:object,required:[path],properties:{type:{const:"mise.toml"}}}}
+        {id:tool-options,output:tool-tool-options,argv:[tool,node,--json,--tool-options],exit_codes:[0],expect:{properties:{install_env:{type:object}}}}
+    ]
+}

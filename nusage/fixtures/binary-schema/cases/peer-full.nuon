@@ -1,0 +1,8 @@
+# Everything given: `since` is converted under the nullable record, `latency` under both.
+{
+    cmd: [peer],
+    invoke: "probe peer",
+    argv: [peer],
+    stdout: "{\"host\": \"h\", \"port\": 22, \"since\": \"2024-01-01T00:00:00Z\", \"link\": {\"up\": true, \"latency\": 15}}",
+    output: {host: h, port: 22, since: 2024-01-01T00:00:00+00:00, link: {up: true, latency: 15ms}},
+}
