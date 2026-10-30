@@ -10,6 +10,8 @@ use nusage_nu::{
     CommandName, Def, Expr, Ident, Infix, Item, Module, Params, Stmt, SyntaxError, Type, Value,
 };
 
+use nusage_spec::Texts;
+
 use crate::binary::HELPERS;
 use crate::calls::{self, CALL_HELPER, Runner, shadow_def};
 use crate::common::{Target, attr_usage_alias, doc_of, nu_params, relative, usage_attrs};
@@ -69,7 +71,7 @@ fn def(command: &Command, base: &Path) -> Result<Def, SyntaxError> {
     };
     let source = std::fs::read_to_string(body_path)
         .map_err(|err| SyntaxError(format!("cannot read {}: {err}", body_path.display())))?;
-    let mut body = calls::scan(body_path, &source)
+    let mut body = calls::scan(body_path, &source, &Texts::new())
         .shadows
         .iter()
         .map(|shadow| {

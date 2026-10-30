@@ -19,6 +19,10 @@ Early development.
 - `intent/`: the direction, as claims that are checked where they can be; nothing there is
   settled.
 
+An editor that runs `nusage lsp` where it would run `nu --lsp` checks a script nusage runs as
+nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to
+that script's header.
+
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nusage built here. `mise run //catalog:install` has every new
 interactive Nushell session load the catalog's modules. `mise dot apply` links the global

@@ -5,46 +5,85 @@
 //! less the helpers they call. Replacing a line with a line keeps every other line where it
 //! was.
 
-use std::path::Path;
+use std::ops::Range;
+use std::path::{Path, PathBuf};
 
 use nusage_model::{Command, Param, ParamKind};
 use nusage_nu::{Item, Module, SyntaxError};
-use nusage_spec::Diagnostic;
+use nusage_spec::{Diagnostic, Texts};
 
 use crate::binary::HELPERS;
 use crate::calls::{self, CALL_HELPER, Calls, Runner};
 
-/// The line that stands in for the script's first, and what the script's calls of scripts
-/// got wrong. The script must be one nusage runs: its shebang names it.
-pub fn line(script: &Path) -> Result<(String, Calls), Diagnostic> {
-    let source = read(script)?;
-    if !calls::is_nusage_script(script) {
+/// The line that stands in for a script's first, and what a checker reports with it.
+#[derive(Debug, Clone)]
+pub struct Analysis {
+    pub line: String,
+    /// Where on the line each shadow is defined, by byte range, and the script it runs.
+    pub shadows: Vec<(Range<usize>, PathBuf)>,
+    /// What the script's calls of scripts get wrong.
+    pub calls: Calls,
+    /// Why the header cannot be read, when it cannot: the line then binds `$usage` with no
+    /// type, so the script still checks.
+    pub header: Option<Diagnostic>,
+}
+
+/// The analysis of the script at `script` as `source` has it, with the other scripts it
+/// reads as `texts` has them: an editor's, saved or not. The script must be one nusage runs:
+/// its shebang names it.
+pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, Diagnostic> {
+    if !calls::names_nusage(source) {
         return Err(Diagnostic::new(
             script,
             "not a script nusage runs: its first line is no shebang naming nusage",
         )
         .at_line(1));
     }
-    let command = command_of(script)?;
-    let calls = calls::scan(script, &source);
-    let mut parts = vec![format!(
-        "let usage: {} = ($env.NUSAGE_USAGE? | default \"{{}}\" | from nuon)",
-        usage_type(&command)
-    )];
+    let mut texts = texts.clone();
+    texts.insert(script.to_path_buf(), source.to_string());
+    let value = "($env.NUSAGE_USAGE? | default \"{}\" | from nuon)";
+    let (mut line, header) = match command_of(script, &texts) {
+        Ok(command) => (
+            format!("let usage: {} = {value}", usage_type(&command)),
+            None,
+        ),
+        Err(err) => (format!("let usage = {value}"), Some(err)),
+    };
+    let calls = calls::scan(script, source, &texts);
+    let mut shadows = Vec::new();
     // Made for each check, never kept, so it can name the script where it is.
     for shadow in &calls.shadows {
         let def = calls::shadow_def(shadow, Runner::Absolute(Path::new("nusage")))
             .map_err(|err| syntax(script, err))?;
-        parts.push(nusage_nu::print_line(&def));
+        line.push_str("; ");
+        let start = line.len();
+        line.push_str(&nusage_nu::print_line(&def));
+        shadows.push((start..line.len(), shadow.target.clone()));
     }
-    Ok((parts.join("; "), calls))
+    Ok(Analysis {
+        line,
+        shadows,
+        calls,
+        header,
+    })
+}
+
+/// The line that stands in for the script's first as it is on disk, and what its calls of
+/// scripts get wrong; a header that cannot be read is the error.
+pub fn line(script: &Path) -> Result<(String, Calls), Diagnostic> {
+    let source = read(script)?;
+    let analysis = analyze(script, &source, &Texts::new())?;
+    match analysis.header {
+        Some(err) => Err(err),
+        None => Ok((analysis.line, analysis.calls)),
+    }
 }
 
 /// The Nushell the interpreter runs before the script: the helpers and the shadows, which
 /// run the scripts they stand for with this `nusage`. Empty when the script calls none.
 pub fn runtime(script: &Path, nusage: &Path) -> Result<String, Diagnostic> {
     let source = read(script)?;
-    let calls = calls::scan(script, &source);
+    let calls = calls::scan(script, &source, &Texts::new());
     if calls.shadows.is_empty() {
         return Ok(String::new());
     }
@@ -73,9 +112,9 @@ fn syntax(script: &Path, err: SyntaxError) -> Diagnostic {
 }
 
 /// The command the script is in its tree.
-fn command_of(script: &Path) -> Result<Command, Diagnostic> {
+fn command_of(script: &Path, texts: &Texts) -> Result<Command, Diagnostic> {
     let (root, path) = calls::place_in_tree(script)?;
-    let assembled = nusage_spec::assemble(&root)?;
+    let assembled = nusage_spec::assemble_in(&root, texts)?;
     nusage_model::model(&assembled)?
         .commands
         .into_iter()

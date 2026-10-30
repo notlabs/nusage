@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -185,9 +186,18 @@ pub(crate) fn header_node(
     }
 }
 
+/// Text to read in place of what a file holds on disk, by the file's path: what an editor
+/// has open and not yet saved.
+pub type Texts = BTreeMap<PathBuf, String>;
+
 /// Read a root script's header: a usage spec, as its `#USAGE` lines spell it.
 pub fn read_header(path: &Path) -> Result<ScriptHeader, Diagnostic> {
-    read(path, None)
+    read(path, None, &Texts::new())
+}
+
+/// [`read_header`], from the text `texts` holds for the path when it holds one.
+pub fn read_header_in(path: &Path, texts: &Texts) -> Result<ScriptHeader, Diagnostic> {
+    read(path, None, texts)
 }
 
 /// Read a subcommand script's header: what a `cmd "<name>" { }` holds, as its `#USAGE`
@@ -195,12 +205,23 @@ pub fn read_header(path: &Path) -> Result<ScriptHeader, Diagnostic> {
 /// `long_help`, so a subcommand declares what usage lets a command declare, an `alias` or
 /// `hide` included.
 pub fn read_subcommand_header(path: &Path, name: &str) -> Result<ScriptHeader, Diagnostic> {
-    read(path, Some(name))
+    read(path, Some(name), &Texts::new())
 }
 
-fn read(path: &Path, subcommand: Option<&str>) -> Result<ScriptHeader, Diagnostic> {
-    let source = fs::read_to_string(path)
-        .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?;
+pub(crate) fn read_subcommand_header_in(
+    path: &Path,
+    name: &str,
+    texts: &Texts,
+) -> Result<ScriptHeader, Diagnostic> {
+    read(path, Some(name), texts)
+}
+
+fn read(path: &Path, subcommand: Option<&str>, texts: &Texts) -> Result<ScriptHeader, Diagnostic> {
+    let source = match texts.get(path) {
+        Some(text) => text.clone(),
+        None => fs::read_to_string(path)
+            .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?,
+    };
     let lines = extract(path, &source)?;
     // Byte offset of each joined line's start, to map node spans back to script lines.
     let mut offsets = Vec::with_capacity(lines.len());

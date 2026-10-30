@@ -28,6 +28,7 @@ enum Commands {
     Spec(Spec),
     Check(Check),
     Overlay(Overlay),
+    Lsp(Lsp),
     Parse(Parse),
     Prelude(Prelude),
     Validate(Validate),
@@ -270,6 +271,29 @@ impl Run for Prelude {
             eprintln!("{finding}");
         }
         Ok(())
+    }
+}
+
+/// Serve Nushell's language server for the scripts nusage runs
+///
+/// For an editor, in place of `nu --lsp`, which it starts and stands in front of. A script
+/// whose shebang names nusage reaches Nushell with its first line replaced by the line `nusage
+/// prelude` writes, so Nushell knows `$usage` and holds each call of another script to that
+/// script's header; what the header and the calls get wrong joins Nushell's diagnostics, and
+/// a definition of a called script leads to it. Every other line is the editor's, and any
+/// other document passes as it is. Arguments after `--` go to `nu --lsp`.
+#[derive(Args)]
+struct Lsp {
+    /// Arguments for `nu --lsp`, such as `--config <file>`
+    args: Vec<String>,
+}
+
+impl Run for Lsp {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        let code = nusage::lsp(&self.args).map_err(|err| err.to_string())?;
+        std::process::exit(code)
     }
 }
 
