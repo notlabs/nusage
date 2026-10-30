@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "The checks of a pull request, as `gh pr checks --json` selects their fields, one array",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "name",
+      "state",
+      "startedAt",
+      "completedAt",
+      "link",
+      "bucket",
+      "event",
+      "workflow",
+      "description"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "name": {"type": "string"},
+      "state": {"type": "string"},
+      "startedAt": {"type": "string", "format": "date-time"},
+      "completedAt": {"type": "string", "format": "date-time"},
+      "link": {"type": "string"},
+      "bucket": {"enum": ["pass", "fail", "pending", "skipping", "cancel"]},
+      "event": {"type": "string"},
+      "workflow": {"type": "string"},
+      "description": {"type": "string"}
+    }
+  }
+}

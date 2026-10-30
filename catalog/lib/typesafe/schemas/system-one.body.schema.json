@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "SystemOneRequest": {
+      "type": "object",
+      "title": "SystemOneRequest",
+      "required": [
+        "model",
+        "state",
+        "questions"
+      ],
+      "properties": {
+        "model": {
+          "type": "string",
+          "description": "Name or alias of the model to use. Available names are returned by GET /v1/models.",
+          "title": "Model"
+        },
+        "state": {
+          "$ref": "#/$defs/Content",
+          "description": "The content all questions in this request refer to.",
+          "title": "State"
+        },
+        "questions": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Question"
+          },
+          "minProperties": 1,
+          "description": "Questions to ask about the content, each with a name you choose. The response uses those names to identify the answers.",
+          "title": "Questions"
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Asset"
+          },
+          "minProperties": 1,
+          "description": "Media assets keyed by an opaque placeholder (recommend a per-image UUID). Each placeholder, wherever it appears as or inside a string in state, question instructions, or criteria, is replaced with the asset. Image assets require a vision-language model.",
+          "title": "Assets"
+        }
+      }
+    },
+    "Asset": {
+      "type": "object",
+      "title": "Asset",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "image",
+          "description": "Identifies an image asset.",
+          "title": "Type"
+        },
+        "format": {
+          "$ref": "#/$defs/Format",
+          "description": "The image format, required with data_base64. The actual format is detected from the bytes.",
+          "title": "Format"
+        },
+        "data_base64": {
+          "type": "string",
+          "description": "Base64-encoded image data.",
+          "title": "Data Base64"
+        },
+        "part": {
+          "type": "string",
+          "description": "In a multipart request, the name of the image part this asset uses. With part, data_base64 is ignored.",
+          "title": "Part"
+        }
+      }
+    },
+    "Format": {
+      "type": "string",
+      "enum": [
+        "png",
+        "jpg",
+        "jpeg"
+      ]
+    },
+    "Question": {
+      "description": "A question about the supplied content.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/NoulQuestion"
+        },
+        {
+          "$ref": "#/$defs/ChoiceQuestion"
+        },
+        {
+          "$ref": "#/$defs/ScoreQuestion"
+        },
+        {
+          "$ref": "#/$defs/BoxQuestion"
+        }
+      ],
+      "discriminator": {
+        "propertyName": "type"
+      }
+    },
+    "BoxQuestion": {
+      "type": "object",
+      "title": "BoxQuestion",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "box",
+          "description": "Identifies a box question.",
+          "title": "Type"
+        },
+        "instructions": {
+          "$ref": "#/$defs/OptionalContent",
+          "description": "What to locate in the image.",
+          "title": "Instructions"
+        }
+      }
+    },
+    "OptionalContent": {
+      "description": "Content, or null to leave it undescribed.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object"
+        },
+        {
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ScoreQuestion": {
+      "type": "object",
+      "title": "ScoreQuestion",
+      "required": [
+        "type",
+        "criteria"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "score",
+          "description": "Identifies a question that rates the content using the levels in criteria.",
+          "title": "Type"
+        },
+        "instructions": {
+          "$ref": "#/$defs/OptionalContent",
+          "description": "What the model should rate.",
+          "title": "Instructions"
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Content"
+          },
+          "minItems": 1,
+          "description": "Ordered descriptions of the score levels. Each description's position determines its score, starting at zero.",
+          "title": "Criteria"
+        }
+      }
+    },
+    "Content": {
+      "description": "Text, a JSON object or a JSON array; a string may hold an asset's reference.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object"
+        },
+        {
+          "type": "array"
+        }
+      ]
+    },
+    "ChoiceQuestion": {
+      "type": "object",
+      "title": "ChoiceQuestion",
+      "required": [
+        "type",
+        "criteria"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "choice",
+          "description": "Identifies a question that selects one of the choices in criteria.",
+          "title": "Type"
+        },
+        "instructions": {
+          "$ref": "#/$defs/OptionalContent",
+          "description": "What the model should decide when choosing an option.",
+          "title": "Instructions"
+        },
+        "criteria": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/OptionalContent"
+          },
+          "description": "Choice names and descriptions of when each applies. A choice without a description is interpreted by its name alone.",
+          "title": "Criteria"
+        }
+      }
+    },
+    "NoulQuestion": {
+      "type": "object",
+      "title": "NoulQuestion",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "noul",
+          "description": "Identifies a yes/no question or statement.",
+          "title": "Type"
+        },
+        "instructions": {
+          "$ref": "#/$defs/OptionalContent",
+          "description": "The yes/no question or statement to evaluate.",
+          "title": "Instructions"
+        },
+        "criteria": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NoulCriteria"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Criteria clarifying what counts as a yes or no answer."
+        }
+      }
+    },
+    "NoulCriteria": {
+      "type": "object",
+      "title": "NoulCriteria",
+      "properties": {
+        "true": {
+          "$ref": "#/$defs/OptionalContent",
+          "description": "What counts as a yes answer.",
+          "title": "True"
+        },
+        "false": {
+          "$ref": "#/$defs/OptionalContent",
+          "description": "What counts as a no answer.",
+          "title": "False"
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/SystemOneRequest"
+}

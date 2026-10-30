@@ -341,6 +341,30 @@ fn fill_stage(fill: &Fill) -> Result<Expr, SyntaxError> {
 /// `stages` on the value at `outer` where that may be null, such as jj's `operation` with
 /// `time.start` under it: a null is left as it is, and the stages run on anything else.
 /// On the whole value when `outer` is empty.
+/// `update <table> {|row| $row.<table> | <stages> }`: the stages on the table at the path,
+/// where they run on every row, as they would on the whole value.
+fn each_row(outer: &[String], stages: Vec<Expr>) -> Result<Expr, SyntaxError> {
+    let row = Ident::new("row")?;
+    let body = Expr::Pipeline(
+        std::iter::once(Expr::Cell {
+            var: row.clone(),
+            path: outer.to_vec(),
+        })
+        .chain(stages)
+        .collect(),
+    );
+    call(
+        "update",
+        vec![
+            Expr::Raw(cell_path(outer)),
+            Expr::ClosureWith {
+                param: row,
+                body: Box::new(body),
+            },
+        ],
+    )
+}
+
 fn unless_null(outer: &[String], stages: Vec<Expr>) -> Result<Expr, SyntaxError> {
     let nothing = || Expr::Literal(Value::nothing(Span::unknown()));
     let guarded = move |value: Expr| Expr::If {
@@ -375,16 +399,46 @@ fn unless_null(outer: &[String], stages: Vec<Expr>) -> Result<Expr, SyntaxError>
 }
 
 fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
-    if let Some(&at) = conversion.nullable.first()
-        && at < conversion.path.len()
-    {
-        let (outer, rest) = conversion.path.split_at(at);
-        let inner = Conversion {
-            path: rest.to_vec(),
-            nullable: conversion.nullable[1..].iter().map(|n| n - at).collect(),
-            ..conversion.clone()
-        };
-        return unless_null(outer, vec![conversion_stage(&inner)?]);
+    // Below the first record on the way that may be null, or the first table, the rest of
+    // the path is converted under an `update` of it: on anything but null, or on each row,
+    // where a cell path from above would stop. Of the two the shorter prefix comes first; a
+    // nullable table is asked about null first, then its rows are the whole value.
+    let nullable_at = conversion
+        .nullable
+        .first()
+        .copied()
+        .filter(|&at| at < conversion.path.len());
+    let table_at = conversion
+        .tables
+        .first()
+        .copied()
+        .filter(|&at| 0 < at && at < conversion.path.len());
+    let below = |at: usize| Conversion {
+        path: conversion.path[at..].to_vec(),
+        nullable: conversion
+            .nullable
+            .iter()
+            .filter(|&&n| n > at)
+            .map(|n| n - at)
+            .collect(),
+        tables: conversion
+            .tables
+            .iter()
+            .filter(|&&n| n > at)
+            .map(|n| n - at)
+            .collect(),
+        ..conversion.clone()
+    };
+    match (nullable_at, table_at) {
+        (Some(at), table) if table.is_none_or(|t| at <= t) => {
+            let outer = &conversion.path[..at];
+            return unless_null(outer, vec![conversion_stage(&below(at))?]);
+        }
+        (_, Some(at)) => {
+            let outer = &conversion.path[..at];
+            return each_row(outer, vec![conversion_stage(&below(at))?]);
+        }
+        _ => {}
     }
     let nullable = conversion.nullable.last() == Some(&conversion.path.len());
     let path = cell_path(&conversion.path);

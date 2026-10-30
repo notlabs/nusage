@@ -1,12 +1,12 @@
 [
-  [name,           signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          attributes];
+  [name,           signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             attributes];
   [probe,          {
       nothing: [
         [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description, completion, parameter_default];
         [null,           input,          nothing,      false,       null,       null,        null,       null],
         [null,           output,         string,       false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           [
 
     ]],
   ["probe events", {
@@ -15,7 +15,7 @@
         [null,           input,          nothing,                                                             false,       null,       null,        null,       null],
         [null,           output,         "table<at: datetime, kind: string, detail: oneof<string, nothing>>", false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      [
       [name,  value];
       [usage, "flag \"--json\" help=\"One JSON object per line\""],
       [usage, "output \"text\" default=#true"],
@@ -29,7 +29,7 @@
         [null,           input,          nothing,                                                                                                                                                                       false,       null,       null,        null,       null],
         [null,           output,         "oneof<nothing, record<host: string, port: oneof<int, nothing>, since: oneof<datetime, nothing>, link: oneof<nothing, record<up: bool, latency: oneof<duration, nothing>>>>>", false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                     [
+    },                                                                                                                                                                                                                                                                                        [
       [name,  value];
       [usage, "output \"json\" framing=\"json\" default=#true {
         schema #\"\"\"
@@ -58,9 +58,9 @@
     ]],
   ["probe report", {
       nothing: [
-        [parameter_name, parameter_type, syntax_shape,                                                                                                                                                                                                                              is_optional, short_flag, description, completion, parameter_default];
-        [null,           input,          nothing,                                                                                                                                                                                                                                   false,       null,       null,        null,       null],
-        [null,           output,         "record<name: string, dependencies: table<name: string, version: string, optional: oneof<bool, nothing>>, meta: record<built: datetime, took: oneof<duration, nothing>>, tags: list<string>, icon: binary, score: oneof<float, nothing>>", false,       null,       null,        null,       null]
+        [parameter_name, parameter_type, syntax_shape,                                                                                                                                                                                                                                                               is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          nothing,                                                                                                                                                                                                                                                                    false,       null,       null,        null,       null],
+        [null,           output,         "record<name: string, dependencies: table<name: string, version: string, optional: oneof<bool, nothing>, since: oneof<datetime, nothing>>, meta: record<built: datetime, took: oneof<duration, nothing>>, tags: list<string>, icon: binary, score: oneof<float, nothing>>", false,       null,       null,        null,       null]
       ]
     }, [
       [name,  value];
@@ -74,7 +74,7 @@
         [null,           input,          nothing,                                                                                                                        false,       null,       null,        null,       null],
         [null,           output,         "record<ok: bool, took: duration, at: datetime, size: filesize, note: oneof<string, nothing>, seen: oneof<datetime, nothing>>", false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                  [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                     [
       [name,  value];
       [usage, "flag \"--json\" help=\"As JSON\""],
       [usage, "output \"text\" default=#true"],

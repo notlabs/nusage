@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A repository, as `gh repo view --json` selects its fields",
+  "$ref": "#/$defs/repository",
+  "$defs": {
+    "repository": {
+      "type": "object",
+      "required": [
+        "name",
+        "nameWithOwner",
+        "owner",
+        "description",
+        "url",
+        "isPrivate",
+        "isArchived",
+        "isFork",
+        "defaultBranchRef",
+        "stargazerCount",
+        "forkCount",
+        "createdAt",
+        "updatedAt",
+        "pushedAt"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "nameWithOwner": {"type": "string"},
+        "owner": {
+          "type": "object",
+          "required": ["id", "login"],
+          "additionalProperties": false,
+          "properties": {
+            "id": {"type": "string"},
+            "login": {"type": "string"}
+          }
+        },
+        "description": {"type": "string"},
+        "url": {"type": "string"},
+        "isPrivate": {"type": "boolean"},
+        "isArchived": {"type": "boolean"},
+        "isFork": {"type": "boolean"},
+        "defaultBranchRef": {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {"name": {"type": "string"}}
+        },
+        "stargazerCount": {"type": "integer"},
+        "forkCount": {"type": "integer"},
+        "createdAt": {"type": "string", "format": "date-time"},
+        "updatedAt": {"type": "string", "format": "date-time"},
+        "pushedAt": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]}
+      }
+    }
+  }
+}

@@ -11,9 +11,10 @@
 //! bundled into a file of its own, every `#/components/schemas/...` it reaches in its
 //! `$defs`, read as draft 2020-12 whatever version the document is.
 //!
-//! OpenAPI 3.0 and 3.1 are read, as JSON; a YAML document is converted first. What is not
-//! read: cookie parameters, parameters with a `content` rather than a `schema`, per-operation
-//! security, and callbacks, links and webhooks. A boolean query or header parameter is a
+//! OpenAPI 3.0 and 3.1 are read, from the document as a JSON value, which the `openapi-usage`
+//! binary reads from JSON or YAML. What is not read: cookie parameters, parameters with a
+//! `content` rather than a `schema`, per-operation security, and callbacks, links and
+//! webhooks. A boolean query or header parameter is a
 //! switch, sent as `true` when given, since a Nushell flag takes no boolean value.
 
 #![forbid(unsafe_code)]

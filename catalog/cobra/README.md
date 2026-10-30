@@ -19,38 +19,30 @@ Separate Go modules let tools keep their own dependency versions.
 
 ## GitHub CLI
 
-Inspected at [v2.103.3](https://github.com/cli/cli/tree/v2.103.3). It is promising for a second
-example, but its construction boundary differs from Compose's.
-
-[`root.NewCmdRoot`](https://github.com/cli/cli/blob/v2.103.3/pkg/cmd/root/root.go) takes a
-factory whose configuration and telemetry interfaces come from `internal/` packages.
-The upstream [docs generator](https://github.com/cli/cli/blob/v2.103.3/cmd/gen-docs/main.go)
-uses an empty in-memory configuration, no extensions, and no-op telemetry. That is the
-right starting point, but it builds inside the upstream module. An independent module
-cannot import those internal packages as the docs generator does. A follow-up can either
-add a public upstream construction helper or build a small export entrypoint in an isolated
-copy of the pinned upstream source. Do not use the user's aliases, extensions, authentication
-configuration, or a module path impersonating the upstream package to bypass this boundary.
+The second example is [gh](../lib/gh/README.md), at
+[v2.103.3](https://github.com/cli/cli/tree/v2.103.3), whose construction boundary differs
+from Compose's. [`root.NewCmdRoot`](https://github.com/cli/cli/blob/v2.103.3/pkg/cmd/root/root.go)
+takes a factory whose configuration and telemetry interfaces come from `internal/` packages,
+which only code inside the upstream module may import; the upstream
+[docs generator](https://github.com/cli/cli/blob/v2.103.3/cmd/gen-docs/main.go) builds there,
+with an empty in-memory configuration, no extensions and no-op telemetry. So does the
+extractor, `lib/gh/spec/main.go`: `gh.nu` clones cli/cli at the tag `lib/gh/spec/pin.toml`
+names, under the user's cache directory, copies the file in as `cmd/nusage-spec/main.go`,
+adds the adapter to the checkout's module at the pinned version, and runs it. The user's
+aliases, extensions, hosts and tokens stay out, `GH_*` and `GITHUB_*` cleared in the exporter
+process; nothing impersonates the upstream module path, and the checkout is never pushed.
+The catalog entry is the same `spec.run` hook as Compose's, with the version probe.
 
 Output metadata is unusually useful:
 [`AddJSONFlags`](https://github.com/cli/cli/blob/v2.103.3/pkg/cmdutil/json_flags.go) records
-the available fields in the Cobra annotation `help:json-fields`. A walker can export a
-per-command field inventory and identify `--json <fields>` selectors without scraping help.
-It cannot infer the output types or whether the command emits an object or an array from
-that annotation. Those require following each command's exporter and serialized values.
+the available fields in the Cobra annotation `help:json-fields`, and `gh.nu --json-fields`
+exports them per command into `lib/gh/json-fields.json`. `--json` takes fields, not the name
+of a format, so it is not a `switch` as mise's `--json` is: each typed command's output
+names its field list as `nusage-args`, in `lib/gh/schemas/outputs.nuon`, and its schema
+follows the exporter for those fields, with `--jq` and `--template`, which transform the
+selection, hidden. `gh api` stays outside the typed baseline.
 
-An output generator for gh should therefore:
-
-1. Read the JSON-field annotation from the constructed, isolated command tree.
-2. Select an explicit field set for each baseline command. `--json` takes fields, not the
-   name of a format; it cannot be treated as Compose's `--format json`.
-3. Follow the serializer for those fields to derive a schema, accounting for nulls,
-   omitted fields, custom marshalers and command-specific outer shapes.
-4. Remove `--jq` and `--template` from a wrapper that promises that shape: both transform
-   the selected output. Keep dynamic endpoints such as `gh api` outside that typed baseline.
-
-The current Usage selector model supplies an output name as a value-taking selector's
-argument. A field-list selector needs an explicit representation of the selected fields
-(or a deliberately named output carrying that list); it should not be silently equated
-with a boolean `--json` switch. This and the internal construction boundary are why this
-PR implements Compose first.
+The adapter reads nothing from a Use line's alternation, `[<number> | <url> | <branch>]`,
+reads a group's `<command>` placeholder as a positional, and writes a command's own
+persistent flag twice, so that usage keeps the one without `global`; the extractor
+normalizes the three, as its comments say, until the adapter does.

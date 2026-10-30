@@ -7,7 +7,8 @@
       "properties": {
         "name": {"type": "string"},
         "version": {"type": "string"},
-        "optional": {"type": "boolean"}
+        "optional": {"type": "boolean"},
+        "since": {"type": "string", "format": "date-time"}
       }
     }
   },

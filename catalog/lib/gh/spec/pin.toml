@@ -1,0 +1,12 @@
+# The upstream the extractor is built in, and the adapter it exports through. `../../../cobra/gh.nu`
+# reads it: a checkout of the repository at the tag, held to the commit, since a tag can be
+# moved and a commit cannot, with `main.go` copied in as `cmd/nusage-spec/main.go`, and the
+# adapter added to the checkout's module at this version, the one Compose's extractor links too.
+[gh]
+repository = "https://github.com/cli/cli"
+tag = "v2.103.3"
+commit = "63837fb778d6a39f02be0ce76ff89f2bc8d74bdc"
+
+[adapter]
+module = "github.com/jdx/usage/integrations/cobra"
+version = "v0.0.0-20261026100501-f357a6c096be"

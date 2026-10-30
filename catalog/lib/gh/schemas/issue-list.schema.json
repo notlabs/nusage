@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "The issues `gh issue list --json` selects, one array",
+  "type": "array",
+  "items": {"$ref": "#/$defs/issue"},
+  "$defs": {
+    "author": {
+      "type": "object",
+      "required": ["is_bot", "login"],
+      "additionalProperties": false,
+      "properties": {
+        "is_bot": {"type": "boolean"},
+        "login": {"type": "string"},
+        "id": {"type": "string"},
+        "name": {"type": "string"}
+      }
+    },
+    "label": {
+      "type": "object",
+      "required": ["id", "name", "description", "color"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "color": {"type": "string"}
+      }
+    },
+    "user": {
+      "type": "object",
+      "required": ["id", "login", "name", "databaseId"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "login": {"type": "string"},
+        "name": {"type": "string"},
+        "databaseId": {"type": "integer"}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "required": [
+        "number",
+        "title",
+        "state",
+        "stateReason",
+        "url",
+        "author",
+        "createdAt",
+        "updatedAt",
+        "closedAt",
+        "labels",
+        "assignees",
+        "body"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "number": {"type": "integer"},
+        "title": {"type": "string"},
+        "state": {"enum": ["OPEN", "CLOSED"]},
+        "stateReason": {"type": "string"},
+        "url": {"type": "string"},
+        "author": {"$ref": "#/$defs/author"},
+        "createdAt": {"type": "string", "format": "date-time"},
+        "updatedAt": {"type": "string", "format": "date-time"},
+        "closedAt": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
+        "labels": {"type": "array", "items": {"$ref": "#/$defs/label"}},
+        "assignees": {"type": "array", "items": {"$ref": "#/$defs/user"}},
+        "body": {"type": "string"}
+      }
+    }
+  }
+}

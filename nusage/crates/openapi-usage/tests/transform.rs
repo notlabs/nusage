@@ -36,6 +36,7 @@ fn the_petstore_is_a_spec_usage_parses() {
         files,
         [
             "schemas/create-pets.body.schema.json",
+            "schemas/create-pets.schema.json",
             "schemas/list-pets.schema.json",
             "schemas/show-pet-by-id.schema.json",
         ]

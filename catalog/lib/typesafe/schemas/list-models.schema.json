@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "ModelMetadataList": {
+      "type": "object",
+      "title": "ModelMetadataList",
+      "required": [
+        "models"
+      ],
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelMetadata"
+          },
+          "description": "Available models and aliases. Use a model's name in POST /v1/systemone requests.",
+          "title": "Models"
+        }
+      }
+    },
+    "ModelMetadata": {
+      "type": "object",
+      "title": "ModelMetadata",
+      "required": [
+        "name",
+        "description",
+        "release_date"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Model name or alias accepted by the request's model field.",
+          "title": "Name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the model and its capabilities.",
+          "title": "Description"
+        },
+        "release_date": {
+          "type": "string",
+          "description": "Model release date, formatted as YYYY-MM-DD.",
+          "title": "Release Date"
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/ModelMetadataList"
+}

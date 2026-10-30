@@ -44,6 +44,10 @@ pub struct Conversion {
     /// prefixes of `path` that may be `null`, shortest first: the whole path for the value
     /// itself. A `null` is left as it is, with nothing under it to convert.
     pub nullable: Vec<usize>,
+    /// Where on the way to the value a table stands, below the top, as the lengths of the
+    /// prefixes of `path` that are tables, shortest first: the rest of the path is a column
+    /// of each row, which a cell path from above does not reach.
+    pub tables: Vec<usize>,
 }
 
 /// What a schema says about the value: its type, the optional properties to fill, and the
@@ -208,6 +212,7 @@ struct Place {
     in_list: bool,
     in_union: bool,
     nullable: Vec<usize>,
+    tables: Vec<usize>,
 }
 
 impl Place {
@@ -217,6 +222,7 @@ impl Place {
             in_list: false,
             in_union: false,
             nullable: Vec::new(),
+            tables: Vec::new(),
         }
     }
 
@@ -233,6 +239,7 @@ impl Place {
             in_list: self.in_list,
             in_union: self.in_union,
             nullable: self.nullable.clone(),
+            tables: self.tables.clone(),
         };
         if nullable {
             place.nullable.push(place.path.len());
@@ -251,6 +258,7 @@ impl Place {
             in_list: self.in_list,
             in_union: self.in_union,
             nullable: nulls,
+            tables: self.tables.clone(),
         }
     }
 
@@ -260,6 +268,7 @@ impl Place {
             in_list: true,
             in_union: self.in_union,
             nullable: Vec::new(),
+            tables: Vec::new(),
         }
     }
 
@@ -270,6 +279,7 @@ impl Place {
             in_list: self.in_list,
             in_union: true,
             nullable: self.nullable.clone(),
+            tables: self.tables.clone(),
         }
     }
 
@@ -695,19 +705,25 @@ impl Reader<'_> {
             ty: ty.to_string(),
             unit: unit.map(str::to_string),
             nullable: place.nullable.clone(),
+            tables: place.tables.clone(),
         });
     }
 }
 
 impl Place {
     /// The rows of a table: the same cell paths, nothing between them and the top but what
-    /// may be null on the way to the table.
+    /// may be null on the way to the table, and the table itself where it is below the top.
     fn field_less(&self) -> Self {
+        let mut tables = self.tables.clone();
+        if !self.path.is_empty() && tables.last() != Some(&self.path.len()) {
+            tables.push(self.path.len());
+        }
         Place {
             path: self.path.clone(),
             in_list: self.in_list,
             in_union: self.in_union,
             nullable: self.nullable.clone(),
+            tables,
         }
     }
 }
