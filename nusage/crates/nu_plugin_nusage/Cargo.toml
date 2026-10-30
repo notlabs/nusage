@@ -1,0 +1,29 @@
+[package]
+name = "nu_plugin_nusage"
+description = "nusage's commands inside Nushell: the CLI's interface, served by one process across calls"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Released as a binary beside nusage, not on crates.io.
+publish = false
+
+[[bin]]
+name = "nu_plugin_nusage"
+bench = false
+
+[lib]
+bench = false
+
+[dependencies]
+nusage.workspace = true
+nusage-plugin.workspace = true
+nushell-schema = { workspace = true, features = ["validate"] }
+serde_json.workspace = true
+
+[dev-dependencies]
+nusage-plugin = { workspace = true, features = ["test"] }
+
+[lints]
+workspace = true

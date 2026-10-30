@@ -1,0 +1,26 @@
+[package]
+name = "nusage-plugin"
+description = "What a Nushell plugin of nusage's shares: its commands from a usage spec, values across the boundary, the serving and the testing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Not on crates.io yet; the version is the workspace's.
+publish = false
+
+[features]
+default = []
+# The in-process harness a plugin's tests run against, `nu-plugin-test-support`.
+test = ["dep:nu-plugin-test-support"]
+
+[dependencies]
+nu-plugin.workspace = true
+nu-protocol.workspace = true
+nusage-spec.workspace = true
+nusage-model.workspace = true
+serde_json.workspace = true
+nu-plugin-test-support = { workspace = true, optional = true }
+
+[lints]
+workspace = true
