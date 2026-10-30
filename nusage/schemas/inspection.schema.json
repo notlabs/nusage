@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "nusage inspect",
+  "description": "Resolved command shadows and findings from the script analyzer. This is not a complete call or dependency graph.",
+  "type": "object",
+  "required": [
+    "script",
+    "calls",
+    "findings",
+    "header"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "script": {
+      "type": "string",
+      "description": "Absolute path of the caller."
+    },
+    "calls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "target",
+          "through",
+          "command"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "command": {
+            "type": "object",
+            "description": "The command model serialized by nusage model."
+          },
+          "through": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "nusage"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "mise"
+                  },
+                  "dir": {
+                    "type": "string"
+                  },
+                  "task": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "dir",
+                  "task"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "span",
+          "message"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "span": {
+            "type": "object",
+            "description": "Zero-based, end-exclusive UTF-8 byte offsets in the caller.",
+            "required": [
+              "start",
+              "end"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "header": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "path",
+        "line",
+        "message"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

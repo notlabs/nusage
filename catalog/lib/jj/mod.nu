@@ -2261,32 +2261,32 @@ If not specified, this defaults to the `templates.evolog` setting.
 """#
         arg <TEMPLATE>
     }'
-@usage 'flag "-p --patch" help="Show patch compared to the previous version of this change" {
+@usage 'flag "-p --patch" help="Show patch compared to the previous version of this change" hide=#true {
         long_help #"""
 Show patch compared to the previous version of this change
 
 If the previous version has different parents, it will be temporarily rebased to the parents of the new version, so the diff is not contaminated by unrelated changes.
 """#
     }'
-@usage 'flag "-s --summary" help="For each path, show only whether it was modified, added, or deleted" help_heading="Diff Formatting Options"'
-@usage 'flag --stat help="Show a histogram of the changes" help_heading="Diff Formatting Options"'
-@usage r#'flag --types help="For each path, show only its type before and after" help_heading="Diff Formatting Options" {
+@usage 'flag "-s --summary" help="For each path, show only whether it was modified, added, or deleted" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --stat help="Show a histogram of the changes" help_heading="Diff Formatting Options" hide=#true'
+@usage r#'flag --types help="For each path, show only its type before and after" help_heading="Diff Formatting Options" hide=#true {
         long_help #"""
 For each path, show only its type before and after
 
 The diff is shown as two letters. The first letter indicates the type before and the second letter indicates the type after. '-' indicates that the path was not present, 'F' represents a regular file, `L' represents a symlink, 'C' represents a conflict, and 'G' represents a Git submodule.
 """#
     }'#
-@usage r#'flag --name-only help="For each path, show only its path" help_heading="Diff Formatting Options" {
+@usage r#'flag --name-only help="For each path, show only its path" help_heading="Diff Formatting Options" hide=#true {
         long_help #"""
 For each path, show only its path
 
 Typically useful for shell commands like: `jj diff -r @- --name-only | xargs perl -pi -e's/OLD/NEW/g`
 """#
     }'#
-@usage 'flag --git help="Show a Git-format diff" help_heading="Diff Formatting Options"'
-@usage 'flag --color-words help="Show a word-level diff with changes indicated only by color" help_heading="Diff Formatting Options"'
-@usage 'flag --tool help="Generate diff by external command" help_heading="Diff Formatting Options" {
+@usage 'flag --git help="Show a Git-format diff" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --color-words help="Show a word-level diff with changes indicated only by color" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --tool help="Generate diff by external command" help_heading="Diff Formatting Options" hide=#true {
         long_help #"""
 Generate diff by external command
 
@@ -2294,11 +2294,11 @@ A builtin format can also be specified as `:<name>`. For example, `--tool=:git` 
 """#
         arg <TOOL>
     }'
-@usage 'flag --context help="Number of lines of context to show" help_heading="Diff Formatting Options" {
+@usage 'flag --context help="Number of lines of context to show" help_heading="Diff Formatting Options" hide=#true {
         arg <CONTEXT>
     }'
-@usage 'flag --ignore-all-space help="Ignore whitespace when comparing lines" help_heading="Diff Formatting Options"'
-@usage 'flag --ignore-space-change help="Ignore changes in amount of whitespace when comparing lines" conflicts=--ignore-all-space help_heading="Diff Formatting Options"'
+@usage 'flag --ignore-all-space help="Ignore whitespace when comparing lines" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --ignore-space-change help="Ignore changes in amount of whitespace when comparing lines" conflicts=--ignore-all-space help_heading="Diff Formatting Options" hide=#true'
 @usage 'group short-format "--summary" "--stat" "--types" "--name-only"'
 @usage 'group long-format "--git" "--color-words"'
 @usage 'output "json" framing="jsonl" { schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"An entry of `jj evolog`: the commit, and the operation that wrote it, if recorded\",\n  \"type\": \"object\",\n  \"required\": [\n    \"commit\",\n    \"operation\"\n  ],\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"commit\": {\n      \"$ref\": \"#/$defs/commit\"\n    },\n    \"operation\": {\n      \"anyOf\": [\n        {\n          \"$ref\": \"#/$defs/operation\"\n        },\n        {\n          \"type\": \"null\"\n        }\n      ]\n    }\n  },\n  \"$defs\": {\n    \"commit_id\": {\n      \"type\": \"string\",\n      \"pattern\": \"^[0-9a-f]+$\"\n    },\n    \"signature\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"name\",\n        \"email\",\n        \"timestamp\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"name\": {\n          \"type\": \"string\"\n        },\n        \"email\": {\n          \"type\": \"string\"\n        },\n        \"timestamp\": {\n          \"type\": \"string\",\n          \"format\": \"date-time\"\n        }\n      }\n    },\n    \"commit\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"commit_id\",\n        \"parents\",\n        \"change_id\",\n        \"description\",\n        \"author\",\n        \"committer\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"commit_id\": {\n          \"$ref\": \"#/$defs/commit_id\"\n        },\n        \"parents\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"$ref\": \"#/$defs/commit_id\"\n          }\n        },\n        \"change_id\": {\n          \"type\": \"string\",\n          \"pattern\": \"^[k-z]+$\"\n        },\n        \"description\": {\n          \"type\": \"string\"\n        },\n        \"author\": {\n          \"$ref\": \"#/$defs/signature\"\n        },\n        \"committer\": {\n          \"$ref\": \"#/$defs/signature\"\n        }\n      }\n    },\n    \"operation\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"id\",\n        \"parents\",\n        \"time\",\n        \"description\",\n        \"hostname\",\n        \"username\",\n        \"is_snapshot\",\n        \"workspace_name\",\n        \"attributes\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"id\": {\n          \"type\": \"string\",\n          \"pattern\": \"^[0-9a-f]+$\"\n        },\n        \"parents\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\",\n            \"pattern\": \"^[0-9a-f]+$\"\n          }\n        },\n        \"time\": {\n          \"type\": \"object\",\n          \"required\": [\n            \"start\",\n            \"end\"\n          ],\n          \"additionalProperties\": false,\n          \"properties\": {\n            \"start\": {\n              \"type\": \"string\",\n              \"format\": \"date-time\"\n            },\n            \"end\": {\n              \"type\": \"string\",\n              \"format\": \"date-time\"\n            }\n          }\n        },\n        \"description\": {\n          \"type\": \"string\"\n        },\n        \"hostname\": {\n          \"type\": \"string\"\n        },\n        \"username\": {\n          \"type\": \"string\"\n        },\n        \"is_snapshot\": {\n          \"type\": \"boolean\"\n        },\n        \"workspace_name\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"attributes\": {\n          \"type\": \"object\",\n          \"additionalProperties\": {\n            \"type\": \"string\"\n          }\n        }\n      }\n    }\n  }\n}\n" }'
@@ -2317,17 +2317,6 @@ export def "jj evolog" [
     --revisions (-r): list<string>,               # Follow changes from these revisions
     --limit (-n): string,                         # Limit number of revisions to show
     --reversed,                                   # Show revisions in the opposite order (older revisions first)
-    --patch (-p),                                 # Show patch compared to the previous version of this change
-    --summary (-s),                               # For each path, show only whether it was modified, added, or deleted
-    --stat,                                       # Show a histogram of the changes
-    --types,                                      # For each path, show only its type before and after
-    --name-only,                                  # For each path, show only its path
-    --git,                                        # Show a Git-format diff
-    --color-words,                                # Show a word-level diff with changes indicated only by color
-    --tool: string,                               # Generate diff by external command
-    --context: string,                            # Number of lines of context to show
-    --ignore-all-space,                           # Ignore whitespace when comparing lines
-    --ignore-space-change,                        # Ignore changes in amount of whitespace when comparing lines
 ]: nothing -> table<commit: record<commit_id: string, parents: list<string>, change_id: string, description: string, author: record<name: string, email: string, timestamp: datetime>, committer: record<name: string, email: string, timestamp: datetime>>, operation: oneof<record<id: string, parents: list<string>, time: record<start: datetime, end: datetime>, description: string, hostname: string, username: string, is_snapshot: bool, workspace_name: oneof<string, nothing>, attributes: record>, nothing>> {
     let text = ^jj evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [] {
         --repository: $repository
@@ -2344,17 +2333,6 @@ export def "jj evolog" [
         --revisions: $revisions
         --limit: $limit
         --reversed: $reversed
-        --patch: $patch
-        --summary: $summary
-        --stat: $stat
-        --types: $types
-        --name-only: $name_only
-        --git: $git
-        --color-words: $color_words
-        --tool: $tool
-        --context: $context
-        --ignore-all-space: $ignore_all_space
-        --ignore-space-change: $ignore_space_change
     })
     nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"An entry of `jj evolog`: the commit, and the operation that wrote it, if recorded\",\"type\":\"object\",\"required\":[\"commit\",\"operation\"],\"additionalProperties\":false,\"properties\":{\"commit\":{\"$ref\":\"#/$defs/commit\"},\"operation\":{\"anyOf\":[{\"$ref\":\"#/$defs/operation\"},{\"type\":\"null\"}]}},\"$defs\":{\"commit_id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"signature\":{\"type\":\"object\",\"required\":[\"name\",\"email\",\"timestamp\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"commit\":{\"type\":\"object\",\"required\":[\"commit_id\",\"parents\",\"change_id\",\"description\",\"author\",\"committer\"],\"additionalProperties\":false,\"properties\":{\"commit_id\":{\"$ref\":\"#/$defs/commit_id\"},\"parents\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/commit_id\"}},\"change_id\":{\"type\":\"string\",\"pattern\":\"^[k-z]+$\"},\"description\":{\"type\":\"string\"},\"author\":{\"$ref\":\"#/$defs/signature\"},\"committer\":{\"$ref\":\"#/$defs/signature\"}}},\"operation\":{\"type\":\"object\",\"required\":[\"id\",\"parents\",\"time\",\"description\",\"hostname\",\"username\",\"is_snapshot\",\"workspace_name\",\"attributes\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"parents\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"}},\"time\":{\"type\":\"object\",\"required\":[\"start\",\"end\"],\"additionalProperties\":false,\"properties\":{\"start\":{\"type\":\"string\",\"format\":\"date-time\"},\"end\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"description\":{\"type\":\"string\"},\"hostname\":{\"type\":\"string\"},\"username\":{\"type\":\"string\"},\"is_snapshot\":{\"type\":\"boolean\"},\"workspace_name\":{\"type\":[\"string\",\"null\"]},\"attributes\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}}}}}" { from json --objects | into datetime commit.author.timestamp | into datetime commit.committer.timestamp | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.start } } | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.end } } } --lines
 }
@@ -4708,29 +4686,29 @@ If not specified, this defaults to the `templates.log` setting.
 """#
         arg <TEMPLATE>
     }'
-@usage 'flag "-p --patch" help="Show patch"'
-@usage 'flag --count help="Print the number of commits instead of showing them" {
+@usage 'flag "-p --patch" help="Show patch" hide=#true'
+@usage 'flag --count help="Print the number of commits instead of showing them" hide=#true {
         conflicts "--summary" "--stat" "--types" "--name-only" "--git" "--color-words" "--tool" "--context" "--ignore-all-space" "--ignore-space-change" "--no-graph" "--patch" "--reversed" "--template"
     }'
-@usage 'flag "-s --summary" help="For each path, show only whether it was modified, added, or deleted" help_heading="Diff Formatting Options"'
-@usage 'flag --stat help="Show a histogram of the changes" help_heading="Diff Formatting Options"'
-@usage r#'flag --types help="For each path, show only its type before and after" help_heading="Diff Formatting Options" {
+@usage 'flag "-s --summary" help="For each path, show only whether it was modified, added, or deleted" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --stat help="Show a histogram of the changes" help_heading="Diff Formatting Options" hide=#true'
+@usage r#'flag --types help="For each path, show only its type before and after" help_heading="Diff Formatting Options" hide=#true {
         long_help #"""
 For each path, show only its type before and after
 
 The diff is shown as two letters. The first letter indicates the type before and the second letter indicates the type after. '-' indicates that the path was not present, 'F' represents a regular file, `L' represents a symlink, 'C' represents a conflict, and 'G' represents a Git submodule.
 """#
     }'#
-@usage r#'flag --name-only help="For each path, show only its path" help_heading="Diff Formatting Options" {
+@usage r#'flag --name-only help="For each path, show only its path" help_heading="Diff Formatting Options" hide=#true {
         long_help #"""
 For each path, show only its path
 
 Typically useful for shell commands like: `jj diff -r @- --name-only | xargs perl -pi -e's/OLD/NEW/g`
 """#
     }'#
-@usage 'flag --git help="Show a Git-format diff" help_heading="Diff Formatting Options"'
-@usage 'flag --color-words help="Show a word-level diff with changes indicated only by color" help_heading="Diff Formatting Options"'
-@usage 'flag --tool help="Generate diff by external command" help_heading="Diff Formatting Options" {
+@usage 'flag --git help="Show a Git-format diff" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --color-words help="Show a word-level diff with changes indicated only by color" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --tool help="Generate diff by external command" help_heading="Diff Formatting Options" hide=#true {
         long_help #"""
 Generate diff by external command
 
@@ -4738,11 +4716,11 @@ A builtin format can also be specified as `:<name>`. For example, `--tool=:git` 
 """#
         arg <TOOL>
     }'
-@usage 'flag --context help="Number of lines of context to show" help_heading="Diff Formatting Options" {
+@usage 'flag --context help="Number of lines of context to show" help_heading="Diff Formatting Options" hide=#true {
         arg <CONTEXT>
     }'
-@usage 'flag --ignore-all-space help="Ignore whitespace when comparing lines" help_heading="Diff Formatting Options"'
-@usage 'flag --ignore-space-change help="Ignore changes in amount of whitespace when comparing lines" conflicts=--ignore-all-space help_heading="Diff Formatting Options"'
+@usage 'flag --ignore-all-space help="Ignore whitespace when comparing lines" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --ignore-space-change help="Ignore changes in amount of whitespace when comparing lines" conflicts=--ignore-all-space help_heading="Diff Formatting Options" hide=#true'
 @usage 'arg "[FILESETS]…" help="Show revisions modifying the given paths" required=#false var=#true var_min=1'
 @usage 'group short-format "--summary" "--stat" "--types" "--name-only"'
 @usage 'group long-format "--git" "--color-words"'
@@ -4764,18 +4742,6 @@ export def "jj log" [
     --revision (-r): list<string>,                # Which revisions to show
     --limit (-n): string,                         # Limit number of revisions to show
     --reversed,                                   # Show revisions in the opposite order (older revisions first)
-    --patch (-p),                                 # Show patch
-    --count,                                      # Print the number of commits instead of showing them
-    --summary (-s),                               # For each path, show only whether it was modified, added, or deleted
-    --stat,                                       # Show a histogram of the changes
-    --types,                                      # For each path, show only its type before and after
-    --name-only,                                  # For each path, show only its path
-    --git,                                        # Show a Git-format diff
-    --color-words,                                # Show a word-level diff with changes indicated only by color
-    --tool: string,                               # Generate diff by external command
-    --context: string,                            # Number of lines of context to show
-    --ignore-all-space,                           # Ignore whitespace when comparing lines
-    --ignore-space-change,                        # Ignore changes in amount of whitespace when comparing lines
 ]: nothing -> table<commit_id: string, parents: list<string>, change_id: string, description: string, author: record<name: string, email: string, timestamp: datetime>, committer: record<name: string, email: string, timestamp: datetime>> {
     let text = ^jj log --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [...$filesets] {
         --repository: $repository
@@ -4792,18 +4758,6 @@ export def "jj log" [
         --revision: $revision
         --limit: $limit
         --reversed: $reversed
-        --patch: $patch
-        --count: $count
-        --summary: $summary
-        --stat: $stat
-        --types: $types
-        --name-only: $name_only
-        --git: $git
-        --color-words: $color_words
-        --tool: $tool
-        --context: $context
-        --ignore-all-space: $ignore_all_space
-        --ignore-space-change: $ignore_space_change
     })
     nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A commit, one line of `jj log`\",\"$ref\":\"#/$defs/commit\",\"$defs\":{\"commit_id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"signature\":{\"type\":\"object\",\"required\":[\"name\",\"email\",\"timestamp\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"commit\":{\"type\":\"object\",\"required\":[\"commit_id\",\"parents\",\"change_id\",\"description\",\"author\",\"committer\"],\"additionalProperties\":false,\"properties\":{\"commit_id\":{\"$ref\":\"#/$defs/commit_id\"},\"parents\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/commit_id\"}},\"change_id\":{\"type\":\"string\",\"pattern\":\"^[k-z]+$\"},\"description\":{\"type\":\"string\"},\"author\":{\"$ref\":\"#/$defs/signature\"},\"committer\":{\"$ref\":\"#/$defs/signature\"}}}}}" { from json --objects | into datetime author.timestamp | into datetime committer.timestamp } --lines
 }
@@ -5451,33 +5405,33 @@ If not specified, this defaults to the `templates.op_log` setting.
 """#
             arg <TEMPLATE>
         }'
-@usage 'flag "-d --op-diff" help="Show changes to the repository at each operation"'
-@usage 'flag "-p --patch" help="Show patch of modifications to changes (implies --op-diff)" {
+@usage 'flag "-d --op-diff" help="Show changes to the repository at each operation" hide=#true'
+@usage 'flag "-p --patch" help="Show patch of modifications to changes (implies --op-diff)" hide=#true {
             long_help #"""
 Show patch of modifications to changes (implies --op-diff)
 
 If the previous version has different parents, it will be temporarily rebased to the parents of the new version, so the diff is not contaminated by unrelated changes.
 """#
         }'
-@usage 'flag "-s --summary" help="For each path, show only whether it was modified, added, or deleted" help_heading="Diff Formatting Options"'
-@usage 'flag --stat help="Show a histogram of the changes" help_heading="Diff Formatting Options"'
-@usage r#'flag --types help="For each path, show only its type before and after" help_heading="Diff Formatting Options" {
+@usage 'flag "-s --summary" help="For each path, show only whether it was modified, added, or deleted" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --stat help="Show a histogram of the changes" help_heading="Diff Formatting Options" hide=#true'
+@usage r#'flag --types help="For each path, show only its type before and after" help_heading="Diff Formatting Options" hide=#true {
             long_help #"""
 For each path, show only its type before and after
 
 The diff is shown as two letters. The first letter indicates the type before and the second letter indicates the type after. '-' indicates that the path was not present, 'F' represents a regular file, `L' represents a symlink, 'C' represents a conflict, and 'G' represents a Git submodule.
 """#
         }'#
-@usage r#'flag --name-only help="For each path, show only its path" help_heading="Diff Formatting Options" {
+@usage r#'flag --name-only help="For each path, show only its path" help_heading="Diff Formatting Options" hide=#true {
             long_help #"""
 For each path, show only its path
 
 Typically useful for shell commands like: `jj diff -r @- --name-only | xargs perl -pi -e's/OLD/NEW/g`
 """#
         }'#
-@usage 'flag --git help="Show a Git-format diff" help_heading="Diff Formatting Options"'
-@usage 'flag --color-words help="Show a word-level diff with changes indicated only by color" help_heading="Diff Formatting Options"'
-@usage 'flag --tool help="Generate diff by external command" help_heading="Diff Formatting Options" {
+@usage 'flag --git help="Show a Git-format diff" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --color-words help="Show a word-level diff with changes indicated only by color" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --tool help="Generate diff by external command" help_heading="Diff Formatting Options" hide=#true {
             long_help #"""
 Generate diff by external command
 
@@ -5485,12 +5439,12 @@ A builtin format can also be specified as `:<name>`. For example, `--tool=:git` 
 """#
             arg <TOOL>
         }'
-@usage 'flag --context help="Number of lines of context to show" help_heading="Diff Formatting Options" {
+@usage 'flag --context help="Number of lines of context to show" help_heading="Diff Formatting Options" hide=#true {
             arg <CONTEXT>
         }'
-@usage 'flag --ignore-all-space help="Ignore whitespace when comparing lines" help_heading="Diff Formatting Options"'
-@usage 'flag --ignore-space-change help="Ignore changes in amount of whitespace when comparing lines" conflicts=--ignore-all-space help_heading="Diff Formatting Options"'
-@usage 'flag --show-changes-in help="Show only changed revisions matching the given revset expression" help_heading="Diff Formatting Options" {
+@usage 'flag --ignore-all-space help="Ignore whitespace when comparing lines" help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --ignore-space-change help="Ignore changes in amount of whitespace when comparing lines" conflicts=--ignore-all-space help_heading="Diff Formatting Options" hide=#true'
+@usage 'flag --show-changes-in help="Show only changed revisions matching the given revset expression" help_heading="Diff Formatting Options" hide=#true {
             long_help #"""
 Show only changed revisions matching the given revset expression
 
@@ -5515,19 +5469,6 @@ export def "jj operation log" [
     --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
     --limit (-n): string,                         # Limit number of operations to show
     --reversed,                                   # Show operations in the opposite order (older operations first)
-    --op-diff (-d),                               # Show changes to the repository at each operation
-    --patch (-p),                                 # Show patch of modifications to changes (implies --op-diff)
-    --summary (-s),                               # For each path, show only whether it was modified, added, or deleted
-    --stat,                                       # Show a histogram of the changes
-    --types,                                      # For each path, show only its type before and after
-    --name-only,                                  # For each path, show only its path
-    --git,                                        # Show a Git-format diff
-    --color-words,                                # Show a word-level diff with changes indicated only by color
-    --tool: string,                               # Generate diff by external command
-    --context: string,                            # Number of lines of context to show
-    --ignore-all-space,                           # Ignore whitespace when comparing lines
-    --ignore-space-change,                        # Ignore changes in amount of whitespace when comparing lines
-    --show-changes-in: string,                    # Show only changed revisions matching the given revset expression
 ]: nothing -> table<id: string, parents: list<string>, time: record<start: datetime, end: datetime>, description: string, hostname: string, username: string, is_snapshot: bool, workspace_name: oneof<string, nothing>, attributes: record> {
     let text = ^jj operation log --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [] {
         --repository: $repository
@@ -5543,19 +5484,6 @@ export def "jj operation log" [
         --config-file: $config_file
         --limit: $limit
         --reversed: $reversed
-        --op-diff: $op_diff
-        --patch: $patch
-        --summary: $summary
-        --stat: $stat
-        --types: $types
-        --name-only: $name_only
-        --git: $git
-        --color-words: $color_words
-        --tool: $tool
-        --context: $context
-        --ignore-all-space: $ignore_all_space
-        --ignore-space-change: $ignore_space_change
-        --show-changes-in: $show_changes_in
     })
     nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"An operation, one line of `jj operation log`\",\"type\":\"object\",\"required\":[\"id\",\"parents\",\"time\",\"description\",\"hostname\",\"username\",\"is_snapshot\",\"workspace_name\",\"attributes\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"parents\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"}},\"time\":{\"type\":\"object\",\"required\":[\"start\",\"end\"],\"additionalProperties\":false,\"properties\":{\"start\":{\"type\":\"string\",\"format\":\"date-time\"},\"end\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"description\":{\"type\":\"string\"},\"hostname\":{\"type\":\"string\"},\"username\":{\"type\":\"string\"},\"is_snapshot\":{\"type\":\"boolean\"},\"workspace_name\":{\"type\":[\"string\",\"null\"]},\"attributes\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}}}" { from json --objects | into datetime time.start | into datetime time.end } --lines
 }

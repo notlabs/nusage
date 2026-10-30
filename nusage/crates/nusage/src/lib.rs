@@ -13,6 +13,7 @@ pub mod cli;
 mod common;
 mod conform;
 mod http;
+mod inspect;
 mod interpret;
 mod lsp;
 mod nu;
@@ -24,6 +25,7 @@ mod validate;
 
 use std::path::{Path, PathBuf};
 
+pub use inspect::inspect;
 pub use interpret::{Parsed, interpret, parse};
 pub use validate::validate;
 

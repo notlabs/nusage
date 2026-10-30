@@ -5,6 +5,14 @@
 use std/assert
 use jj *
 
+# The typed history commands own their output: diff modes and count would turn their
+# JSON lines into text. These flags must be absent from the callable signatures.
+for name in ["jj log" "jj evolog" "jj operation log"] {
+    let parameters = scope commands | where name == $name | get 0.signatures.nothing.parameter_name | compact
+    let breaks_output = $parameters | where {|flag| $flag in [patch summary stat types name-only git color-words tool count op-diff show-changes-in] }
+    assert ($breaks_output | is-empty) $"($name) exposes flags that replace its JSON lines: ($breaks_output | to nuon)"
+}
+
 # A repository of its own, in a home of its own and configured by global flags alone: jj keeps
 # each repository's configuration under the user's configuration directory, reads the user's
 # files, and a path that does not exist is passed over.

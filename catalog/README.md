@@ -75,8 +75,11 @@ includes = ["oci::ghcr.io/notlabs/nusage-tasks:0.1.0"]
 ```
 
 They run as `catalog:spec`, `catalog:generate`, `catalog:check` and `catalog:install`, and
-need `nusage`, `nu` and `usage` on `PATH`, as the conf.d fragment installs them. Pin a
-digest, `@sha256:…`, where a moved tag must not pass unnoticed.
+need `nusage`, `nu` and `usage` on `PATH`, as the conf.d fragment installs them. They carry
+their shared helpers; the entries and their inputs stay in the consuming project's
+`lib/<tool>/`. A `clap` entry also needs Cargo and rustfmt, with its extractor and its
+dependencies supplied by the project; an `openapi` entry needs `openapi-usage`. Pin a digest,
+`@sha256:…`, where a moved tag must not pass unnoticed.
 
 ## Add an entry
 

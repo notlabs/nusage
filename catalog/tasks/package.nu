@@ -9,6 +9,9 @@
 # `catalog:spec`, `catalog:generate`, `catalog:check` and `catalog:install`; this task and the
 # module they share are not tasks there.
 use catalog.nu *
+use support.nu *
+
+const tasks = path self | path dirname
 
 let version = ^mise config get vars.catalog_version | str trim
 if $version == "" {
@@ -44,8 +47,26 @@ print $"($tarball | path relative-to (root))"
 let oci = $out | path join oci
 rm --recursive --force $oci
 mkdir ($oci | path join catalog)
-let tasks = root | path join tasks
 for file in [catalog.nu spec.nu generate.nu check.nu install.nu] {
     cp ($tasks | path join $file) ($oci | path join catalog $file)
 }
+# Hidden from mise's task discovery, but shipped with the scripts that import them.
+let helpers = [
+    {name: actions, source: $actions, relative: .support/actions.nu}
+    {name: clap, source: $clap, relative: .support/clap/spec.nu}
+    {
+        name: schema_overlay
+        source: $schema_overlay
+        relative: .support/schemas/overlay.nu
+    }
+]
+for helper in $helpers {
+    let target = $oci | path join catalog $helper.relative
+    mkdir ($target | path dirname)
+    cp $helper.source $target
+}
+cp ($schema_overlay | path dirname | path join lib.nu) ($oci | path join catalog .support schemas lib.nu)
+$helpers | each {|helper|
+    $'export const ($helper.name) = path self | path dirname | path join ($helper.relative)'
+} | str join "\n" | save --force ($oci | path join catalog support.nu)
 print $"($oci | path relative-to (root))/catalog: push it with `oras push <registry>/nusage-tasks:($version) catalog` from ($oci | path relative-to (root))"

@@ -138,6 +138,80 @@ fn documents_are_held_to_the_schema_as_rows() {
     std::fs::remove_dir_all(schema.parent().unwrap()).unwrap();
 }
 
+/// The same documents have the same findings through the CLI's validator and the
+/// plugin; the CLI renders them as errors, while the plugin returns them as rows.
+#[test]
+fn the_cli_and_plugin_hold_the_same_documents() {
+    let schema = schema_file("parity", SCHEMA);
+    let doc = schema.with_file_name("doc.json");
+    let schema_word = format!("{:?}", schema.to_string_lossy());
+    let mut test = harness("nusage", NusagePlugin::new().unwrap()).unwrap();
+    for text in [r#"{"ok": true}"#, r#"{"ok": "yes"}"#, "{", "null"] {
+        std::fs::write(&doc, text).unwrap();
+        let cli = nusage::validate(&schema, &[&doc], false).unwrap();
+        for source in [
+            format!("nusage validate {schema_word} {:?}", doc.to_string_lossy()),
+            format!("{text:?} | nusage validate {schema_word}"),
+            format!("{text:?} | nusage validate {schema_word} -"),
+        ] {
+            let found = value(&mut test, &source).unwrap().into_list().unwrap();
+            assert_eq!(found.len(), cli.len(), "{source}");
+            for (row, finding) in found.iter().zip(&cli) {
+                let what = row
+                    .get_data_by_key("what")
+                    .unwrap()
+                    .coerce_string()
+                    .unwrap();
+                assert!(finding.ends_with(&what), "{source}: {finding} != {what}");
+            }
+        }
+    }
+    // No input checks the schema alone; a native null is a JSON null document.
+    let absent = value(&mut test, &format!("nusage validate {schema_word}")).unwrap();
+    assert!(absent.into_list().unwrap().is_empty());
+    let native = value(&mut test, &format!("null | nusage validate {schema_word}")).unwrap();
+    let text = value(
+        &mut test,
+        &format!("'null' | nusage validate {schema_word}"),
+    )
+    .unwrap();
+    assert_eq!(rows(&native), [("input".into(), None, String::new())]);
+    assert_eq!(
+        nusage_plugin::value::to_json(&native).unwrap(),
+        nusage_plugin::value::to_json(&text).unwrap()
+    );
+    std::fs::remove_dir_all(schema.parent().unwrap()).unwrap();
+}
+
+#[test]
+fn stdin_is_consumed_once_at_the_named_position() {
+    let schema = schema_file("stdin", SCHEMA);
+    let schema_word = format!("{:?}", schema.to_string_lossy());
+    let mut test = harness("nusage", NusagePlugin::new().unwrap()).unwrap();
+    let found = value(
+        &mut test,
+        &format!(r#"'{{"ok": "yes"}}' | nusage validate {schema_word} -"#),
+    )
+    .unwrap();
+    // `-` names the finding, and the input is not checked a second time afterwards.
+    assert_eq!(rows(&found), [("-".into(), None, "/ok".into())]);
+    let repeated = value(
+        &mut test,
+        &format!(r#"'{{"ok": true}}' | nusage validate {schema_word} - -"#),
+    )
+    .unwrap();
+    assert_eq!(rows(&repeated), [("-".into(), None, String::new())]);
+    let empty = value(&mut test, &format!("nusage validate {schema_word} -")).unwrap();
+    assert_eq!(rows(&empty), [("-".into(), None, String::new())]);
+    let lines = value(
+        &mut test,
+        &format!(r#"'{{"ok": "yes"}}' | nusage validate --lines {schema_word} -"#),
+    )
+    .unwrap();
+    assert_eq!(rows(&lines), [("-".into(), Some(1), "/ok".into())]);
+    std::fs::remove_dir_all(schema.parent().unwrap()).unwrap();
+}
+
 #[test]
 fn a_schema_that_holds_nothing_is_an_error() {
     let schema = schema_file("bad", r#"{"type": "whatever"}"#);

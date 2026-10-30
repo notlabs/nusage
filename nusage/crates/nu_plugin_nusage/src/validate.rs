@@ -1,6 +1,7 @@
 //! `nusage validate`, as the CLI has it: a schema, documents, `--lines`. The documents are
-//! the files named and the input: text as one JSON document, or one per line with
-//! `--lines`; a value as the document it is; a stream as one document per item. The result
+//! the files named and the input, with `-` consuming the input at that position. Text is
+//! one JSON document, or one per line with `--lines`; a value is the document it is,
+//! including null; a stream is one document per item. No input is no document. The result
 //! is every finding as a row, `{document, line, path, what}`, and no rows when every
 //! document conforms. A schema that cannot be read or is not in the dialect is an error,
 //! as the CLI's exit code 2 says nothing was held to anything.
@@ -71,6 +72,21 @@ impl Held {
                 .push(row(name, line, "", &err.to_string(), self.span)),
         }
     }
+
+    fn input(&mut self, name: &str, input: PipelineData) -> Result<(), LabeledError> {
+        match input {
+            PipelineData::Empty => {}
+            PipelineData::Value(Value::String { val, .. }, _) => self.text(name, &val),
+            PipelineData::Value(other, _) => self.json(name, None, &value::to_json(&other)?),
+            PipelineData::ByteStream(stream, _) => self.text(name, &stream.into_string()?),
+            PipelineData::ListStream(stream, _) => {
+                for (index, item) in stream.into_iter().enumerate() {
+                    self.json(name, Some(index + 1), &value::to_json(&item)?);
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// A finding as a row.
@@ -139,7 +155,17 @@ impl PluginCommand for Validate {
             span,
             findings: Vec::new(),
         };
+        let mut input = Some(input);
         for document in &documents {
+            if document.item == "-" {
+                match input.take() {
+                    // Like an exhausted stdin, an explicitly requested empty input is an
+                    // empty document. Without `-`, no input holds the schema alone.
+                    None | Some(PipelineData::Empty) => held.text("-", ""),
+                    Some(input) => held.input("-", input)?,
+                }
+                continue;
+            }
             let path = cwd.join(&document.item);
             let text = std::fs::read_to_string(&path).map_err(|err| {
                 LabeledError::new(format!("{}: {err}", path.display()))
@@ -147,17 +173,8 @@ impl PluginCommand for Validate {
             })?;
             held.text(&document.item, &text);
         }
-        match input {
-            PipelineData::Empty => {}
-            PipelineData::Value(Value::Nothing { .. }, _) => {}
-            PipelineData::Value(Value::String { val, .. }, _) => held.text("input", &val),
-            PipelineData::Value(other, _) => held.json("input", None, &value::to_json(&other)?),
-            PipelineData::ByteStream(stream, _) => held.text("input", &stream.into_string()?),
-            PipelineData::ListStream(stream, _) => {
-                for (index, item) in stream.into_iter().enumerate() {
-                    held.json("input", Some(index + 1), &value::to_json(&item)?);
-                }
-            }
+        if let Some(input) = input {
+            held.input("input", input)?;
         }
         let findings = held.findings;
         Ok(PipelineData::value(Value::list(findings, span), None))
