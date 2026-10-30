@@ -1,0 +1,64 @@
+From ec6292ab2272747017a2f78a3614eb4703b67f76 Mon Sep 17 00:00:00 2001
+From: nusage <dev@nusage>
+Date: Fri, 30 Oct 2026 13:52:12 +0000
+Subject: [PATCH 2/3] Print the leading source of mixed trees
+
+A node can start before its first child, when the grammar makes the whitespace
+between a delimiter and the first element part of the element list rather than
+of the enclosing node: tree-sitter-nu's `record_body` and `list_body` are such
+nodes, and so is any root.
+
+The exact trees print their whole source, leading part included, and the first
+child of a list added the leading source of that child. But a mixed tree that
+is not a first child never printed its own leading source, so a record whose
+entries were merged lost the newline and indentation after its opening brace:
+`{dir: $dir` instead of `{` and the entry on the next line.
+
+Print the leading source of every mixed tree right after its preceding
+whitespace, and no longer from the first child's side, which printed it only
+in that position.
+---
+ src/merged_tree/print.rs | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/src/merged_tree/print.rs b/src/merged_tree/print.rs
+index af7c092..f714d5d 100644
+--- a/src/merged_tree/print.rs
++++ b/src/merged_tree/print.rs
+@@ -73,6 +73,20 @@ impl<'a> MergedTree<'a> {
+                     indentation,
+                     class_mapping,
+                 );
++                // Also add any leading source (content included in the node's source before
++                // its first child), which `reindented_source` covers for exact trees.
++                // Some grammars let a node start before its first child, for instance
++                // when the whitespace between a delimiter and the first element belongs
++                // to the element list and not to the enclosing node.
++                let leading_source = {
++                    let mut representatives = class_mapping.representatives(leader);
++                    representatives.sort_by_key(|a| a.rev);
++                    representatives
++                        .iter()
++                        .find_map(|repr| repr.node.leading_source())
++                        .unwrap_or("")
++                };
++                output.push_merged(Cow::from(leading_source));
+                 let mut previous_sibling = None;
+                 for c in children {
+                     c.pretty_print_recursively(
+@@ -272,12 +286,6 @@ impl<'a> MergedTree<'a> {
+                     .find_map(|repr| repr.node.preceding_whitespace())
+                     .unwrap_or("");
+                 output.push_merged(Cow::from(whitespace));
+-                // Also add any leading source (content included in the node's source before the first child)
+-                let whitespace = representatives
+-                    .iter()
+-                    .find_map(|repr| repr.node.leading_source())
+-                    .unwrap_or("");
+-                output.push_merged(Cow::from(whitespace));
+                 Cow::from(indentation)
+             }
+         }
+-- 
+2.43.0
+

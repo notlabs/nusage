@@ -6,46 +6,9 @@
 # Unlabelled lines: GitHub reads an annotation only at the start of a line.
 # The formatters' own checks name a file and no more; a lint has to say what is wrong where,
 # so each file is formatted again and the difference printed, and in GitHub Actions each
-# hunk is an annotation on its lines, which the pull request shows inline.
-def in-actions [] {
-    ($env.GITHUB_ACTIONS? | default "") == "true"
-}
-
-# An annotation, as the workflow command spells it, with the message's line breaks encoded.
-def annotate [
-    file: string
-    line: int
-    end: int
-    title: string
-    message: string
-] {
-    let encoded = $message
-    | str replace --all "%" "%25"
-    | str replace --all "\r" "%0D"
-    | str replace --all "\n" "%0A"
-    print $"::error file=($file),line=($line),endLine=($end),title=($title)::($encoded)"
-}
-
-# The hunks of a unified diff: the lines each starts at and covers in the first file, and its
-# text.
-def hunks [diff: string] {
-    mut hunks = []
-    for line in ($diff | lines) {
-        let header = $line | parse --regex '^@@ -(?<line>\d+)(?:,(?<count>\d+))? '
-        if ($header | is-not-empty) {
-            let start = $header.0.line | into int
-            let count = if $header.0.count == "" {
-                1
-            } else {
-                $header.0.count | into int
-            }
-            $hunks = $hunks | append {line: $start, end: ($start + ([$count 1] | math max) - 1), body: ""}
-        } else if ($hunks | is-not-empty) {
-            $hunks = $hunks | update ($hunks | length | $in - 1) {|hunk| $hunk | update body ($hunk.body + $line + "\n") }
-        }
-    }
-    $hunks
-}
+# hunk is an annotation on its lines, which the pull request shows inline, through the
+# module every task shares.
+use ../lib/actions.nu *
 
 # Whether a file is what its formatter writes for it; the difference printed when not.
 def formatted [file: string, formatter: string, format: closure] {
@@ -59,23 +22,13 @@ def formatted [file: string, formatter: string, format: closure] {
     | ^diff --unified --label $file --label $"($file) as ($formatter) wants" $file -
     | complete
     print --no-newline $diff.stdout
-    if (in-actions) {
-        for hunk in (hunks $diff.stdout) {
-            (annotate
-                $file
-                $hunk.line
-                $hunk.end
-                $"($formatter): not formatted"
-                $"`jj fix` writes it:\n($hunk.body)"
-            )
-        }
-    }
+    annotate-diff $file $"($formatter): not formatted, `jj fix` writes it" $diff.stdout
     false
 }
 
 mut failed = []
 
-print "$ jactionlint"
+group-start jactionlint
 let workflows = if (in-actions) {
     ^jactionlint --format github | complete
 } else {
@@ -85,8 +38,9 @@ print --no-newline $workflows.stdout
 if $workflows.exit_code != 0 {
     $failed = $failed | append "jactionlint"
 }
+group-end
 
-print "$ nufmt"
+group-start nufmt
 for file in (
     ^git ls-files "*.nu"
     | lines
@@ -96,13 +50,15 @@ for file in (
         $failed = $failed | append $"nufmt: ($file)"
     }
 }
+group-end
 
-print "$ taplo"
+group-start taplo
 for file in (^git ls-files "*.toml" | lines) {
     if not (formatted $file taplo { ^taplo fmt - }) {
         $failed = $failed | append $"taplo: ($file)"
     }
 }
+group-end
 
 if ($failed | is-not-empty) {
     error make --unspanned {msg: $"lint failed: ($failed | str join ', ')"}

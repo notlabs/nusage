@@ -101,8 +101,8 @@ description = "Formatting, clippy and rustdoc, as CI checks them"
 env = { RUSTDOCFLAGS = "-D warnings" }
 run = [
   "cargo fmt --all --check",
-  "cargo clippy --workspace --all-targets --locked -- -D warnings",
-  "cargo doc --workspace --no-deps --locked",
+  "cargo clippy --quiet --workspace --all-targets --locked -- -D warnings",
+  "cargo doc --quiet --workspace --no-deps --locked",
 ]
 
 [tasks.verify-fixtures]

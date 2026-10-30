@@ -6,6 +6,7 @@
 # and asks after the tool's version: a stale spec fails in CI, where the tool's version is
 # pinned, and is a warning elsewhere, where any version may be on PATH.
 use catalog.nu *
+use ../../.mise/lib/actions.nu *
 
 def in-ci []: nothing -> bool {
     ($env.CI? | default "") == "true"
@@ -23,6 +24,7 @@ def differs [committed: string, made: string]: nothing -> bool {
     let diff = ^diff --unified --label $"($committed | path relative-to (root)) committed" --label "generated now" $committed $made
     | complete
     print --no-newline $diff.stdout
+    annotate-diff $committed "not what the spec, suite and overlays give; `mise run generate` rewrites it" $diff.stdout
     true
 }
 

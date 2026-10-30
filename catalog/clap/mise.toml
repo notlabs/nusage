@@ -9,7 +9,7 @@ run = "cargo test --locked"
 description = "Formatting and clippy, as CI checks them"
 run = [
   "cargo fmt --check",
-  "cargo clippy --all-targets --locked -- -D warnings",
+  "cargo clippy --quiet --all-targets --locked -- -D warnings",
 ]
 
 [tasks.check]

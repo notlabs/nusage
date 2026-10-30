@@ -1,0 +1,59 @@
+From 566f961c84fd6a2b71b3f5e851edfb2d4657881f Mon Sep 17 00:00:00 2001
+From: nusage <dev@nusage>
+Date: Fri, 30 Oct 2026 13:52:12 +0000
+Subject: [PATCH 3/3] Depend on tree-sitter-nu from its repository
+
+The grammar is not published on crates.io yet; pin the revision the Nushell
+profile was written against. Not for upstream as is: Mergiraf takes grammars
+from crates.io, so the upstream change is a one-line crates.io dependency once
+the grammar is published.
+---
+ Cargo.lock | 10 ++++++++++
+ Cargo.toml |  3 +++
+ 2 files changed, 13 insertions(+)
+
+diff --git a/Cargo.lock b/Cargo.lock
+index e9df44d..68f838d 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -678,6 +678,7 @@ dependencies = [
+  "tree-sitter-matlab",
+  "tree-sitter-md",
+  "tree-sitter-nix",
++ "tree-sitter-nu",
+  "tree-sitter-ocaml",
+  "tree-sitter-php",
+  "tree-sitter-properties",
+@@ -1487,6 +1488,15 @@ dependencies = [
+  "tree-sitter-language",
+ ]
+ 
++[[package]]
++name = "tree-sitter-nu"
++version = "0.0.1"
++source = "git+https://github.com/nushell/tree-sitter-nu?rev=4f577aaa735154f934594b598a69ed7b1b707cf6#4f577aaa735154f934594b598a69ed7b1b707cf6"
++dependencies = [
++ "cc",
++ "tree-sitter-language",
++]
++
+ [[package]]
+ name = "tree-sitter-ocaml"
+ version = "0.26.0"
+diff --git a/Cargo.toml b/Cargo.toml
+index 947f5b6..e3bde97 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -87,6 +87,9 @@ path = "tests/timeout_support.rs"
+ name = "working"
+ path = "tests/working.rs"
+ 
++[dependencies]
++tree-sitter-nu = { git = "https://github.com/nushell/tree-sitter-nu", rev = "4f577aaa735154f934594b598a69ed7b1b707cf6", version = "0.0.1" }
++
+ [dependencies.clap]
+ version = "4.5.50"
+ features = ["derive"]
+-- 
+2.43.0
+
