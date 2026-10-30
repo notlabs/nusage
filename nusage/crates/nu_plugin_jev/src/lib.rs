@@ -6,9 +6,10 @@
 //!
 //! The plugin is the hot path the `typesafe` module of the catalog would otherwise be: one
 //! process across calls, holding the connection and the answers given so far, keyed by the
-//! request that got them, so the same question of the same content is answered once. That
-//! is the first form of the record a judgment leaves; where it rests across processes is the
-//! store's question, not this plugin's.
+//! request and the service and credential that answered it, so the same question of the
+//! same content is answered once in that context. That is the first form of the record a
+//! judgment leaves; where it rests across processes is the store's question, not this
+//! plugin's.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -30,11 +31,20 @@ pub const BASE: &str = "https://api.typesafe.ai";
 /// The model unless `--model` says otherwise.
 pub const MODEL: &str = "jev-latest";
 
+// The credential distinguishes accounts on the same service. This key stays in memory,
+// is never serialized, and deliberately has no Debug implementation.
+#[derive(PartialEq, Eq, Hash)]
+struct AnswerKey {
+    url: String,
+    credential: String,
+    request: String,
+}
+
 pub struct JevPlugin {
     tree: CommandTree,
     agent: ureq::Agent,
-    /// Each answer by the request that got it, in canonical JSON.
-    answers: Mutex<HashMap<String, serde_json::Value>>,
+    /// Each answer by the request and the authority that answered it.
+    answers: Mutex<HashMap<AnswerKey, serde_json::Value>>,
 }
 
 impl JevPlugin {
@@ -53,8 +63,8 @@ impl JevPlugin {
     }
 
     /// The service's answer to `questions` about `state` from `model`: the one already
-    /// given to this request, else the service's, kept. An answer kept keeps the plugin
-    /// running, since it lives nowhere else yet.
+    /// given to this request by this service and credential, else the service's, kept.
+    /// An answer kept keeps the plugin running, since it lives nowhere else yet.
     pub fn judge(
         &self,
         engine: &EngineInterface,
@@ -64,15 +74,6 @@ impl JevPlugin {
         span: Span,
     ) -> Result<serde_json::Value, LabeledError> {
         let request = serde_json::json!({"model": model, "state": state, "questions": questions});
-        let key = value::canonical(&request);
-        if let Some(answer) = self
-            .answers
-            .lock()
-            .expect("no panic holds the answers")
-            .get(&key)
-        {
-            return Ok(answer.clone());
-        }
         let base =
             nusage_plugin::env(engine, &["TYPESAFE_URL"])?.unwrap_or_else(|| BASE.to_string());
         let token = nusage_plugin::env(engine, &["TYPESAFE_TOKEN", "TYPESAFE_API_KEY"])?
@@ -81,6 +82,19 @@ impl JevPlugin {
                     .with_label("this call", span)
             })?;
         let url = format!("{}/v1/systemone", base.trim_end_matches('/'));
+        let key = AnswerKey {
+            url: url.clone(),
+            credential: token.clone(),
+            request: value::canonical(&request),
+        };
+        if let Some(answer) = self
+            .answers
+            .lock()
+            .expect("no panic holds the answers")
+            .get(&key)
+        {
+            return Ok(answer.clone());
+        }
         let mut response = self
             .agent
             .post(&url)

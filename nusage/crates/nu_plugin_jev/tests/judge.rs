@@ -98,6 +98,53 @@ fn a_statement_is_judged_once_and_the_answer_kept() {
 }
 
 #[test]
+fn a_different_endpoint_answers_the_same_question_itself() {
+    let (first_url, first_server) = serve(vec![(200, ANSWER)]);
+    let (second_url, second_server) = serve(vec![(
+        200,
+        r#"{"answers": {"answer": {"type": "noul", "noul": 0.12}}}"#,
+    )]);
+    let mut test = test_at(&first_url, Some("key"));
+    let question = r#""x" | jev noul "y""#;
+    assert_eq!(value(&mut test, question).unwrap(), Value::test_float(0.93));
+    // Equivalent URLs share their answer; a different endpoint does not.
+    test.engine_state_mut().add_env_var(
+        "TYPESAFE_URL".into(),
+        Value::test_string(format!("{first_url}/")),
+    );
+    assert_eq!(value(&mut test, question).unwrap(), Value::test_float(0.93));
+    test.engine_state_mut()
+        .add_env_var("TYPESAFE_URL".into(), Value::test_string(second_url));
+    assert_eq!(value(&mut test, question).unwrap(), Value::test_float(0.12));
+    assert_eq!(value(&mut test, question).unwrap(), Value::test_float(0.12));
+    assert_eq!(first_server.join().unwrap().len(), 1);
+    assert_eq!(second_server.join().unwrap().len(), 1);
+}
+
+#[test]
+fn a_different_credential_gets_its_own_answer() {
+    let (url, server) = serve(vec![
+        (200, ANSWER),
+        (
+            200,
+            r#"{"answers": {"answer": {"type": "noul", "noul": 0.12}}}"#,
+        ),
+    ]);
+    let mut test = test_at(&url, Some("first-key"));
+    let question = r#""x" | jev noul "y""#;
+    assert_eq!(value(&mut test, question).unwrap(), Value::test_float(0.93));
+    test.engine_state_mut()
+        .add_env_var("TYPESAFE_TOKEN".into(), Value::test_string("second-key"));
+    assert_eq!(value(&mut test, question).unwrap(), Value::test_float(0.12));
+    assert_eq!(value(&mut test, question).unwrap(), Value::test_float(0.12));
+    let seen = server.join().unwrap();
+    assert_eq!(seen.len(), 2);
+    assert_eq!(seen[0].1, "Bearer first-key");
+    assert_eq!(seen[1].1, "Bearer second-key");
+    assert_eq!(seen[0].0, seen[1].0);
+}
+
+#[test]
 fn questions_are_asked_as_given_and_answered_as_a_record() {
     let (url, server) = serve(vec![(
         200,
