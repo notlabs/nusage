@@ -37,6 +37,13 @@ external. The interpreter and the module define the shadows before the script, a
 prelude` writes them as the line that stands in for the script's first where Nushell checks it.
 `script-calls` calls `callee.nu` the three ways.
 
+A task of mise's whose file is a script nusage runs is called the same way, as `mise run
+<task>` or `mise r <task>`: the shadow runs the task through mise, which runs what the task
+depends on around it, and returns the task's own value. mise is asked what the name means
+from the calling script's directory, where the shadow runs it from too. A task mise finds up
+to date does not run, and the call returns nothing; `^mise run` is still the external, and
+so is a call with mise's own flags before the task.
+
 A binary's wrapper decodes the one output it asks for. An output is decoded when its
 `media_type` names a format Nushell reads (`text/csv`, `application/yaml`, ...), when its
 framing is `json` or `jsonl`, or when its declaration carries a `nusage-decode` child whose argument

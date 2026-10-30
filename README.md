@@ -21,7 +21,17 @@ Early development.
 
 An editor that runs `nusage lsp` where it would run `nu --lsp` checks a script nusage runs as
 nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to
-that script's header.
+that script's header, and each `mise run` of a task whose file is one. Or leave the editor as it is and opt in through mise: after `mise dot
+apply`, with `MISE_ENV=nusage-lsp` in the environment the editor starts from, every `nu`
+mise starts is `nusage nu`, which serves `nusage lsp` when asked for `nu --lsp` and is
+Nushell for anything else. That `nusage` is the released one, so the environment wants a
+release that has `nusage nu`: an older one refuses it for every `nu` mise starts.
+`MISE_ENV=nusage-lsp,nusage-kakehashi` installs
+[kakehashi](https://github.com/atusy/kakehashi) too, and `nu --lsp` then also highlights a
+script's header as usage KDL and the scripts its `run=` names as Nushell or sh. A project's
+own `[wrappers.nu]` takes the place of this one; a project that wants a wrapper of its own,
+for its environment, names nusage the same way, `command = "nusage"` and `args = ["nu"]`
+beside its `env`, and keeps nusage's server, which is Nushell for anything but `--lsp`.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nusage built here. `mise run //catalog:install` has every new

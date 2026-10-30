@@ -11,7 +11,8 @@
 //! Before the script, Nushell defines the shadows of the scripts it calls, which run them
 //! through this same interpreter ([`crate::calls`]). Run by one, with `NUSAGE_OUTPUT_FILE`
 //! naming a file, the interpreter writes the script's value there as NUON for the shadow to
-//! read, and the script's own calls do not see the variable.
+//! read, when `NUSAGE_OUTPUT_SCRIPT` names this script or nothing: mise runs a task's
+//! dependencies with the same variables. The script's own calls see neither.
 
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -114,7 +115,7 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
         .map_err(|err| Diagnostic::new(script, format!("cannot find nusage itself: {err}")))?;
     let prelude = crate::prelude::runtime(&path, &nusage)?;
     let to_nuon = match std::env::var_os(crate::calls::OUTPUT_VAR) {
-        Some(file) if !file.is_empty() => format!(
+        Some(file) if !file.is_empty() && value_is_asked_of(&path) => format!(
             " | to nuon | save --raw --force {}",
             nusage_nu::word(&file.to_string_lossy())
         ),
@@ -140,12 +141,28 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
         .args(["-c", &code])
         .env("NUSAGE_USAGE", nusage_nu::nuon(&record))
         .env_remove(crate::calls::OUTPUT_VAR)
+        .env_remove(crate::calls::OUTPUT_SCRIPT_VAR)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
         .map_err(|err| Diagnostic::new(script, format!("cannot run `nu`: {err}")))?;
     Ok(status.code().unwrap_or(1))
+}
+
+/// Whether the caller asks this script for its value: the one it names, or any when it names
+/// none.
+fn value_is_asked_of(script: &Path) -> bool {
+    match std::env::var_os(crate::calls::OUTPUT_SCRIPT_VAR) {
+        Some(asked) if !asked.is_empty() => {
+            let asked = Path::new(&asked);
+            match (std::fs::canonicalize(asked), std::fs::canonicalize(script)) {
+                (Ok(asked), Ok(script)) => asked == script,
+                _ => asked == script,
+            }
+        }
+        _ => true,
+    }
 }
 
 /// Whether standard input is a pipe or a regular file: what `/dev/stdin` opens as a stream.

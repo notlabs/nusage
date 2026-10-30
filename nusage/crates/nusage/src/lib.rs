@@ -11,9 +11,11 @@ mod common;
 mod conform;
 mod interpret;
 mod lsp;
+mod nu;
 mod prelude;
 mod shim;
 mod switch_overlay;
+mod tasks;
 mod validate;
 
 use std::path::{Path, PathBuf};
@@ -133,6 +135,13 @@ pub fn prelude(script: &Path) -> Result<(String, Vec<String>), Diagnostic> {
 /// the line [`prelude`] writes in place of its first. The exit code is Nushell's.
 pub fn lsp(args: &[String]) -> std::io::Result<i32> {
     lsp::serve(args)
+}
+
+/// Run as `nu`, as mise's command wrapper does in the `nusage-lsp` environment: `nu --lsp`
+/// is nusage's language server, through kakehashi when it is on PATH, and anything else is
+/// `nu` itself. The exit code is what ran's.
+pub fn nu(args: &[String]) -> std::io::Result<i32> {
+    nu::run(args)
 }
 
 /// What the interpreter runs before the script: the shadows of the scripts it calls, which

@@ -37,6 +37,18 @@ fn session(
     change: Option<&str>,
     requests: &[(&str, Json)],
 ) -> Option<(Vec<Json>, Vec<Json>)> {
+    session_with(&["lsp"], &[], open, change, requests)
+}
+
+/// [`session`], with the server started as `nusage` and these arguments, in this
+/// environment.
+fn session_with(
+    server: &[&str],
+    vars: &[(&str, String)],
+    open: &str,
+    change: Option<&str>,
+    requests: &[(&str, Json)],
+) -> Option<(Vec<Json>, Vec<Json>)> {
     if Command::new("nu").arg("--version").output().is_err() {
         assert!(
             std::env::var("CI").as_deref() != Ok("true"),
@@ -78,7 +90,8 @@ fn session(
     ));
     std::fs::create_dir_all(&home).unwrap();
     let mut server = Command::new(env!("CARGO_BIN_EXE_nusage"))
-        .arg("lsp")
+        .args(server)
+        .envs(vars.iter().map(|(name, value)| (*name, value)))
         .env("HOME", &home)
         .env("XDG_CONFIG_HOME", home.join(".config"))
         .env("XDG_DATA_HOME", home.join(".local/share"))
@@ -292,4 +305,121 @@ fn an_editor_that_goes_without_saying_exit_ends_the_session() {
     std::fs::remove_dir_all(&home).unwrap();
     // The protocol's code for a server that ends unasked.
     assert_eq!(status.code(), Some(1));
+}
+
+/// PATH without kakehashi on it.
+fn without_kakehashi() -> String {
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let dirs = std::env::split_paths(&path)
+        .filter(|dir| !dir.join("kakehashi").is_file() && !dir.join("kakehashi.exe").is_file());
+    std::env::join_paths(dirs)
+        .unwrap()
+        .to_string_lossy()
+        .into_owned()
+}
+
+#[test]
+fn nu_lsp_is_nusages_server_when_kakehashi_is_not_there() {
+    let text = std::fs::read_to_string(caller()).unwrap();
+    let requests = [(
+        "textDocument/hover",
+        json!({"position": at(&text, "$usage.args.who", 1)}),
+    )];
+    let vars = [("PATH", without_kakehashi())];
+    let Some((results, _)) = session_with(&["nu", "--lsp"], &vars, &text, None, &requests) else {
+        return;
+    };
+    let hover = results[0]["contents"]["value"].as_str().unwrap();
+    assert!(hover.contains("args: record<who: string>"), "{hover}");
+}
+
+#[test]
+fn the_nu_a_server_of_nusages_starts_is_nushells_own() {
+    let text = std::fs::read_to_string(caller()).unwrap();
+    let requests = [(
+        "textDocument/hover",
+        json!({"position": at(&text, "$usage.args.who", 1)}),
+    )];
+    let vars = [("NUSAGE_LSP", "1".to_string())];
+    // `-n`: a Nushell of a home of its own says so on standard output as it writes its
+    // configuration files.
+    let server = ["nu", "--lsp", "-n"];
+    let Some((results, _)) = session_with(&server, &vars, &text, None, &requests) else {
+        return;
+    };
+    // Nushell's own server, which knows no `$usage`.
+    let hover = results[0]["contents"]["value"].as_str().unwrap();
+    assert!(!hover.contains("record<"), "{hover}");
+}
+
+#[test]
+fn anything_else_is_nu_itself() {
+    if Command::new("nu").arg("--version").output().is_err() {
+        assert!(
+            std::env::var("CI").as_deref() != Ok("true"),
+            "nu is not on PATH"
+        );
+        return;
+    }
+    let output = Command::new(env!("CARGO_BIN_EXE_nusage"))
+        .args(["nu", "-n", "-c", "print ([a b] | str join)"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "ab");
+}
+
+/// A `nu` first on PATH that runs `nusage nu` again, as a wrapper of mise's would that
+/// nusage cannot tell for one: the second time round, the same process stops.
+#[cfg(unix)]
+#[test]
+fn a_nu_that_leads_back_here_stops() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = std::env::temp_dir().join(format!("nusage-nu-loop-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let nu = dir.join("nu");
+    std::fs::write(&nu, "#!/bin/sh\nexec \"$NUSAGE_UNDER_TEST\" nu \"$@\"\n").unwrap();
+    std::fs::set_permissions(&nu, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_nusage"))
+        .args(["nu", "-c", "print hi"])
+        .env("PATH", &dir)
+        .env("NUSAGE_UNDER_TEST", env!("CARGO_BIN_EXE_nusage"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while child.try_wait().unwrap().is_none() {
+        if std::time::Instant::now() > deadline {
+            child.kill().unwrap();
+            panic!("`nusage nu` is still going round");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let output = child.wait_with_output().unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(!output.status.success(), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("leads back to `nusage nu`"),
+        "{output:?}"
+    );
+}
+
+#[test]
+fn a_nu_another_one_ran_runs() {
+    if Command::new("nu").arg("--version").output().is_err() {
+        assert!(
+            std::env::var("CI").as_deref() != Ok("true"),
+            "nu is not on PATH"
+        );
+        return;
+    }
+    // The mark of a `nusage nu` that ran this process's parent, as a `nu` Nushell starts has.
+    let output = Command::new(env!("CARGO_BIN_EXE_nusage"))
+        .args(["nu", "-n", "-c", "print inner"])
+        .env("NUSAGE_NU_PID", "1")
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "inner");
 }
