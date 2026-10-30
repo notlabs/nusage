@@ -234,8 +234,12 @@ export def "petstore list-pets" [
 }
 
 # Create a pet
-export def "petstore create-pets" []: record<name: string> -> string {
-    nusage request {
+@usage 'output "json" framing="json" default=#true {
+        schema file="schemas/create-pets.schema.json"
+    }'
+export def "petstore create-pets" []: record<name: string> -> record<name: string, tag: oneof<string, nothing>, owner: oneof<record<name: string, pets: oneof<int, nothing>>, nothing>, born: oneof<datetime, nothing>, id: int> {
+    let body = $in
+    let text = nusage request {
         service: petstore
         base: "https://petstore.example.com/v1"
         auth: [{kind: bearer}]
@@ -244,9 +248,10 @@ export def "petstore create-pets" []: record<name: string> -> string {
         params: {}
         query: {}
         headers: {}
-        body: $in
+        body: $body
         media: application/json
     }
+    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$defs\":{\"Pet\":{\"allOf\":[{\"$ref\":\"#/$defs/NewPet\"},{\"type\":\"object\",\"required\":[\"id\"],\"properties\":{\"id\":{\"type\":\"integer\",\"format\":\"int64\"}}}]},\"NewPet\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"tag\":{\"type\":[\"string\",\"null\"]},\"owner\":{\"anyOf\":[{\"$ref\":\"#/$defs/Owner\"},{\"type\":\"null\"}]},\"born\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"Owner\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"pets\":{\"type\":\"integer\",\"exclusiveMinimum\":0}}}},\"$ref\":\"#/$defs/Pet\"}" { from json | default null tag | default null owner | update owner {|row| if $row.owner == null { null } else { $row.owner | default null pets } } | default null born | update born {|row| if $row.born == null { null } else { $row.born | into datetime } } }
 }
 
 # Info for a specific pet

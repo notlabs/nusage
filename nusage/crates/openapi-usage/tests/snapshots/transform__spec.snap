@@ -26,7 +26,11 @@ cmd "list-pets" help="List all pets" {
         schema file="schemas/list-pets.schema.json"
     }
 }
-cmd "create-pets" help="Create a pet"
+cmd "create-pets" help="Create a pet" {
+    output "json" framing="json" default=#true {
+        schema file="schemas/create-pets.schema.json"
+    }
+}
 cmd "show-pet-by-id" help="Info for a specific pet" {
     arg (int)"<pet-id>" help="The id of the pet"
     output "json" framing="json" default=#true {

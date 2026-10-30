@@ -1,0 +1,6 @@
+{
+    name: "gh",
+    type: "module",
+    description: "Typed Nushell commands for the GitHub CLI: its pull request, issue, repository, run and release commands, the listings and views as data",
+    license: "MIT",
+}

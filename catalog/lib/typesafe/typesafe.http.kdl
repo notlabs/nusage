@@ -1,0 +1,7 @@
+base "https://api.typesafe.ai"
+auth "bearer"
+cmd "list-models" method="get" path="/v1/models"
+cmd "system-one" method="post" path="/v1/systemone" {
+    header "TypeSafe-Danger-Zone-Images" flag="type-safe-danger-zone-images"
+    body "application/json" schema="schemas/system-one.body.schema.json" required=#true
+}

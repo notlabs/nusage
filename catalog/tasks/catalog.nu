@@ -11,17 +11,26 @@
 #   [_.nusage.catalog.jj]
 #   spec = { clap = "spec" }                        # an extractor `../clap/spec.nu` builds and runs
 #
+#   [_.nusage.catalog.typesafe]
+#   spec = { openapi = "openapi.yaml" }             # an OpenAPI document under the package
+#
 # `spec` names one way to obtain the spec: `run` for a tool that prints its own, `clap` for a
-# binary whose crate builds its clap command, the directory of the extractor under the package.
-# `check` asks whether the committed spec is the tool's on PATH with a `probe`: `export` runs
-# `run` again and compares, the default for a `run` entry whose export is cheap; `version`
-# compares the spec's own `version` to `<bin> --version`, the default for `clap`, and the
-# choice for a `run` whose export builds something, `probe = "version"`.
+# binary whose crate builds its clap command, the directory of the extractor under the package,
+# `openapi` for a service, the OpenAPI document under the package that `openapi-usage` writes
+# as a spec with the HTTP mapping and the schemas beside it. `check` asks whether the committed
+# spec is the tool's on PATH with a `probe`: `export` runs `run` again and compares, the
+# default for a `run` entry whose export is cheap, and the only probe of an `openapi` entry,
+# whose every written file is compared; `version` compares the spec's own `version` to `<bin>
+# --version`, the default for `clap`, and the choice for a `run` whose export builds
+# something, `probe = "version"`.
 #
 # The entry's package is `lib/<tool>/`, a Nushell module directory: with `lib` on
 # `$NU_LIB_DIRS`, `use <tool> *` names the commands as the tool does. It holds
 #
 #   <tool>.usage.kdl    the spec, as obtained; `spec` refreshes it
+#   <tool>.http.kdl     the HTTP mapping beside a service's spec, with `schemas/*.schema.json`
+#                       the mapping and the spec name; `spec` writes them with it, and the
+#                       package keeps no suite: its `schemas/` is written, a binary's is kept
 #   <tool>.select.kdl   the overlay declaring the output `switch` selects; generated
 #   <tool>.schemas.kdl  the overlay `../schemas/overlay.nu` writes from `schemas/outputs.nuon`,
 #                       declaring each output with its schema; generated when the suite exists
@@ -65,6 +74,7 @@ export def files [tool: string]: nothing -> record {
     {
         dir: $dir
         spec: ($dir | path join $"($tool).usage.kdl")
+        http: ($dir | path join $"($tool).http.kdl")
         select: ($dir | path join $"($tool).select.kdl")
         schemas_overlay: ($dir | path join $"($tool).schemas.kdl")
         schemas: ($dir | path join schemas outputs.nuon)
@@ -75,13 +85,13 @@ export def files [tool: string]: nothing -> record {
     }
 }
 
-# How the entry's spec is obtained: `run` or `clap`.
+# How the entry's spec is obtained: `run`, `clap` or `openapi`.
 export def spec-kind [entry: record]: nothing -> string {
     let spec = $entry.spec? | default {}
-    let kinds = [run clap] | where {|kind| $kind in ($spec | columns) }
+    let kinds = [run clap openapi] | where {|kind| $kind in ($spec | columns) }
     if ($kinds | length) != 1 {
         error make --unspanned {
-            msg: $"entry `($entry.name)`: `spec` names one way to obtain the spec, `run` or `clap`; it has ($kinds | str join ', ')"
+            msg: $"entry `($entry.name)`: `spec` names one way to obtain the spec, `run`, `clap` or `openapi`; it has ($kinds | str join ', ')"
         }
     }
     $kinds.0
@@ -89,13 +99,54 @@ export def spec-kind [entry: record]: nothing -> string {
 
 # How `check` asks whether the committed spec is current: `export` or `version`.
 export def spec-probe [entry: record]: nothing -> string {
-    let probe = $entry.spec.probe? | default (if (spec-kind $entry) == clap { "version" } else { "export" })
+    let kind = spec-kind $entry
+    let probe = $entry.spec.probe? | default (if $kind == clap { "version" } else { "export" })
     if $probe not-in [export version] {
         error make --unspanned {
             msg: $"entry `($entry.name)`: `spec.probe` is `export` or `version`, not `($probe)`"
         }
     }
+    if $kind == openapi and $probe != export {
+        error make --unspanned {
+            msg: $"entry `($entry.name)`: an `openapi` entry is probed by `export`, which writes the document again and compares"
+        }
+    }
     $probe
+}
+
+# An `openapi` entry's document, JSON or YAML under the package, as `openapi-usage` reads it.
+export def openapi-document [entry: record]: nothing -> string {
+    let document = root | path join lib $entry.name $entry.spec.openapi
+    if not ($document | path exists) {
+        error make --unspanned {
+            msg: $"entry `($entry.name)`: no OpenAPI document at ($document | path relative-to (root))"
+        }
+    }
+    $document
+}
+
+# Write an `openapi` entry's spec, HTTP mapping and schemas into `into`, as `openapi-usage`
+# writes them: the spec and the mapping named after the entry, the schemas under `schemas/`.
+export def export-openapi [entry: record, into: string]: nothing -> nothing {
+    let wrote = ^openapi-usage (openapi-document $entry) --name $entry.name --bin $entry.name --out $into | complete
+    if $wrote.exit_code != 0 {
+        error make --unspanned {
+            msg: $"entry `($entry.name)`: openapi-usage failed: ($wrote.stderr | str trim)"
+        }
+    }
+}
+
+# The files an `openapi` entry's export writes, relative to where it writes them: the spec,
+# the mapping and the schemas.
+export def openapi-files [dir: string]: nothing -> list<string> {
+    let schemas = $dir | path join schemas
+    let written = if ($schemas | path exists) { glob ($schemas | path join '*.schema.json') } else { [] }
+    [$"*.usage.kdl" $"*.http.kdl"]
+    | each {|pattern| glob ($dir | path join $pattern) }
+    | flatten
+    | append $written
+    | each {|file| $file | path relative-to $dir }
+    | sort
 }
 
 # What the committed spec says of itself: its `bin`, and the `version` it describes, when it
@@ -107,8 +158,17 @@ export def spec-identity [files: record]: nothing -> record {
     {bin: $bin, version: $version}
 }
 
-# The spec as a `run` entry's tool prints it now.
+# The spec as a `run` entry's tool prints it now, or as an `openapi` entry's document converts.
 export def export-spec [entry: record]: nothing -> string {
+    if (spec-kind $entry) == openapi {
+        let got = ^openapi-usage (openapi-document $entry) --name $entry.name --bin $entry.name | complete
+        if $got.exit_code != 0 {
+            error make --unspanned {
+                msg: $"entry `($entry.name)`: openapi-usage failed: ($got.stderr | str trim)"
+            }
+        }
+        return $got.stdout
+    }
     let run = $entry.spec.run
     let got = ^nu -c $run | complete
     if $got.exit_code != 0 {
@@ -142,11 +202,29 @@ export def generate [entry: record, --into: string]: nothing -> record {
             msg: $"entry `($entry.name)`: no spec at ($files.spec | path relative-to (root)); `mise run spec ($entry.name)` obtains it"
         }
     }
+    if ($files.http | path exists) and ($files.schemas | path exists) {
+        error make --unspanned {
+            msg: $"entry `($entry.name)`: a service's `schemas/` is written from its document; it keeps no suite"
+        }
+    }
     let out = $into | default $files.dir
     mkdir $out
     let spec = $out | path join ($files.spec | path basename)
     if $spec != $files.spec {
         cp $files.spec $spec
+        # A service's spec names its schemas by their path beside it, and its mapping goes
+        # beside it too.
+        if ($files.http | path exists) {
+            cp $files.http ($out | path join ($files.http | path basename))
+            cp --recursive ($files.dir | path join schemas) ($out | path join schemas)
+        }
+    }
+    let http = if ($files.http | path exists) {
+        [
+            "--http" ($out | path join ($files.http | path basename))
+        ]
+    } else {
+        []
     }
     let module = $out | path join mod.nu
     mut generated = []
@@ -162,6 +240,6 @@ export def generate [entry: record, --into: string]: nothing -> record {
         $generated = $generated | append $schemas
     }
     let overlays = $generated ++ $files.overlays
-    ^nusage generate $spec ...($overlays | each {|overlay| ["--overlay" $overlay] } | flatten) --out $module
+    ^nusage generate $spec ...($overlays | each {|overlay| ["--overlay" $overlay] } | flatten) ...$http --out $module
     {generated: $generated, module: $module, overlays: $overlays}
 }

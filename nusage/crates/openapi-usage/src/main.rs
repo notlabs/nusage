@@ -9,12 +9,12 @@ use usage_rs::Cli;
 /// a query or header parameter its flag, a JSON response its output with the schema. The
 /// method, the path, where each parameter goes on the wire and the request body go in
 /// `<name>.http.kdl` beside `<name>.usage.kdl`, and each schema in `schemas/`, all in the
-/// directory `--out` names. Without `--out`, the spec alone is printed. The document is read
-/// as JSON; for YAML, `open doc.yaml | to json` first.
+/// directory `--out` names. Without `--out`, the spec alone is printed. The document is
+/// JSON, or YAML where its name ends in `.yaml` or `.yml`.
 #[derive(Cli)]
 #[usage(bin = "openapi-usage", version)]
 struct OpenapiUsage {
-    /// The OpenAPI document, as JSON
+    /// The OpenAPI document, as JSON or YAML
     document: PathBuf,
     /// The directory to write the spec, the mapping and the schemas into
     #[usage(long, short = 'o')]
@@ -41,8 +41,16 @@ fn main() -> ExitCode {
 fn run(cli: OpenapiUsage) -> Result<(), String> {
     let text = std::fs::read_to_string(&cli.document)
         .map_err(|err| format!("{}: {err}", cli.document.display()))?;
-    let document: serde_json::Value =
-        serde_json::from_str(&text).map_err(|err| format!("{}: {err}", cli.document.display()))?;
+    let yaml = cli
+        .document
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml") || ext.eq_ignore_ascii_case("yml"));
+    let document: serde_json::Value = if yaml {
+        serde_saphyr::from_str(&text).map_err(|err| format!("{}: {err}", cli.document.display()))?
+    } else {
+        serde_json::from_str(&text).map_err(|err| format!("{}: {err}", cli.document.display()))?
+    };
     let options = openapi_usage::Options {
         name: cli.name,
         bin: cli.bin,

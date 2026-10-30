@@ -1,0 +1,6 @@
+{
+    name: "typesafe",
+    type: "module",
+    description: "Typed Nushell commands for the TypeSafe AI API: the models, and System One decisions about content",
+    license: "MIT",
+}

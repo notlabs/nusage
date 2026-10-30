@@ -19,20 +19,21 @@ shell = "nu -c"
 # binary there whenever another of its commands relinks it, under a task that is running it.
 # The plugins are copied beside nusage, for `plugins` to register.
 [tasks.build]
-description = "Build the workspace and copy nusage and its plugins into the repository's bin directory"
+description = "Build the workspace and copy nusage, openapi-usage and its plugins into the repository's bin directory"
 sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
 outputs = [
   "../.bin/nusage",
+  "../.bin/openapi-usage",
   "../.bin/nu_plugin_nusage",
   "../.bin/nu_plugin_jev",
 ]
 run = '''
-let built = ^cargo build --workspace --locked --message-format json-render-diagnostics
+let built = ^cargo build --quiet --workspace --locked --message-format json-render-diagnostics
   | lines
   | where ($it | str starts-with "{")
   | each { from json }
   | where reason == compiler-artifact and executable != null
-  | where $it.target.name == nusage or ($it.target.name | str starts-with nu_plugin_)
+  | where $it.target.name in [nusage openapi-usage] or ($it.target.name | str starts-with nu_plugin_)
   | get executable
 let bin = "{{ config_root }}/../.bin" | path expand
 mkdir $bin

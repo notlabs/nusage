@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A pull request, as `gh pr view --json` selects its fields",
+  "$ref": "#/$defs/pull_request",
+  "$defs": {
+    "author": {
+      "type": "object",
+      "required": ["is_bot", "login"],
+      "additionalProperties": false,
+      "properties": {
+        "is_bot": {"type": "boolean"},
+        "login": {"type": "string"},
+        "id": {"type": "string"},
+        "name": {"type": "string"}
+      }
+    },
+    "label": {
+      "type": "object",
+      "required": ["id", "name", "description", "color"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "color": {"type": "string"}
+      }
+    },
+    "pull_request": {
+      "type": "object",
+      "required": [
+        "number",
+        "title",
+        "state",
+        "isDraft",
+        "url",
+        "author",
+        "headRefName",
+        "baseRefName",
+        "createdAt",
+        "updatedAt",
+        "closedAt",
+        "mergedAt",
+        "labels",
+        "reviewDecision",
+        "body"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "number": {"type": "integer"},
+        "title": {"type": "string"},
+        "state": {"enum": ["OPEN", "CLOSED", "MERGED"]},
+        "isDraft": {"type": "boolean"},
+        "url": {"type": "string"},
+        "author": {"$ref": "#/$defs/author"},
+        "headRefName": {"type": "string"},
+        "baseRefName": {"type": "string"},
+        "createdAt": {"type": "string", "format": "date-time"},
+        "updatedAt": {"type": "string", "format": "date-time"},
+        "closedAt": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
+        "mergedAt": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
+        "labels": {"type": "array", "items": {"$ref": "#/$defs/label"}},
+        "reviewDecision": {"enum": ["", "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"]},
+        "body": {"type": "string"}
+      }
+    }
+  }
+}

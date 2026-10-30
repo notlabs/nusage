@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "The workflow runs `gh run list --json` selects, one array",
+  "type": "array",
+  "items": {"$ref": "#/$defs/run"},
+  "$defs": {
+    "run": {
+      "type": "object",
+      "required": [
+        "databaseId",
+        "number",
+        "attempt",
+        "name",
+        "displayTitle",
+        "workflowName",
+        "headBranch",
+        "headSha",
+        "event",
+        "status",
+        "conclusion",
+        "createdAt",
+        "updatedAt",
+        "startedAt",
+        "url"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "databaseId": {"type": "integer"},
+        "number": {"type": "integer"},
+        "attempt": {"type": "integer"},
+        "name": {"type": "string"},
+        "displayTitle": {"type": "string"},
+        "workflowName": {"type": "string"},
+        "headBranch": {"type": "string"},
+        "headSha": {"type": "string"},
+        "event": {"type": "string"},
+        "status": {"type": "string"},
+        "conclusion": {"type": "string"},
+        "createdAt": {"type": "string", "format": "date-time"},
+        "updatedAt": {"type": "string", "format": "date-time"},
+        "startedAt": {"type": "string", "format": "date-time"},
+        "url": {"type": "string"}
+      }
+    }
+  }
+}

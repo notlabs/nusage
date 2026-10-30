@@ -107,7 +107,7 @@ fn the_wrappers_send_what_the_mapping_says_and_return_typed_values() {
             200,
             r#"[{"id": 1, "name": "Rex", "born": "2024-01-02T03:04:05Z"}, {"id": 2, "name": "Tom", "tag": "cat", "owner": {"name": "Ana"}}]"#,
         ),
-        (200, ""),
+        (200, r#"{"id": 3, "name": "Rex", "tag": "dog"}"#),
         (200, r#"{"id": 7, "name": "Kit", "owner": null}"#),
         (200, ""),
     ]);
@@ -170,7 +170,17 @@ let gone = petstore delete-pets-pet-id 7 --force
             .unwrap(),
         nu_protocol::Value::test_nothing()
     );
-    assert_eq!(field("created").coerce_string().unwrap(), "");
+    // The pet created, decoded by its schema: the body went as the input and the response
+    // came back typed, with the absent properties filled.
+    let created = field("created");
+    assert_eq!(
+        created.get_data_by_key("id").unwrap(),
+        nu_protocol::Value::test_int(3)
+    );
+    assert_eq!(
+        created.get_data_by_key("born").unwrap(),
+        nu_protocol::Value::test_nothing()
+    );
     assert_eq!(
         field("kit")
             .get_data_by_key("name")

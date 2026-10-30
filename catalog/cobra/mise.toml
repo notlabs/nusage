@@ -6,14 +6,27 @@ description = "Export the pinned Compose command tree through Usage's Cobra adap
 dir = "../lib/docker-compose/spec"
 run = "go run -mod=readonly ."
 
+# gh's root is constructed from internal packages, so its extractor is built inside a checkout
+# of cli/cli at the tag `../lib/gh/spec/pin.toml` names, as `gh.nu` describes; the catalog's
+# `spec` task runs this for the `gh` entry.
+[tasks.gh]
+description = "Export the pinned gh command tree through Usage's Cobra adapter, built in a checkout of cli/cli"
+depends = ["//nusage:build"]
+file = "gh.nu"
+
+[tasks.gh-json-fields]
+description = "Write the fields each gh command's --json accepts into the package, from the same checkout"
+depends = ["//nusage:build"]
+run = "nusage {{ config_root }}/gh.nu --json-fields | save --force {{ config_root }}/../lib/gh/json-fields.json"
+
 [task_config]
 shell = "nu -c"
 
 [tasks.check]
-description = "Check Go formatting and reproduce the spec despite environment overrides"
+description = "Check Go formatting and reproduce the Compose spec despite environment overrides"
 dir = "../lib/docker-compose/spec"
 run = '''
-let unformatted = ^gofmt -l main.go
+let unformatted = ^gofmt -l main.go ../../gh/spec/main.go
 if ($unformatted | str trim | is-not-empty) {
     error make {msg: $"gofmt: ($unformatted)"}
 }

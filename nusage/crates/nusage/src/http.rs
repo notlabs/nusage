@@ -102,11 +102,8 @@ fn wrapper(tree: &CommandTree, service: &Service, command: &Command) -> Result<D
         Some(output) => Type::new(output.as_str())?,
         None => Type::new("string")?,
     };
-    let run = call(
-        "nusage request",
-        vec![request_record(tree, service, base, request)?],
-    )?;
-    // Then the decoding, as a binary wrapper's.
+    // Then the decoding, as a binary wrapper's. A decoded output binds the response first,
+    // and a `let` does not pass the wrapper's input on, so the body is bound before it.
     let body = match &command.structured {
         Some(structured) if structured.schema.is_some() => {
             let schema: serde_json::Value =
@@ -121,20 +118,53 @@ fn wrapper(tree: &CommandTree, service: &Service, command: &Command) -> Result<D
             if structured.framing == nusage_model::Framing::Jsonl {
                 args.push(Expr::Str("--lines".into()));
             }
-            vec![
-                Stmt::Let {
-                    name: text,
-                    value: run,
-                },
-                Stmt::Pipeline(vec![call("nusage decoded", args)?]),
-            ]
+            let mut body = Vec::new();
+            let carried = if request.body.is_some() {
+                let bound = Ident::new("body")?;
+                body.push(Stmt::Let {
+                    name: bound.clone(),
+                    value: Expr::Var(Ident::new("in")?),
+                });
+                bound
+            } else {
+                Ident::new("in")?
+            };
+            let run = call(
+                "nusage request",
+                vec![request_record(tree, service, base, request, carried)?],
+            )?;
+            body.push(Stmt::Let {
+                name: text,
+                value: run,
+            });
+            body.push(Stmt::Pipeline(vec![call("nusage decoded", args)?]));
+            body
         }
         Some(structured) => {
+            let run = call(
+                "nusage request",
+                vec![request_record(
+                    tree,
+                    service,
+                    base,
+                    request,
+                    Ident::new("in")?,
+                )?],
+            )?;
             let mut stages = vec![run];
             stages.extend(decode_stages(structured)?);
             vec![Stmt::Pipeline(stages)]
         }
-        None => vec![Stmt::Pipeline(vec![run])],
+        None => vec![Stmt::Pipeline(vec![call(
+            "nusage request",
+            vec![request_record(
+                tree,
+                service,
+                base,
+                request,
+                Ident::new("in")?,
+            )?],
+        )?])],
     };
     Ok(Def {
         export: true,
@@ -149,12 +179,14 @@ fn wrapper(tree: &CommandTree, service: &Service, command: &Command) -> Result<D
 
 /// What `nusage request` is handed: the service and where it is, how it authenticates, the
 /// method and path, and the parameters by where they go, each as the variable that carries
-/// it; the body as the input, with its media type, when the call sends one.
+/// it; the body as `carried`, the input or the variable bound to it, with its media type,
+/// when the call sends one.
 fn request_record(
     tree: &CommandTree,
     service: &Service,
     base: Expr,
     request: &Request,
+    carried: Ident,
 ) -> Result<Expr, SyntaxError> {
     let auths = service
         .auths
@@ -194,7 +226,7 @@ fn request_record(
         ("headers".to_string(), at(Location::Header)?),
     ];
     if let Some(body) = &request.body {
-        fields.push(("body".to_string(), Expr::Var(Ident::new("in")?)));
+        fields.push(("body".to_string(), Expr::Var(carried)));
         fields.push(("media".to_string(), Expr::Str(body.media.clone())));
     }
     Ok(Expr::Record(fields))

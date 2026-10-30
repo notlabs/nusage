@@ -32,6 +32,28 @@ def spec-state [entry: record, files: record]: nothing -> record {
     let name = $entry.name
     let refresh = $"`mise run spec ($name)` then `mise run generate ($name)` refresh it"
     match (spec-probe $entry) {
+        export if (spec-kind $entry) == openapi => {
+            # The document is the source: every file written from it is held to the package.
+            let scratch = mktemp --directory --tmpdir --suffix .nusage-openapi
+            try { export-openapi $entry $scratch } catch {|err|
+                rm --recursive $scratch
+                return {state: unknown, note: $err.msg}
+            }
+            let written = openapi-files $scratch
+            let stale = ($written | where {|file|
+                let committed = $files.dir | path join $file
+                not ($committed | path exists) or (open --raw $committed) != (open --raw ($scratch | path join $file))
+            }) ++ (openapi-files $files.dir | where {|file| $file not-in $written })
+            rm --recursive $scratch
+            if ($stale | is-empty) {
+                {state: current}
+            } else {
+                {
+                    state: stale
+                    note: $"($stale | str join ', ') under ($files.dir | path relative-to (root)) are not what the document gives; ($refresh)"
+                }
+            }
+        }
         export => {
             let fresh = try { export-spec $entry } catch {|err| return {state: unknown, note: $err.msg} }
             if $fresh == (open --raw $files.spec) {
@@ -106,7 +128,8 @@ for entry in (entries $usage.args.tool) {
 
     let committed = $made.generated | each {|file| $files.dir | path join ($file | path basename) }
     let overlays = $committed ++ $files.overlays
-    let held = ^nusage check $files.spec $files.module ...($overlays | each {|overlay| ["--overlay" $overlay] } | flatten) | complete
+    let http = if ($files.http | path exists) { ["--http" $files.http] } else { [] }
+    let held = ^nusage check $files.spec $files.module ...($overlays | each {|overlay| ["--overlay" $overlay] } | flatten) ...$http | complete
     if $held.exit_code != 0 {
         print --no-newline $held.stderr
         $failed = $failed | append $"($name): nusage check"

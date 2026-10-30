@@ -1,0 +1,132 @@
+{
+    format: 1
+    tool: gh
+    baseline: {
+        version: "2.103.3"
+        repository: "https://github.com/cli/cli"
+        revision: "v2.103.3"
+    }
+    # gh selects JSON with `--json` and a list of the fields wanted, from those the command's
+    # `help:json-fields` annotation names, which `../json-fields.json` lists per command. So
+    # each output is asked for with `--json` and the field list its schema describes, as
+    # `nusage-args`: the wrapper owns `--json`, and `--jq` and `--template`, which transform
+    # the selection, are hidden in `../gh.typed.overlay.kdl`. A source names a file of cli/cli
+    # at the revision: the field list, the exporter that writes each field, and the type behind
+    # it.
+    outputs: [
+        {
+            id: pr-list
+            command: [pr list]
+            name: json
+            select: [--json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body"]
+            framing: json
+            schema: pull-request-list.schema.json
+            source: ["api/query_builder.go:353" "api/export_pr.go:91" "api/queries_pr.go:27" "api/queries_issue.go:294" "api/queries_repo.go:223"]
+        }
+        {
+            id: pr-view
+            command: [pr view]
+            name: json
+            select: [--json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body"]
+            framing: json
+            schema: pull-request.schema.json
+            source: ["api/query_builder.go:353" "api/export_pr.go:91" "api/queries_pr.go:27" "api/queries_issue.go:294" "api/queries_repo.go:223"]
+        }
+        {
+            id: pr-checks
+            command: [pr checks]
+            name: json
+            select: [--json "name,state,startedAt,completedAt,link,bucket,event,workflow,description"]
+            framing: json
+            schema: check-list.schema.json
+            source: ["pkg/cmd/pr/checks/checks.go:23" "pkg/cmd/pr/checks/aggregate.go:12"]
+        }
+        {
+            id: issue-list
+            command: [issue list]
+            name: json
+            select: [--json "number,title,state,stateReason,url,author,createdAt,updatedAt,closedAt,labels,assignees,body"]
+            framing: json
+            schema: issue-list.schema.json
+            source: ["api/query_builder.go:351" "api/export_pr.go:8" "api/queries_issue.go:26" "api/queries_issue.go:294" "api/queries_repo.go:144" "api/queries_repo.go:223"]
+        }
+        {
+            id: issue-view
+            command: [issue view]
+            name: json
+            select: [--json "number,title,state,stateReason,url,author,createdAt,updatedAt,closedAt,labels,assignees,body"]
+            framing: json
+            schema: issue.schema.json
+            source: ["api/query_builder.go:351" "api/export_pr.go:8" "api/queries_issue.go:26" "api/queries_issue.go:294" "api/queries_repo.go:144" "api/queries_repo.go:223"]
+        }
+        {
+            id: repo-view
+            command: [repo view]
+            name: json
+            select: [--json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt"]
+            framing: json
+            schema: repository.schema.json
+            source: ["api/query_builder.go:476" "api/export_repo.go:7" "api/queries_repo.go:29" "api/queries_repo.go:139" "api/queries_repo.go:169"]
+        }
+        {
+            id: repo-list
+            command: [repo list]
+            name: json
+            select: [--json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt"]
+            framing: json
+            schema: repository-list.schema.json
+            source: ["api/query_builder.go:476" "api/export_repo.go:7" "api/queries_repo.go:29" "api/queries_repo.go:139" "api/queries_repo.go:169"]
+        }
+        {
+            id: run-list
+            command: [run list]
+            name: json
+            select: [--json "databaseId,number,attempt,name,displayTitle,workflowName,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,startedAt,url"]
+            framing: json
+            schema: run-list.schema.json
+            source: ["pkg/cmd/run/shared/shared.go:70" "pkg/cmd/run/shared/shared.go:164" "pkg/cmd/run/shared/shared.go:91"]
+        }
+        {
+            id: run-view
+            command: [run view]
+            name: json
+            select: [--json "databaseId,number,attempt,name,displayTitle,workflowName,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,startedAt,url"]
+            framing: json
+            schema: run.schema.json
+            source: ["pkg/cmd/run/shared/shared.go:89" "pkg/cmd/run/shared/shared.go:164" "pkg/cmd/run/shared/shared.go:91"]
+        }
+        {
+            id: release-list
+            command: [release list]
+            name: json
+            select: [--json "name,tagName,isDraft,isLatest,isPrerelease,isImmutable,createdAt,publishedAt"]
+            framing: json
+            schema: release-list.schema.json
+            source: ["pkg/cmd/release/list/list.go:62" "pkg/cmd/release/list/http.go:26" "pkg/cmdutil/json_flags.go:306"]
+        }
+        {
+            id: release-view
+            command: [release view]
+            name: json
+            select: [--json "tagName,name,body,isDraft,isPrerelease,isImmutable,createdAt,publishedAt,targetCommitish,url,author,assets"]
+            framing: json
+            schema: release.schema.json
+            source: ["pkg/cmd/release/shared/fetch.go:23" "pkg/cmd/release/shared/fetch.go:44" "pkg/cmd/release/shared/fetch.go:87"]
+        }
+    ]
+    # The cases read this repository, with the token `check-schemas.nu` requires: a merged pull
+    # request, the repository itself, its workflow runs and its releases. No issue and no run
+    # is named, since an issue may be closed away and a run's id is the moment's; those outputs
+    # are held to `examples.nuon`.
+    cases: [
+        {id: pr-list, output: pr-list, argv: [pr list --repo notlabs/nusage --state all --limit 3 --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body"], exit_codes: [0], expect: {minItems: 1}}
+        {id: pr-view, output: pr-view, argv: [pr view 34 --repo notlabs/nusage --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body"], exit_codes: [0], expect: {properties: {number: {const: 34}, state: {const: MERGED}}}}
+        {id: pr-checks, output: pr-checks, argv: [pr checks 34 --repo notlabs/nusage --json "name,state,startedAt,completedAt,link,bucket,event,workflow,description"], exit_codes: [0], expect: {minItems: 1}}
+        {id: issue-list, output: issue-list, argv: [issue list --repo notlabs/nusage --state all --limit 3 --json "number,title,state,stateReason,url,author,createdAt,updatedAt,closedAt,labels,assignees,body"], exit_codes: [0], expect: {type: array}}
+        {id: repo-view, output: repo-view, argv: [repo view notlabs/nusage --json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt"], exit_codes: [0], expect: {properties: {nameWithOwner: {const: "notlabs/nusage"}, defaultBranchRef: {properties: {name: {const: main}}}}}}
+        {id: repo-list, output: repo-list, argv: [repo list notlabs --limit 2 --json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt"], exit_codes: [0], expect: {minItems: 1}}
+        {id: run-list, output: run-list, argv: [run list --repo notlabs/nusage --limit 3 --json "databaseId,number,attempt,name,displayTitle,workflowName,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,startedAt,url"], exit_codes: [0], expect: {minItems: 1}}
+        {id: release-list, output: release-list, argv: [release list --repo notlabs/nusage --limit 5 --json "name,tagName,isDraft,isLatest,isPrerelease,isImmutable,createdAt,publishedAt"], exit_codes: [0], expect: {minItems: 1, contains: {properties: {tagName: {const: "v0.1.1"}}}}}
+        {id: release-view, output: release-view, argv: [release view v0.1.1 --repo notlabs/nusage --json "tagName,name,body,isDraft,isPrerelease,isImmutable,createdAt,publishedAt,targetCommitish,url,author,assets"], exit_codes: [0], expect: {properties: {tagName: {const: "v0.1.1"}, isDraft: {const: false}}}}
+    ]
+}
