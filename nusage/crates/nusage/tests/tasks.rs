@@ -153,6 +153,22 @@ fn a_call_of_a_task_is_held_to_its_scripts_header() {
     };
     let errors = parse_errors(&dir.join("caller.nu"));
     let (line, findings) = nusage::prelude(&dir.join("caller.nu")).unwrap();
+    let inspection = nusage::inspect(&dir.join("caller.nu")).unwrap();
+    let call = inspection["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|call| call["name"] == "mise run greet")
+        .unwrap();
+    assert_eq!(call["through"]["kind"], "mise");
+    assert_eq!(call["through"]["task"], "greet");
+    assert_eq!(call["through"]["dir"], dir.to_str().unwrap());
+    assert_eq!(
+        Path::new(call["target"].as_str().unwrap())
+            .canonicalize()
+            .unwrap(),
+        dir.join("mise-tasks/greet").canonicalize().unwrap()
+    );
     std::fs::remove_dir_all(&dir).unwrap();
     for expected in [
         "expected int",

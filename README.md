@@ -29,6 +29,11 @@ Early development.
   proposed upstream: `mise run //mergiraf:build`, and `//mergiraf:test` holds the build to
   the cases the patches carry.
 
+Run `nusage inspect script.nu | from json` to read the analyzer's resolved calls and
+findings as values, without running the script. The output's contract is
+`nusage/schemas/inspection.schema.json`; its command models are the ones `nusage model`
+prints. It reports the calls the analyzer resolves, not a complete dependency graph.
+
 An editor that runs `nusage lsp` where it would run `nu --lsp` checks a script nusage runs as
 nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to
 that script's header, and each `mise run` of a task whose file is one. Or leave the editor as it is and opt in through mise: after `mise dot

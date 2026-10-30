@@ -37,6 +37,7 @@ pub enum Commands {
     Nu(Nu),
     Parse(Parse),
     Prelude(Prelude),
+    Inspect(Inspect),
     Validate(Validate),
 }
 
@@ -289,6 +290,30 @@ impl Run for Parse {
                 std::process::exit(2)
             }
         }
+    }
+}
+
+/// Inspect a script's resolved calls and findings as JSON, without running it
+///
+/// The same analysis as the interpreter and language server. Calls are resolved command
+/// shadows, not a complete dependency graph; paths are absolute and finding spans are
+/// UTF-8 byte offsets. Header and call findings remain structured data in the result.
+#[derive(Args)]
+pub struct Inspect {
+    /// The script whose shebang names nusage
+    script: PathBuf,
+}
+
+impl Run for Inspect {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        let inspection = crate::inspect(&self.script).map_err(|e| e.to_string())?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&inspection).map_err(|e| e.to_string())?
+        );
+        Ok(())
     }
 }
 
