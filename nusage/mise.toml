@@ -17,12 +17,13 @@ shell = "nu -c"
 # The build, copied where the root's `[env] _.path` looks for it, from the path Cargo
 # reports: a build cache may keep the target directory elsewhere, and Cargo rewrites the
 # binary there whenever another of its commands relinks it, under a task that is running it.
+# Quiet: Cargo's progress and the cache's summary are noise in a log; diagnostics still print.
 [tasks.build]
 description = "Build the workspace and copy nusage into the repository's bin directory"
 sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
 outputs = ["../.bin/nusage"]
 run = '''
-let built = ^cargo build --workspace --locked --message-format json-render-diagnostics
+let built = ^cargo build --quiet --workspace --locked --message-format json-render-diagnostics
   | lines
   | where ($it | str starts-with "{")
   | each { from json }
@@ -51,8 +52,8 @@ description = "Formatting, clippy and rustdoc, as CI checks them"
 env = { RUSTDOCFLAGS = "-D warnings" }
 run = [
   "cargo fmt --all --check",
-  "cargo clippy --workspace --all-targets --locked -- -D warnings",
-  "cargo doc --workspace --no-deps --locked",
+  "cargo clippy --quiet --workspace --all-targets --locked -- -D warnings",
+  "cargo doc --quiet --workspace --no-deps --locked",
 ]
 
 [tasks.verify-fixtures]

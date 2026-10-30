@@ -11,7 +11,9 @@ so it is built here from its published source with the patches beside it applied
   `.bin`, where the root's `[env] _.path` finds it; `//mergiraf:test` merges each case the
   Nushell patch carries with that binary, as `jj resolve` would, and holds it to the case's
   expected result; `//mergiraf:check`, which CI runs, holds the patches to the pinned source
-  without building.
+  without building. In GitHub Actions a failure of any of them is an annotation on the file
+  at fault, a patch or this configuration, through the module at `.mise/lib/actions.nu` that
+  the lint and the catalog's check annotate with too.
 - `patches/`: the changes, as a series `git format-patch` wrote against the source as
   published, applied in name order.
   - `0001-Add-Nushell-support.patch`: the language profile, its test cases under

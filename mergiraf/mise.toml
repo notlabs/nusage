@@ -7,6 +7,11 @@
 # are written against, and a bump means holding them to the new source with `check`.
 "http:mergiraf-source" = { version = "0.20.0", url = "https://static.crates.io/crates/mergiraf/mergiraf-{{ version }}.crate", format = "tar.gz", strip_components = 1, bin_path = "doc", checksum = "sha256:4a7be1108bbb7d636476c790bb512f80351433fabbc481fefe78a2e36eaacb0e" }
 
+# The tasks print GitHub Actions' annotations through the module at `.mise/lib/actions.nu`,
+# which the runner reads only at the start of a line: so each task interleaves its output,
+# unprefixed, and quiets mise's own, which would print these scripts whole. A task's `env`
+# is rendered with the tools of the task's own config root, which the source is one of; a
+# `run` script sees only the root's from `//`, so the source comes in as variables.
 [task_config]
 shell = "nu -c"
 
@@ -14,27 +19,31 @@ shell = "nu -c"
 # the copy is disposable, and Cargo keeps the build between runs in a target directory of
 # its own, so a changed patch rebuilds Mergiraf and not its grammars. The copy sits inside
 # this repository's Cargo workspace, so its manifest gets the empty `[workspace]` table that
-# keeps it out. The path Cargo reports is copied, as `//nusage:build` does, for the same
-# reasons.
+# keeps it out. Cargo is quiet, as in `//nusage:build`, and the path it reports is copied,
+# for the same reasons.
 [tasks.build]
 description = "Build Mergiraf with the patches applied and copy it into the repository's bin directory"
 sources = ["mise.toml", "patches/*.patch"]
 outputs = ["../.bin/mergiraf"]
+output = "interleave"
+quiet = true
+env = { MERGIRAF_SOURCE = "{{ tools['mergiraf-source'].path }}", MERGIRAF_VERSION = "{{ tools['mergiraf-source'].version }}" }
 run = '''
-let source = "{{ tools['mergiraf-source'].path }}"
+use "{{ config_root }}/../.mise/lib/actions.nu" *
 let target = "{{ config_root }}/../target" | path expand
 let work = $target | path join mergiraf-source
 rm -rf $work
 mkdir $target
-cp -r $source $work
+cp -r $env.MERGIRAF_SOURCE $work
 for patch in (glob "{{ config_root }}/patches/*.patch" | sort) {
-    ^patch -p1 -s -d $work -i $patch
+    ^patch -p1 -s -F0 -d $work -i $patch
 }
 "\n[workspace]\n" | save --append ($work | path join Cargo.toml)
-let build = ^cargo build --release --locked --manifest-path ($work | path join Cargo.toml) --target-dir ($target | path join mergiraf) --message-format json-render-diagnostics
+let build = ^cargo build --quiet --release --locked --manifest-path ($work | path join Cargo.toml) --target-dir ($target | path join mergiraf) --message-format json-render-diagnostics
   | complete
-print --stderr $build.stderr
+print --stderr --no-newline $build.stderr
 if $build.exit_code != 0 {
+    annotate error $build.stderr --file "{{ config_root }}/mise.toml" --title $"Mergiraf ($env.MERGIRAF_VERSION) with the patches does not build"
     error make --unspanned { msg: $"cargo build failed with exit code ($build.exit_code)" }
 }
 let built = $build.stdout
@@ -50,25 +59,33 @@ cp $built ($bin | path join mergiraf)
 
 # The cases the Nushell patch carries, in Mergiraf's own test layout, merged by the binary
 # built, with the flags jj passes it, and held to each case's expected result; a case whose
-# expected result keeps conflict markers is one Mergiraf is right to leave alone.
+# expected result keeps conflict markers is one Mergiraf is right to leave alone. A case that
+# differs is an annotation on the patch, at the expected result it carries.
 [tasks.test]
 description = "Merge each case of the Nushell patch with the Mergiraf built and hold it to the expected result"
 depends = [":build"]
+output = "interleave"
+quiet = true
 run = '''
+use "{{ config_root }}/../.mise/lib/actions.nu" *
+let patch = "{{ config_root }}/patches/0001-Add-Nushell-support.patch"
 let cases = "{{ config_root }}/../target/mergiraf-source/tests/data/nushell/working" | path expand
 let failed = glob ($cases | path join "*") | sort | each {|case|
+    let name = $case | path basename
     let suffix = ls $case | get name | path basename | where ($it | str starts-with Base) | first | path parse | get extension
     let file = {|revision| $case | path join $"($revision).($suffix)" }
     let expected = open --raw (do $file Expected)
     let merged = ^mergiraf merge --fast -s BASE -x LEFT -y RIGHT (do $file Base) (do $file Left) (do $file Right) | complete
     if $merged.stdout == $expected {
-        print $"($case | path basename): as expected"
-        null
-    } else {
-        print $"($case | path basename): differs from Expected.($suffix)"
-        print ($merged.stdout | diff --unified (do $file Expected) - | complete | get stdout)
-        $case | path basename
+        print $"($name): as expected"
+        return null
     }
+    let diff = $merged.stdout | ^diff --unified --label $"($name)/Expected.($suffix)" --label "merged now" (do $file Expected) - | complete | get stdout
+    print $"($name): differs from Expected.($suffix)"
+    print --no-newline $diff
+    let line = open --raw $patch | lines | enumerate | where $it.item == $"+++ b/tests/data/nushell/working/($name)/Expected.($suffix)" | get 0?.index
+    annotate error $diff --file $patch --line (if $line != null { $line + 1 }) --title $"($name): not what Mergiraf merges now"
+    $name
 } | compact
 if ($failed | is-not-empty) {
     error make --unspanned { msg: $"($failed | length) of (glob ($cases | path join '*') | length) cases differ" }
@@ -76,17 +93,24 @@ if ($failed | is-not-empty) {
 '''
 
 # Cheap enough for CI, which runs every root's `check`: the patches still apply to the
-# pinned source, each after the ones before it. Building Mergiraf is left to `build`.
+# pinned source, each after the ones before it, and exactly, as `build` applies them: a patch
+# whose context has drifted is one to look at, not one for `patch` to place by guesswork.
+# Building Mergiraf is left to `build`.
 [tasks.check]
 description = "Hold the patches to the pinned Mergiraf source: each applies"
+output = "interleave"
+quiet = true
+env = { MERGIRAF_SOURCE = "{{ tools['mergiraf-source'].path }}", MERGIRAF_VERSION = "{{ tools['mergiraf-source'].version }}" }
 run = '''
-let source = "{{ tools['mergiraf-source'].path }}"
+use "{{ config_root }}/../.mise/lib/actions.nu" *
 let work = (mktemp -d) | path join source
-cp -r $source $work
+cp -r $env.MERGIRAF_SOURCE $work
 for patch in (glob "{{ config_root }}/patches/*.patch" | sort) {
-    let applied = ^patch -p1 -s -d $work -i $patch | complete
+    let applied = ^patch -p1 -s -F0 -d $work -i $patch | complete
     if $applied.exit_code != 0 {
-        error make --unspanned { msg: $"($patch | path basename) no longer applies to Mergiraf {{ tools['mergiraf-source'].version }}:\n($applied.stdout)($applied.stderr)" }
+        let why = $applied.stdout + $applied.stderr
+        annotate error $why --file $patch --title $"($patch | path basename) no longer applies to Mergiraf ($env.MERGIRAF_VERSION)"
+        error make --unspanned { msg: $"($patch | path basename) no longer applies to Mergiraf ($env.MERGIRAF_VERSION):\n($why)" }
     }
     print $"($patch | path basename): applies"
 }
