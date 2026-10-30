@@ -25,6 +25,6 @@ pub use header::{
     Header, HeaderNode, ScriptHeader, Texts, read_header, read_header_in, read_subcommand_header,
 };
 pub use tree::{
-    Assembled, CommandPath, Provider, Source, assemble, assemble_http, assemble_in, assemble_with,
-    command_at,
+    Assembled, CommandPath, Provider, Source, assemble, assemble_http, assemble_in, assemble_text,
+    assemble_with, command_at,
 };
