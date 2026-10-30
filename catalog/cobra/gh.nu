@@ -18,7 +18,9 @@ if not ($cache | path join .git | path exists) {
     mkdir ($cache | path dirname)
     let cloned = ^git -c advice.detachedHead=false clone --quiet --depth 1 --branch $pin.gh.tag $pin.gh.repository $cache | complete
     if $cloned.exit_code != 0 {
-        error make --unspanned {msg: $"cloning ($pin.gh.repository) at ($pin.gh.tag) failed: ($cloned.stderr | str trim)"}
+        error make --unspanned {
+            msg: $"cloning ($pin.gh.repository) at ($pin.gh.tag) failed: ($cloned.stderr | str trim)"
+        }
     }
 }
 let at = ^git -C $cache describe --tags --exact-match | complete

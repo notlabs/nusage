@@ -222,7 +222,13 @@ export def generate [entry: record, --into: string]: nothing -> record {
             cp --recursive ($files.dir | path join schemas) ($out | path join schemas)
         }
     }
-    let http = if ($files.http | path exists) { ["--http" ($out | path join ($files.http | path basename))] } else { [] }
+    let http = if ($files.http | path exists) {
+        [
+            "--http" ($out | path join ($files.http | path basename))
+        ]
+    } else {
+        []
+    }
     let module = $out | path join mod.nu
     mut generated = []
     let switch = $entry.switch?
