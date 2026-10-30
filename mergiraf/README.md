@@ -37,10 +37,14 @@ its result back, recording as a conflict what came back with markers. `jj resolv
 ## What the profile knows
 
 Nushell predeclares the `def`s and `extern`s of a block before parsing its pipelines, so
-their order in a script, a module or any block does not matter: they commute, keyed by name,
-and so do `use` statements among themselves. Record entries commute, keyed by their key, in
-scripts and in NUON files alike; the commands a `use` imports, `use foo [a b c]`, commute
-too. Strings, interpolated strings and the shebang are merged as a whole. Everything else
+their order in a script, a module or any block does not matter: they commute, keyed by name.
+Whole `use` statements keep their order: two modules can export the same command name,
+and the last import then determines which command runs. Concurrent additions at the same
+import position stay a conflict, even when the names happen to be distinct. Regression
+cases cover colliding imports both at the top level and inside a block.
+Record entries commute, keyed by their key, in scripts and in NUON files alike; the named
+commands a single `use` imports, `use foo [a b c]`, commute too. Strings, interpolated
+strings and the shebang are merged as a whole. Everything else
 keeps its order and a concurrent change to the same place in it stays a conflict: pipelines,
 `let`, `const` and `alias`, since each may depend on the one before; lists and tables, since
 their order is data; match arms, since the first match wins; command parameters, since the
