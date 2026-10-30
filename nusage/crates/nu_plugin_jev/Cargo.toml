@@ -1,0 +1,28 @@
+[package]
+name = "nu_plugin_jev"
+description = "Typed judgments about a value, from TypeSafe AI's System One model, inside Nushell"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Released as a binary beside nusage, not on crates.io.
+publish = false
+
+[[bin]]
+name = "nu_plugin_jev"
+bench = false
+
+[lib]
+bench = false
+
+[dependencies]
+nusage-plugin.workspace = true
+serde_json.workspace = true
+ureq.workspace = true
+
+[dev-dependencies]
+nusage-plugin = { workspace = true, features = ["test"] }
+
+[lints]
+workspace = true
