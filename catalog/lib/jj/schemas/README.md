@@ -14,7 +14,8 @@ target or a TOML datetime in the configuration. `mise run //catalog:check jj` bu
 repository in a home of its own and holds jj's output to the schemas and to each case's
 expectation; `--bin` holds another jj to the same.
 
-`log` and `operation log` keep jj's diff flags, `--patch`, `--stat`, `--summary` and the
-like, which write a diff after each line that the wrapper cannot decode: `^jj` asks for that.
+`jj.typed.overlay.kdl` hides the diff modes and their formatting flags on `log`, `evolog`
+and `operation log`, and `log --count`: they append text to or replace the JSON lines the
+wrapper returns. Use `^jj` for those modes.
 A configuration value is any TOML value, so its type is `any`. The commands whose template
 type does not serialize, `diff`, `show` and the `file` commands, stay text.
