@@ -78,9 +78,23 @@
       "properties": {
         "analysis": {
           "enum": ["kept", "changed", "relocated"],
-          "description": "What the change does to the script's analysis, as `nusage prelude` prints it today: the same, different, or the same but for the directory it names."
+          "description": "What the change does to the script's analysis, as `nusage prelude` prints it, with `nusage inspect` confirming no findings: the same, different, or the same but for the directory it names."
         },
         "traits": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "calls": {
+          "type": "array",
+          "description": "Resolved calls and their complete long flag names before and after the change.",
+          "items": {
+            "type": "object",
+            "required": ["name", "before_flags", "after_flags"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "before_flags": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+              "after_flags": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+            }
+          }
+        },
         "reads": {
           "type": "array",
           "uniqueItems": true,
