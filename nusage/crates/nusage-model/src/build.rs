@@ -835,13 +835,15 @@ fn conversions_for(ty: &NuType) -> Result<Vec<Conversion>, String> {
     let parsed =
         parse_type(ty).map_err(|err| format!("`{}` is not a Nushell type: {err}", ty.as_str()))?;
     let mut out = Vec::new();
-    collect_conversions(&parsed, Vec::new(), &mut out, ty)?;
+    collect_conversions(&parsed, Vec::new(), Vec::new(), &mut out, ty)?;
     Ok(out)
 }
 
+/// `tables` is where the path so far crosses a table below the top, by prefix length.
 fn collect_conversions(
     ty: &Type,
     path: Vec<String>,
+    tables: Vec<usize>,
     out: &mut Vec<Conversion>,
     declared: &NuType,
 ) -> Result<(), String> {
@@ -858,15 +860,20 @@ fn collect_conversions(
             ty: into.to_string(),
             unit: None,
             nullable: Vec::new(),
+            tables,
         });
         return Ok(());
     }
     match ty {
         Type::Record(columns) | Type::Table(columns) => {
+            let mut tables = tables;
+            if matches!(ty, Type::Table(_)) && !path.is_empty() {
+                tables.push(path.len());
+            }
             for (column, column_ty) in columns.iter() {
                 let mut path = path.clone();
                 path.push(column.clone());
-                collect_conversions(column_ty, path, out, declared)?;
+                collect_conversions(column_ty, path, tables.clone(), out, declared)?;
             }
         }
         Type::List(inner) if needs_conversion(inner) => {
@@ -1056,5 +1063,25 @@ mod tests {
         );
         assert!(conversions_for(&NuType("list<datetime>".into())).is_err());
         assert!(conversions_for(&NuType("list<string>".into())).is_ok());
+        // A column of a table below the top is reached on each row, not by a cell path.
+        let below = conversions_for(&NuType(
+            "record<deps: table<since: datetime>, at: datetime>".into(),
+        ))
+        .unwrap();
+        assert_eq!(
+            below
+                .iter()
+                .map(|c| (c.path.join("."), c.tables.clone()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("deps.since".to_string(), vec![1]),
+                ("at".to_string(), vec![])
+            ]
+        );
+        assert!(
+            conversions_for(&NuType("table<at: datetime>".into())).unwrap()[0]
+                .tables
+                .is_empty()
+        );
     }
 }
