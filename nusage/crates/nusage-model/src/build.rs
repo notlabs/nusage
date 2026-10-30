@@ -957,6 +957,13 @@ fn required_columns(ty: &NuType) -> Result<NuType, String> {
 }
 
 fn parse_type(ty: &NuType) -> Result<Type, String> {
+    nu_shape(ty).map(|shape| shape.to_type())
+}
+
+/// The type as Nushell's parser reads it where a parameter declares it: the syntax shape of
+/// `p: <ty>`, which is what a signature built outside Nushell, a plugin's, declares. A `path`
+/// keeps its shape here, where [`nu_type`] reads it as the `string` it carries.
+pub fn nu_shape(ty: &NuType) -> Result<nu_protocol::SyntaxShape, String> {
     let mut working_set = StateWorkingSet::new(&ENGINE);
     let source = format!("def __nusage_type [p: {}] {{}}", ty.as_str());
     nu_parser::parse(&mut working_set, None, source.as_bytes(), false);
@@ -970,8 +977,13 @@ fn parse_type(ty: &NuType) -> Result<Type, String> {
     decl.signature()
         .required_positional
         .first()
-        .map(|positional| positional.shape.to_type())
+        .map(|positional| positional.shape.clone())
         .ok_or_else(|| "the parser kept no parameter".to_string())
+}
+
+/// The type as Nushell's checker holds a value to it, read as [`nu_shape`] reads it.
+pub fn nu_type(ty: &NuType) -> Result<Type, String> {
+    parse_type(ty)
 }
 
 #[cfg(test)]

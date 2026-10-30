@@ -234,11 +234,30 @@ fn assemble_single(path: &Path, texts: &Texts) -> Result<Assembled, Diagnostic> 
     Ok(out)
 }
 
+/// [`assemble`] for a spec given as KDL text rather than a file: `name` stands for the file,
+/// `<name>.usage.kdl`, in diagnostics and as the spec's name when the text declares none. For
+/// a spec a program carries in itself, as a plugin carries the spec of the CLI it stands for.
+pub fn assemble_text(name: &str, kdl: &str) -> Result<Assembled, Diagnostic> {
+    assemble_spec_text(
+        Path::new(&format!("{name}.usage.kdl")),
+        kdl.to_string(),
+        &[],
+    )
+}
+
 /// A spec file: the root's declaration is its top-level nodes, each `cmd` node is a command
 /// whose declaration is its children.
 fn assemble_spec_file(path: &Path, overlays: &[PathBuf]) -> Result<Assembled, Diagnostic> {
     let text = fs::read_to_string(path)
         .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?;
+    assemble_spec_text(path, text, overlays)
+}
+
+fn assemble_spec_text(
+    path: &Path,
+    text: String,
+    overlays: &[PathBuf],
+) -> Result<Assembled, Diagnostic> {
     let mut doc: KdlDocument = text
         .parse()
         .map_err(|err| Diagnostic::new(path, format!("not valid KDL: {err}")))?;

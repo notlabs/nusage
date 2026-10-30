@@ -9,6 +9,7 @@
 
 mod binary;
 mod calls;
+pub mod cli;
 mod common;
 mod conform;
 mod http;
