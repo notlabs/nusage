@@ -1,11 +1,13 @@
-//! `nusage lsp` in front of the pinned `nu --lsp`: a whole session is written to it at once
-//! and its answers read back, which Nushell gives in order, diagnostics after each change.
+//! `nusage lsp` in front of the pinned `nu --lsp`: requests are sent together, then answers
+//! are read through the shutdown acknowledgment before exit, draining all complete frames.
 //! Without `nu` on PATH the session is skipped, except in CI, where it fails.
 
-use std::io::Write;
+use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value as Json, json};
 
@@ -57,6 +59,27 @@ fn session_with(
         eprintln!("skipped: nu is not on PATH");
         return None;
     }
+    Some(
+        exchange_session(
+            server,
+            vars,
+            open,
+            change,
+            requests,
+            Duration::from_secs(30),
+        )
+        .expect("a complete LSP session"),
+    )
+}
+
+fn exchange_session(
+    server: &[&str],
+    vars: &[(&str, String)],
+    open: &str,
+    change: Option<&str>,
+    requests: &[(&str, Json)],
+    timeout: Duration,
+) -> io::Result<(Vec<Json>, Vec<Json>)> {
     let script = caller();
     let document = uri(&script);
     let mut messages = vec![
@@ -73,7 +96,6 @@ fn session_with(
         messages.push(json!({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {"textDocument": {"uri": document, "version": 2}, "contentChanges": [{"text": text}]}}));
     }
     messages.push(json!({"jsonrpc": "2.0", "id": 999, "method": "shutdown"}));
-    messages.push(json!({"jsonrpc": "2.0", "method": "exit"}));
     let mut input = Vec::new();
     for message in &messages {
         let body = serde_json::to_vec(message).unwrap();
@@ -99,30 +121,118 @@ fn session_with(
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
-    server.stdin.take().unwrap().write_all(&input).unwrap();
-    let output = server.wait_with_output().unwrap();
-    std::fs::remove_dir_all(&home).unwrap();
-    assert!(output.status.success(), "{:?}", output.status);
+    let mut stdin = Some(server.stdin.take().unwrap());
+    let stdout = server.stdout.take().unwrap();
+    let (sent, received) = mpsc::channel();
+    let reader = std::thread::spawn(move || {
+        let mut stdout = BufReader::new(stdout);
+        loop {
+            let message = response(&mut stdout);
+            let ended = !matches!(message, Ok(Some(_)));
+            if sent.send(message).is_err() || ended {
+                break;
+            }
+        }
+    });
+    let deadline = Instant::now() + timeout;
+    let session = (|| -> io::Result<_> {
+        stdin.as_mut().unwrap().write_all(&input)?;
+        let mut results = vec![Json::Null; requests.len()];
+        let mut diagnostics = Vec::new();
+        let mut shutdown = false;
+        loop {
+            let body = received
+                .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+                .map_err(|err| match err {
+                    mpsc::RecvTimeoutError::Timeout => {
+                        io::Error::new(io::ErrorKind::TimedOut, "LSP response deadline exceeded")
+                    }
+                    mpsc::RecvTimeoutError::Disconnected => {
+                        io::Error::new(io::ErrorKind::UnexpectedEof, "LSP response reader stopped")
+                    }
+                })??;
+            let Some(body) = body else {
+                if shutdown {
+                    break;
+                }
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "no shutdown response",
+                ));
+            };
+            if body["id"] == 999 {
+                if body.get("result") != Some(&Json::Null) {
+                    return Err(io::Error::other(format!("shutdown failed: {body}")));
+                }
+                // Only the complete acknowledgment permits exit; Nu may otherwise stop
+                // before its output thread has finished writing earlier responses.
+                let exit = br#"{"jsonrpc":"2.0","method":"exit"}"#;
+                let mut input = stdin.take().unwrap();
+                write!(input, "Content-Length: {}\r\n\r\n", exit.len())?;
+                input.write_all(exit)?;
+                shutdown = true;
+            } else if body["method"] == "textDocument/publishDiagnostics"
+                && body["params"]["uri"] == document
+            {
+                diagnostics = body["params"]["diagnostics"]
+                    .as_array()
+                    .ok_or_else(|| io::Error::other("diagnostics are not an array"))?
+                    .clone();
+            } else if let Some(id) = body["id"].as_u64()
+                && (1..=requests.len() as u64).contains(&id)
+            {
+                results[id as usize - 1] = body["result"].clone();
+            }
+        }
+        Ok((results, diagnostics))
+    })();
+    // EOF lets nusage clean up its own Nu child. Bound that grace period too, then reap.
+    drop(stdin);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let status = loop {
+        if let Some(status) = server.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            server.kill()?;
+            break server.wait()?;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    reader.join().expect("the response reader");
+    std::fs::remove_dir_all(&home)?;
+    let result = session?;
+    if !status.success() {
+        return Err(io::Error::other(format!("LSP server exited: {status}")));
+    }
+    Ok(result)
+}
 
-    let mut results = vec![Json::Null; requests.len()];
-    let mut diagnostics = Vec::new();
-    let mut rest = output.stdout.as_slice();
-    while !rest.is_empty() {
-        let split = rest.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
-        let head = std::str::from_utf8(&rest[..split]).unwrap();
-        let length: usize = head.split(':').nth(1).unwrap().trim().parse().unwrap();
-        let body: Json = serde_json::from_slice(&rest[split + 4..split + 4 + length]).unwrap();
-        rest = &rest[split + 4 + length..];
-        if body["method"] == "textDocument/publishDiagnostics" && body["params"]["uri"] == document
-        {
-            diagnostics = body["params"]["diagnostics"].as_array().unwrap().clone();
-        } else if let Some(id) = body["id"].as_u64()
-            && (1..=requests.len() as u64).contains(&id)
-        {
-            results[id as usize - 1] = body["result"].clone();
+/// A complete LSP frame; EOF is valid only between frames.
+fn response(stdout: &mut impl BufRead) -> io::Result<Option<Json>> {
+    let mut header = String::new();
+    if stdout.read_line(&mut header)? == 0 {
+        return Ok(None);
+    }
+    let mut length = None;
+    while header != "\r\n" {
+        if let Some(value) = header.strip_prefix("Content-Length:") {
+            length = Some(value.trim().parse::<usize>().map_err(io::Error::other)?);
+        }
+        header.clear();
+        if stdout.read_line(&mut header)? == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "incomplete LSP header",
+            ));
         }
     }
-    Some((results, diagnostics))
+    let length = length.ok_or_else(|| io::Error::other("no Content-Length"))?;
+    let mut bytes = vec![0; length];
+    stdout.read_exact(&mut bytes)?;
+    serde_json::from_slice(&bytes)
+        .map(Some)
+        .map_err(io::Error::other)
 }
 
 fn said(diagnostics: &[Json]) -> Vec<(u64, String)> {
@@ -135,6 +245,46 @@ fn said(diagnostics: &[Json]) -> Vec<(u64, String)> {
             )
         })
         .collect()
+}
+
+#[cfg(unix)]
+#[test]
+fn a_server_that_exits_early_or_never_answers_cannot_stall_the_session() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = std::env::temp_dir().join(format!("nusage-lsp-unresponsive-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let nu = dir.join("nu");
+    let vars = [("PATH", dir.to_string_lossy().into_owned())];
+    for script in [
+        "#!/bin/sh\nexit 9\n",
+        "#!/bin/sh\nexec /bin/cat > /dev/null\n",
+    ] {
+        std::fs::write(&nu, script).unwrap();
+        std::fs::set_permissions(&nu, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let started = Instant::now();
+        let error = exchange_session(
+            &["lsp"],
+            &vars,
+            "let a = 1\n",
+            None,
+            &[],
+            Duration::from_millis(250),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(
+                error.kind(),
+                io::ErrorKind::TimedOut | io::ErrorKind::UnexpectedEof | io::ErrorKind::BrokenPipe
+            ),
+            "{error}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(5), "{error}");
+        if script.contains("cat") {
+            assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        }
+    }
+    std::fs::remove_dir_all(dir).unwrap();
 }
 
 #[test]

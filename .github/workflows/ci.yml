@@ -54,3 +54,23 @@ jobs:
       - run: mise run '//...:check'
         env:
           GH_TOKEN: ${{ github.token }}
+      # Patch application is checked on every run; build and exercise the semantic cases
+      # when their implementation, runner or toolchain changes.
+      - id: mergiraf-changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            # Checkout leaves no credential behind; supply its read-only token for this fetch.
+            git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --no-tags --depth=1 origin "$BASE_SHA"
+            if git diff --quiet "$BASE_SHA" HEAD -- mergiraf jj.toml mise.toml mise.lock .mise/lib/actions.nu .github/workflows/ci.yml; then
+              echo "run=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "run=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+      - if: steps.mergiraf-changes.outputs.run == 'true'
+        run: mise run //mergiraf:test

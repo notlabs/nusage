@@ -2,7 +2,8 @@
 #USAGE about "Holds the intent to its schemas and its checked claims to nusage as it is"
 # Disposable: the claims, the traits and the schemas are what last. This holds each file to
 # its schema, the names the claims use to the traits and the graph's words, and runs each
-# checked claim against today's `nusage prelude`; an open claim it only holds to its shape.
+# checked claim against today's `nusage prelude`, backed by `nusage inspect`; an open claim
+# it only holds to its shape.
 
 const here = path self | path dirname
 
@@ -20,17 +21,53 @@ def write-files [dir: string, files: record] {
         let target = $dir | path join $file.path
         mkdir ($target | path dirname)
         $file.text | save --force --raw $target
+        # mise discovers file tasks by their executable bit; no config needs trusting.
+        if $nu.os-info.name != windows and ($file.text | str starts-with "#!") {
+            ^chmod +x $target
+        }
     }
 }
 
-# The script's analysis as nusage has it today: the line `nusage prelude` prints for it, and
-# what it says of the calls.
-def analysis [dir: string, script: string]: nothing -> string {
-    let result = ^nusage prelude ($dir | path join $script) | complete
-    if $result.exit_code != 0 {
-        error make --unspanned {msg: $"nusage prelude ($script): ($result.stderr)"}
+# Inspect validates the resolved analysis on both sides. Prelude retains the existing
+# comparison semantics, including the caller's own $usage type.
+def analysis [dir: string, script: string]: nothing -> record {
+    let result = do {
+        cd $dir
+        ^nusage inspect ($dir | path join $script) | complete
     }
-    $result.stdout + $result.stderr
+    if $result.exit_code != 0 {
+        error make --unspanned {msg: $"nusage inspect ($script): ($result.stderr)"}
+    }
+    let inspected = $result.stdout | from json
+    if ($inspected.findings | is-not-empty) {
+        error make --unspanned {
+            msg: $"nusage inspect ($script) has findings: ($inspected.findings | to nuon)"
+        }
+    }
+    # Prelude carries the caller's own $usage type, which inspect's resolved calls do not.
+    let prelude = do {
+        cd $dir
+        ^nusage prelude ($dir | path join $script) | complete
+    }
+    if $prelude.exit_code != 0 or ($prelude.stderr | str trim | is-not-empty) {
+        error make --unspanned {msg: $"nusage prelude ($script): ($prelude.stderr)"}
+    }
+    $inspected | insert prelude $prelude.stdout
+}
+
+# A named call must stay resolved, with exactly the long flags its claim expects.
+def call-flags [analysis: record, expected: record, phase: string] {
+    let calls = $analysis.calls | where name == $expected.name
+    if ($calls | length) != 1 {
+        error make --unspanned {msg: $"($phase): expected one resolved call to ($expected.name)"}
+    }
+    let flags = $calls.0.command.flags | get long | compact | sort
+    let wanted = $expected | get $"($phase)_flags" | sort
+    if $flags != $wanted {
+        error make --unspanned {
+            msg: $"($phase): ($expected.name) has flags ($flags | to nuon), expected ($wanted | to nuon)"
+        }
+    }
 }
 
 # What the claim's change does to the analysis, against what it expects.
@@ -43,18 +80,23 @@ def holds [claim: record]: nothing -> bool {
         for entry in (ls --all $dir) {
             cp --recursive $entry.name $moved
         }
-        let after = analysis $moved $claim.given.script | str replace --all $moved $dir
+        # Paths move with the fixture; normalize that directory in the compared prelude.
+        let after = analysis $moved $claim.given.script
         rm --recursive $moved
-        $after
+        $after | update prelude ($after.prelude | str replace --all $moved $dir)
     } else {
         write-files $dir $claim.change.files
         analysis $dir $claim.given.script
     }
     rm --recursive $dir
+    for expected in ($claim.expect.calls? | default []) {
+        call-flags $before $expected before
+        call-flags $after $expected after
+    }
     if $claim.expect.analysis == changed {
-        $after != $before
+        $after.prelude != $before.prelude
     } else {
-        $after == $before
+        $after.prelude == $before.prelude
     }
 }
 

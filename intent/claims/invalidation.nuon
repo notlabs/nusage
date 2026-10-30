@@ -117,7 +117,7 @@ $usage.args.x
   {
     id: task-script-header
     says: "Changing the header of the script a called task runs changes the analysis, as a called script's does."
-    status: open
+    status: checked
     given: {
       script: caller.nu
       files: {
@@ -139,8 +139,10 @@ $'hello ($usage.args.name)'
 "
       }
     }
-    expect: {analysis: changed}
-    open: ["Checked once task calls (#30) are on main: the runner then needs mise and an executable task file."]
+    expect: {
+      analysis: changed
+      calls: [{name: "mise run greet", before_flags: [], after_flags: [loud]}]
+    }
   }
   {
     id: one-read-per-change

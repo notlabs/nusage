@@ -59,7 +59,8 @@ cp $built ($bin | path join mergiraf)
 
 # The cases the Nushell patch carries, in Mergiraf's own test layout, merged by the binary
 # built, with the flags jj passes it, and held to each case's expected result; a case whose
-# expected result keeps conflict markers is one Mergiraf is right to leave alone. A case that
+# expected result keeps conflict markers is one Mergiraf is right to leave alone, with exit
+# code 1; a clean merge is exit code 0. A case that
 # differs is an annotation on the patch, at the expected result it carries.
 [tasks.test]
 description = "Merge each case of the Nushell patch with the Mergiraf built and hold it to the expected result"
@@ -76,15 +77,17 @@ let failed = glob ($cases | path join "*") | sort | each {|case|
     let file = {|revision| $case | path join $"($revision).($suffix)" }
     let expected = open --raw (do $file Expected)
     let merged = ^mergiraf merge --fast -s BASE -x LEFT -y RIGHT (do $file Base) (do $file Left) (do $file Right) | complete
-    if $merged.stdout == $expected {
+    let expected_exit = if ($expected | lines | any {|line| $line | str starts-with "<<<<<<<" }) { 1 } else { 0 }
+    if $merged.stdout == $expected and $merged.exit_code == $expected_exit {
         print $"($name): as expected"
         return null
     }
     let diff = $merged.stdout | ^diff --unified --label $"($name)/Expected.($suffix)" --label "merged now" (do $file Expected) - | complete | get stdout
-    print $"($name): differs from Expected.($suffix)"
+    let status = $"exit code ($merged.exit_code), expected ($expected_exit)"
+    print $"($name): differs from Expected.($suffix); ($status)"
     print --no-newline $diff
     let line = open --raw $patch | lines | enumerate | where $it.item == $"+++ b/tests/data/nushell/working/($name)/Expected.($suffix)" | get 0?.index
-    annotate error $diff --file $patch --line (if $line != null { $line + 1 }) --title $"($name): not what Mergiraf merges now"
+    annotate error ($status + "\n" + $diff + $merged.stderr) --file $patch --line (if $line != null { $line + 1 }) --title $"($name): not what Mergiraf merges now"
     $name
 } | compact
 if ($failed | is-not-empty) {
