@@ -6,7 +6,8 @@
 # and asks after the tool's version: a stale spec fails in CI, where the tool's version is
 # pinned, and is a warning elsewhere, where any version may be on PATH.
 use catalog.nu *
-use ../../.mise/lib/actions.nu *
+use support.nu actions
+use $actions *
 
 def in-ci []: nothing -> bool {
     ($env.CI? | default "") == "true"

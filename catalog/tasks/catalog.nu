@@ -42,6 +42,8 @@
 #   spec/               a clap extractor, for an entry whose `spec` is `clap`
 #   nupm.nuon           the package's manifest, as nupm and numan read it
 
+use support.nu schema_overlay
+
 # The directory the packages are under: the config root mise runs the task in.
 export def root []: nothing -> string {
     $env.MISE_CONFIG_ROOT? | default $env.PWD
@@ -236,7 +238,7 @@ export def generate [entry: record, --into: string]: nothing -> record {
     }
     if ($files.schemas | path exists) {
         let schemas = $out | path join ($files.schemas_overlay | path basename)
-        ^nusage (root | path join schemas overlay.nu) $files.schemas | save --force $schemas
+        ^nusage $schema_overlay $files.schemas | save --force $schemas
         $generated = $generated | append $schemas
     }
     let overlays = $generated ++ $files.overlays

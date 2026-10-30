@@ -4,6 +4,7 @@
 #USAGE flag "--force" help="Write a clap entry's spec though it describes the binary's version, after a change to the extractor or to usage"
 # What depends on a spec stays fresh across runs when the file is written only on a change.
 use catalog.nu *
+use support.nu clap
 
 for entry in (entries $usage.args.tool) {
     let files = files $entry.name
@@ -21,7 +22,7 @@ for entry in (entries $usage.args.tool) {
         clap => {
             let dir = (extractor $entry).dir
             let force = if $usage.flags.force { ["--force"] } else { [] }
-            ^(root | path join clap spec.nu) $dir --out $files.spec ...$force
+            ^nusage $clap $dir --out $files.spec ...$force
         }
         openapi => {
             # The committed set is made the written set: a file the document no longer gives
