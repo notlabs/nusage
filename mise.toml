@@ -9,6 +9,7 @@ config_roots = [
   "catalog/cobra",
   "catalog/schemas",
   "intent",
+  "mergiraf",
 ]
 
 # The Cargo workspace is at the root, so its toolchain is: one pin for Cargo, the tasks and CI.

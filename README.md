@@ -19,6 +19,10 @@ Early development.
   suite, as both packages keep one.
 - `intent/`: the direction, as claims that are checked where they can be; nothing there is
   settled.
+- `mergiraf/`: Mergiraf, the structural merge tool `jj resolve` runs here, built from its
+  published source with the patches beside it, which teach it Nushell and are written to be
+  proposed upstream: `mise run //mergiraf:build`, and `//mergiraf:test` holds the build to
+  the cases the patches carry.
 
 An editor that runs `nusage lsp` where it would run `nu --lsp` checks a script nusage runs as
 nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to

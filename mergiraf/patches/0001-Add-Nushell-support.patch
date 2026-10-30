@@ -1,0 +1,642 @@
+From 3bfdb8b6e24cd446c45260ef8d3df9915d029cfa Mon Sep 17 00:00:00 2001
+From: nusage <dev@nusage>
+Date: Fri, 30 Oct 2026 13:52:12 +0000
+Subject: [PATCH 1/3] Add Nushell support
+
+A profile for Nushell scripts and modules (*.nu) and NUON data (*.nuon), with
+the tree-sitter-nu grammar.
+
+Nushell predeclares the `def`s and `extern`s of a block before parsing its
+pipelines, so their order in a script, a module or any other block does not
+matter and they commute, keyed by name. `use` statements commute among
+themselves. Everything else in a block runs in order (pipelines, `let`,
+`const`, `alias`) and is left alone. Record entries commute, keyed by their
+key; the spread of another record is kept in place. The commands a `use`
+imports, `use foo [a b c]`, commute too.
+
+Lists, tables, pipelines, match arms and command parameters keep their order:
+a concurrent insertion at the same place in one of them stays a conflict.
+
+Strings, interpolated strings and the shebang are merged as a whole.
+
+The grammar's separators between entries (commas, whitespace) are hidden
+tokens, so the newline separator is used when elements are added on both
+sides; a formatter puts an inline record back on one line.
+---
+ doc/src/languages.md                          |  1 +
+ src/supported_langs.rs                        | 50 +++++++++++++++++++
+ .../working/add_different_commands/Base.nu    |  8 +++
+ .../add_different_commands/Expected.nu        | 18 +++++++
+ .../working/add_different_commands/Left.nu    | 13 +++++
+ .../working/add_different_commands/Right.nu   | 13 +++++
+ .../add_different_imported_commands/Base.nu   |  3 ++
+ .../Expected.nu                               |  3 ++
+ .../add_different_imported_commands/Left.nu   |  3 ++
+ .../add_different_imported_commands/Right.nu  |  3 ++
+ .../working/add_different_imports/Base.nu     |  4 ++
+ .../working/add_different_imports/Expected.nu |  6 +++
+ .../working/add_different_imports/Left.nu     |  5 ++
+ .../working/add_different_imports/Right.nu    |  5 ++
+ .../add_different_keys_inline_record/Base.nu  |  2 +
+ .../Expected.nu                               |  3 ++
+ .../add_different_keys_inline_record/Left.nu  |  2 +
+ .../add_different_keys_inline_record/Right.nu |  2 +
+ .../working/add_different_record_keys/Base.nu |  8 +++
+ .../add_different_record_keys/Expected.nu     | 10 ++++
+ .../working/add_different_record_keys/Left.nu |  9 ++++
+ .../add_different_record_keys/Right.nu        |  9 ++++
+ .../add_different_record_keys_nuon/Base.nuon  |  7 +++
+ .../Expected.nuon                             |  9 ++++
+ .../add_different_record_keys_nuon/Left.nuon  |  8 +++
+ .../add_different_record_keys_nuon/Right.nuon |  8 +++
+ .../working/append_to_list_conflicts/Base.nu  |  4 ++
+ .../append_to_list_conflicts/Expected.nu      | 10 ++++
+ .../working/append_to_list_conflicts/Left.nu  |  5 ++
+ .../working/append_to_list_conflicts/Right.nu |  5 ++
+ .../working/move_and_edit_command/Base.nu     | 11 ++++
+ .../working/move_and_edit_command/Expected.nu | 11 ++++
+ .../working/move_and_edit_command/Left.nu     | 11 ++++
+ .../working/move_and_edit_command/Right.nu    | 11 ++++
+ .../working/same_key_added_twice/Base.nu      |  3 ++
+ .../working/same_key_added_twice/Expected.nu  |  9 ++++
+ .../working/same_key_added_twice/Left.nu      |  4 ++
+ .../working/same_key_added_twice/Right.nu     |  4 ++
+ 38 files changed, 300 insertions(+)
+ create mode 100644 tests/data/nushell/working/add_different_commands/Base.nu
+ create mode 100644 tests/data/nushell/working/add_different_commands/Expected.nu
+ create mode 100644 tests/data/nushell/working/add_different_commands/Left.nu
+ create mode 100644 tests/data/nushell/working/add_different_commands/Right.nu
+ create mode 100644 tests/data/nushell/working/add_different_imported_commands/Base.nu
+ create mode 100644 tests/data/nushell/working/add_different_imported_commands/Expected.nu
+ create mode 100644 tests/data/nushell/working/add_different_imported_commands/Left.nu
+ create mode 100644 tests/data/nushell/working/add_different_imported_commands/Right.nu
+ create mode 100644 tests/data/nushell/working/add_different_imports/Base.nu
+ create mode 100644 tests/data/nushell/working/add_different_imports/Expected.nu
+ create mode 100644 tests/data/nushell/working/add_different_imports/Left.nu
+ create mode 100644 tests/data/nushell/working/add_different_imports/Right.nu
+ create mode 100644 tests/data/nushell/working/add_different_keys_inline_record/Base.nu
+ create mode 100644 tests/data/nushell/working/add_different_keys_inline_record/Expected.nu
+ create mode 100644 tests/data/nushell/working/add_different_keys_inline_record/Left.nu
+ create mode 100644 tests/data/nushell/working/add_different_keys_inline_record/Right.nu
+ create mode 100644 tests/data/nushell/working/add_different_record_keys/Base.nu
+ create mode 100644 tests/data/nushell/working/add_different_record_keys/Expected.nu
+ create mode 100644 tests/data/nushell/working/add_different_record_keys/Left.nu
+ create mode 100644 tests/data/nushell/working/add_different_record_keys/Right.nu
+ create mode 100644 tests/data/nushell/working/add_different_record_keys_nuon/Base.nuon
+ create mode 100644 tests/data/nushell/working/add_different_record_keys_nuon/Expected.nuon
+ create mode 100644 tests/data/nushell/working/add_different_record_keys_nuon/Left.nuon
+ create mode 100644 tests/data/nushell/working/add_different_record_keys_nuon/Right.nuon
+ create mode 100644 tests/data/nushell/working/append_to_list_conflicts/Base.nu
+ create mode 100644 tests/data/nushell/working/append_to_list_conflicts/Expected.nu
+ create mode 100644 tests/data/nushell/working/append_to_list_conflicts/Left.nu
+ create mode 100644 tests/data/nushell/working/append_to_list_conflicts/Right.nu
+ create mode 100644 tests/data/nushell/working/move_and_edit_command/Base.nu
+ create mode 100644 tests/data/nushell/working/move_and_edit_command/Expected.nu
+ create mode 100644 tests/data/nushell/working/move_and_edit_command/Left.nu
+ create mode 100644 tests/data/nushell/working/move_and_edit_command/Right.nu
+ create mode 100644 tests/data/nushell/working/same_key_added_twice/Base.nu
+ create mode 100644 tests/data/nushell/working/same_key_added_twice/Expected.nu
+ create mode 100644 tests/data/nushell/working/same_key_added_twice/Left.nu
+ create mode 100644 tests/data/nushell/working/same_key_added_twice/Right.nu
+
+diff --git a/doc/src/languages.md b/doc/src/languages.md
+index 1326913..956aef1 100644
+--- a/doc/src/languages.md
++++ b/doc/src/languages.md
+@@ -19,6 +19,7 @@ Mergiraf currently supports the following programming languages:
+ * Lua (*.lua)
+ * MATLAB (*.m)
+ * Nix (*.nix)
++* Nushell (*.nu, *.nuon)
+ * OCaml (*.ml, *.mli)
+ * PHP (*.php, *.phmtl)
+ * Python (*.py)
+diff --git a/src/supported_langs.rs b/src/supported_langs.rs
+index 9304d16..113b8a9 100644
+--- a/src/supported_langs.rs
++++ b/src/supported_langs.rs
+@@ -1621,6 +1621,56 @@ pub static SUPPORTED_LANGUAGES: LazyLock<Vec<LangProfile>> = LazyLock::new(|| {
+             extra_comment_nodes: &[],
+             allow_parse_errors: false,
+         },
++        LangProfile {
++            name: "Nushell",
++            alternate_names: &["nu"],
++            extensions: &["nu", "nuon"],
++            file_names: &[],
++            language: tree_sitter_nu::LANGUAGE.into(),
++            // Strings are merged as a whole, quotes and interpolations included.
++            atomic_nodes: &["val_string", "val_interpolated", "shebang"],
++            commutative_parents: vec![
++                // Nushell predeclares the `def`s and `extern`s of a block before parsing its
++                // pipelines, so their order in a script, a module or any other block does not
++                // matter. `use` statements commute among themselves. Everything else in a block
++                // runs in order (pipelines, `let`, `const`, `alias`) and is left alone.
++                CommutativeParent::without_delimiters("nu_script", "\n").restricted_to(vec![
++                    ChildrenGroup::with_separator(&["decl_use"], "\n"),
++                    ChildrenGroup::with_separator(&["decl_def", "decl_extern"], "\n\n"),
++                ]),
++                CommutativeParent::new("block", "{\n", "\n", "\n}").restricted_to(vec![
++                    ChildrenGroup::with_separator(&["decl_use"], "\n"),
++                    ChildrenGroup::with_separator(&["decl_def", "decl_extern"], "\n\n"),
++                ]),
++                // The entries of a record are keyed, so their order does not matter. Spreads
++                // (`...$other`) are not entries and stay in place.
++                CommutativeParent::without_delimiters("record_body", "\n")
++                    .restricted_to_groups(&[&["record_entry"]]),
++                // The commands a `use` imports: `use foo [a b c]`.
++                CommutativeParent::new("command_list", "[", " ", "]")
++                    .restricted_to_groups(&[&["cmd_identifier", "val_string"]]),
++            ],
++            signatures: vec![
++                // A command is named either way, unquoted or quoted; the signature takes
++                // whichever is present.
++                signature(
++                    "decl_def",
++                    vec![vec![Field("unquoted_name")], vec![Field("quoted_name")]],
++                ),
++                signature(
++                    "decl_extern",
++                    vec![vec![Field("unquoted_name")], vec![Field("quoted_name")]],
++                ),
++                signature("decl_use", vec![vec![]]),
++                signature("record_entry", vec![vec![Field("key")]]),
++                signature("cmd_identifier", vec![vec![]]),
++                signature("val_string", vec![vec![]]),
++            ],
++            injections: None,
++            flattened_nodes: &[],
++            extra_comment_nodes: &[],
++            allow_parse_errors: false,
++        },
+     ]
+ });
+ 
+diff --git a/tests/data/nushell/working/add_different_commands/Base.nu b/tests/data/nushell/working/add_different_commands/Base.nu
+new file mode 100644
+index 0000000..eb62980
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_commands/Base.nu
+@@ -0,0 +1,8 @@
++# The entries, as rows.
++export def entries []: nothing -> table {
++    ls | select name size
++}
++
++export def names []: nothing -> list<string> {
++    entries | get name
++}
+diff --git a/tests/data/nushell/working/add_different_commands/Expected.nu b/tests/data/nushell/working/add_different_commands/Expected.nu
+new file mode 100644
+index 0000000..efdd89d
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_commands/Expected.nu
+@@ -0,0 +1,18 @@
++# The entries, as rows.
++export def entries []: nothing -> table {
++    ls | select name size
++}
++
++export def names []: nothing -> list<string> {
++    entries | get name
++}
++
++# The largest entry.
++export def largest []: nothing -> record {
++    entries | sort-by size | last
++}
++
++# How many entries there are.
++export def count []: nothing -> int {
++    entries | length
++}
+diff --git a/tests/data/nushell/working/add_different_commands/Left.nu b/tests/data/nushell/working/add_different_commands/Left.nu
+new file mode 100644
+index 0000000..4bd52c1
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_commands/Left.nu
+@@ -0,0 +1,13 @@
++# The entries, as rows.
++export def entries []: nothing -> table {
++    ls | select name size
++}
++
++export def names []: nothing -> list<string> {
++    entries | get name
++}
++
++# The largest entry.
++export def largest []: nothing -> record {
++    entries | sort-by size | last
++}
+diff --git a/tests/data/nushell/working/add_different_commands/Right.nu b/tests/data/nushell/working/add_different_commands/Right.nu
+new file mode 100644
+index 0000000..67ef461
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_commands/Right.nu
+@@ -0,0 +1,13 @@
++# The entries, as rows.
++export def entries []: nothing -> table {
++    ls | select name size
++}
++
++export def names []: nothing -> list<string> {
++    entries | get name
++}
++
++# How many entries there are.
++export def count []: nothing -> int {
++    entries | length
++}
+diff --git a/tests/data/nushell/working/add_different_imported_commands/Base.nu b/tests/data/nushell/working/add_different_imported_commands/Base.nu
+new file mode 100644
+index 0000000..c964450
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_imported_commands/Base.nu
+@@ -0,0 +1,3 @@
++use ./catalog.nu [root entries]
++
++entries
+diff --git a/tests/data/nushell/working/add_different_imported_commands/Expected.nu b/tests/data/nushell/working/add_different_imported_commands/Expected.nu
+new file mode 100644
+index 0000000..d99497d
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_imported_commands/Expected.nu
+@@ -0,0 +1,3 @@
++use ./catalog.nu [root entries files spec-kind]
++
++entries
+diff --git a/tests/data/nushell/working/add_different_imported_commands/Left.nu b/tests/data/nushell/working/add_different_imported_commands/Left.nu
+new file mode 100644
+index 0000000..13e4427
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_imported_commands/Left.nu
+@@ -0,0 +1,3 @@
++use ./catalog.nu [root entries files]
++
++entries
+diff --git a/tests/data/nushell/working/add_different_imported_commands/Right.nu b/tests/data/nushell/working/add_different_imported_commands/Right.nu
+new file mode 100644
+index 0000000..f91bdaa
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_imported_commands/Right.nu
+@@ -0,0 +1,3 @@
++use ./catalog.nu [root entries spec-kind]
++
++entries
+diff --git a/tests/data/nushell/working/add_different_imports/Base.nu b/tests/data/nushell/working/add_different_imports/Base.nu
+new file mode 100644
+index 0000000..ea45559
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_imports/Base.nu
+@@ -0,0 +1,4 @@
++use std log
++use ./catalog.nu *
++
++log info "start"
+diff --git a/tests/data/nushell/working/add_different_imports/Expected.nu b/tests/data/nushell/working/add_different_imports/Expected.nu
+new file mode 100644
+index 0000000..f24c24b
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_imports/Expected.nu
+@@ -0,0 +1,6 @@
++use std log
++use ./catalog.nu *
++use ./schemas.nu [verify]
++use ./clap.nu
++
++log info "start"
+diff --git a/tests/data/nushell/working/add_different_imports/Left.nu b/tests/data/nushell/working/add_different_imports/Left.nu
+new file mode 100644
+index 0000000..b880d04
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_imports/Left.nu
+@@ -0,0 +1,5 @@
++use std log
++use ./catalog.nu *
++use ./schemas.nu [verify]
++
++log info "start"
+diff --git a/tests/data/nushell/working/add_different_imports/Right.nu b/tests/data/nushell/working/add_different_imports/Right.nu
+new file mode 100644
+index 0000000..111bdb8
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_imports/Right.nu
+@@ -0,0 +1,5 @@
++use std log
++use ./catalog.nu *
++use ./clap.nu
++
++log info "start"
+diff --git a/tests/data/nushell/working/add_different_keys_inline_record/Base.nu b/tests/data/nushell/working/add_different_keys_inline_record/Base.nu
+new file mode 100644
+index 0000000..44ae48f
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_keys_inline_record/Base.nu
+@@ -0,0 +1,2 @@
++let x = {a: 1, b: 2}
++$x
+diff --git a/tests/data/nushell/working/add_different_keys_inline_record/Expected.nu b/tests/data/nushell/working/add_different_keys_inline_record/Expected.nu
+new file mode 100644
+index 0000000..b81bc65
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_keys_inline_record/Expected.nu
+@@ -0,0 +1,3 @@
++let x = {a: 1, b: 2, c: 3
++d: 4}
++$x
+diff --git a/tests/data/nushell/working/add_different_keys_inline_record/Left.nu b/tests/data/nushell/working/add_different_keys_inline_record/Left.nu
+new file mode 100644
+index 0000000..3d0db2f
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_keys_inline_record/Left.nu
+@@ -0,0 +1,2 @@
++let x = {a: 1, b: 2, c: 3}
++$x
+diff --git a/tests/data/nushell/working/add_different_keys_inline_record/Right.nu b/tests/data/nushell/working/add_different_keys_inline_record/Right.nu
+new file mode 100644
+index 0000000..3060929
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_keys_inline_record/Right.nu
+@@ -0,0 +1,2 @@
++let x = {a: 1, b: 2, d: 4}
++$x
+diff --git a/tests/data/nushell/working/add_different_record_keys/Base.nu b/tests/data/nushell/working/add_different_record_keys/Base.nu
+new file mode 100644
+index 0000000..6ff95eb
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_record_keys/Base.nu
+@@ -0,0 +1,8 @@
++export def files [tool: string]: nothing -> record {
++    let dir = root | path join lib $tool
++    {
++        dir: $dir
++        spec: ($dir | path join $"($tool).usage.kdl")
++        module: ($dir | path join mod.nu)
++    }
++}
+diff --git a/tests/data/nushell/working/add_different_record_keys/Expected.nu b/tests/data/nushell/working/add_different_record_keys/Expected.nu
+new file mode 100644
+index 0000000..5af5dcb
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_record_keys/Expected.nu
+@@ -0,0 +1,10 @@
++export def files [tool: string]: nothing -> record {
++    let dir = root | path join lib $tool
++    {
++        dir: $dir
++        spec: ($dir | path join $"($tool).usage.kdl")
++        module: ($dir | path join mod.nu)
++        check: ($dir | path join check.nu)
++        schemas: ($dir | path join schemas outputs.nuon)
++    }
++}
+diff --git a/tests/data/nushell/working/add_different_record_keys/Left.nu b/tests/data/nushell/working/add_different_record_keys/Left.nu
+new file mode 100644
+index 0000000..47c78f7
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_record_keys/Left.nu
+@@ -0,0 +1,9 @@
++export def files [tool: string]: nothing -> record {
++    let dir = root | path join lib $tool
++    {
++        dir: $dir
++        spec: ($dir | path join $"($tool).usage.kdl")
++        module: ($dir | path join mod.nu)
++        check: ($dir | path join check.nu)
++    }
++}
+diff --git a/tests/data/nushell/working/add_different_record_keys/Right.nu b/tests/data/nushell/working/add_different_record_keys/Right.nu
+new file mode 100644
+index 0000000..dec6839
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_record_keys/Right.nu
+@@ -0,0 +1,9 @@
++export def files [tool: string]: nothing -> record {
++    let dir = root | path join lib $tool
++    {
++        dir: $dir
++        spec: ($dir | path join $"($tool).usage.kdl")
++        module: ($dir | path join mod.nu)
++        schemas: ($dir | path join schemas outputs.nuon)
++    }
++}
+diff --git a/tests/data/nushell/working/add_different_record_keys_nuon/Base.nuon b/tests/data/nushell/working/add_different_record_keys_nuon/Base.nuon
+new file mode 100644
+index 0000000..1b674bd
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_record_keys_nuon/Base.nuon
+@@ -0,0 +1,7 @@
++[
++  {
++    id: script-calls-script
++    says: "A script that calls another by its path has an edge to it."
++    status: open
++  }
++]
+diff --git a/tests/data/nushell/working/add_different_record_keys_nuon/Expected.nuon b/tests/data/nushell/working/add_different_record_keys_nuon/Expected.nuon
+new file mode 100644
+index 0000000..cb18d89
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_record_keys_nuon/Expected.nuon
+@@ -0,0 +1,9 @@
++[
++  {
++    id: script-calls-script
++    says: "A script that calls another by its path has an edge to it."
++    status: open
++    since: "0.1.0"
++    open: ["Whether the path is resolved before the edge is drawn."]
++  }
++]
+diff --git a/tests/data/nushell/working/add_different_record_keys_nuon/Left.nuon b/tests/data/nushell/working/add_different_record_keys_nuon/Left.nuon
+new file mode 100644
+index 0000000..c55de97
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_record_keys_nuon/Left.nuon
+@@ -0,0 +1,8 @@
++[
++  {
++    id: script-calls-script
++    says: "A script that calls another by its path has an edge to it."
++    status: open
++    since: "0.1.0"
++  }
++]
+diff --git a/tests/data/nushell/working/add_different_record_keys_nuon/Right.nuon b/tests/data/nushell/working/add_different_record_keys_nuon/Right.nuon
+new file mode 100644
+index 0000000..0e41cb5
+--- /dev/null
++++ b/tests/data/nushell/working/add_different_record_keys_nuon/Right.nuon
+@@ -0,0 +1,8 @@
++[
++  {
++    id: script-calls-script
++    says: "A script that calls another by its path has an edge to it."
++    status: open
++    open: ["Whether the path is resolved before the edge is drawn."]
++  }
++]
+diff --git a/tests/data/nushell/working/append_to_list_conflicts/Base.nu b/tests/data/nushell/working/append_to_list_conflicts/Base.nu
+new file mode 100644
+index 0000000..ef82023
+--- /dev/null
++++ b/tests/data/nushell/working/append_to_list_conflicts/Base.nu
+@@ -0,0 +1,4 @@
++let steps = [
++    build
++    test
++]
+diff --git a/tests/data/nushell/working/append_to_list_conflicts/Expected.nu b/tests/data/nushell/working/append_to_list_conflicts/Expected.nu
+new file mode 100644
+index 0000000..f47fe18
+--- /dev/null
++++ b/tests/data/nushell/working/append_to_list_conflicts/Expected.nu
+@@ -0,0 +1,10 @@
++let steps = [
++    build
++    test
++<<<<<<< LEFT
++    lint
++||||||| BASE
++=======
++    package
++>>>>>>> RIGHT
++]
+diff --git a/tests/data/nushell/working/append_to_list_conflicts/Left.nu b/tests/data/nushell/working/append_to_list_conflicts/Left.nu
+new file mode 100644
+index 0000000..c6f8c5c
+--- /dev/null
++++ b/tests/data/nushell/working/append_to_list_conflicts/Left.nu
+@@ -0,0 +1,5 @@
++let steps = [
++    build
++    test
++    lint
++]
+diff --git a/tests/data/nushell/working/append_to_list_conflicts/Right.nu b/tests/data/nushell/working/append_to_list_conflicts/Right.nu
+new file mode 100644
+index 0000000..dcd7d01
+--- /dev/null
++++ b/tests/data/nushell/working/append_to_list_conflicts/Right.nu
+@@ -0,0 +1,5 @@
++let steps = [
++    build
++    test
++    package
++]
+diff --git a/tests/data/nushell/working/move_and_edit_command/Base.nu b/tests/data/nushell/working/move_and_edit_command/Base.nu
+new file mode 100644
+index 0000000..c28a128
+--- /dev/null
++++ b/tests/data/nushell/working/move_and_edit_command/Base.nu
+@@ -0,0 +1,11 @@
++def alpha [] {
++    1
++}
++
++def beta [] {
++    2
++}
++
++def gamma [] {
++    3
++}
+diff --git a/tests/data/nushell/working/move_and_edit_command/Expected.nu b/tests/data/nushell/working/move_and_edit_command/Expected.nu
+new file mode 100644
+index 0000000..d634812
+--- /dev/null
++++ b/tests/data/nushell/working/move_and_edit_command/Expected.nu
+@@ -0,0 +1,11 @@
++def alpha [] {
++    1
++}
++
++def gamma [] {
++    3
++}
++
++def beta [] {
++    2 + 20
++}
+diff --git a/tests/data/nushell/working/move_and_edit_command/Left.nu b/tests/data/nushell/working/move_and_edit_command/Left.nu
+new file mode 100644
+index 0000000..333bc2c
+--- /dev/null
++++ b/tests/data/nushell/working/move_and_edit_command/Left.nu
+@@ -0,0 +1,11 @@
++def alpha [] {
++    1
++}
++
++def gamma [] {
++    3
++}
++
++def beta [] {
++    2
++}
+diff --git a/tests/data/nushell/working/move_and_edit_command/Right.nu b/tests/data/nushell/working/move_and_edit_command/Right.nu
+new file mode 100644
+index 0000000..5c173f2
+--- /dev/null
++++ b/tests/data/nushell/working/move_and_edit_command/Right.nu
+@@ -0,0 +1,11 @@
++def alpha [] {
++    1
++}
++
++def beta [] {
++    2 + 20
++}
++
++def gamma [] {
++    3
++}
+diff --git a/tests/data/nushell/working/same_key_added_twice/Base.nu b/tests/data/nushell/working/same_key_added_twice/Base.nu
+new file mode 100644
+index 0000000..e6cdb15
+--- /dev/null
++++ b/tests/data/nushell/working/same_key_added_twice/Base.nu
+@@ -0,0 +1,3 @@
++let x = {
++    a: 1
++}
+diff --git a/tests/data/nushell/working/same_key_added_twice/Expected.nu b/tests/data/nushell/working/same_key_added_twice/Expected.nu
+new file mode 100644
+index 0000000..a7289a7
+--- /dev/null
++++ b/tests/data/nushell/working/same_key_added_twice/Expected.nu
+@@ -0,0 +1,9 @@
++let x = {
++    a: 1
++<<<<<<< LEFT
++    b: 2
++||||||| BASE
++=======
++    b: 3
++>>>>>>> RIGHT
++}
+diff --git a/tests/data/nushell/working/same_key_added_twice/Left.nu b/tests/data/nushell/working/same_key_added_twice/Left.nu
+new file mode 100644
+index 0000000..edd8bc3
+--- /dev/null
++++ b/tests/data/nushell/working/same_key_added_twice/Left.nu
+@@ -0,0 +1,4 @@
++let x = {
++    a: 1
++    b: 2
++}
+diff --git a/tests/data/nushell/working/same_key_added_twice/Right.nu b/tests/data/nushell/working/same_key_added_twice/Right.nu
+new file mode 100644
+index 0000000..93c3bef
+--- /dev/null
++++ b/tests/data/nushell/working/same_key_added_twice/Right.nu
+@@ -0,0 +1,4 @@
++let x = {
++    a: 1
++    b: 3
++}
+-- 
+2.43.0
+
