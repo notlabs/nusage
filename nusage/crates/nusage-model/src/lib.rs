@@ -10,7 +10,7 @@
 
 mod build;
 
-pub use build::{Identifier, identifier, model, value_from_text};
+pub use build::{Identifier, identifier, model, nu_shape, nu_type, value_from_text};
 pub use nu_protocol::Value;
 pub use nusage_spec::http::{Auth, Location};
 pub use nusage_spec::{CommandPath, Diagnostic};

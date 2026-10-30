@@ -17,29 +17,76 @@ shell = "nu -c"
 # The build, copied where the root's `[env] _.path` looks for it, from the paths Cargo
 # reports: a build cache may keep the target directory elsewhere, and Cargo rewrites a
 # binary there whenever another of its commands relinks it, under a task that is running it.
-# `openapi-usage` goes with nusage: the catalog's `spec` task runs it for a service's entry.
-# Quiet: Cargo's progress and the cache's summary are noise in a log; diagnostics still print.
+# The plugins are copied beside nusage, for `plugins` to register.
 [tasks.build]
-description = "Build the workspace and copy nusage and openapi-usage into the repository's bin directory"
+description = "Build the workspace and copy nusage, openapi-usage and its plugins into the repository's bin directory"
 sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
-outputs = ["../.bin/nusage", "../.bin/openapi-usage"]
+outputs = [
+  "../.bin/nusage",
+  "../.bin/openapi-usage",
+  "../.bin/nu_plugin_nusage",
+  "../.bin/nu_plugin_jev",
+]
 run = '''
 let built = ^cargo build --quiet --workspace --locked --message-format json-render-diagnostics
   | lines
   | where ($it | str starts-with "{")
   | each { from json }
-  | where reason == compiler-artifact and executable != null and target.name in [nusage openapi-usage]
+  | where reason == compiler-artifact and executable != null
+  | where $it.target.name in [nusage openapi-usage] or ($it.target.name | str starts-with nu_plugin_)
+  | get executable
 let bin = "{{ config_root }}/../.bin" | path expand
 mkdir $bin
-for artifact in $built {
-    let copy = $bin | path join $artifact.target.name
+for exe in $built {
+    let copy = $bin | path join ($exe | path basename)
     if ($copy | path type) == symlink {
         rm $copy
     }
-    if not ($copy | path exists) or (open --raw $artifact.executable | hash sha256) != (open --raw $copy | hash sha256) {
-        cp $artifact.executable $copy
+    if not ($copy | path exists) or (open --raw $exe | hash sha256) != (open --raw $copy | hash sha256) {
+        cp $exe $copy
     }
 }
+'''
+
+# Registration is the user's: `plugin add` writes the plugin registry of the Nushell that
+# runs this, and a session then takes the plugin with `plugin use <name>`. A plugin's
+# commands are the CLI's by its spec, so `nusage validate` in a module is the plugin where
+# it is registered and the binary where it is not.
+[tasks.plugins]
+description = "Register the plugins built here with the Nushell on PATH, for `plugin use` in a session"
+depends = [":build"]
+run = '''
+for plugin in (glob ("{{ config_root }}/../.bin/nu_plugin_*" | path expand)) {
+    plugin add $plugin
+    print $"registered ($plugin | path basename): `plugin use ($plugin | path basename | str replace nu_plugin_ '')`"
+}
+'''
+
+# A plugin crate from the template, named after its spec: the spec is the one place its
+# interface is written, and the commands take their signatures from it. The crate joins the
+# workspace by its directory; the build copies its binary beside nusage.
+[tasks.plugin-new]
+description = "A new plugin crate from the template, `plugin-new <name>`, as `crates/nu_plugin_<name>`"
+usage = '''
+arg "<name>" help="The plugin's name: its binary is `nu_plugin_<name>` and its commands start with `<name>`"
+'''
+run = '''
+let name = "{{ arg(name='name') }}"
+if ($name | str contains "-") or ($name | str contains " ") {
+    error make --unspanned {msg: $"a plugin's name is one word of letters, digits and `_`: ($name)"}
+}
+let template = "{{ config_root }}/plugin-template" | path expand
+let crate = "{{ config_root }}/crates" | path join $"nu_plugin_($name)" | path expand
+if ($crate | path exists) {
+    error make --unspanned {msg: $"($crate) exists"}
+}
+for file in (glob ($template | path join "**/*") | where ($it | path type) == file) {
+    let relative = $file | path relative-to $template | str replace --all NAME $name
+    let target = $crate | path join $relative
+    mkdir ($target | path dirname)
+    open --raw $file | str replace --all NAME $name | save $target
+}
+print $"($crate): `cargo build -p nu_plugin_($name)`, then its spec and commands are its own"
 '''
 
 # After the build: both write the target directory's `nusage`, and the corpus test runs it.
