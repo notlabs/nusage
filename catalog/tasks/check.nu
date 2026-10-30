@@ -39,10 +39,11 @@ def spec-state [entry: record, files: record]: nothing -> record {
                 rm --recursive $scratch
                 return {state: unknown, note: $err.msg}
             }
-            let stale = openapi-files $scratch | where {|file|
+            let written = openapi-files $scratch
+            let stale = ($written | where {|file|
                 let committed = $files.dir | path join $file
                 not ($committed | path exists) or (open --raw $committed) != (open --raw ($scratch | path join $file))
-            }
+            }) ++ (openapi-files $files.dir | where {|file| $file not-in $written })
             rm --recursive $scratch
             if ($stale | is-empty) {
                 {state: current}

@@ -23,10 +23,11 @@ if not ($cache | path join .git | path exists) {
         }
     }
 }
-let at = ^git -C $cache describe --tags --exact-match | complete
-if $at.exit_code != 0 or ($at.stdout | str trim) != $pin.gh.tag {
+# The checkout is held to the pinned commit, not the tag alone: a tag can be moved.
+let at = ^git -C $cache rev-parse HEAD | complete
+if $at.exit_code != 0 or ($at.stdout | str trim) != $pin.gh.commit {
     error make --unspanned {
-        msg: $"($cache) is not at ($pin.gh.tag): ($at.stdout | str trim)($at.stderr | str trim); remove it to clone again"
+        msg: $"($cache) is at ($at.stdout | str trim)($at.stderr | str trim), not ($pin.gh.tag)'s commit ($pin.gh.commit); remove it to clone again"
     }
 }
 

@@ -16,6 +16,8 @@ path = "src/main.rs"
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+# A YAML document read as it is written, by the reader Nushell reads YAML with.
+serde-saphyr = { version = "1.3.0", default-features = false, features = ["deserialize"] }
 thiserror.workspace = true
 nushell-schema.workspace = true
 usage-rs.workspace = true

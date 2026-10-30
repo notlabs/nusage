@@ -1,4 +1,6 @@
-# A request whose body is the input, typed by its schema's required properties.
+# A request whose body is the input, typed by its schema's required properties, and whose
+# response is decoded by its schema: the input is bound before the response is, since a `let`
+# does not pass it on.
 {
     cmd: [create-pets],
 }

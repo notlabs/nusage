@@ -16,6 +16,9 @@ if ($token | is-empty) {
 }
 
 let dir = mktemp --directory
+# What is read is this repository: that #34 is merged and `v0.1.1` released are facts the
+# assertions rest on, so a rewritten history or a deleted release fails this for a reason
+# that is not the module's.
 with-env {GH_CONFIG_DIR: $dir, GH_TOKEN: $token, GH_PROMPT_DISABLED: "1", GH_NO_UPDATE_NOTIFIER: "1", NO_COLOR: "1"} {
     # A record, its times decoded.
     let repo = gh repo view notlabs/nusage
@@ -45,8 +48,10 @@ with-env {GH_CONFIG_DIR: $dir, GH_TOKEN: $token, GH_PROMPT_DISABLED: "1", GH_NO_
     assert (($runs | length) > 0)
     assert equal ($runs.0.databaseId | describe) int
 
-    # A command without a typed output passes gh's text through, the original CLI's.
-    let status = gh pr checks 34 --repo notlabs/nusage
-    assert (($status | describe) | str starts-with "table<")
+    # The checks of a merged pull request, a table whose times decode.
+    let checks = gh pr checks 34 --repo notlabs/nusage
+    assert (($checks | describe) | str starts-with "table<")
+    assert (($checks | length) > 0)
+    assert equal ($checks.0.completedAt | describe) datetime
 }
 rm --recursive $dir

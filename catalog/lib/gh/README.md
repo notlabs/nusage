@@ -64,12 +64,22 @@ mise run //catalog:generate gh
 mise run //catalog:check gh
 ```
 
-`spec` clones cli/cli at the tag `spec/pin.toml` names under the user's cache directory, and
-builds the extractor there, as [`../../cobra/README.md`](../../cobra/README.md) describes;
-the first run downloads Go's modules and, when the one on PATH is older, the toolchain the
-module asks for. A new gh version is a new tag in `pin.toml` and a new version in the
-catalog's `check` task, then the four commands; `outputs.nuon`'s baseline names the revision
-the schemas were read at.
+`spec` clones cli/cli at the tag `spec/pin.toml` names under the user's cache directory,
+holds the checkout to the pinned commit, and builds the extractor there, as
+[`../../cobra/README.md`](../../cobra/README.md) describes; the first run downloads Go's
+modules and, when the one on PATH is older, the toolchain the module asks for. A new gh
+version is a new tag and commit in `pin.toml` and a new version in the catalog's `check`
+task, then the four commands; `outputs.nuon`'s baseline names the revision the schemas were
+read at.
+
+Unlike Compose's, the spec is not reproducible from this repository alone: the extractor
+builds in a checkout outside it, with the adapter added at run time, and
+`//catalog/cobra:check` reproduces Compose's export, not gh's. So `check` holds the spec to
+the tool on PATH by version only, and a change in what the extractor would export, from the
+adapter or from the extractor itself, shows up only when someone runs `spec` again, which
+the `check` of a bumped `pin.toml` then reviews as a diff of the committed spec. That is the
+trade-off the construction boundary forces; a public construction helper upstream would
+remove it.
 
 ## What the extractor normalizes
 

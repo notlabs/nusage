@@ -24,9 +24,12 @@ for entry in (entries $usage.args.tool) {
             ^(root | path join clap spec.nu) $dir --out $files.spec ...$force
         }
         openapi => {
+            # The committed set is made the written set: a file the document no longer gives
+            # is removed with the rest refreshed.
             let scratch = mktemp --directory --tmpdir --suffix .nusage-openapi
             export-openapi $entry $scratch
-            let changed = openapi-files $scratch | where {|file|
+            let written = openapi-files $scratch
+            let changed = $written | where {|file|
                 let committed = $files.dir | path join $file
                 not ($committed | path exists) or (open --raw $committed) != (open --raw ($scratch | path join $file))
             }
@@ -35,8 +38,13 @@ for entry in (entries $usage.args.tool) {
                 cp ($scratch | path join $file) ($files.dir | path join $file)
                 print $"($entry.name): (($files.dir | path join $file) | path relative-to (root)) written"
             }
+            let stale = openapi-files $files.dir | where {|file| $file not-in $written }
+            for file in $stale {
+                rm ($files.dir | path join $file)
+                print $"($entry.name): (($files.dir | path join $file) | path relative-to (root)) removed; the document no longer gives it"
+            }
             rm --recursive $scratch
-            if ($changed | is-empty) {
+            if ($changed | is-empty) and ($stale | is-empty) {
                 print $"($entry.name): spec is current"
             }
         }

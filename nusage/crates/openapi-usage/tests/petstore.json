@@ -68,7 +68,7 @@
         "operationId": "createPets",
         "summary": "Create a pet",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewPet"}}}},
-        "responses": {"201": {"description": "Null response"}}
+        "responses": {"201": {"description": "The pet created", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Pet"}}}}}
       }
     },
     "/pets/{petId}": {

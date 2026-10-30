@@ -18,12 +18,13 @@ shell = "nu -c"
 # reports: a build cache may keep the target directory elsewhere, and Cargo rewrites a
 # binary there whenever another of its commands relinks it, under a task that is running it.
 # `openapi-usage` goes with nusage: the catalog's `spec` task runs it for a service's entry.
+# Quiet: Cargo's progress and the cache's summary are noise in a log; diagnostics still print.
 [tasks.build]
 description = "Build the workspace and copy nusage and openapi-usage into the repository's bin directory"
 sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
 outputs = ["../.bin/nusage", "../.bin/openapi-usage"]
 run = '''
-let built = ^cargo build --workspace --locked --message-format json-render-diagnostics
+let built = ^cargo build --quiet --workspace --locked --message-format json-render-diagnostics
   | lines
   | where ($it | str starts-with "{")
   | each { from json }

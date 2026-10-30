@@ -29,7 +29,8 @@
 #
 #   <tool>.usage.kdl    the spec, as obtained; `spec` refreshes it
 #   <tool>.http.kdl     the HTTP mapping beside a service's spec, with `schemas/*.schema.json`
-#                       the mapping and the spec name; `spec` writes them with it
+#                       the mapping and the spec name; `spec` writes them with it, and the
+#                       package keeps no suite: its `schemas/` is written, a binary's is kept
 #   <tool>.select.kdl   the overlay declaring the output `switch` selects; generated
 #   <tool>.schemas.kdl  the overlay `../schemas/overlay.nu` writes from `schemas/outputs.nuon`,
 #                       declaring each output with its schema; generated when the suite exists
@@ -113,27 +114,21 @@ export def spec-probe [entry: record]: nothing -> string {
     $probe
 }
 
-# An `openapi` entry's document, YAML or JSON under the package, written as JSON where
-# `openapi-usage` reads it: into `into`, as `openapi.json`.
-export def openapi-document [entry: record, into: string]: nothing -> string {
+# An `openapi` entry's document, JSON or YAML under the package, as `openapi-usage` reads it.
+export def openapi-document [entry: record]: nothing -> string {
     let document = root | path join lib $entry.name $entry.spec.openapi
     if not ($document | path exists) {
         error make --unspanned {
             msg: $"entry `($entry.name)`: no OpenAPI document at ($document | path relative-to (root))"
         }
     }
-    let json = $into | path join openapi.json
-    open $document | to json | save --force $json
-    $json
+    $document
 }
 
 # Write an `openapi` entry's spec, HTTP mapping and schemas into `into`, as `openapi-usage`
 # writes them: the spec and the mapping named after the entry, the schemas under `schemas/`.
 export def export-openapi [entry: record, into: string]: nothing -> nothing {
-    let scratch = mktemp --directory --tmpdir --suffix .nusage-openapi
-    let json = openapi-document $entry $scratch
-    let wrote = ^openapi-usage $json --name $entry.name --bin $entry.name --out $into | complete
-    rm --recursive $scratch
+    let wrote = ^openapi-usage (openapi-document $entry) --name $entry.name --bin $entry.name --out $into | complete
     if $wrote.exit_code != 0 {
         error make --unspanned {
             msg: $"entry `($entry.name)`: openapi-usage failed: ($wrote.stderr | str trim)"
@@ -166,10 +161,7 @@ export def spec-identity [files: record]: nothing -> record {
 # The spec as a `run` entry's tool prints it now, or as an `openapi` entry's document converts.
 export def export-spec [entry: record]: nothing -> string {
     if (spec-kind $entry) == openapi {
-        let scratch = mktemp --directory --tmpdir --suffix .nusage-openapi
-        let json = openapi-document $entry $scratch
-        let got = ^openapi-usage $json --name $entry.name --bin $entry.name | complete
-        rm --recursive $scratch
+        let got = ^openapi-usage (openapi-document $entry) --name $entry.name --bin $entry.name | complete
         if $got.exit_code != 0 {
             error make --unspanned {
                 msg: $"entry `($entry.name)`: openapi-usage failed: ($got.stderr | str trim)"
@@ -208,6 +200,11 @@ export def generate [entry: record, --into: string]: nothing -> record {
     if not ($files.spec | path exists) {
         error make --unspanned {
             msg: $"entry `($entry.name)`: no spec at ($files.spec | path relative-to (root)); `mise run spec ($entry.name)` obtains it"
+        }
+    }
+    if ($files.http | path exists) and ($files.schemas | path exists) {
+        error make --unspanned {
+            msg: $"entry `($entry.name)`: a service's `schemas/` is written from its document; it keeps no suite"
         }
     }
     let out = $into | default $files.dir

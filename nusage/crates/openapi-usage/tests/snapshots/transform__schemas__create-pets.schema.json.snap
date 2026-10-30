@@ -1,0 +1,75 @@
+---
+source: nusage/crates/openapi-usage/tests/transform.rs
+expression: schema
+---
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Pet": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/NewPet"
+        },
+        {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      ]
+    },
+    "NewPet": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tag": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Owner"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "born": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "Owner": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "pets": {
+          "type": "integer",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  },
+  "$ref": "#/$defs/Pet"
+}
