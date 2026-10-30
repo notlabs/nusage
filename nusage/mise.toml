@@ -32,7 +32,7 @@ let built = ^cargo build --workspace --locked --message-format json-render-diagn
   | where ($it | str starts-with "{")
   | each { from json }
   | where reason == compiler-artifact and executable != null
-  | where target.name == nusage or (target.name | str starts-with nu_plugin_)
+  | where $it.target.name == nusage or ($it.target.name | str starts-with nu_plugin_)
   | get executable
 let bin = "{{ config_root }}/../.bin" | path expand
 mkdir $bin
