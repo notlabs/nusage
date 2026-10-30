@@ -77,11 +77,12 @@ fn the_schemas_are_in_the_dialect() {
         nushell_schema::validate::conforms(schema).unwrap_or_else(|err| panic!("{file}: {err}"));
         nushell_schema::shape_of(schema).unwrap_or_else(|err| panic!("{file}: {err}"));
     }
+    // A pet is a new pet with an id, as the document's `allOf` says.
     let pets =
         nushell_schema::shape_of(&transformed.schemas["schemas/list-pets.schema.json"]).unwrap();
     assert_eq!(
         pets.ty.as_str(),
-        "table<id: int, name: string, tag: oneof<string, nothing>, owner: oneof<record<name: string, pets: oneof<int, nothing>>, nothing>, born: oneof<datetime, nothing>>"
+        "table<name: string, tag: oneof<string, nothing>, owner: oneof<record<name: string, pets: oneof<int, nothing>>, nothing>, born: oneof<datetime, nothing>, id: int>"
     );
 }
 

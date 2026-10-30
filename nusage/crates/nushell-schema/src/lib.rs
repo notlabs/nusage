@@ -16,7 +16,9 @@
 //! `format: date-time` becomes a datetime, one with `contentEncoding: base64` becomes
 //! binary, and a number with `x-nu` becomes what it counts. `anyOf`, `oneOf` and a list of
 //! types are `oneof<…>`; `enum` and `const` take the type of their values; a local `$ref` is
-//! followed. What the reader does not read is `any`: `allOf`, `not`, conditionals,
+//! followed. `allOf` is read as the one schema its branches describe together: their
+//! properties and required names combined, as OpenAPI writes inheritance, and an error where
+//! they cannot all hold. What the reader does not read is `any`: `not`, conditionals,
 //! `patternProperties`.
 
 #![forbid(unsafe_code)]

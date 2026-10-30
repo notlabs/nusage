@@ -3638,6 +3638,7 @@ dependencies = [
  "nusage-nu",
  "nusage-spec",
  "nushell-schema",
+ "serde",
  "serde_json",
  "usage-lib",
 ]
@@ -3660,6 +3661,7 @@ name = "nusage-spec"
 version = "0.1.1"
 dependencies = [
  "indexmap",
+ "serde",
  "thiserror 2.0.21",
  "usage-lib",
 ]

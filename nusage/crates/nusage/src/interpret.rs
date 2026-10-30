@@ -84,7 +84,8 @@ fn parse_routed(script: &Path, args: &[String]) -> Result<(Parsed, PathBuf), Dia
         usage_record(command, &parsed).map_err(|message| Diagnostic::new(script, message))?;
     let run = match &command.execution {
         Execution::Script(body) => body.clone(),
-        Execution::External => script.to_path_buf(),
+        // The interpreter runs scripts; a spec's commands never reach it.
+        Execution::External | Execution::Request(_) | Execution::Service => script.to_path_buf(),
     };
     Ok((Parsed::Record(record), run))
 }

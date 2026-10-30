@@ -1,0 +1,82 @@
+[
+  [name,                          signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    attributes];
+  [petstore,                      {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          nothing,      false,       null,       null,        null,       null],
+        [null,           output,         string,       false,       null,       null,        null,       null]
+      ]
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  [
+      [name,  value];
+      [usage, "version \"1.0.0\""]
+    ]],
+  ["petstore create-pets",        {
+      "record<name: string>": [
+        [parameter_name, parameter_type, syntax_shape,           is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          "record<name: string>", false,       null,       null,        null,       null],
+        [null,           output,         string,                 false,       null,       null,        null,       null]
+      ]
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     [
+
+    ]],
+  ["petstore delete-pets-pet-id", {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,         completion, parameter_default];
+        [null,           input,          nothing,      false,       null,       null,                null,       null],
+        [pet_id,         positional,     int,          false,       null,       "The id of the pet", null,       null],
+        [force,          switch,         null,         true,        null,       "",                  null,       null],
+        [null,           output,         string,       false,       null,       null,                null,       null]
+      ]
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          [
+      [name,  value];
+      [usage, "flag \"--force\" required=#true"],
+      [usage, "arg (int)\"<pet-id>\" help=\"The id of the pet\""]
+    ]],
+  ["petstore list-pets",          {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                                                                                                                                                        is_optional, short_flag, description,                                      completion,                                            parameter_default];
+        [null,           input,          nothing,                                                                                                                                                             false,       null,       null,                                             null,                                                  null],
+        [limit,          named,          int,                                                                                                                                                                 true,        null,       "How many items to return at one time (max 100)", null,                                                  null],
+        [status,         named,          string,                                                                                                                                                              true,        null,       "",                                               [
+            available,
+            sold
+          ], null],
+        [tags,           named,          list<string>,                                                                                                                                                        true,        null,       "Only pets with these tags",                      null,                                                  null],
+        [x-request-id,   named,          string,                                                                                                                                                              true,        null,       "",                                               null,                                                  null],
+        [null,           output,         "table<name: string, tag: oneof<string, nothing>, owner: oneof<record<name: string, pets: oneof<int, nothing>>, nothing>, born: oneof<datetime, nothing>, id: int>", false,       null,       null,                                             null,                                                  null]
+      ]
+    }, [
+      [name,  value];
+      [usage, "flag \"--limit\" help=\"How many items to return at one time (max 100)\" {
+        arg (int)\"<LIMIT>\"
+    }"],
+      [usage, "flag \"--status\" {
+        arg \"<STATUS>\" {
+            choices \"available\" \"sold\"
+        }
+    }"],
+      [usage, "flag \"--tags\" help=\"Only pets with these tags\" var=#true {
+        arg \"<TAGS>\"
+    }"],
+      [usage, "flag \"--x-request-id\" {
+        arg \"<X_REQUEST_ID>\"
+    }"],
+      [usage, "output \"json\" framing=\"json\" default=#true {
+        schema file=\"schemas/list-pets.schema.json\"
+    }"]
+    ]],
+  ["petstore show-pet-by-id",     {
+      nothing: [
+        [parameter_name, parameter_type, syntax_shape,                                                                                                                                                         is_optional, short_flag, description,         completion, parameter_default];
+        [null,           input,          nothing,                                                                                                                                                              false,       null,       null,                null,       null],
+        [pet_id,         positional,     int,                                                                                                                                                                  false,       null,       "The id of the pet", null,       null],
+        [null,           output,         "record<name: string, tag: oneof<string, nothing>, owner: oneof<record<name: string, pets: oneof<int, nothing>>, nothing>, born: oneof<datetime, nothing>, id: int>", false,       null,       null,                null,       null]
+      ]
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  [
+      [name,  value];
+      [usage, "arg (int)\"<pet-id>\" help=\"The id of the pet\""],
+      [usage, "output \"json\" framing=\"json\" default=#true {
+        schema file=\"schemas/show-pet-by-id.schema.json\"
+    }"]
+    ]]
+]

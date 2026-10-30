@@ -2,13 +2,16 @@
 //! of binaries.
 //!
 //! [`generate`] is the whole pipeline: assemble the source into one spec, derive the command
-//! model, write the module for the target the source implies. The CLI in `main.rs` is a thin
-//! shell around it.
+//! model, write the module for the target the source implies: the shim for scripts, the
+//! binary target for a spec file, the HTTP target for a spec file with the mapping of a
+//! service beside it. Each stage prints: [`spec`] the assembled spec, [`model`] the command
+//! model, [`generate`] the module. The CLI in `main.rs` is a thin shell around it.
 
 mod binary;
 mod calls;
 mod common;
 mod conform;
+mod http;
 mod interpret;
 mod lsp;
 mod nu;
@@ -37,17 +40,21 @@ use nusage_spec::Source;
 /// relative to that file's directory, or to the current directory with `None`. The result
 /// has been parsed by Nushell: what Nushell rejects is a diagnostic here, not at `use`.
 pub fn generate(source: &Path, out: Option<&Path>) -> Result<String, Diagnostic> {
-    generate_with(source, out, &[])
+    generate_with(source, out, &[], None)
 }
 
-/// [`generate`], with overlays merged onto a spec file first; see
-/// [`nusage_spec::assemble_with`].
+/// [`generate`], with overlays merged onto a spec file first, see
+/// [`nusage_spec::assemble_with`], and with the HTTP mapping of a spec that describes a
+/// service, see [`nusage_spec::assemble_http`]: then the module gets the HTTP target, a
+/// `def` per command that sends the request the mapping says and decodes the response as a
+/// binary's output is decoded, its body the input when the call sends one.
 pub fn generate_with(
     source: &Path,
     out: Option<&Path>,
     overlays: &[PathBuf],
+    http: Option<&Path>,
 ) -> Result<String, Diagnostic> {
-    let assembled = nusage_spec::assemble_with(source, overlays)?;
+    let assembled = assemble(source, overlays, http)?;
     let tree = nusage_model::model(&assembled)?;
     // Paths inside the module, a shim's `run` and a binary's spec, are relative to where it
     // will be written.
@@ -57,6 +64,7 @@ pub fn generate_with(
     };
     let module = match &assembled.source {
         Source::Scripts { .. } => shim::module(&tree, &base),
+        Source::Binary if tree.service.is_some() => http::module(&tree),
         Source::Binary => binary::module(&tree, &common::relative(&base, source)),
     }
     .map_err(|err| Diagnostic::new(source, err.to_string()))?;
@@ -87,8 +95,13 @@ pub fn generate_with(
 /// it: every command the spec shows is a definition with the spec's positionals, flags and
 /// completers, named as the generator names them, with its description once. [`generate`]
 /// checks what it writes the same way.
-pub fn check(source: &Path, overlays: &[PathBuf], module: &Path) -> Result<(), Diagnostic> {
-    let assembled = nusage_spec::assemble_with(source, overlays)?;
+pub fn check(
+    source: &Path,
+    overlays: &[PathBuf],
+    http: Option<&Path>,
+    module: &Path,
+) -> Result<(), Diagnostic> {
+    let assembled = assemble(source, overlays, http)?;
     let text = std::fs::read_to_string(module)
         .map_err(|err| Diagnostic::new(module, format!("cannot read: {err}")))?;
     let name = module
@@ -107,6 +120,18 @@ pub fn check(source: &Path, overlays: &[PathBuf], module: &Path) -> Result<(), D
                 findings.join("\n  ")
             ),
         ))
+    }
+}
+
+/// The source assembled, with the overlays, and the HTTP mapping when there is one.
+fn assemble(
+    source: &Path,
+    overlays: &[PathBuf],
+    http: Option<&Path>,
+) -> Result<nusage_spec::Assembled, Diagnostic> {
+    match http {
+        Some(http) => nusage_spec::assemble_http(source, overlays, http),
+        None => nusage_spec::assemble_with(source, overlays),
     }
 }
 
@@ -148,6 +173,47 @@ pub fn nu(args: &[String]) -> std::io::Result<i32> {
 /// run them with `nusage`, and the helpers they use. Empty when it calls none.
 pub fn prelude_run(script: &Path, nusage: &Path) -> Result<String, Diagnostic> {
     prelude::runtime(script, nusage)
+}
+
+/// The command model derived from the source, as NUON: what a target is handed, after every
+/// decision between usage's vocabulary and a Nushell signature is made and before any
+/// Nushell is written. The stages of [`generate`] are each printable: [`spec`] the
+/// assembled spec, this the model, [`generate`] the module.
+pub fn model(
+    source: &Path,
+    overlays: &[PathBuf],
+    http: Option<&Path>,
+) -> Result<String, Diagnostic> {
+    let assembled = assemble(source, overlays, http)?;
+    let tree = nusage_model::model(&assembled)?;
+    let json = serde_json::to_value(&tree)
+        .map_err(|err| Diagnostic::new(source, format!("the model does not serialize: {err}")))?;
+    Ok(nusage_nu::nuon(&nu_value(json)))
+}
+
+/// A JSON value as a Nushell one, for printing as NUON.
+fn nu_value(json: serde_json::Value) -> nu_protocol::Value {
+    use nu_protocol::{Span, Value};
+    let span = Span::unknown();
+    match json {
+        serde_json::Value::Null => Value::nothing(span),
+        serde_json::Value::Bool(b) => Value::bool(b, span),
+        serde_json::Value::Number(n) => match n.as_i64() {
+            Some(i) => Value::int(i, span),
+            None => Value::float(n.as_f64().unwrap_or_default(), span),
+        },
+        serde_json::Value::String(s) => Value::string(s, span),
+        serde_json::Value::Array(items) => {
+            Value::list(items.into_iter().map(nu_value).collect(), span)
+        }
+        serde_json::Value::Object(fields) => {
+            let mut record = nu_protocol::Record::new();
+            for (key, value) in fields {
+                record.push(key, nu_value(value));
+            }
+            Value::record(record, span)
+        }
+    }
 }
 
 /// The assembled spec as usage KDL, overlays merged, for every tool that reads usage specs.

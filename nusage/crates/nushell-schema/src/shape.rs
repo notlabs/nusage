@@ -112,6 +112,17 @@ pub enum Error {
         /// The conversion's type.
         what: String,
     },
+    /// An `allOf` whose branches cannot all hold at once.
+    #[error(
+        "{place}: the branches of `allOf` disagree on `{keyword}`, so no value satisfies all \
+         of them"
+    )]
+    Unsatisfiable {
+        /// Where in the value.
+        place: String,
+        /// The keyword the branches set differently.
+        keyword: String,
+    },
     /// An `x-nu` the vocabulary does not allow.
     #[error("{place}: {why}")]
     Counted {
@@ -277,6 +288,10 @@ impl Reader<'_> {
             // `true` and `false` schemas, or nonsense.
             return Ok("any".to_string());
         };
+        if object.contains_key("allOf") {
+            let merged = self.merged(object, place)?;
+            return self.node(&merged, place);
+        }
         if let Some(reference) = object.get("$ref").and_then(Json::as_str) {
             return self.reference(reference, place);
         }
@@ -369,6 +384,142 @@ impl Reader<'_> {
         let ty = self.node(&target, place);
         self.refs.pop();
         ty
+    }
+
+    /// The one schema an `allOf` and the keywords beside it describe together: every branch
+    /// holds, so the properties are all of theirs, a property several describe is what they
+    /// say together, the required names are all of theirs, and the type is what every branch
+    /// that names one allows. A keyword the reader reads that two branches set differently
+    /// is an error: no value has two formats. What the reader does not read is left out,
+    /// and a branch that refers to itself adds nothing on the second visit.
+    fn merged(&self, object: &serde_json::Map<String, Json>, place: &Place) -> Result<Json, Error> {
+        let mut merged = serde_json::Map::new();
+        let mut seen = Vec::new();
+        self.merge_into(&mut merged, &Json::Object(object.clone()), place, &mut seen)?;
+        Ok(Json::Object(merged))
+    }
+
+    fn merge_into(
+        &self,
+        into: &mut serde_json::Map<String, Json>,
+        schema: &Json,
+        place: &Place,
+        seen: &mut Vec<String>,
+    ) -> Result<(), Error> {
+        let Some(object) = schema.as_object() else {
+            // `true` constrains nothing; `false` is read as nothing too.
+            return Ok(());
+        };
+        let unsatisfiable = |keyword: &str| Error::Unsatisfiable {
+            place: place.describe(),
+            keyword: keyword.to_string(),
+        };
+        if let Some(reference) = object.get("$ref").and_then(Json::as_str) {
+            let Some(pointer) = reference.strip_prefix('#') else {
+                return Err(Error::ForeignReference {
+                    place: place.describe(),
+                    reference: reference.to_string(),
+                });
+            };
+            if !seen.iter().any(|visited| visited == reference) {
+                let target = self
+                    .root
+                    .pointer(pointer)
+                    .ok_or_else(|| Error::DanglingReference {
+                        place: place.describe(),
+                        reference: reference.to_string(),
+                    })?
+                    .clone();
+                seen.push(reference.to_string());
+                self.merge_into(into, &target, place, seen)?;
+                seen.pop();
+            }
+        }
+        if let Some(branches) = object.get("allOf").and_then(Json::as_array) {
+            for branch in branches {
+                self.merge_into(into, branch, place, seen)?;
+            }
+        }
+        for (keyword, value) in object {
+            match keyword.as_str() {
+                "$ref" | "allOf" => {}
+                "properties" => {
+                    let Some(properties) = value.as_object() else {
+                        continue;
+                    };
+                    let known = into
+                        .entry("properties")
+                        .or_insert_with(|| Json::Object(serde_json::Map::new()));
+                    let Some(known) = known.as_object_mut() else {
+                        continue;
+                    };
+                    for (name, property) in properties {
+                        match known.get(name) {
+                            None => {
+                                known.insert(name.clone(), property.clone());
+                            }
+                            Some(before) if before == property => {}
+                            Some(before) => {
+                                // What both say: read as an `allOf` of its own.
+                                let both = serde_json::json!({"allOf": [before, property]});
+                                known.insert(name.clone(), both);
+                            }
+                        }
+                    }
+                }
+                "required" => {
+                    let Some(names) = value.as_array() else {
+                        continue;
+                    };
+                    let known = into
+                        .entry("required")
+                        .or_insert_with(|| Json::Array(Vec::new()));
+                    if let Some(known) = known.as_array_mut() {
+                        for name in names {
+                            if !known.contains(name) {
+                                known.push(name.clone());
+                            }
+                        }
+                    }
+                }
+                "type" => {
+                    let allowed: Vec<Json> = match value {
+                        Json::String(_) => vec![value.clone()],
+                        Json::Array(many) => many.clone(),
+                        _ => continue,
+                    };
+                    let kept: Vec<Json> = match into.get("type") {
+                        None => allowed,
+                        Some(Json::String(one)) => allowed
+                            .into_iter()
+                            .filter(|ty| ty.as_str() == Some(one))
+                            .collect(),
+                        Some(Json::Array(before)) => allowed
+                            .into_iter()
+                            .filter(|ty| before.contains(ty))
+                            .collect(),
+                        Some(_) => allowed,
+                    };
+                    let ty = match kept.len() {
+                        0 => return Err(unsatisfiable("type")),
+                        1 => kept.into_iter().next().unwrap(),
+                        _ => Json::Array(kept),
+                    };
+                    into.insert("type".into(), ty);
+                }
+                "anyOf" | "oneOf" | "enum" | "const" | "x-nu" | "items" | "format"
+                | "contentEncoding" => match into.get(keyword) {
+                    None => {
+                        into.insert(keyword.clone(), value.clone());
+                    }
+                    Some(before) if before == value => {}
+                    Some(_) => return Err(unsatisfiable(keyword)),
+                },
+                // Not read: a description, a bound, what additional properties may be.
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     fn union(&mut self, members: &[Json], place: &Place) -> Result<String, Error> {
@@ -510,25 +661,32 @@ impl Reader<'_> {
         })
     }
 
-    /// Whether the schema describes an object, following a local `$ref`.
+    /// Whether the schema describes an object, following a local `$ref` and the branches
+    /// of an `allOf`.
     fn is_object(&self, schema: &Json) -> bool {
-        let mut seen = 0;
-        let mut schema = schema;
-        while let Some(reference) = schema.get("$ref").and_then(Json::as_str) {
-            let Some(target) = reference
+        self.is_object_within(schema, 0)
+    }
+
+    fn is_object_within(&self, schema: &Json, depth: usize) -> bool {
+        if depth > 32 {
+            return false;
+        }
+        if let Some(reference) = schema.get("$ref").and_then(Json::as_str) {
+            return reference
                 .strip_prefix('#')
                 .and_then(|pointer| self.root.pointer(pointer))
-            else {
-                return false;
-            };
-            schema = target;
-            seen += 1;
-            if seen > 32 {
-                return false;
-            }
+                .is_some_and(|target| self.is_object_within(target, depth + 1));
         }
         schema.get("type").and_then(Json::as_str) == Some("object")
             || schema.get("properties").is_some()
+            || schema
+                .get("allOf")
+                .and_then(Json::as_array)
+                .is_some_and(|branches| {
+                    branches
+                        .iter()
+                        .any(|branch| self.is_object_within(branch, depth + 1))
+                })
     }
 
     fn convert(&mut self, place: &Place, ty: &str, unit: Option<&str>) {
@@ -796,6 +954,57 @@ mod tests {
         let defs = r##"{"$defs": {"id": {"type": "integer"}}, "type": "object", "required": ["id"], "properties": {"id": {"$ref": "#/$defs/id"}}}"##;
         assert_eq!(ty(defs), "record<id: int>");
         let cyclic = r##"{"$defs": {"node": {"type": "object", "required": ["next"], "properties": {"next": {"$ref": "#/$defs/node"}}}}, "$ref": "#/$defs/node"}"##;
+        assert_eq!(ty(cyclic), "record<next: any>");
+    }
+
+    #[test]
+    fn all_of_is_read_as_what_its_branches_say_together() {
+        // Inheritance as OpenAPI writes it: a pet is a new pet with an id.
+        let schema = r##"{"$defs": {"NewPet": {"type": "object", "required": ["name"],
+            "properties": {"name": {"type": "string"}, "tag": {"type": "string"},
+            "born": {"type": "string", "format": "date-time"}}}},
+            "allOf": [{"$ref": "#/$defs/NewPet"}, {"type": "object", "required": ["id"],
+            "properties": {"id": {"type": "integer"}}}]}"##;
+        let pet = shape(schema).unwrap();
+        assert_eq!(
+            pet.ty.0,
+            "record<name: string, tag: oneof<string, nothing>, born: oneof<datetime, nothing>, id: int>"
+        );
+        assert_eq!(pet.fills, vec![fill(&["tag"], &[]), fill(&["born"], &[])]);
+        assert_eq!(pet.conversions.len(), 1);
+        assert_eq!(pet.conversions[0].path, ["born"]);
+        // The rows of a table, and what the keywords beside `allOf` add.
+        let rows = r##"{"$defs": {"NewPet": {"type": "object", "required": ["name"],
+            "properties": {"name": {"type": "string"}, "tag": {"type": "string"},
+            "born": {"type": "string", "format": "date-time"}}},
+            "Pet": {"allOf": [{"$ref": "#/$defs/NewPet"}, {"type": "object", "required": ["id"],
+            "properties": {"id": {"type": "integer"}}}]}},
+            "type": "array", "items": {"allOf": [{"$ref": "#/$defs/Pet"}],
+            "properties": {"sold": {"type": "boolean"}}}}"##;
+        assert_eq!(
+            ty(rows),
+            "table<name: string, tag: oneof<string, nothing>, born: oneof<datetime, nothing>, id: int, sold: oneof<bool, nothing>>"
+        );
+        // A property several branches describe is what they say together: required by
+        // one, typed by the other; nullable by one, not by the other.
+        let together = r#"{"allOf": [{"type": "object", "properties": {"id": {"type": "integer"},
+            "tag": {"type": ["string", "null"]}}}, {"required": ["id"], "properties":
+            {"id": {"minimum": 1}, "tag": {"type": "string"}}}]}"#;
+        assert_eq!(ty(together), "record<id: int, tag: oneof<string, nothing>>");
+        // Branches that cannot all hold.
+        for schema in [
+            r#"{"allOf": [{"type": "string"}, {"type": "integer"}]}"#,
+            r#"{"allOf": [{"type": "string", "format": "date-time"}, {"type": "string", "format": "email"}]}"#,
+        ] {
+            assert!(
+                matches!(shape(schema), Err(Error::Unsatisfiable { .. })),
+                "{schema}"
+            );
+        }
+        // A branch naming itself adds nothing the second time round.
+        let cyclic = r##"{"$defs": {"Node": {"allOf": [{"$ref": "#/$defs/Node"}, {"type": "object",
+            "required": ["next"], "properties": {"next": {"$ref": "#/$defs/Node"}}}]}},
+            "$ref": "#/$defs/Node"}"##;
         assert_eq!(ty(cyclic), "record<next: any>");
     }
 

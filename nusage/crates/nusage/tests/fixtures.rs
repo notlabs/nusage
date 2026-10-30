@@ -44,11 +44,14 @@ fn fixtures_generate_their_expected_modules() {
             .expect("expected/<bin>.nu");
         let bin = module_file.file_stem().unwrap().to_str().unwrap();
         let source = source_of(&fixture, bin);
-        // A spec fixture may carry an overlay beside its spec.
+        // A spec fixture may carry an overlay beside its spec, and a service's its HTTP
+        // mapping.
         let overlay = fixture.join(format!("{bin}.overlay.kdl"));
         let overlays: Vec<PathBuf> = overlay.is_file().then_some(overlay).into_iter().collect();
+        let http = fixture.join(format!("{bin}.http.kdl"));
+        let http = http.is_file().then_some(http);
         let expected = fs::read_to_string(&module_file).unwrap();
-        match nusage::generate_with(&source, Some(&module_file), &overlays) {
+        match nusage::generate_with(&source, Some(&module_file), &overlays, http.as_deref()) {
             Ok(actual) if actual == expected => checked += 1,
             Ok(actual) => failures.push(format!(
                 "{}: generated module differs from {}\n--- expected\n{expected}--- actual\n{actual}",

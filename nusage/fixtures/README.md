@@ -44,6 +44,16 @@ from the calling script's directory, where the shadow runs it from too. A task m
 to date does not run, and the call returns nothing; `^mise run` is still the external, and
 so is a call with mise's own flags before the task.
 
+A spec may describe a service rather than a binary, with the HTTP mapping `openapi-usage`
+writes beside it, `<bin>.http.kdl`: then each command's wrapper sends the request the mapping
+says, the path parameters from its positionals, the query and headers from its flags, and
+the body from its input, typed by the properties the body's schema requires; the response is
+decoded as a binary's output is. The service's base URL and credentials are the
+environment's, `$env.<BIN>_URL` and `$env.<BIN>_TOKEN`, as the module's helpers say, and the
+root says where the service is. `http-petstore` is the petstore through the converter; its
+cases name the commands for their signatures, and `tests/http.rs` sends their requests to a
+server of its own, since no fake stands in for a service.
+
 A binary's wrapper decodes the one output it asks for. An output is decoded when its
 `media_type` names a format Nushell reads (`text/csv`, `application/yaml`, ...), when its
 framing is `json` or `jsonl`, or when its declaration carries a `nusage-decode` child whose argument

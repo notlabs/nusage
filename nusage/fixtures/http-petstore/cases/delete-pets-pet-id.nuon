@@ -1,0 +1,4 @@
+# A switch in the query, sent only when on.
+{
+    cmd: [delete-pets-pet-id],
+}
