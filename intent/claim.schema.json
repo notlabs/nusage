@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Claims",
+  "description": "A file of claims: what the direction says should hold, a sentence each, with what it leaves undecided and the ways it could be met. Nothing here is settled; a claim is changed or deleted as freely as it is added.",
+  "type": "array",
+  "minItems": 1,
+  "items": { "$ref": "#/$defs/claim" },
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "required": ["id", "says", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+        "says": { "type": "string", "minLength": 1 },
+        "status": {
+          "enum": ["open", "checked"],
+          "description": "open: proposed, its examples only held to their schemas. checked: check.nu holds nusage as it is to it."
+        },
+        "traits": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Names from traits.nuon.",
+          "items": { "type": "string" }
+        },
+        "given": { "$ref": "#/$defs/given" },
+        "change": { "$ref": "#/$defs/change" },
+        "expect": { "$ref": "#/$defs/expect" },
+        "open": {
+          "type": "array",
+          "description": "What the claim leaves undecided.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "alternatives": {
+          "type": "array",
+          "description": "Ways it could be met, none chosen.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "if": { "properties": { "status": { "const": "checked" } } },
+      "then": {
+        "required": ["given", "change", "expect"],
+        "properties": {
+          "given": { "required": ["files", "script"] },
+          "expect": { "required": ["analysis"] }
+        }
+      }
+    },
+    "given": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "type": "object",
+          "description": "Files by their path in a directory of their own, and their text.",
+          "additionalProperties": { "type": "string" }
+        },
+        "script": { "type": "string", "description": "The path, among the files, of the script analysed." },
+        "source": { "type": "string", "description": "A script's text, for a claim about what it is." },
+        "mise": { "type": "string", "description": "A mise config beside the files, as TOML." }
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "type": "object",
+          "description": "Files written over the given ones.",
+          "additionalProperties": { "type": "string" }
+        },
+        "moved": { "const": true, "description": "The files are moved to another directory." }
+      }
+    },
+    "expect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "analysis": {
+          "enum": ["kept", "changed", "relocated"],
+          "description": "What the change does to the script's analysis, as `nusage prelude` prints it today: the same, different, or the same but for the directory it names."
+        },
+        "traits": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "reads": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^(file|fileset|env|arg|operation):.+$" }
+        },
+        "graph": { "type": "object", "description": "A fragment, held to graph.schema.json." }
+      }
+    }
+  }
+}

@@ -1,0 +1,119 @@
+# mise's task graph and the scripts' call graph as one graph. The calls are the ones nusage
+# already shadows; the rest is what the graph would add. Each example is a fragment, held to
+# graph.schema.json.
+[
+  {
+    id: script-calls-script
+    says: "A script that calls another by its path has an edge to it."
+    status: open
+    given: {
+      script: a.nu
+      files: {
+        "a.nu": "#!/usr/bin/env nusage
+./b.nu
+"
+        "b.nu": "#!/usr/bin/env nusage
+42
+"
+      }
+    }
+    expect: {
+      graph: {
+        nodes: [{id: "script:a.nu", kind: script} {id: "script:b.nu", kind: script}]
+        edges: [{from: "script:a.nu", to: "script:b.nu", kind: calls}]
+      }
+    }
+  }
+  {
+    id: script-runs-task
+    says: "A script that runs a task has an edge to the task, and a file task to the script it runs."
+    status: open
+    given: {
+      script: a.nu
+      files: {
+        "a.nu": "#!/usr/bin/env nusage
+mise run greet world
+"
+        "mise-tasks/greet": "#!/usr/bin/env nusage
+#USAGE arg \"<name>\"
+$'hello ($usage.args.name)'
+"
+      }
+    }
+    expect: {
+      graph: {
+        nodes: [
+          {id: "script:a.nu", kind: script}
+          {id: "task:greet", kind: task}
+          {id: "script:mise-tasks/greet", kind: script}
+        ]
+        edges: [
+          {from: "script:a.nu", to: "task:greet", kind: runs}
+          {from: "task:greet", to: "script:mise-tasks/greet", kind: executes}
+        ]
+      }
+    }
+    open: ["Whether a file task and its script are one node or two joined by an edge."]
+  }
+  {
+    id: task-depends
+    says: "A task's `depends` are edges to the tasks it needs first."
+    status: open
+    given: {
+      mise: "[tasks.build]
+run = 'cargo build'
+
+[tasks.test]
+depends = ['build']
+run = 'cargo test'
+"
+    }
+    expect: {
+      graph: {
+        nodes: [{id: "task:build", kind: task} {id: "task:test", kind: task}]
+        edges: [{from: "task:test", to: "task:build", kind: depends}]
+      }
+    }
+  }
+  {
+    id: module-import
+    says: "A script's `use` of a module file is an edge to it, as a call is."
+    status: open
+    given: {
+      script: a.nu
+      files: {
+        "a.nu": "#!/usr/bin/env nusage
+use lib.nu double
+double 21
+"
+        "lib.nu": "export def double [n: int] { $n * 2 }
+"
+      }
+    }
+    expect: {
+      graph: {
+        nodes: [{id: "script:a.nu", kind: script} {id: "module:lib.nu", kind: module}]
+        edges: [{from: "script:a.nu", to: "module:lib.nu", kind: imports}]
+      }
+    }
+  }
+  {
+    id: sources-are-a-fileset
+    says: "A task's `sources` are a read of a fileset, so what invalidates the task is a change to a file the fileset holds."
+    status: open
+    traits: [reads]
+    given: {
+      mise: "[tasks.build]
+sources = ['src/**/*.rs']
+run = 'cargo build'
+"
+    }
+    expect: {
+      graph: {
+        nodes: [{id: "task:build", kind: task} {id: "fileset:glob:src/**/*.rs", kind: fileset}]
+        edges: [{from: "task:build", to: "fileset:glob:src/**/*.rs", kind: reads}]
+      }
+    }
+    open: ["Whether mise's globs are read as jj filesets, or translated into them."]
+  }
+]

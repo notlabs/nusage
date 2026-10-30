@@ -6,10 +6,9 @@ use nu_protocol::{Span, Type};
 use nusage_spec::{Assembled, CommandPath, Diagnostic, Header, HeaderNode, Source};
 use usage::{SpecArg, SpecCommand, SpecComplete, SpecFlag, SpecOutput};
 
-use crate::schema;
 use crate::{
-    Command, CommandTree, Completer, Conversion, Execution, Framing, NuType, Param, ParamKind,
-    Structured, Value,
+    Command, CommandTree, Completer, Conversion, Decoder, Execution, Framing, NuType, Param,
+    ParamKind, Structured, Value,
 };
 
 /// Header nodes that have a native place in the module and so do not become attributes.
@@ -596,11 +595,10 @@ fn default_output(outputs: &[SpecOutput]) -> Option<&SpecOutput> {
         .or_else(|| (outputs.len() == 1).then(|| &outputs[0]))
 }
 
-/// The annotation on the declaration of the named output in effect: the deepest command in
-/// the chain that declares an output by that name, else the root, whose declaration holds
-/// the spec's top-level outputs. A declaration usage expanded from another file has no
-/// annotation.
-fn output_annotation(chain: &[Level<'_>], name: &str) -> Option<NuType> {
+/// The declaration of the named output in effect: the deepest command in the chain that
+/// declares an output by that name, else the root, whose declaration holds the spec's
+/// top-level outputs. A declaration usage expanded from another file has no node.
+fn output_node<'a>(chain: &[Level<'a>], name: &str) -> Option<&'a HeaderNode> {
     let declaring = chain
         .iter()
         .rev()
@@ -611,8 +609,32 @@ fn output_annotation(chain: &[Level<'_>], name: &str) -> Option<NuType> {
         .nodes
         .iter()
         .find(|node| node.name == "output" && node.first.as_deref() == Some(name))
+}
+
+/// The annotation on the declaration of the named output in effect, which is nusage's own and
+/// usage ignores.
+fn output_annotation(chain: &[Level<'_>], name: &str) -> Option<NuType> {
+    output_node(chain, name)
         .and_then(|node| node.value_type())
         .map(|ty| NuType(ty.to_string()))
+}
+
+/// How the output is decoded, when it is: the `nusage-decode` pipeline its declaration states, else
+/// Nushell's reader for its media type, else `from json` for the JSON framings.
+fn decoder_of(output: &SpecOutput, chain: &[Level<'_>]) -> Option<Decoder> {
+    if let Some(pipeline) = output_node(chain, &output.name).and_then(|node| node.decode.clone()) {
+        return Some(Decoder::Pipeline(pipeline));
+    }
+    let objects = output.framing == usage::Framing::Jsonl;
+    let reader = match output.media_type.as_deref().and_then(crate::reader_for) {
+        Some(reader) => reader,
+        None if objects || output.framing == usage::Framing::Json => "json",
+        None => return None,
+    };
+    Some(Decoder::From {
+        format: reader.to_string(),
+        objects,
+    })
 }
 
 /// Whether a selector word, `--json` or `-j`, names the flag.
@@ -622,11 +644,11 @@ fn flag_named(flag: &Param, selector: &str) -> bool {
         || (name.chars().count() == 1 && flag.short == name.chars().next())
 }
 
-/// The structured output a wrapper asks for: the default output when it is framed, else the
-/// first `json` output that is selectable, else the first `jsonl` one; `None` for a text
-/// command. An output is selectable when its `nusage-args` say how to ask for it, it is the
-/// default, has its own `select` switch, or the command has a `select` flag whose value
-/// names it.
+/// The structured output a wrapper asks for, among those that have a decoder: the default
+/// output, else the first `json` output that is selectable, else the first selectable one;
+/// `None` for a text command. An output is selectable when its `nusage-args` say how to ask
+/// for it, it is the default, has its own `select` switch, or the command has a `select` flag
+/// whose value names it.
 fn structured_output<'a>(
     outputs: &[SpecOutput],
     command_select: Option<&str>,
@@ -634,9 +656,9 @@ fn structured_output<'a>(
     chain: &[Level<'_>],
 ) -> Result<Option<Structured>, String> {
     let framing_of = |output: &SpecOutput| match output.framing {
-        usage::Framing::Json => Some(Framing::Json),
-        usage::Framing::Jsonl => Some(Framing::Jsonl),
-        _ => None,
+        usage::Framing::Json => Framing::Json,
+        usage::Framing::Jsonl => Framing::Jsonl,
+        usage::Framing::Text => Framing::Text,
     };
     let args_of = |output: &SpecOutput| -> Option<Vec<String>> {
         if let Some(words) = nusage_args(&output.name) {
@@ -650,16 +672,16 @@ fn structured_output<'a>(
         }
     };
     let candidates = || {
-        outputs
-            .iter()
-            .filter(|output| framing_of(output).is_some())
-            .filter_map(|output| args_of(output).map(|args| (output, args)))
+        outputs.iter().filter_map(|output| {
+            let decoder = decoder_of(output, chain)?;
+            args_of(output).map(|args| (output, args, decoder))
+        })
     };
     let chosen = candidates()
-        .find(|(output, _)| output.default)
-        .or_else(|| candidates().find(|(output, _)| output.framing == usage::Framing::Json))
+        .find(|(output, _, _)| output.default)
+        .or_else(|| candidates().find(|(output, _, _)| output.framing == usage::Framing::Json))
         .or_else(|| candidates().next());
-    let Some((output, args)) = chosen else {
+    let Some((output, args, decoder)) = chosen else {
         return Ok(None);
     };
     // The type: the output's schema, which usage carries, else the annotation on its
@@ -672,13 +694,19 @@ fn structured_output<'a>(
                 output.name
             ));
         }
+        (Some(_), None) if !decoder.is_json() => {
+            return Err(format!(
+                "output `{}` has a schema, which describes JSON, but is not decoded by `from json`; annotate its Nushell type instead",
+                output.name
+            ));
+        }
         (Some(schema), None) => {
-            let shape = schema::shape(schema)
+            let shape = nushell_schema::shape(schema)
                 .map_err(|why| format!("the schema of output `{}`: {why}", output.name))?;
             // A schema describes one document; JSON lines are a list of them, a table when
             // they are objects, and the fills and conversions apply to every row.
             let ty = match framing_of(output) {
-                Some(Framing::Jsonl) => match shape.ty.0.strip_prefix("record<") {
+                Framing::Jsonl => match shape.ty.0.strip_prefix("record<") {
                     Some(rest) => NuType(format!("table<{rest}")),
                     None => NuType(format!("list<{}>", shape.ty.0)),
                 },
@@ -696,7 +724,8 @@ fn structured_output<'a>(
         name: output.name.clone(),
         schema: output.schema.clone(),
         args,
-        framing: framing_of(output).expect("a candidate is framed"),
+        framing: framing_of(output),
+        decoder,
         ty,
         fills,
         conversions,

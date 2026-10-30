@@ -1,0 +1,5 @@
+#!/bin/sh
+# The fixture's stand-in for the binary: records the argv it received, prints what the case
+# says it should. Both come from the harness through the environment.
+printf '%s\n' "$@" > "$NUSAGE_FAKE_ARGV"
+if [ -n "$NUSAGE_FAKE_STDOUT" ]; then printf '%s\n' "$NUSAGE_FAKE_STDOUT"; fi

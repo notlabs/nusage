@@ -1,0 +1,9 @@
+[tasks.check]
+description = "Hold the intent's files to their schemas and its checked claims to nusage as it is"
+depends = ["//nusage:build"]
+file = "check.nu"
+
+[tasks.claims]
+description = "List the intent's claims, by topic and status"
+depends = ["//nusage:build"]
+file = "claims.nu"

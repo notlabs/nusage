@@ -6,16 +6,18 @@ Early development.
 
 - `nusage/`: the tool. `nusage --help` for the CLI, `fixtures/` for the hand-written modules
   the generator reproduces and the contract a script relies on, `cargo doc --workspace
-  --no-deps` for the crates.
-- `mise/`: the module for mise, generated from mise's own spec and the overlays there, with
-  the schemas of its outputs under `schemas/`.
-- `jj/`: the module for jj, generated from the spec `clap/` reads from jj-cli, committed
-  since writing it compiles jj-cli, with the schemas of its JSON outputs under `schemas/`;
-  `mise run //jj:spec` writes the spec for a new jj.
-- `clap/`: the spec of a binary that ships none, read from the clap command its crate
-  builds. Its README says how to add a binary.
-- `schemas/`: the runner of an output-schema suite and the overlay it declares, shared by
-  the modules. Its README says what a suite is.
+  --no-deps` for the crates. Two of them stand on their own: `nushell-schema`, the Nushell
+  dialect of JSON Schema, and `openapi-usage`, an OpenAPI document as a usage spec with the
+  HTTP mapping beside it.
+- `catalog/`: the wrappers for other tools, a Nushell module package per tool under
+  `catalog/lib/`, generated from each tool's spec, the schemas of its outputs and the
+  overlays beside it. With `catalog/lib` on `$NU_LIB_DIRS`, `use mise *` names mise's
+  commands as mise does, and `use jj *` jj's. `catalog/mise.toml` declares the entries and
+  `catalog/tasks/catalog.nu` the layout; `catalog/clap/` reads the spec of a binary whose
+  crate builds its clap command, as jj's is, and `catalog/schemas/` runs an output-schema
+  suite, as both packages keep one.
+- `intent/`: the direction, as claims that are checked where they can be; nothing there is
+  settled.
 
 An editor that runs `nusage lsp` where it would run `nu --lsp` checks a script nusage runs as
 nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to
@@ -32,8 +34,8 @@ for its environment, names nusage the same way, `command = "nusage"` and `args =
 beside its `env`, and keeps nusage's server, which is Nushell for anything but `--lsp`.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
-tasks, which run through the nusage built here. `mise run //mise:install` and `mise run
-//jj:install` generate a module and have every new interactive Nushell session load it. `mise
-dot apply` links the global fragment that installs the released nusage for the user, with
-the `nu` it runs scripts in and the `usage` its completions run. The repository uses a single
-`main` bookmark with a colocated Git/Jujutsu checkout.
+tasks, which run through the nusage built here. `mise run //catalog:install` has every new
+interactive Nushell session load the catalog's modules. `mise dot apply` links the global
+fragment that installs the released nusage for the user, with the `nu` it runs scripts in and
+the `usage` its completions run. The repository uses a single `main` bookmark with a colocated
+Git/Jujutsu checkout.

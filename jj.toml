@@ -7,7 +7,9 @@ patterns = ["glob:'**/*.rs'"]
 # Not the modules the generator writes: they are compared byte for byte with its output.
 [fix.tools.nufmt]
 command = ["nufmt", "--stdin"]
-patterns = ["glob:'**/*.nu' ~ glob:'**/expected/*.nu'"]
+patterns = [
+  "glob:'**/*.nu' ~ glob:'**/expected/*.nu' ~ glob:'catalog/lib/*/mod.nu'",
+]
 
 [fix.tools.taplo]
 command = ["taplo", "fmt", "-"]
