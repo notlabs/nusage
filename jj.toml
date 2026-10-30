@@ -1,3 +1,8 @@
+# Keep the native jj identity visible in Git commit messages as well as Git's extra header.
+# Preserve an existing Change-Id, including one carried by an imported commit.
+[templates]
+commit_trailers = 'if(!trailers.contains_key("Change-Id"), "Change-Id: " ++ change_id ++ "\n")'
+
 # The formatters, as `jj fix` runs them on the changes themselves: each reads a file on
 # standard input and writes it formatted. The same formatters check the tree in CI.
 [fix.tools.rustfmt]
