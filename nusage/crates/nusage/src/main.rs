@@ -26,6 +26,7 @@ struct Nusage {
 enum Commands {
     Generate(Generate),
     Spec(Spec),
+    Model(Model),
     Check(Check),
     Overlay(Overlay),
     Lsp(Lsp),
@@ -108,6 +109,36 @@ impl Run for Spec {
     fn run(self) -> Self::Output {
         let spec = nusage::spec(&self.source, &self.overlay).map_err(|e| e.to_string())?;
         print!("{spec}");
+        Ok(())
+    }
+}
+
+/// Print the command model of a script, a tree or a spec, as NUON
+///
+/// What a target is handed: every command with its parameters, their types and defaults,
+/// its output and how a binary's or a service's is selected and decoded, and what runs when
+/// it is called, after every decision between usage's vocabulary and a Nushell signature is
+/// made and before any Nushell is written. `spec` prints the stage before it, `generate`
+/// the one after.
+#[derive(Args)]
+struct Model {
+    /// The script, the directory of scripts, or the `.kdl` spec file
+    source: PathBuf,
+    /// A usage KDL document merged onto the spec file first, as for `generate`
+    #[usage(long)]
+    overlay: Vec<PathBuf>,
+    /// The HTTP mapping beside the spec, as for `generate`
+    #[usage(long)]
+    http: Option<PathBuf>,
+}
+
+impl Run for Model {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        let model = nusage::model(&self.source, &self.overlay, self.http.as_deref())
+            .map_err(|e| e.to_string())?;
+        println!("{model}");
         Ok(())
     }
 }

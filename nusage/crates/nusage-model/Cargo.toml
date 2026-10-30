@@ -17,6 +17,7 @@ nu-parser.workspace = true
 nuon.workspace = true
 nu-cmd-lang.workspace = true
 nusage-nu.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 nushell-schema.workspace = true
 

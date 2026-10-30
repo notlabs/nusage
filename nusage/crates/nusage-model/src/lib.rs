@@ -5,7 +5,8 @@
 //! repeated or counted flag is spelled, the order of inherited flags, the `$usage` record
 //! shape, which header nodes ride along as attributes, what a completion provider may look
 //! like, and how a binary's outputs are selected and decoded. The result is plain data a
-//! target turns into a module; it names no Nushell syntax and performs no I/O.
+//! target turns into a module; it names no Nushell syntax and performs no I/O. It
+//! serializes, so a tool can show what a target is handed: `nusage model` prints it.
 
 mod build;
 
@@ -20,7 +21,7 @@ use std::path::PathBuf;
 /// Every command of a script, tree or spec, in the order a module should define them: each
 /// command before its subcommands, and among siblings the completion providers first, so a
 /// parameter's completer is defined before the parameter that names it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct CommandTree {
     pub bin: String,
     pub commands: Vec<Command>,
@@ -31,7 +32,7 @@ pub struct CommandTree {
 }
 
 /// An HTTP service: where it is, and how it authenticates a call.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Service {
     /// The base URL the requests' paths follow, when the mapping names one; the wrapper
     /// lets the environment say otherwise either way.
@@ -42,7 +43,7 @@ pub struct Service {
 
 /// What a command's call sends, with the spec's parameters resolved to the wrapper's: a
 /// request of the tree's [`Service`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Request {
     /// The method, lower case.
     pub method: String,
@@ -54,7 +55,7 @@ pub struct Request {
 }
 
 /// A parameter on the wire and the variable that carries it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Wire {
     pub location: Location,
     /// The name on the wire.
@@ -64,7 +65,7 @@ pub struct Wire {
 }
 
 /// The request body, which the wrapper takes as its input.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Body {
     /// The media type it is sent as.
     pub media: String,
@@ -76,7 +77,7 @@ pub struct Body {
     pub required: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Command {
     pub path: CommandPath,
     /// usage `about`: the description.
@@ -104,7 +105,8 @@ pub struct Command {
 }
 
 /// What runs when the command is called.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Execution {
     /// `run` this script with `$usage` and `$in`.
     Script(PathBuf),
@@ -121,7 +123,7 @@ pub enum Execution {
 /// returns data and the binary itself, `^tool`, returns text: among the outputs that have a
 /// decoder, the default one, else the first `json` one a selector can ask for, else the first
 /// that can be asked for. The selector flags are the wrapper's, not the caller's.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Structured {
     pub name: String,
     /// The JSON Schema the output declares, as text, when it declares one rather than an
@@ -144,7 +146,8 @@ pub struct Structured {
 }
 
 /// usage's `framing`: the stream contract of an output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Framing {
     /// One document, read to its end; usage's default.
     Text,
@@ -157,7 +160,8 @@ pub enum Framing {
 /// How a wrapper decodes an output. An output has a decoder when its `media_type` names a
 /// format Nushell reads, when its framing is `json` or `jsonl`, or when its declaration
 /// carries a `nusage-decode` node; an output with none is text, which the wrapper returns as it is.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Decoder {
     /// `from <format>`: Nushell's reader for the media type, `json` for the JSON framings
     /// when no media type says otherwise, with `--objects` for one document per line.
@@ -202,7 +206,7 @@ pub fn reader_for(media_type: &str) -> Option<&'static str> {
     })
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Param {
     /// The name usage gave it: `target`, `dry-run`.
     pub usage_name: String,
@@ -221,7 +225,8 @@ pub struct Param {
     pub completer: Option<Completer>,
     /// The declared default as a Nushell value of type `ty`. `Count` is `0` and `Repeated` is
     /// `[]` unless usage declares otherwise; a switch has one only when usage declares it. A
-    /// binary applies its own defaults, so an extern never writes them.
+    /// binary applies its own defaults, so an extern never writes them. Serialized as NUON.
+    #[serde(serialize_with = "as_nuon")]
     pub default: Option<Value>,
     /// usage `negate`: the long name, without dashes, of the switch that turns this one off.
     pub negate: Option<String>,
@@ -237,6 +242,14 @@ pub struct Param {
     pub clause: bool,
 }
 
+/// A default as its NUON text, which says the value as a signature writes it.
+fn as_nuon<S: serde::Serializer>(value: &Option<Value>, serializer: S) -> Result<S::Ok, S::Error> {
+    match value {
+        Some(value) => serializer.serialize_some(&nusage_nu::nuon(value)),
+        None => serializer.serialize_none(),
+    }
+}
+
 impl Param {
     /// The flag's long name as Nushell spells it: the binary's, with a trailing `_` when the
     /// variable needed one (`--env_` for `--env`); the short form is untouched either way.
@@ -250,7 +263,8 @@ impl Param {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ParamKind {
     /// `arg "<x>"`
     Required,
@@ -270,7 +284,8 @@ pub enum ParamKind {
     Repeated,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Completer {
     /// Static `choices`.
     Inline(Vec<String>),

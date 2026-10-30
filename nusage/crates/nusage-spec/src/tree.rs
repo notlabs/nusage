@@ -11,7 +11,7 @@ use crate::header::{header_node, read_header_in, read_subcommand_header_in, stri
 use crate::{Diagnostic, Header, Texts};
 
 /// A command's place in the tree: subcommand names outermost first, empty at the root.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize)]
 pub struct CommandPath(pub Vec<String>);
 
 impl CommandPath {

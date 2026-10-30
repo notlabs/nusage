@@ -67,7 +67,8 @@ pub struct Wire {
 }
 
 /// Where a parameter goes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Location {
     /// Into the path, in place of its `{name}`.
     Path,
@@ -89,7 +90,8 @@ pub struct Body {
 }
 
 /// How the service authenticates a call.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Auth {
     /// `Authorization: Bearer <token>`.
     Bearer,

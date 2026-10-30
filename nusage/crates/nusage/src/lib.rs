@@ -4,7 +4,8 @@
 //! [`generate`] is the whole pipeline: assemble the source into one spec, derive the command
 //! model, write the module for the target the source implies: the shim for scripts, the
 //! binary target for a spec file, the HTTP target for a spec file with the mapping of a
-//! service beside it. The CLI in `main.rs` is a thin shell around it.
+//! service beside it. Each stage prints: [`spec`] the assembled spec, [`model`] the command
+//! model, [`generate`] the module. The CLI in `main.rs` is a thin shell around it.
 
 mod binary;
 mod calls;
@@ -172,6 +173,47 @@ pub fn nu(args: &[String]) -> std::io::Result<i32> {
 /// run them with `nusage`, and the helpers they use. Empty when it calls none.
 pub fn prelude_run(script: &Path, nusage: &Path) -> Result<String, Diagnostic> {
     prelude::runtime(script, nusage)
+}
+
+/// The command model derived from the source, as NUON: what a target is handed, after every
+/// decision between usage's vocabulary and a Nushell signature is made and before any
+/// Nushell is written. The stages of [`generate`] are each printable: [`spec`] the
+/// assembled spec, this the model, [`generate`] the module.
+pub fn model(
+    source: &Path,
+    overlays: &[PathBuf],
+    http: Option<&Path>,
+) -> Result<String, Diagnostic> {
+    let assembled = assemble(source, overlays, http)?;
+    let tree = nusage_model::model(&assembled)?;
+    let json = serde_json::to_value(&tree)
+        .map_err(|err| Diagnostic::new(source, format!("the model does not serialize: {err}")))?;
+    Ok(nusage_nu::nuon(&nu_value(json)))
+}
+
+/// A JSON value as a Nushell one, for printing as NUON.
+fn nu_value(json: serde_json::Value) -> nu_protocol::Value {
+    use nu_protocol::{Span, Value};
+    let span = Span::unknown();
+    match json {
+        serde_json::Value::Null => Value::nothing(span),
+        serde_json::Value::Bool(b) => Value::bool(b, span),
+        serde_json::Value::Number(n) => match n.as_i64() {
+            Some(i) => Value::int(i, span),
+            None => Value::float(n.as_f64().unwrap_or_default(), span),
+        },
+        serde_json::Value::String(s) => Value::string(s, span),
+        serde_json::Value::Array(items) => {
+            Value::list(items.into_iter().map(nu_value).collect(), span)
+        }
+        serde_json::Value::Object(fields) => {
+            let mut record = nu_protocol::Record::new();
+            for (key, value) in fields {
+                record.push(key, nu_value(value));
+            }
+            Value::record(record, span)
+        }
+    }
 }
 
 /// The assembled spec as usage KDL, overlays merged, for every tool that reads usage specs.
