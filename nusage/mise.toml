@@ -14,28 +14,30 @@
 [task_config]
 shell = "nu -c"
 
-# The build, copied where the root's `[env] _.path` looks for it, from the path Cargo
-# reports: a build cache may keep the target directory elsewhere, and Cargo rewrites the
+# The build, copied where the root's `[env] _.path` looks for it, from the paths Cargo
+# reports: a build cache may keep the target directory elsewhere, and Cargo rewrites a
 # binary there whenever another of its commands relinks it, under a task that is running it.
+# `openapi-usage` goes with nusage: the catalog's `spec` task runs it for a service's entry.
 [tasks.build]
-description = "Build the workspace and copy nusage into the repository's bin directory"
+description = "Build the workspace and copy nusage and openapi-usage into the repository's bin directory"
 sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
-outputs = ["../.bin/nusage"]
+outputs = ["../.bin/nusage", "../.bin/openapi-usage"]
 run = '''
 let built = ^cargo build --workspace --locked --message-format json-render-diagnostics
   | lines
   | where ($it | str starts-with "{")
   | each { from json }
-  | where reason == compiler-artifact and executable != null and target.name == nusage
-  | get 0.executable
+  | where reason == compiler-artifact and executable != null and target.name in [nusage openapi-usage]
 let bin = "{{ config_root }}/../.bin" | path expand
-let copy = $bin | path join nusage
 mkdir $bin
-if ($copy | path type) == symlink {
-    rm $copy
-}
-if not ($copy | path exists) or (open --raw $built | hash sha256) != (open --raw $copy | hash sha256) {
-    cp $built $copy
+for artifact in $built {
+    let copy = $bin | path join $artifact.target.name
+    if ($copy | path type) == symlink {
+        rm $copy
+    }
+    if not ($copy | path exists) or (open --raw $artifact.executable | hash sha256) != (open --raw $copy | hash sha256) {
+        cp $artifact.executable $copy
+    }
 }
 '''
 

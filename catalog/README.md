@@ -81,12 +81,15 @@ digest, `@sha256:…`, where a moved tag must not pass unnoticed.
 ## Add an entry
 
 1. Declare it in `mise.toml`: `spec = { run = "…" }` names a command line that prints the
-   tool's usage spec, or `spec = { clap = "spec" }` an extractor under the package that
-   `clap/spec.nu` builds and runs, as `clap/README.md` describes; `switch` names the flag
-   that selects structured output and its framing, when the spec declares no `output`. A
-   `run` whose export builds something adds `probe = "version"`, so `check` compares the
-   spec's `version` to `<bin> --version` rather than exporting again.
-2. `mise run //catalog:spec <tool>` writes `lib/<tool>/<tool>.usage.kdl`.
+   tool's usage spec, `spec = { clap = "spec" }` an extractor under the package that
+   `clap/spec.nu` builds and runs, as `clap/README.md` describes, or `spec = { openapi =
+   "openapi.yaml" }` the OpenAPI document of a service under the package, as
+   `lib/typesafe/` has it; `switch` names the flag that selects structured output and its
+   framing, when the spec declares no `output`. A `run` whose export builds something adds
+   `probe = "version"`, so `check` compares the spec's `version` to `<bin> --version` rather
+   than exporting again.
+2. `mise run //catalog:spec <tool>` writes `lib/<tool>/<tool>.usage.kdl`; for a service also
+   `<tool>.http.kdl`, the mapping the wrappers send requests by, and `schemas/`.
 3. Add `lib/<tool>/*.overlay.kdl` for what the spec lacks: types, outputs, selectors. They
    merge in name order after the generated overlays. A suite under `lib/<tool>/schemas/`,
    as `schemas/README.md` describes, declares outputs with their schemas instead, and

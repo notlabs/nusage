@@ -15,6 +15,16 @@ spec = { clap = "spec" }
 [_.nusage.catalog.docker-compose]
 spec = { run = "mise run //catalog/cobra:compose", probe = "version" }
 
+# gh takes `--json <fields>`, a field list rather than an output name, so no `switch`: each
+# typed command's overlay names its fields with `nusage-args`.
+[_.nusage.catalog.gh]
+spec = { run = "mise run //catalog/cobra:gh", probe = "version" }
+
+# A service: the document under the package is the source, and `spec` writes the usage spec,
+# the HTTP mapping and the schemas from it.
+[_.nusage.catalog.typesafe]
+spec = { openapi = "openapi.yaml" }
+
 # The catalog's own version, released apart from nusage's: a push to main that changes it
 # is the release, which release.yml tags `catalog/v<version>`, with the tarball `package`
 # builds attached and the tasks pushed to GHCR as an OCI task catalog.
@@ -39,7 +49,7 @@ file = "tasks/generate.nu"
 description = "Hold each entry's generated files to their inputs and its spec to the tool on PATH, its output to its schemas, and drive the tool through its module"
 depends = ["//nusage:build"]
 file = "tasks/check.nu"
-tools = { docker-compose = "5.6.1" }
+tools = { docker-compose = "5.6.1", gh = "2.103.3" }
 
 [tasks.install]
 description = "Generate the modules and have every new interactive Nushell session load them"

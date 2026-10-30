@@ -23,5 +23,22 @@ for entry in (entries $usage.args.tool) {
             let force = if $usage.flags.force { ["--force"] } else { [] }
             ^(root | path join clap spec.nu) $dir --out $files.spec ...$force
         }
+        openapi => {
+            let scratch = mktemp --directory --tmpdir --suffix .nusage-openapi
+            export-openapi $entry $scratch
+            let changed = openapi-files $scratch | where {|file|
+                let committed = $files.dir | path join $file
+                not ($committed | path exists) or (open --raw $committed) != (open --raw ($scratch | path join $file))
+            }
+            for file in $changed {
+                mkdir ($files.dir | path join $file | path dirname)
+                cp ($scratch | path join $file) ($files.dir | path join $file)
+                print $"($entry.name): (($files.dir | path join $file) | path relative-to (root)) written"
+            }
+            rm --recursive $scratch
+            if ($changed | is-empty) {
+                print $"($entry.name): spec is current"
+            }
+        }
     }
 }

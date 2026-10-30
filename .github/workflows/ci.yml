@@ -49,4 +49,8 @@ jobs:
           clean-target-before-export: true
       # rustc's and clippy's findings as annotations, through mise's task prefix.
       - run: echo "::add-matcher::.github/matchers/rust.json"
+      # The catalog's gh checks read this repository through gh; the workflow's token reads
+      # and nothing more.
       - run: mise run '//...:check'
+        env:
+          GH_TOKEN: ${{ github.token }}

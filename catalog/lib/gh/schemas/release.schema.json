@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A release with its assets, as `gh release view --json` selects its fields",
+  "type": "object",
+  "required": [
+    "tagName",
+    "name",
+    "body",
+    "isDraft",
+    "isPrerelease",
+    "isImmutable",
+    "createdAt",
+    "publishedAt",
+    "targetCommitish",
+    "url",
+    "author",
+    "assets"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "tagName": {"type": "string"},
+    "name": {"type": "string"},
+    "body": {"type": "string"},
+    "isDraft": {"type": "boolean"},
+    "isPrerelease": {"type": "boolean"},
+    "isImmutable": {"type": "boolean"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "publishedAt": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
+    "targetCommitish": {"type": "string"},
+    "url": {"type": "string"},
+    "author": {
+      "type": "object",
+      "required": ["id", "login"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "login": {"type": "string"}
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "url",
+          "apiUrl",
+          "id",
+          "name",
+          "label",
+          "size",
+          "digest",
+          "state",
+          "createdAt",
+          "updatedAt",
+          "downloadCount",
+          "contentType"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "url": {"type": "string"},
+          "apiUrl": {"type": "string"},
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "label": {"type": "string"},
+          "size": {"type": "integer"},
+          "digest": {"type": ["string", "null"]},
+          "state": {"type": "string"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"},
+          "downloadCount": {"type": "integer"},
+          "contentType": {"type": "string"}
+        }
+      }
+    }
+  }
+}
