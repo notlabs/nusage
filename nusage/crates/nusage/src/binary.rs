@@ -24,7 +24,7 @@ use crate::common::{SPEC_COMPLETER, Target, attr_usage_alias, doc_of, nu_params,
 pub(crate) const HELPERS: &str = include_str!("binary-helpers.nu");
 /// The helper that holds a failed decode to the output's schema, carried when a wrapper
 /// decodes a JSON document that has one.
-const DECODED: &str = include_str!("binary-decoded.nu");
+pub(crate) const DECODED: &str = include_str!("binary-decoded.nu");
 
 /// The module for a binary: the helpers, the completer when a parameter wants one, then a
 /// wrapper per command. `spec` is the spec file's path relative to the module's directory,
@@ -259,7 +259,7 @@ fn flag_word(param: &Param) -> String {
 /// read; then each conversion at its cell path, `into <ty> <path>` where the value is text
 /// or a count of bytes, else an `update` whose closure counts the unit and leaves `null`
 /// alone where the value may be one.
-fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
+pub(crate) fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
     let mut stages = vec![match &structured.decoder {
         Decoder::From { format, objects } => {
             let args = if *objects {
@@ -481,7 +481,7 @@ fn cell_path(path: &[String]) -> String {
         .join(".")
 }
 
-fn call(name: &str, args: Vec<Expr>) -> Result<Expr, SyntaxError> {
+pub(crate) fn call(name: &str, args: Vec<Expr>) -> Result<Expr, SyntaxError> {
     Ok(Expr::Call {
         name: CommandName::new(name)?,
         args,

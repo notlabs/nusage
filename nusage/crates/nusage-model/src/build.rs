@@ -7,8 +7,8 @@ use nusage_spec::{Assembled, CommandPath, Diagnostic, Header, HeaderNode, Source
 use usage::{SpecArg, SpecCommand, SpecComplete, SpecFlag, SpecOutput};
 
 use crate::{
-    Command, CommandTree, Completer, Conversion, Decoder, Execution, Framing, NuType, Param,
-    ParamKind, Structured, Value,
+    Body, Command, CommandTree, Completer, Conversion, Decoder, Execution, Framing, NuType, Param,
+    ParamKind, Request, Service, Structured, Value, Wire,
 };
 
 /// Header nodes that have a native place in the module and so do not become attributes.
@@ -40,6 +40,10 @@ pub fn model(assembled: &Assembled) -> Result<CommandTree, Diagnostic> {
     Ok(CommandTree {
         bin: assembled.spec.bin.clone(),
         commands,
+        service: assembled.http.as_ref().map(|http| Service {
+            base: http.base.clone(),
+            auths: http.auths.clone(),
+        }),
     })
 }
 
@@ -189,13 +193,13 @@ impl Context<'_> {
         // of each is on its declaration: the deepest command declaring an output by that
         // name, else the spec's top level.
         let outputs = usage::effective_outputs_ref(&self.assembled.spec, cmds.iter().copied());
-        let (output, structured, flags) = match execution {
+        let (output, structured, flags) = match &execution {
             Execution::Script(_) => {
                 let output = default_output(&outputs)
                     .and_then(|output| output_annotation(&chain, &output.name));
                 (output, None, flags)
             }
-            Execution::External => {
+            _ => {
                 let select = usage::effective_select_ref(&self.assembled.spec, &cmds);
                 let args = |name: &str| self.assembled.output_args(&path, name);
                 let structured = structured_output(&outputs, select.as_deref(), &args, &chain)
@@ -255,6 +259,28 @@ impl Context<'_> {
                 }
             }
         }
+
+        // With a mapping, a binary's command is a request of the service, resolved now that
+        // the parameters are known.
+        let execution = match (&execution, &self.assembled.http) {
+            (Execution::External, Some(http)) => match http.commands.get(&path) {
+                Some(request) => Execution::Request(self.request(
+                    request,
+                    &path,
+                    &positionals,
+                    &flags,
+                    header,
+                )?),
+                None if path.is_root() => Execution::Service,
+                None => {
+                    return Err(Diagnostic::new(
+                        &header.path,
+                        format!("`{path}` has no request in the HTTP mapping"),
+                    ));
+                }
+            },
+            _ => execution,
+        };
 
         let attributes = header
             .nodes
@@ -349,6 +375,76 @@ impl Context<'_> {
     }
 
     /// A flag as declared at `level`, the command that declares it.
+    /// The mapping's request for the command, each parameter on the wire resolved to the
+    /// variable of the positional or flag that carries it, and the body's input type read
+    /// from its schema.
+    fn request(
+        &self,
+        mapped: &nusage_spec::http::Request,
+        path: &CommandPath,
+        positionals: &[Param],
+        flags: &[Param],
+        header: &Header,
+    ) -> Result<Request, Diagnostic> {
+        let mut params = Vec::new();
+        for wire in &mapped.params {
+            let among = match wire.location {
+                crate::Location::Path => positionals,
+                crate::Location::Query | crate::Location::Header => flags,
+            };
+            let param = among
+                .iter()
+                .find(|param| param.usage_name == wire.param)
+                .ok_or_else(|| {
+                    Diagnostic::new(
+                        &header.path,
+                        format!(
+                            "`{path}`: the HTTP mapping sends `{}` as parameter `{}`, which the                              spec does not declare",
+                            wire.name, wire.param
+                        ),
+                    )
+                })?;
+            params.push(Wire {
+                location: wire.location,
+                name: wire.name.clone(),
+                var: param.var.clone(),
+            });
+        }
+        let body = match &mapped.body {
+            Some(body) => {
+                let ty = match &body.schema {
+                    Some(schema) => {
+                        let shape = nushell_schema::shape(schema).map_err(|why| {
+                            Diagnostic::new(
+                                &header.path,
+                                format!("`{path}`: the schema of the request body: {why}"),
+                            )
+                        })?;
+                        Some(required_columns(&shape.ty).map_err(|why| {
+                            Diagnostic::new(
+                                &header.path,
+                                format!("`{path}`: the type of the request body: {why}"),
+                            )
+                        })?)
+                    }
+                    None => None,
+                };
+                Some(Body {
+                    media: body.media.clone(),
+                    ty,
+                    required: body.required,
+                })
+            }
+            None => None,
+        };
+        Ok(Request {
+            method: mapped.method.clone(),
+            path: mapped.path.clone(),
+            params,
+            body,
+        })
+    }
+
     fn flag_param(&self, flag: &SpecFlag, level: Level<'_>) -> Result<Param, Diagnostic> {
         let node = flag_node(level.header, flag);
         let long = flag.long.first().cloned();
@@ -835,6 +931,31 @@ pub fn value_from_text(text: &str, ty: &NuType) -> Result<Value, String> {
 
 /// The type a signature reads from the annotation: nu-parser keeps its type parser private,
 /// so the annotation is parsed as the type of a parameter.
+/// The type with the optional columns of its record, or of its table's rows, left out: what
+/// a schema requires of an input. Nushell holds a record to every field its type names and
+/// lets it carry more, so a caller passes the optional properties it has and none it does
+/// not; the fields a schema does not require are `oneof<T, nothing>` in the shape.
+fn required_columns(ty: &NuType) -> Result<NuType, String> {
+    let parsed = parse_type(ty)?;
+    let optional = |column: &Type| match column {
+        Type::OneOf(members) => members.iter().any(|member| *member == Type::Nothing),
+        _ => false,
+    };
+    let kept = |columns: &nu_protocol::CollectionColumns<Type>| {
+        columns
+            .iter()
+            .filter(|(_, column)| !optional(column))
+            .cloned()
+            .collect::<nu_protocol::CollectionColumns<Type>>()
+    };
+    let narrowed = match &parsed {
+        Type::Record(columns) => Type::Record(kept(columns)),
+        Type::Table(columns) => Type::Table(kept(columns)),
+        _ => return Ok(ty.clone()),
+    };
+    Ok(NuType(narrowed.to_string()))
+}
+
 fn parse_type(ty: &NuType) -> Result<Type, String> {
     let mut working_set = StateWorkingSet::new(&ENGINE);
     let source = format!("def __nusage_type [p: {}] {{}}", ty.as_str());

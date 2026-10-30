@@ -11,6 +11,7 @@ mod build;
 
 pub use build::{Identifier, identifier, model, value_from_text};
 pub use nu_protocol::Value;
+pub use nusage_spec::http::{Auth, Location};
 pub use nusage_spec::{CommandPath, Diagnostic};
 pub use nushell_schema::{Conversion, Fill, NuType, Shape};
 
@@ -23,6 +24,56 @@ use std::path::PathBuf;
 pub struct CommandTree {
     pub bin: String,
     pub commands: Vec<Command>,
+    /// The service the commands call, when the spec has an HTTP mapping: then every
+    /// command's execution is a [`Execution::Request`], or [`Execution::Service`] for the
+    /// root.
+    pub service: Option<Service>,
+}
+
+/// An HTTP service: where it is, and how it authenticates a call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Service {
+    /// The base URL the requests' paths follow, when the mapping names one; the wrapper
+    /// lets the environment say otherwise either way.
+    pub base: Option<String>,
+    /// What every call carries, in the mapping's order.
+    pub auths: Vec<Auth>,
+}
+
+/// What a command's call sends, with the spec's parameters resolved to the wrapper's: a
+/// request of the tree's [`Service`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Request {
+    /// The method, lower case.
+    pub method: String,
+    /// The path after the base, each path parameter as `{name}`.
+    pub path: String,
+    /// The parameters on the wire, in the mapping's order.
+    pub params: Vec<Wire>,
+    pub body: Option<Body>,
+}
+
+/// A parameter on the wire and the variable that carries it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Wire {
+    pub location: Location,
+    /// The name on the wire.
+    pub name: String,
+    /// The wrapper's variable, as [`Param::var`] names it.
+    pub var: String,
+}
+
+/// The request body, which the wrapper takes as its input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Body {
+    /// The media type it is sent as.
+    pub media: String,
+    /// The input type its schema declares, the record of the properties the schema requires
+    /// (a caller passes what it has, and Nushell holds a record to the fields its type
+    /// names), or `None` without a schema.
+    pub ty: Option<NuType>,
+    /// Whether the call must send one; otherwise the input may be nothing.
+    pub required: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,6 +110,11 @@ pub enum Execution {
     Script(PathBuf),
     /// The binary named by the spec, from `PATH`.
     External,
+    /// A request of the tree's [`Service`], whose response is the command's output.
+    Request(Request),
+    /// The service itself, as the root of a spec with an HTTP mapping: nothing is called,
+    /// and the wrapper says where the service is.
+    Service,
 }
 
 /// The one output a binary command's wrapper asks for and decodes, as a Nushell command

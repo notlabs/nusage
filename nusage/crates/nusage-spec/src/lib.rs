@@ -7,13 +7,15 @@
 //! exists beyond the file extension and the `mod.nu` layout.
 //!
 //! The entry points are [`read_header`] for one script and [`assemble`] for a script, a tree
-//! or a spec file; [`assemble_with`] merges overlays onto a spec file first. A spec's
-//! `nusage-args` hold what usage's grammar cannot, the words that ask for an output, and are
-//! taken out before usage reads it.
+//! or a spec file; [`assemble_with`] merges overlays onto a spec file first, and
+//! [`assemble_http`] reads the HTTP mapping beside a spec that describes a service rather
+//! than a binary. A spec's `nusage-args` hold what usage's grammar cannot, the words that
+//! ask for an output, and are taken out before usage reads it.
 
 mod args;
 mod error;
 mod header;
+pub mod http;
 mod overlay;
 mod tree;
 
@@ -23,5 +25,6 @@ pub use header::{
     Header, HeaderNode, ScriptHeader, Texts, read_header, read_header_in, read_subcommand_header,
 };
 pub use tree::{
-    Assembled, CommandPath, Provider, Source, assemble, assemble_in, assemble_with, command_at,
+    Assembled, CommandPath, Provider, Source, assemble, assemble_http, assemble_in, assemble_with,
+    command_at,
 };

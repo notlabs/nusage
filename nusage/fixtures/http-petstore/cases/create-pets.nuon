@@ -1,0 +1,4 @@
+# A request whose body is the input, typed by its schema's required properties.
+{
+    cmd: [create-pets],
+}

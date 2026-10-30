@@ -58,14 +58,26 @@ struct Generate {
     /// 'json(self)'`, and the wrapper owns the flags they name
     #[usage(long)]
     overlay: Vec<PathBuf>,
+    /// The HTTP mapping beside a spec that describes a service, `<name>.http.kdl` as
+    /// `openapi-usage` writes it: then each command's wrapper sends the request the mapping
+    /// says, with the body as its input, and decodes the response as a binary's output.
+    /// The service's base URL and credentials come from the environment, `$env.<NAME>_URL`
+    /// and `$env.<NAME>_TOKEN`, as the module's helpers say
+    #[usage(long)]
+    http: Option<PathBuf>,
 }
 
 impl Run for Generate {
     type Output = Result<(), String>;
 
     fn run(self) -> Self::Output {
-        let module = nusage::generate_with(&self.source, self.out.as_deref(), &self.overlay)
-            .map_err(|e| e.to_string())?;
+        let module = nusage::generate_with(
+            &self.source,
+            self.out.as_deref(),
+            &self.overlay,
+            self.http.as_deref(),
+        )
+        .map_err(|e| e.to_string())?;
         match &self.out {
             Some(out) => {
                 std::fs::write(out, module).map_err(|err| format!("{}: {err}", out.display()))
@@ -116,13 +128,22 @@ struct Check {
     /// A usage KDL document merged onto the spec file first, as for `generate`
     #[usage(long)]
     overlay: Vec<PathBuf>,
+    /// The HTTP mapping beside the spec, as for `generate`
+    #[usage(long)]
+    http: Option<PathBuf>,
 }
 
 impl Run for Check {
     type Output = Result<(), String>;
 
     fn run(self) -> Self::Output {
-        nusage::check(&self.source, &self.overlay, &self.module).map_err(|e| e.to_string())
+        nusage::check(
+            &self.source,
+            &self.overlay,
+            self.http.as_deref(),
+            &self.module,
+        )
+        .map_err(|e| e.to_string())
     }
 }
 

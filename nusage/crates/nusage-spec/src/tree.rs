@@ -77,6 +77,8 @@ pub struct Assembled {
     /// The words that ask for an output where usage's `select` cannot say them: each
     /// `nusage-args`, by the command whose `output` declared it.
     pub output_args: OutputArgs,
+    /// The HTTP mapping, when the spec describes a service: what each command's call sends.
+    pub http: Option<crate::http::Http>,
 }
 
 impl Assembled {
@@ -119,6 +121,25 @@ pub fn assemble(source: &Path) -> Result<Assembled, Diagnostic> {
 /// Scripts take no overlay; their headers are their own.
 pub fn assemble_with(source: &Path, overlays: &[PathBuf]) -> Result<Assembled, Diagnostic> {
     assemble_from(source, overlays, &Texts::new())
+}
+
+/// [`assemble_with`], for a spec file that describes a service rather than a binary: the
+/// HTTP mapping at `http`, `<name>.http.kdl` as `openapi-usage` writes it beside the spec,
+/// says what each command's call sends. See [`crate::http`].
+pub fn assemble_http(
+    source: &Path,
+    overlays: &[PathBuf],
+    http: &Path,
+) -> Result<Assembled, Diagnostic> {
+    let mut assembled = assemble_from(source, overlays, &Texts::new())?;
+    if !matches!(assembled.source, Source::Binary) {
+        return Err(Diagnostic::new(
+            http,
+            "an HTTP mapping goes with a spec file; scripts have nothing to map",
+        ));
+    }
+    assembled.http = Some(crate::http::read_http(http)?);
+    Ok(assembled)
 }
 
 /// [`assemble`] for a script or a tree, reading each script from the text `texts` holds for
@@ -181,6 +202,7 @@ fn assemble_from(
         headers,
         providers: Vec::new(),
         output_args: OutputArgs::new(),
+        http: None,
     };
     resolve_providers(&mut out)?;
     Ok(out)
@@ -206,6 +228,7 @@ fn assemble_single(path: &Path, texts: &Texts) -> Result<Assembled, Diagnostic> 
         headers: BTreeMap::from([(root, script.header)]),
         providers: Vec::new(),
         output_args: OutputArgs::new(),
+        http: None,
     };
     resolve_providers(&mut out)?;
     Ok(out)
@@ -293,6 +316,7 @@ fn assemble_spec_file(path: &Path, overlays: &[PathBuf]) -> Result<Assembled, Di
         headers,
         providers: Vec::new(),
         output_args,
+        http: None,
     })
 }
 

@@ -1,0 +1,4 @@
+# A path parameter as the positional.
+{
+    cmd: [show-pet-by-id],
+}

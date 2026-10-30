@@ -108,7 +108,10 @@ def check-conform [
     }
     let overlay = $dir | path join $"($bin).overlay.kdl"
     let overlays = if ($overlay | path exists) { [--overlay $overlay] } else { [] }
-    let out = ^$env.NUSAGE_BIN check $source $module ...$overlays | complete
+    # A service's spec has its HTTP mapping beside it.
+    let http = $dir | path join $"($bin).http.kdl"
+    let mapping = if ($http | path exists) { [--http $http] } else { [] }
+    let out = ^$env.NUSAGE_BIN check $source $module ...$overlays ...$mapping | complete
     {
         ok: ($out.exit_code == 0)
         detail: ($out.stderr | str trim)
