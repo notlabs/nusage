@@ -42,8 +42,6 @@ nu-utils = { version = "0.116.1", default-features = false }
 # The plugins: the protocol, and the harness that runs a plugin in process for its tests.
 nu-plugin = "0.116.1"
 nu-plugin-test-support = "0.116.1"
-# The HTTP client of a plugin that calls a service, in a process that lives across calls.
-ureq = { version = "3.4", features = ["json"] }
 # The printer's templates. 0.20 is the first release whose `quote!` sees line breaks on stable.
 genco = "0.20"
 # Snapshots of what a transformation writes, reviewed with `cargo insta`.

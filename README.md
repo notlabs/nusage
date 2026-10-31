@@ -9,12 +9,11 @@ Early development.
   --no-deps` for the crates. Two of them stand on their own: `nushell-schema`, the Nushell
   dialect of JSON Schema, and `openapi-usage`, an OpenAPI document as a usage spec with the
   HTTP mapping beside it, which `nusage generate --http` turns into a module that calls the
-  service as another calls a binary. `nusage-plugin` is what a Nushell plugin of ours shares:
-  a plugin stands for a command line, its commands declared by the same usage spec, so
-  `nu_plugin_nusage` serves `nusage validate` inside Nushell with the CLI's signature and
-  `nu_plugin_jev` a judgment about a value by TypeSafe AI's model; `mise run
-  //nusage:plugins` registers the plugins built here, and `//nusage:plugin-new <name>` stamps
-  a new one from `nusage/plugin-template/`.
+  service as another calls a binary. `nu_plugin_nusage` is nusage inside Nushell: the
+  commands a module calls on its hot path, `nusage validate` first, with the CLI's own
+  signatures, served by one process across calls; `mise run //nusage:plugins` registers it.
+  A plugin is for what needs Rust in the interpreter, as a library only Rust reaches; a
+  service or a binary is a module.
 - `catalog/`: the wrappers for other tools, a Nushell module package per tool under
   `catalog/lib/`, generated from each tool's spec, the schemas of its outputs and the
   overlays beside it. With `catalog/lib` on `$NU_LIB_DIRS`, `use mise *` names mise's
