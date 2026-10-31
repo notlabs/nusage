@@ -6,15 +6,11 @@
 //! document conforms. A schema that cannot be read or is not in the dialect is an error,
 //! as the CLI's exit code 2 says nothing was held to anything.
 
-use nusage_plugin::nu_plugin::{EngineInterface, EvaluatedCall, PluginCommand};
-use nusage_plugin::nu_protocol::{
-    LabeledError, PipelineData, Record, Signature, Span, Spanned, Type, Value,
-};
-use nusage_plugin::{CommandTree, Declared, value};
+use nusage_plugin::nu_protocol::{LabeledError, PipelineData, Record, Span, Spanned, Type, Value};
+use nusage_plugin::{Args, CommandTree, Context, Declared, Run, value};
 use nushell_schema::validate::Schema;
 
-use crate::NusagePlugin;
-
+#[derive(Clone)]
 pub struct Validate(Declared);
 
 impl Validate {
@@ -105,37 +101,22 @@ fn row(document: &str, line: Option<usize>, path: &str, what: &str, span: Span) 
     Value::record(record, span)
 }
 
-impl PluginCommand for Validate {
-    type Plugin = NusagePlugin;
-
-    fn name(&self) -> &str {
-        &self.0.name
-    }
-
-    fn signature(&self) -> Signature {
-        self.0.signature.clone()
-    }
-
-    fn description(&self) -> &str {
-        &self.0.description
-    }
-
-    fn extra_description(&self) -> &str {
-        &self.0.extra_description
+impl Run for Validate {
+    fn declared(&self) -> &Declared {
+        &self.0
     }
 
     fn run(
         &self,
-        _plugin: &NusagePlugin,
-        engine: &EngineInterface,
-        call: &EvaluatedCall,
+        cx: &dyn Context,
+        args: &Args,
         input: PipelineData,
     ) -> Result<PipelineData, LabeledError> {
-        let span = call.head;
-        let schema: Spanned<String> = call.req(0)?;
-        let documents: Vec<Spanned<String>> = call.rest(1)?;
-        let lines = call.has_flag("lines")?;
-        let cwd = std::path::PathBuf::from(engine.get_current_dir()?);
+        let span = args.head;
+        let schema: Spanned<String> = args.req(0)?;
+        let documents: Vec<Spanned<String>> = args.rest(1)?;
+        let lines = args.has_flag("lines");
+        let cwd = std::path::PathBuf::from(cx.cwd()?);
         let schema_path = cwd.join(&schema.item);
         let text = std::fs::read_to_string(&schema_path).map_err(|err| {
             LabeledError::new(format!("{}: {err}", schema_path.display()))

@@ -36,6 +36,7 @@ jsonschema = { version = "0.60", default-features = false }
 serde_json = { version = "1", features = ["preserve_order"] }
 nu-protocol = { version = "0.116.1", default-features = false }
 nu-parser = "0.116.1"
+nu-engine = "0.116.1"
 nu-cmd-lang = "0.116.1"
 nu-command = "0.116.1"
 nu-utils = { version = "0.116.1", default-features = false }

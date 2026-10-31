@@ -3774,6 +3774,10 @@ dependencies = [
 name = "nusage-plugin"
 version = "0.1.1"
 dependencies = [
+ "nu-cmd-lang",
+ "nu-command",
+ "nu-engine",
+ "nu-parser",
  "nu-plugin",
  "nu-plugin-test-support",
  "nu-protocol",
