@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Hold each entry's generated files to their inputs and its spec to the tool on PATH, hold the tool's output to its schemas and the module to usage's reading of the spec, then drive the tool through the module"
 #USAGE arg "[tool]" help="One entry; every entry when absent"
 # The generated files are committed: the module a package ships is reviewed as a diff when the
@@ -132,10 +132,10 @@ for entry in (entries $usage.args.tool) {
     let committed = $made.generated | each {|file| $files.dir | path join ($file | path basename) }
     let overlays = $committed ++ $files.overlays
     let http = if ($files.http | path exists) { ["--http" $files.http] } else { [] }
-    let held = ^nusage check $files.spec $files.module ...($overlays | each {|overlay| ["--overlay" $overlay] } | flatten) ...$http | complete
+    let held = ^nus check $files.spec $files.module ...($overlays | each {|overlay| ["--overlay" $overlay] } | flatten) ...$http | complete
     if $held.exit_code != 0 {
         print --no-newline $held.stderr
-        $failed = $failed | append $"($name): nusage check"
+        $failed = $failed | append $"($name): nus check"
     }
 
     if (spec-kind $entry) == clap {

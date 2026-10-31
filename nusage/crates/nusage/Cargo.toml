@@ -10,7 +10,7 @@ repository.workspace = true
 publish = false
 
 [[bin]]
-name = "nusage"
+name = "nus"
 path = "src/main.rs"
 
 [dependencies]

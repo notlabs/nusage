@@ -1,5 +1,5 @@
 [env]
-NUSAGE_SCHEMA_FIXTURE = "present"
+NUS_SCHEMA_FIXTURE = "present"
 
 [tools]
 node = ["22.0.0", "24.0.0"]

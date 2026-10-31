@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE name "pack"
 #USAGE bin "pack"
 #USAGE about "Bundle files"

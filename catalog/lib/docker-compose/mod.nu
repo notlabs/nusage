@@ -1,7 +1,7 @@
 alias "attr usage" = echo
 
 # A value as an argv word: a datetime in ISO 8601, anything else as Nushell writes it.
-def "nusage word" []: any -> string {
+def "nus word" []: any -> string {
     if ($in | describe --detailed | get type) == datetime {
         $in | format date "%+"
     } else {
@@ -13,37 +13,37 @@ def "nusage word" []: any -> string {
 # preceded by the clause-scoped flags, then the other flags. A flag goes by its value: a
 # switch once when on, a count that many times, a list once per item with its value, any
 # other value once with its value; null and false add nothing.
-def "nusage argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
-    let scoped = $scoped | nusage flag-words
-    let words = $positionals | compact | each { nusage word }
+def "nus argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
+    let scoped = $scoped | nus flag-words
+    let words = $positionals | compact | each { nus word }
     let instances = if ($words | is-empty) {
         $scoped
     } else {
         $words | each {|word| $scoped ++ [$word] } | flatten
     }
-    $instances ++ ($flags | nusage flag-words)
+    $instances ++ ($flags | nus flag-words)
 }
 
-def "nusage flag-words" []: record -> list<string> {
+def "nus flag-words" []: record -> list<string> {
     $in | transpose name value | each {|flag|
         match ($flag.value | describe --detailed | get type) {
             bool => (if $flag.value { [$flag.name] } else { [] })
             int => (0..<$flag.value | each { $flag.name })
-            list => ($flag.value | each {|value| [$flag.name ($value | nusage word)] } | flatten)
+            list => ($flag.value | each {|value| [$flag.name ($value | nus word)] } | flatten)
             nothing => []
-            _ => [$flag.name ($flag.value | nusage word)]
+            _ => [$flag.name ($flag.value | nus word)]
         }
     } | flatten
 }
 
 # A binary's output decoded as the module's closure decodes it. When that fails and the
-# `nusage` this module was generated with is on PATH, the output is held to the schema the
+# `nus` this module was generated with is on PATH, the output is held to the schema the
 # spec declares, line by line with `--lines`, so the error names what does not match it
 # rather than what failed to convert; what failed to convert follows, as the inner error.
-# The error is the decoding's own when the output matches or there is no `nusage` to ask,
+# The error is the decoding's own when the output matches or there is no `nus` to ask,
 # and the inner one under why the output could not be held to its schema when the check
 # did not run.
-def "nusage decoded" [
+def "nus decoded" [
     text: string
     schema: string
     decode: closure
@@ -58,7 +58,7 @@ def "nusage decoded" [
         let file = mktemp --tmpdir nusage-XXXXXX.schema.json
         $schema | save --force $file
         let flags = if $lines { [--lines] } else { [] }
-        let checked = $text | ^nusage validate $file - ...$flags | complete
+        let checked = $text | ^nus validate $file - ...$flags | complete
         rm $file
         match $checked.exit_code {
             0 => { error make $err }
@@ -69,7 +69,7 @@ def "nusage decoded" [
             }
             _ => {
                 $err | error make --unspanned {
-                    msg: $"the output could not be held to its schema: nusage validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
+                    msg: $"the output could not be held to its schema: nus validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
                 }
             }
         }
@@ -128,7 +128,7 @@ export def main [
     --project-directory: string,  # Specify an alternate working directory (default: the path of the, first specified, Compose file)
     --project-name (-p): string,  # Project name
 ]: nothing -> string {
-    ^docker-compose ...(nusage argv [] {
+    ^docker-compose ...(nus argv [] {
         --dry-run: $dry_run
         --all-resources: $all_resources
         --ansi: $ansi
@@ -175,8 +175,8 @@ export def "docker-compose ls" [
     --all (-a),        # Show all stopped Compose projects
     --filter: string,  # Filter output based on conditions provided
 ]: nothing -> table<Name: string, Status: string, ConfigFiles: string> {
-    let text = ^docker-compose ls --format json ...(nusage argv [] {--dry-run: $dry_run, --all: $all, --filter: $filter})
-    nusage decoded $text "{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"Name\",\"Status\",\"ConfigFiles\"],\"properties\":{\"Name\":{\"type\":\"string\"},\"Status\":{\"type\":\"string\"},\"ConfigFiles\":{\"type\":\"string\"}}}}" { from json }
+    let text = ^docker-compose ls --format json ...(nus argv [] {--dry-run: $dry_run, --all: $all, --filter: $filter})
+    nus decoded $text "{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"Name\",\"Status\",\"ConfigFiles\"],\"properties\":{\"Name\":{\"type\":\"string\"},\"Status\":{\"type\":\"string\"},\"ConfigFiles\":{\"type\":\"string\"}}}}" { from json }
 }
 
 # Show the Docker Compose version information
@@ -198,6 +198,6 @@ export def "docker-compose ls" [
 export def "docker-compose version" [
     --dry-run,  # Execute command in dry run mode
 ]: nothing -> record<version: string> {
-    let text = ^docker-compose version --format json ...(nusage argv [] {--dry-run: $dry_run})
-    nusage decoded $text "{\"type\":\"object\",\"required\":[\"version\"],\"properties\":{\"version\":{\"type\":\"string\"}}}" { from json }
+    let text = ^docker-compose version --format json ...(nus argv [] {--dry-run: $dry_run})
+    nus decoded $text "{\"type\":\"object\",\"required\":[\"version\"],\"properties\":{\"version\":{\"type\":\"string\"}}}" { from json }
 }

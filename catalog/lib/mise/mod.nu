@@ -1,7 +1,7 @@
 alias "attr usage" = echo
 
 # A value as an argv word: a datetime in ISO 8601, anything else as Nushell writes it.
-def "nusage word" []: any -> string {
+def "nus word" []: any -> string {
     if ($in | describe --detailed | get type) == datetime {
         $in | format date "%+"
     } else {
@@ -13,32 +13,32 @@ def "nusage word" []: any -> string {
 # preceded by the clause-scoped flags, then the other flags. A flag goes by its value: a
 # switch once when on, a count that many times, a list once per item with its value, any
 # other value once with its value; null and false add nothing.
-def "nusage argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
-    let scoped = $scoped | nusage flag-words
-    let words = $positionals | compact | each { nusage word }
+def "nus argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
+    let scoped = $scoped | nus flag-words
+    let words = $positionals | compact | each { nus word }
     let instances = if ($words | is-empty) {
         $scoped
     } else {
         $words | each {|word| $scoped ++ [$word] } | flatten
     }
-    $instances ++ ($flags | nusage flag-words)
+    $instances ++ ($flags | nus flag-words)
 }
 
-def "nusage flag-words" []: record -> list<string> {
+def "nus flag-words" []: record -> list<string> {
     $in | transpose name value | each {|flag|
         match ($flag.value | describe --detailed | get type) {
             bool => (if $flag.value { [$flag.name] } else { [] })
             int => (0..<$flag.value | each { $flag.name })
-            list => ($flag.value | each {|value| [$flag.name ($value | nusage word)] } | flatten)
+            list => ($flag.value | each {|value| [$flag.name ($value | nus word)] } | flatten)
             nothing => []
-            _ => [$flag.name ($flag.value | nusage word)]
+            _ => [$flag.name ($flag.value | nus word)]
         }
     } | flatten
 }
 
 # Completions from usage's own completer, against the spec this module was generated
 # from, with the words typed so far. Nothing when the `usage` CLI is not installed.
-def "nusage complete" [place: record] {
+def "nus complete" [place: record] {
     const spec = (path self | path dirname | path join "mise.usage.kdl")
     if (which usage | is-empty) {
         return []
@@ -52,13 +52,13 @@ def "nusage complete" [place: record] {
 }
 
 # A binary's output decoded as the module's closure decodes it. When that fails and the
-# `nusage` this module was generated with is on PATH, the output is held to the schema the
+# `nus` this module was generated with is on PATH, the output is held to the schema the
 # spec declares, line by line with `--lines`, so the error names what does not match it
 # rather than what failed to convert; what failed to convert follows, as the inner error.
-# The error is the decoding's own when the output matches or there is no `nusage` to ask,
+# The error is the decoding's own when the output matches or there is no `nus` to ask,
 # and the inner one under why the output could not be held to its schema when the check
 # did not run.
-def "nusage decoded" [
+def "nus decoded" [
     text: string
     schema: string
     decode: closure
@@ -73,7 +73,7 @@ def "nusage decoded" [
         let file = mktemp --tmpdir nusage-XXXXXX.schema.json
         $schema | save --force $file
         let flags = if $lines { [--lines] } else { [] }
-        let checked = $text | ^nusage validate $file - ...$flags | complete
+        let checked = $text | ^nus validate $file - ...$flags | complete
         rm $file
         match $checked.exit_code {
             0 => { error make $err }
@@ -84,7 +84,7 @@ def "nusage decoded" [
             }
             _ => {
                 $err | error make --unspanned {
-                    msg: $"the output could not be held to its schema: nusage validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
+                    msg: $"the output could not be held to its schema: nus validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
                 }
             }
         }
@@ -351,22 +351,22 @@ case $cur in
 esac
 """#'#
 export def main [
-    task?: string@"nusage complete",    # Task to run
-    ...task_args: string,               # Task arguments
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --no-config,                        # Do not load any config files
-    --no-env,                           # Do not load environment variables from config files
-    --no-hooks,                         # Do not run hooks from config files
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    task?: string@"nus complete",    # Task to run
+    ...task_args: string,            # Task arguments
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --no-config,                     # Do not load any config files
+    --no-env,                        # Do not load environment variables from config files
+    --no-hooks,                      # Do not run hooks from config files
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise ...(nusage argv [$task ...$task_args] {
+    ^mise ...(nus argv [$task ...$task_args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -479,7 +479,7 @@ Defaults to the shell named by MISE_SHELL or SHELL. mise reports an error when n
 @usage 'example "(&mise activate pwsh) | Out-String | Invoke-Expression" help="Activate mise in PowerShell"'
 export def "mise activate" [
     shell_type?: string@[bash elvish fish nu xonsh zsh pwsh],  # Shell type to generate the script for
-    --cd (-C): path@"nusage complete",                         # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",                            # Run as if mise were started in DIR
     --env_ (-E): list<string>,                                 # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                                       # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                                              # Suppress non-error messages
@@ -491,7 +491,7 @@ export def "mise activate" [
     --no-hook-env,                                             # Do not run hook-env automatically
     --shims,                                                   # Put the shims directory on PATH instead of updating PATH at each prompt
 ]: nothing -> string {
-    ^mise activate ...(nusage argv [$shell_type] {
+    ^mise activate ...(nus argv [$shell_type] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -534,19 +534,19 @@ flags below are passed to it). See https://mise.jdx.dev/dev-tools/aliases.html
 @usage 'flag --no-header help="Do not print the table header"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise tool-alias" [
-    --cd (-C): path@"nusage complete",      # Run as if mise were started in DIR
-    --env_ (-E): list<string>,              # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                    # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                           # Suppress non-error messages
-    --tool (-p): string@"nusage complete",  # Filter aliases by tool
-    --verbose (-v): int,                    # Show extra output (use -vv for even more)
-    --yes (-y),                             # Answer yes to all confirmation prompts
-    --raw,                                  # Connect tasks and install commands directly to the terminal
-    --locked,                               # Require download URLs from the lockfile when installing
-    --silent,                               # Suppress all task output and mise non-error messages
-    --no-header,                            # Do not print the table header
+    --cd (-C): path@"nus complete",      # Run as if mise were started in DIR
+    --env_ (-E): list<string>,           # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                 # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                        # Suppress non-error messages
+    --tool (-p): string@"nus complete",  # Filter aliases by tool
+    --verbose (-v): int,                 # Show extra output (use -vv for even more)
+    --yes (-y),                          # Answer yes to all confirmation prompts
+    --raw,                               # Connect tasks and install commands directly to the terminal
+    --locked,                            # Require download URLs from the lockfile when installing
+    --silent,                            # Suppress all task output and mise non-error messages
+    --no-header,                         # Do not print the table header
 ]: nothing -> string {
-    ^mise tool-alias ...(nusage argv [] {
+    ^mise tool-alias ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -586,19 +586,19 @@ mise tool-alias get node project
 20
 """# help="Read back an alias you set"'
 export def "mise tool-alias get" [
-    tool: string@"nusage complete",     # The tool to show the alias for
-    alias: string@"nusage complete",    # The alias to show
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    tool: string@"nus complete",     # The tool to show the alias for
+    alias: string@"nus complete",    # The alias to show
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise tool-alias get ...(nusage argv [$tool $alias] {
+    ^mise tool-alias get ...(nus argv [$tool $alias] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -647,19 +647,19 @@ node  lts-jod    22
 node  project    20
 """# help="List node's version aliases"'#
 export def "mise tool-alias ls" [
-    tool?: string@"nusage complete",    # Only show aliases for this tool
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --no-header,                        # Do not print the table header
+    tool?: string@"nus complete",    # Only show aliases for this tool
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --no-header,                     # Do not print the table header
 ]: nothing -> string {
-    ^mise tool-alias ls ...(nusage argv [$tool] {
+    ^mise tool-alias ls ...(nus argv [$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -697,20 +697,20 @@ project's mise.toml to share them.
 @usage 'example "mise tool-alias set ripgrep aqua:BurntSushi/ripgrep" help="Install ripgrep from its aqua backend"'
 @usage 'example "mise tool-alias set node project 20" help="Make node@project mean node@20"'
 export def "mise tool-alias set" [
-    tool: string@"nusage complete",     # The tool to alias
-    alias: string@"nusage complete",    # The version alias to set, or the backend when VALUE is omitted
-    value?: string,                     # The version request the alias stands for
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    tool: string@"nus complete",     # The tool to alias
+    alias: string@"nus complete",    # The version alias to set, or the backend when VALUE is omitted
+    value?: string,                  # The version request the alias stands for
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise tool-alias set ...(nusage argv [$tool $alias $value] {
+    ^mise tool-alias set ...(nus argv [$tool $alias $value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -742,19 +742,19 @@ removes that version alias. Edits the global config
 @usage r#'example "mise tool-alias unset ripgrep" help="Remove ripgrep's backend alias"'#
 @usage r#'example "mise tool-alias unset node project" help="Remove node's project version alias"'#
 export def "mise tool-alias unset" [
-    tool: string@"nusage complete",     # The tool to remove the alias from
-    alias?: string@"nusage complete",   # The version alias to remove; omit it to remove the backend alias
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    tool: string@"nus complete",     # The tool to remove the alias from
+    alias?: string@"nus complete",   # The version alias to remove; omit it to remove the backend alias
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise tool-alias unset ...(nusage argv [$tool $alias] {
+    ^mise tool-alias unset ...(nus argv [$tool $alias] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -787,17 +787,17 @@ https://mise.jdx.dev/dev-tools/backends/.
 @usage 'after_long_help "\u{1b}[1m\u{1b}[4mDeprecation:\u{1b}[22m\u{1b}[24m\n\nThe `mise b` alias is deprecated and will be removed in mise 2027.4.0; use\n`mise backends`.\n"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise backends" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise backends ...(nusage argv [] {
+    ^mise backends ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -822,17 +822,17 @@ Backends that plugins add are listed by `mise plugins ls`.
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'example "mise backends ls" help="List the backends built into mise"'
 export def "mise backends ls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise backends ls ...(nusage argv [] {
+    ^mise backends ls ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -879,20 +879,20 @@ has replaced. A version (`hk@1.58.1`) limits the switch to that version.
 @usage r#'example "mise backends switch communique" help="Move communique to the registry's current backend"'#
 @usage 'example "mise backends switch --dry-run" help="List every locked tool the registry now installs from another backend"'
 export def "mise backends switch" [
-    ...tool_version: string@"nusage complete",  # Tools to switch
-    --cd (-C): path@"nusage complete",          # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                        # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                             # Show what would switch without changing the lockfile or installs
-    --quiet (-q),                               # Suppress non-error messages
-    --verbose (-v): int,                        # Show extra output (use -vv for even more)
-    --yes (-y),                                 # Answer yes to all confirmation prompts
-    --raw,                                      # Connect tasks and install commands directly to the terminal
-    --locked,                                   # Require download URLs from the lockfile when installing
-    --silent,                                   # Suppress all task output and mise non-error messages
-    --global (-g),                              # Switch tools in the global config's lockfile instead of the project's
+    ...tool_version: string@"nus complete",  # Tools to switch
+    --cd (-C): path@"nus complete",          # Run as if mise were started in DIR
+    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                          # Show what would switch without changing the lockfile or installs
+    --quiet (-q),                            # Suppress non-error messages
+    --verbose (-v): int,                     # Show extra output (use -vv for even more)
+    --yes (-y),                              # Answer yes to all confirmation prompts
+    --raw,                                   # Connect tasks and install commands directly to the terminal
+    --locked,                                # Require download URLs from the lockfile when installing
+    --silent,                                # Suppress all task output and mise non-error messages
+    --global (-g),                           # Switch tools in the global config's lockfile instead of the project's
 ]: nothing -> string {
-    ^mise backends switch ...(nusage argv [...$tool_version] {
+    ^mise backends switch ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -930,19 +930,19 @@ mise adds to PATH.
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise bin-paths --json\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"path\": {\n        \"type\": \"string\"\n      },\n      \"symlink\": {\n        \"type\": \"boolean\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"path\",\n      \"symlink\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
 }'
 export def "mise bin-paths" [
-    ...tool_version: string@"nusage complete",  # Only list these tools, such as `ruby@3`
-    --cd (-C): path@"nusage complete",          # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                        # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                               # Suppress non-error messages
-    --verbose (-v): int,                        # Show extra output (use -vv for even more)
-    --yes (-y),                                 # Answer yes to all confirmation prompts
-    --raw,                                      # Connect tasks and install commands directly to the terminal
-    --locked,                                   # Require download URLs from the lockfile when installing
-    --silent,                                   # Suppress all task output and mise non-error messages
-    --bin-names,                                # Print executable names instead of bin directories
+    ...tool_version: string@"nus complete",  # Only list these tools, such as `ruby@3`
+    --cd (-C): path@"nus complete",          # Run as if mise were started in DIR
+    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                            # Suppress non-error messages
+    --verbose (-v): int,                     # Show extra output (use -vv for even more)
+    --yes (-y),                              # Answer yes to all confirmation prompts
+    --raw,                                   # Connect tasks and install commands directly to the terminal
+    --locked,                                # Require download URLs from the lockfile when installing
+    --silent,                                # Suppress all task output and mise non-error messages
+    --bin-names,                             # Print executable names instead of bin directories
 ]: nothing -> table<name: string, path: string, symlink: bool> {
-    let text = ^mise bin-paths --json ...(nusage argv [...$tool_version] {
+    let text = ^mise bin-paths --json ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -954,7 +954,7 @@ export def "mise bin-paths" [
         --silent: $silent
         --bin-names: $bin_names
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise bin-paths --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"symlink\":{\"type\":\"boolean\"}},\"required\":[\"name\",\"path\",\"symlink\"],\"additionalProperties\":false}}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise bin-paths --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"symlink\":{\"type\":\"boolean\"}},\"required\":[\"name\",\"path\",\"symlink\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Set up this machine from your mise config
@@ -1179,7 +1179,7 @@ In the packages phase, runs the equivalent of `mise bootstrap packages upgrade` 
 @usage r#'example "mise bootstrap --adopt example/setup --replace-history --yes" help="Use a setup repository's dotfile history instead of this machine's"'#
 @usage 'example "mise bootstrap --update" help="Refresh package metadata and fast-forward repositories first"'
 export def "mise bootstrap" [
-    --cd (-C): path@"nusage complete",                                                                                                                                                                       # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",                                                                                                                                                                          # Run as if mise were started in DIR
     --env_ (-E): list<string>,                                                                                                                                                                               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                                                                                                                                                                                     # How many jobs to run in parallel; defaults to the `jobs` setting
     --dry-run (-n),                                                                                                                                                                                          # Show what would change without changing anything
@@ -1193,8 +1193,8 @@ export def "mise bootstrap" [
     --adopt: string,                                                                                                                                                                                         # Clone a repository of global mise config or dotfile history, then apply it
     --replace-history,                                                                                                                                                                                       # Discard this machine's dotfile history and adopt the repository's
     --take-remote-all,                                                                                                                                                                                       # Take the setup repository's version of every existing file that differs while adopting
-    --from-dir: path@"nusage complete",                                                                                                                                                                      # Directory for the `--from` checkout (default: `$MISE_DATA_DIR/bootstrap-repo`)
-    --config-dir: path@"nusage complete",                                                                                                                                                                    # Link the global config directory to this directory of the `--from` checkout
+    --from-dir: path@"nus complete",                                                                                                                                                                         # Directory for the `--from` checkout (default: `$MISE_DATA_DIR/bootstrap-repo`)
+    --config-dir: path@"nus complete",                                                                                                                                                                       # Link the global config directory to this directory of the `--from` checkout
     --skip-dirty,                                                                                                                                                                                            # Skip configured repositories with local changes instead of failing
     --force-dotfiles,                                                                                                                                                                                        # Overwrite existing files that conflict with whole-file dotfile entries
     --prune-dotfiles,                                                                                                                                                                                        # Remove files that dotfile groups deployed but no active entry deploys now
@@ -1205,7 +1205,7 @@ export def "mise bootstrap" [
     --update,                                                                                                                                                                                                # Refresh package metadata and update repositories before applying
     --upgrade,                                                                                                                                                                                               # Upgrade installed packages and tools as well as installing missing ones
 ]: nothing -> string {
-    ^mise bootstrap ...(nusage argv [] {
+    ^mise bootstrap ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1250,17 +1250,17 @@ state.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap accounts" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap accounts ...(nusage argv [] {
+    ^mise bootstrap accounts ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1278,18 +1278,18 @@ export def "mise bootstrap accounts" [
 @usage 'flag "-y --yes" help="Skip the confirmation prompt"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap accounts apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap accounts apply ...(nusage argv [] {
+    ^mise bootstrap accounts apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1309,18 +1309,18 @@ export def "mise bootstrap accounts apply" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap accounts status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if any account differs from the config (all are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if any account differs from the config (all are still listed)
 ] {
-    ^mise bootstrap accounts status --json ...(nusage argv [] {
+    ^mise bootstrap accounts status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1348,17 +1348,17 @@ machine.
 @usage 'example "mise bootstrap compose status" help="Show the state of every declared project"'
 @usage 'example "mise bootstrap compose apply --dry-run" help="Show what would change"'
 export def "mise bootstrap compose" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap compose ...(nusage argv [] {
+    ^mise bootstrap compose ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1376,18 +1376,18 @@ export def "mise bootstrap compose" [
 @usage 'flag "-y --yes" help="Skip the confirmation prompt"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap compose apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap compose apply ...(nusage argv [] {
+    ^mise bootstrap compose apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1407,18 +1407,18 @@ export def "mise bootstrap compose apply" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap compose status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if any Compose project differs from the config (all are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if any Compose project differs from the config (all are still listed)
 ] {
-    ^mise bootstrap compose status --json ...(nusage argv [] {
+    ^mise bootstrap compose status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1451,17 +1451,17 @@ edit, use `[dotfiles]` and `mise dotfiles`.
 @usage 'example "mise bootstrap files apply --dry-run" help="Show what would change"'
 @usage 'example "mise bootstrap files apply --yes" help="Apply without a prompt"'
 export def "mise bootstrap files" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap files ...(nusage argv [] {
+    ^mise bootstrap files ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1480,19 +1480,19 @@ export def "mise bootstrap files" [
 @usage 'flag --prompt-secrets help="Prompt securely for missing bootstrap secret inputs"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap files apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --prompt-secrets,                   # Prompt securely for missing bootstrap secret inputs
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --prompt-secrets,                # Prompt securely for missing bootstrap secret inputs
 ]: nothing -> string {
-    ^mise bootstrap files apply ...(nusage argv [] {
+    ^mise bootstrap files apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1514,19 +1514,19 @@ export def "mise bootstrap files apply" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap files status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --prompt-secrets,                   # Prompt securely for missing bootstrap secret inputs
-    --missing,                          # Exit with status 1 if any file or directory differs from the config (all are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --prompt-secrets,                # Prompt securely for missing bootstrap secret inputs
+    --missing,                       # Exit with status 1 if any file or directory differs from the config (all are still listed)
 ] {
-    ^mise bootstrap files status --json ...(nusage argv [] {
+    ^mise bootstrap files status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1561,17 +1561,17 @@ a remote machine.
 @usage r#'example "mise bootstrap firewall status" help="Show the firewall's state"'#
 @usage 'example "mise bootstrap firewall apply --dry-run" help="Show the policy and rules that would change"'
 export def "mise bootstrap firewall" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap firewall ...(nusage argv [] {
+    ^mise bootstrap firewall ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1589,18 +1589,18 @@ export def "mise bootstrap firewall" [
 @usage 'flag "-y --yes" help="Skip the confirmation prompt"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap firewall apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap firewall apply ...(nusage argv [] {
+    ^mise bootstrap firewall apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1620,18 +1620,18 @@ export def "mise bootstrap firewall apply" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap firewall status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if the firewall differs from the config
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if the firewall differs from the config
 ] {
-    ^mise bootstrap firewall status --json ...(nusage argv [] {
+    ^mise bootstrap firewall status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1657,17 +1657,17 @@ The host firewall in `[bootstrap.linux.firewall]` is managed by
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap linux" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap linux ...(nusage argv [] {
+    ^mise bootstrap linux ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1699,17 +1699,17 @@ on macOS and Windows, use `[bootstrap.services]`.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap linux systemd-units" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap linux systemd-units ...(nusage argv [] {
+    ^mise bootstrap linux systemd-units ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1727,18 +1727,18 @@ export def "mise bootstrap linux systemd-units" [
 @usage 'flag "-y --yes" help="Skip the confirmation prompt"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap linux systemd-units apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap linux systemd-units apply ...(nusage argv [] {
+    ^mise bootstrap linux systemd-units apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1758,18 +1758,18 @@ export def "mise bootstrap linux systemd-units apply" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap linux systemd-units status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if any unit differs from the config (all are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if any unit differs from the config (all are still listed)
 ] {
-    ^mise bootstrap linux systemd-units status --json ...(nusage argv [] {
+    ^mise bootstrap linux systemd-units status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1786,17 +1786,17 @@ export def "mise bootstrap linux systemd-units status" [
 # Manage macOS preferences and LaunchAgents from `[bootstrap.macos]`
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap macos" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap macos ...(nusage argv [] {
+    ^mise bootstrap macos ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1827,17 +1827,17 @@ only after they relaunch.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap macos defaults" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap macos defaults ...(nusage argv [] {
+    ^mise bootstrap macos defaults ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1855,18 +1855,18 @@ export def "mise bootstrap macos defaults" [
 @usage 'flag "-y --yes" help="Skip the confirmation prompt"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap macos defaults apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap macos defaults apply ...(nusage argv [] {
+    ^mise bootstrap macos defaults apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1886,18 +1886,18 @@ export def "mise bootstrap macos defaults apply" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap macos defaults status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if any preference differs from the config (all are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if any preference differs from the config (all are still listed)
 ] {
-    ^mise bootstrap macos defaults status --json ...(nusage argv [] {
+    ^mise bootstrap macos defaults status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1930,17 +1930,17 @@ with `scope = "user"`.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap macos launchd-agents" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap macos launchd-agents ...(nusage argv [] {
+    ^mise bootstrap macos launchd-agents ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1958,18 +1958,18 @@ export def "mise bootstrap macos launchd-agents" [
 @usage 'flag "-y --yes" help="Skip the confirmation prompt"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap macos launchd-agents apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap macos launchd-agents apply ...(nusage argv [] {
+    ^mise bootstrap macos launchd-agents apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1989,18 +1989,18 @@ export def "mise bootstrap macos launchd-agents apply" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap macos launchd-agents status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if any LaunchAgent differs from the config (all are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if any LaunchAgent differs from the config (all are still listed)
 ] {
-    ^mise bootstrap macos launchd-agents status --json ...(nusage argv [] {
+    ^mise bootstrap macos launchd-agents status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2029,17 +2029,17 @@ afterward.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap mise-shell-activate" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap mise-shell-activate ...(nusage argv [] {
+    ^mise bootstrap mise-shell-activate ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2057,18 +2057,18 @@ export def "mise bootstrap mise-shell-activate" [
 @usage 'flag "-y --yes" help="Skip the confirmation prompt"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap mise-shell-activate apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap mise-shell-activate apply ...(nusage argv [] {
+    ^mise bootstrap mise-shell-activate apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2088,18 +2088,18 @@ export def "mise bootstrap mise-shell-activate apply" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap mise-shell-activate status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if any shell activation differs from the config (all are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if any shell activation differs from the config (all are still listed)
 ] {
-    ^mise bootstrap mise-shell-activate status --json ...(nusage argv [] {
+    ^mise bootstrap mise-shell-activate status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2135,17 +2135,17 @@ https://mise.jdx.dev/bootstrap/packages/ for each package manager.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap packages" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap packages ...(nusage argv [] {
+    ^mise bootstrap packages ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2213,21 +2213,21 @@ For example, apt runs `apt-get update` and dnf adds `--refresh`. brew, brew-cask
 @usage 'example "mise bootstrap packages apply apt:curl" help="On Debian or Ubuntu, install one package without adding it to config"'
 @usage 'example "mise bootstrap packages apply brew:jq brew-cask:firefox" help="On macOS, install a formula and a cask without adding them to config"'
 export def "mise bootstrap packages apply" [
-    ...package: string,                 # Packages as `manager:package`; defaults to every package in `[bootstrap.packages]`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --update,                           # Refresh package manager metadata first, where the manager supports it
-    --manager (-m): string,             # Only apply packages for this built-in or plugin manager
+    ...package: string,              # Packages as `manager:package`; defaults to every package in `[bootstrap.packages]`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --update,                        # Refresh package manager metadata first, where the manager supports it
+    --manager (-m): string,          # Only apply packages for this built-in or plugin manager
 ]: nothing -> string {
-    ^mise bootstrap packages apply ...(nusage argv [...$package] {
+    ^mise bootstrap packages apply ...(nus argv [...$package] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2263,17 +2263,17 @@ Not available on Windows.
 """#'#
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap packages brew" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap packages brew ...(nusage argv [] {
+    ^mise bootstrap packages brew ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2299,22 +2299,22 @@ export def "mise bootstrap packages brew" [
 @usage 'example "mise bootstrap packages brew tap acme/tools https://github.com/acme/brew-tools.git --local" help="Write the entry to the local config instead"'
 @usage 'complete url type=url'
 export def "mise bootstrap packages brew tap" [
-    tap: string,                        # Tap name, e.g. `owner/repo`
-    url?: string@"nusage complete",     # GitHub URL of the tap; defaults to `https://github.com/<owner>/homebrew-<repo>.git`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show the config change without writing it
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --local (-l),                       # Write to the local config instead of the global config
-    --path (-p): string,                # Write to this config file or directory
+    tap: string,                     # Tap name, e.g. `owner/repo`
+    url?: string@"nus complete",     # GitHub URL of the tap; defaults to `https://github.com/<owner>/homebrew-<repo>.git`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show the config change without writing it
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --local (-l),                    # Write to the local config instead of the global config
+    --path (-p): string,             # Write to this config file or directory
 ]: nothing -> string {
-    ^mise bootstrap packages brew tap ...(nusage argv [$tap $url] {
+    ^mise bootstrap packages brew tap ...(nus argv [$tap $url] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2341,21 +2341,21 @@ export def "mise bootstrap packages brew tap" [
 @usage 'arg <TAPS>… help="Tap names, e.g. `owner/repo`" var=#true'
 @usage 'example "mise bootstrap packages brew untap acme/tools" help="Remove a tap entry from the global config"'
 export def "mise bootstrap packages brew untap" [
-    ...taps: string,                    # Tap names, e.g. `owner/repo`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show the config change without writing it
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --local (-l),                       # Write to the local config instead of the global config
-    --path (-p): string,                # Write to this config file or directory
+    ...taps: string,                 # Tap names, e.g. `owner/repo`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show the config change without writing it
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --local (-l),                    # Write to the local config instead of the global config
+    --path (-p): string,             # Write to this config file or directory
 ]: nothing -> string {
-    ^mise bootstrap packages brew untap ...(nusage argv [...$taps] {
+    ^mise bootstrap packages brew untap ...(nus argv [...$taps] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2399,18 +2399,18 @@ packages come from.
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'example "mise bootstrap packages export --format nix > packages.nix" help="Write the module to a file you can import from a NixOS configuration"'
 export def "mise bootstrap packages export" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --format: string@[nix],             # Output format
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --format: string@[nix],          # Output format
 ]: nothing -> string {
-    ^mise bootstrap packages export ...(nusage argv [] {
+    ^mise bootstrap packages export ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2470,22 +2470,22 @@ New entries go to the `write_targets.packages` file when that setting is set.
 @usage 'example "mise bootstrap packages import --all" help="Include formulae installed as dependencies"'
 @usage 'example "mise bootstrap packages import -g" help="Write to the global config"'
 export def "mise bootstrap packages import" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show the entries that would be written without writing them
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --global (-g),                      # Write to the global config (~/.config/mise/config.toml)
-    --manager (-m): string@[brew],      # Package manager to import from
-    --all,                              # Import every linked formula, including dependencies
-    --path (-p): string,                # Write to this config file or directory
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show the entries that would be written without writing them
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --global (-g),                   # Write to the global config (~/.config/mise/config.toml)
+    --manager (-m): string@[brew],   # Package manager to import from
+    --all,                           # Import every linked formula, including dependencies
+    --path (-p): string,             # Write to this config file or directory
 ]: nothing -> string {
-    ^mise bootstrap packages import ...(nusage argv [] {
+    ^mise bootstrap packages import ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2545,20 +2545,20 @@ mise removes the files it recorded installing that are still in place, but not w
 @usage 'example "mise bootstrap packages prune --manager brew-cask --dry-run" help="Preview which casks would be removed"'
 @usage 'example "mise bootstrap packages prune --manager vscode --dry-run" help="Preview removals for a package plugin named vscode"'
 export def "mise bootstrap packages prune" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force,                            # Remove `brew-cask` casks that mise installed even when it cannot prove they are unchanged, such as self-updating apps or casks with install scripts
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would be removed without removing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --manager (-m): string,             # Package manager to prune: `brew`, `brew-cask`, or a package plugin
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force,                         # Remove `brew-cask` casks that mise installed even when it cannot prove they are unchanged, such as self-updating apps or casks with install scripts
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would be removed without removing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --manager (-m): string,          # Package manager to prune: `brew`, `brew-cask`, or a package plugin
 ]: nothing -> string {
-    ^mise bootstrap packages prune ...(nusage argv [] {
+    ^mise bootstrap packages prune ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -2584,18 +2584,18 @@ export def "mise bootstrap packages prune" [
 @usage 'example "mise bootstrap packages status --missing" help="Exit with status 1 if any package differs from the config"'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap packages status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if any package differs from the config (all are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if any package differs from the config (all are still listed)
 ] {
-    ^mise bootstrap packages status --json ...(nusage argv [] {
+    ^mise bootstrap packages status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2644,20 +2644,20 @@ Name packages as `manager:package` to upgrade only those.
 @usage 'example "mise bootstrap packages upgrade --manager apt --yes" help="Upgrade only apt packages, without a prompt"'
 @usage 'example "mise bootstrap packages upgrade brew:postgresql@17" help="Upgrade one Homebrew formula"'
 export def "mise bootstrap packages upgrade" [
-    ...package: string,                 # Packages as `manager:package`; defaults to every package in `[bootstrap.packages]`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --manager (-m): string,             # Only upgrade packages for this built-in or plugin manager
+    ...package: string,              # Packages as `manager:package`; defaults to every package in `[bootstrap.packages]`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --manager (-m): string,          # Only upgrade packages for this built-in or plugin manager
 ]: nothing -> string {
-    ^mise bootstrap packages upgrade ...(nusage argv [...$package] {
+    ^mise bootstrap packages upgrade ...(nus argv [...$package] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2727,22 +2727,22 @@ New entries go to the `write_targets.packages` file when that setting is set.
 @usage 'example "mise bootstrap packages use -g brew:postgresql@17" help="Add a versioned Homebrew formula to the global config"'
 @usage 'example "mise bootstrap packages use apt:curl@8.5.0-2" help="Pin an apt package to a version"'
 export def "mise bootstrap packages use" [
-    ...package: string,                 # Packages in `manager:package[@version]` form
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without writing config or installing
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --global (-g),                      # Write to the global config (~/.config/mise/config.toml) instead of the local one
-    --path (-p): string,                # Write to this config file or directory
-    --no-install,                       # Write the package declarations without checking or installing packages
+    ...package: string,              # Packages in `manager:package[@version]` form
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without writing config or installing
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --global (-g),                   # Write to the global config (~/.config/mise/config.toml) instead of the local one
+    --path (-p): string,             # Write to this config file or directory
+    --no-install,                    # Write the package declarations without checking or installing packages
 ]: nothing -> string {
-    ^mise bootstrap packages use ...(nusage argv [...$package] {
+    ^mise bootstrap packages use ...(nus argv [...$package] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2789,18 +2789,18 @@ if root="$(mise bootstrap packages where brew:unzip)"; then
 fi
 """# help="Put a formula's bin directory on PATH when it is installed"'#
 export def "mise bootstrap packages where" [
-    package: string,                    # Formula to locate, as `brew:<formula>` or `brew:<owner>/<tap>/<formula>`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    package: string,                 # Formula to locate, as `brew:<formula>` or `brew:<owner>/<tap>/<formula>`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap packages where ...(nusage argv [$package] {
+    ^mise bootstrap packages where ...(nus argv [$package] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2844,19 +2844,19 @@ A resource's state is unknown when mise cannot reach its declared state on its o
 @usage 'example "mise bootstrap plan --detailed-exitcode" help="Exit with status 2 if anything would change"'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap plan" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --prompt-secrets,                   # Prompt securely for missing bootstrap secret inputs
-    --detailed-exitcode,                # Exit 0 if nothing would change, 2 if something would, 1 on errors or unknown state
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --prompt-secrets,                # Prompt securely for missing bootstrap secret inputs
+    --detailed-exitcode,             # Exit 0 if nothing would change, 2 if something would, 1 on errors or unknown state
 ] {
-    ^mise bootstrap plan --json ...(nusage argv [] {
+    ^mise bootstrap plan --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2889,17 +2889,17 @@ install its packages.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap plugins" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap plugins ...(nusage argv [] {
+    ^mise bootstrap plugins ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2923,18 +2923,18 @@ It does not ask for confirmation.
 @usage 'flag "-n --dry-run" help="Show which plugins would be installed without installing them"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap plugins apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show which plugins would be installed without installing them
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show which plugins would be installed without installing them
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap plugins apply ...(nusage argv [] {
+    ^mise bootstrap plugins apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2952,18 +2952,18 @@ export def "mise bootstrap plugins apply" [
 @usage 'flag --missing help="Exit with status 1 if a declared plugin is not installed"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap plugins status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if a declared plugin is not installed
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if a declared plugin is not installed
 ]: nothing -> string {
-    ^mise bootstrap plugins status ...(nusage argv [] {
+    ^mise bootstrap plugins status ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3189,7 +3189,7 @@ Needs exactly one of `--github-relay-repo` or `--github-relay-all-repos`.
 @usage 'complete dir type=dir'
 export def "mise bootstrap remote" [
     ...target: string,                                                                                                                                                                                       # Inventory host names from `[bootstrap.remote.hosts]`
-    --cd (-C): path@"nusage complete",                                                                                                                                                                       # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",                                                                                                                                                                          # Run as if mise were started in DIR
     --env_ (-E): list<string>,                                                                                                                                                                               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                                                                                                                                                                                     # How many jobs to run in parallel; defaults to the `jobs` setting
     --dry-run (-n),                                                                                                                                                                                          # Show what would change on each target without changing it
@@ -3208,20 +3208,20 @@ export def "mise bootstrap remote" [
     --all,                                                                                                                                                                                                   # Select every inventory host
     --bootstrap-command: string,                                                                                                                                                                             # Shell command, run on each target, that installs mise and puts it on PATH
     --connect-timeout: string,                                                                                                                                                                               # SSH connection timeout in seconds
-    --copy-link: list<path>@"nusage complete",                                                                                                                                                               # Copy the target of this source-relative symbolic link instead of the link; repeat for more
+    --copy-link: list<path>@"nus complete",                                                                                                                                                                  # Copy the target of this source-relative symbolic link instead of the link; repeat for more
     --copy-links,                                                                                                                                                                                            # Copy the targets of every symbolic link in the source instead of the links
     --exclude: list<string>,                                                                                                                                                                                 # Another pattern to leave out of the archive; repeat for more
     --fail-fast,                                                                                                                                                                                             # Stop after the first failed target
     --host: list<string>,                                                                                                                                                                                    # SSH destination that is not in the inventory (`[user@]host`); repeat for more
-    --identity-file (-i): path@"nusage complete",                                                                                                                                                            # SSH identity file, overriding the inventory and SSH config
-    --install-mise: path@"nusage complete",                                                                                                                                                                  # Install the provisioned mise on each host instead of only staging it
+    --identity-file (-i): path@"nus complete",                                                                                                                                                               # SSH identity file, overriding the inventory and SSH config
+    --install-mise: path@"nus complete",                                                                                                                                                                     # Install the provisioned mise on each host instead of only staging it
     --keep-staging,                                                                                                                                                                                          # Keep the remote staging directory for debugging
-    --mise-bin: path@"nusage complete",                                                                                                                                                                      # Upload this local mise executable, for platforms without an official release binary
+    --mise-bin: path@"nus complete",                                                                                                                                                                         # Upload this local mise executable, for platforms without an official release binary
     --no-install-mise,                                                                                                                                                                                       # Do not install mise on the host, even when the selected hosts configure it
     --port: string,                                                                                                                                                                                          # SSH port, overriding the inventory and SSH config
     --remote-env: list<string>,                                                                                                                                                                              # Config environments to load on each target; repeat or separate with commas (for example, ci,dotfiles)
     --remote-mise: string,                                                                                                                                                                                   # Existing mise executable name or path; relative paths use the staged project
-    --source: path@"nusage complete",                                                                                                                                                                        # Local directory to archive and send to each target
+    --source: path@"nus complete",                                                                                                                                                                           # Local directory to archive and send to each target
     --ssh-option: list<string>,                                                                                                                                                                              # OpenSSH `-o` option; repeat for multiple options
     --tag: list<string>,                                                                                                                                                                                     # Select configured hosts with this tag; repeat to match any tag
     --github-relay-read-only,                                                                                                                                                                                # Borrow read-only GitHub access for this run (Linux and macOS only)
@@ -3232,7 +3232,7 @@ export def "mise bootstrap remote" [
     --github-relay-log-format: string,                                                                                                                                                                       # Relay log and summary format, `text` or `jsonl` (needs `--github-relay-read-only`)
     --github-relay-max-duration: string,                                                                                                                                                                     # End borrowed access after a duration such as `1h`; `0s` lasts the whole run (needs `--github-relay-read-only`)
 ]: nothing -> string {
-    ^mise bootstrap remote ...(nusage argv [...$target] {
+    ^mise bootstrap remote ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3294,17 +3294,17 @@ changes and continue with the rest.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap repos" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap repos ...(nusage argv [] {
+    ^mise bootstrap repos ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3323,19 +3323,19 @@ export def "mise bootstrap repos" [
 @usage 'flag --skip-dirty help="Skip repositories with local changes instead of failing"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap repos apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --skip-dirty,                       # Skip repositories with local changes instead of failing
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --skip-dirty,                    # Skip repositories with local changes instead of failing
 ]: nothing -> string {
-    ^mise bootstrap repos apply ...(nusage argv [] {
+    ^mise bootstrap repos apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3373,20 +3373,20 @@ warning. Use `--continue-on-error` to visit the rest after a failure.
 @usage 'example "mise bootstrap repos exec ~/src/mise -- git log -1" help="Run a command in one repository"'
 @usage 'example "mise bootstrap repos exec --continue-on-error -- git fetch" help="Fetch every repository, even after one fails"'
 export def "mise bootstrap repos exec" [
-    ...path: string,                    # Run only in repositories at these paths, as written in config or expanded
-    --continue-on-error (-c),           # Continue running in other repositories after a command fails
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Print the commands that would run without running them
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...path: string,                 # Run only in repositories at these paths, as written in config or expanded
+    --continue-on-error (-c),        # Continue running in other repositories after a command fails
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Print the commands that would run without running them
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap repos exec ...(nusage argv [...$path] {
+    ^mise bootstrap repos exec ...(nus argv [...$path] {
         --continue-on-error: $continue_on_error
         --cd: $cd
         --env: $env_
@@ -3407,18 +3407,18 @@ export def "mise bootstrap repos exec" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap repos status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if any repository differs from the config (all are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if any repository differs from the config (all are still listed)
 ] {
-    ^mise bootstrap repos status --json ...(nusage argv [] {
+    ^mise bootstrap repos status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3452,20 +3452,20 @@ with a `ref` is checked out at that ref.
 @usage 'example "mise bootstrap repos update --dry-run" help="Show the Git commands that would run"'
 @usage 'example "mise bootstrap repos update ~/src/mise" help="Update one repository"'
 export def "mise bootstrap repos update" [
-    ...path: string,                    # Only update repositories at these paths, as written in config or expanded (for example ~/src/mise)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --skip-dirty,                       # Skip repositories with local changes instead of failing
+    ...path: string,                 # Only update repositories at these paths, as written in config or expanded (for example ~/src/mise)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --skip-dirty,                    # Skip repositories with local changes instead of failing
 ]: nothing -> string {
-    ^mise bootstrap repos update ...(nusage argv [...$path] {
+    ^mise bootstrap repos update ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3494,17 +3494,17 @@ variables, or prompts for missing ones with `--prompt-secrets`.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap secrets" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap secrets ...(nusage argv [] {
+    ^mise bootstrap secrets ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3523,18 +3523,18 @@ export def "mise bootstrap secrets" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap secrets status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if a declared secret input is unset, empty, or not valid Unicode
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if a declared secret input is unset, empty, or not valid Unicode
 ] {
-    ^mise bootstrap secrets status --json ...(nusage argv [] {
+    ^mise bootstrap secrets status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3573,17 +3573,17 @@ that only one platform has, see `mise bootstrap linux systemd-units` and
 @usage 'example "mise bootstrap services apply --dry-run" help="Show what would change"'
 @usage 'example "mise bootstrap services remove mise-history" help="Uninstall a user service"'
 export def "mise bootstrap services" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap services ...(nusage argv [] {
+    ^mise bootstrap services ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3601,18 +3601,18 @@ export def "mise bootstrap services" [
 @usage 'flag "-y --yes" help="Skip the confirmation prompt"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap services apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap services apply ...(nusage argv [] {
+    ^mise bootstrap services apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3655,19 +3655,19 @@ also removes one that [bootstrap.linux.systemd.units] or
 @usage 'arg <NAME> help="Name of the installed user service"'
 @usage 'example "mise bootstrap services remove mise-history --dry-run" help="Preview uninstalling the user service named mise-history"'
 export def "mise bootstrap services remove" [
-    name: string,                       # Name of the installed user service
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would be removed without removing it
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    name: string,                    # Name of the installed user service
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would be removed without removing it
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap services remove ...(nusage argv [$name] {
+    ^mise bootstrap services remove ...(nus argv [$name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3687,18 +3687,18 @@ export def "mise bootstrap services remove" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap services status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if any service differs from the config (all are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if any service differs from the config (all are still listed)
 ] {
-    ^mise bootstrap services status --json ...(nusage argv [] {
+    ^mise bootstrap services status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3744,19 +3744,19 @@ still lists every entry.
 @usage 'example "mise bootstrap status --json" help="Print the state as JSON"'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --prompt-secrets,                   # Prompt securely for missing bootstrap secret inputs
-    --missing,                          # Exit with status 1 if anything differs from the config (all entries are still listed)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --prompt-secrets,                # Prompt securely for missing bootstrap secret inputs
+    --missing,                       # Exit with status 1 if anything differs from the config (all entries are still listed)
 ] {
-    ^mise bootstrap status --json ...(nusage argv [] {
+    ^mise bootstrap status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3825,21 +3825,21 @@ other sections are left alone.
 @usage 'example "mise bootstrap unapply ssh" help="Remove them after a confirmation prompt"'
 @usage 'example "mise bootstrap unapply ssh gpg --yes" help="Remove the resources of two environments without a prompt"'
 export def "mise bootstrap unapply" [
-    ...env_: string,                    # Config environments whose resources should be removed
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                       # Remove targets that changed since they were applied
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would be removed without removing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --prompt-secrets,                   # Prompt securely for missing bootstrap secret inputs
+    ...env_: string,                 # Config environments whose resources should be removed
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                    # Remove targets that changed since they were applied
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would be removed without removing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --prompt-secrets,                # Prompt securely for missing bootstrap secret inputs
 ]: nothing -> string {
-    ^mise bootstrap unapply ...(nusage argv [...$env_] {
+    ^mise bootstrap unapply ...(nus argv [...$env_] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -3867,17 +3867,17 @@ future logins, not to the shell running this command.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap user" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap user ...(nusage argv [] {
+    ^mise bootstrap user ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3895,18 +3895,18 @@ export def "mise bootstrap user" [
 @usage 'flag "-y --yes" help="Skip the confirmation prompt"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise bootstrap user apply" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise bootstrap user apply ...(nusage argv [] {
+    ^mise bootstrap user apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3926,18 +3926,18 @@ export def "mise bootstrap user apply" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise bootstrap user status" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --missing,                          # Exit with status 1 if your login shell differs from the config
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --missing,                       # Exit with status 1 if your login shell differs from the config
 ] {
-    ^mise bootstrap user status --json ...(nusage argv [] {
+    ^mise bootstrap user status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3965,17 +3965,17 @@ release metadata. With no subcommand, prints the cache directory, like
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise cache" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise cache ...(nusage argv [] {
+    ^mise cache ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4016,19 +4016,19 @@ rebuilds what it needs again.
 @usage r#'example "mise cache clear node" help="Refresh node's version list"'#
 @usage r#'example "mise cache clear --task build" help="[experimental] Forget the build task's cached artifacts"'#
 export def "mise cache clear" [
-    ...tool: string@"nusage complete",  # Only clear the cache of these tools, such as `node`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --task: string@"nusage complete",   # [experimental] Clear task artifact cache entries for a task name or pattern
+    ...tool: string@"nus complete",  # Only clear the cache of these tools, such as `node`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --task: string@"nus complete",   # [experimental] Clear task artifact cache entries for a task name or pattern
 ]: nothing -> string {
-    ^mise cache clear ...(nusage argv [...$tool] {
+    ^mise cache clear ...(nus argv [...$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4046,17 +4046,17 @@ export def "mise cache clear" [
 @usage 'alias dir'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise cache path" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise cache path ...(nusage argv [] {
+    ^mise cache path ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4088,19 +4088,19 @@ on its own.
 @usage 'arg "[TOOL]…" help="Only prune the cache of these tools, such as `node`" required=#false var=#true'
 @usage 'example "mise cache prune --dry-run" help="List what would be removed"'
 export def "mise cache prune" [
-    ...tool: string@"nusage complete",  # Only prune the cache of these tools, such as `node`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run,                          # Show what would be pruned without deleting anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...tool: string@"nus complete",  # Only prune the cache of these tools, such as `node`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run,                       # Show what would be pruned without deleting anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise cache prune ...(nusage argv [...$tool] {
+    ^mise cache prune ...(nus argv [...$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4134,18 +4134,18 @@ https://mise.jdx.dev/tasks/caching.html#enable-artifact-caching.
 @usage r#'example "mise cache task build" help="List the build task's cache entries"'#
 @usage 'output json framing=json select=--json'
 export def "mise cache task" [
-    task: string@"nusage complete",     # Task name or pattern to inspect
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    task: string@"nus complete",     # Task name or pattern to inspect
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^mise cache task --json ...(nusage argv [$task] {
+    ^mise cache task --json ...(nus argv [$task] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4233,12 +4233,12 @@ changes without being rewritten.
 @usage 'example "mise completion zsh --tool hk --install" help="Install completions for hk, a tool installed with the packslip backend"'
 export def "mise completion" [
     shell?: string@[bash fish nu powershell zsh],  # Shell type to generate completions for (required)
-    --cd (-C): path@"nusage complete",             # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",                # Run as if mise were started in DIR
     --env_ (-E): list<string>,                     # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --force,                                       # Replace a file at the target path that mise did not write
     --jobs (-j): string,                           # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                                  # Suppress non-error messages
-    --tool: string@"nusage complete",              # Generate completions for a tool installed with the `packslip:` backend
+    --tool: string@"nus complete",                 # Generate completions for a tool installed with the `packslip:` backend
     --verbose (-v): int,                           # Show extra output (use -vv for even more)
     --yes (-y),                                    # Answer yes to all confirmation prompts
     --raw,                                         # Connect tasks and install commands directly to the terminal
@@ -4246,7 +4246,7 @@ export def "mise completion" [
     --silent,                                      # Suppress all task output and mise non-error messages
     --install,                                     # Install the script where this shell looks for it, instead of printing it
 ]: nothing -> string {
-    ^mise completion ...(nusage argv [$shell] {
+    ^mise completion ...(nus argv [$shell] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -4289,21 +4289,21 @@ they use.
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"path\": {\n        \"type\": \"string\"\n      },\n      \"tools\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"override\": {\n        \"type\": \"boolean\"\n      }\n    },\n    \"required\": [\n      \"path\",\n      \"tools\",\n      \"override\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
 }'
 export def "mise config" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --truncate,                         # Truncate long terminal output to fit the available width
-    --no-truncate,                      # Turn off --truncate
-    --no-header,                        # Do not print the table header
-    --tracked-configs,                  # List every config file mise has loaded, in any project
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --truncate,                      # Truncate long terminal output to fit the available width
+    --no-truncate,                   # Turn off --truncate
+    --no-header,                     # Do not print the table header
+    --tracked-configs,               # List every config file mise has loaded, in any project
 ]: nothing -> table<path: string, tools: list<string>, override: bool> {
-    let text = ^mise config --json ...(nusage argv [] {
+    let text = ^mise config --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4318,7 +4318,7 @@ export def "mise config" [
         --no-header: $no_header
         --tracked-configs: $tracked_configs
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"tools\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"override\":{\"type\":\"boolean\"}},\"required\":[\"path\",\"tools\",\"override\"],\"additionalProperties\":false}}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"tools\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"override\":{\"type\":\"boolean\"}},\"required\":[\"path\",\"tools\",\"override\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Describe each key in a mise TOML file
@@ -4374,22 +4374,22 @@ mise config explain
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise config explain --json\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"key\": {\n        \"type\": \"string\"\n      },\n      \"path\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"line\": {\n        \"type\": \"integer\",\n        \"minimum\": 0\n      },\n      \"description\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"deprecated\": {\n        \"type\": \"boolean\"\n      },\n      \"known\": {\n        \"type\": \"boolean\"\n      },\n      \"suggestion\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      }\n    },\n    \"required\": [\n      \"key\",\n      \"path\",\n      \"line\",\n      \"description\",\n      \"deprecated\",\n      \"known\",\n      \"suggestion\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
 }'
 export def "mise config explain" [
-    key?: string@"nusage complete",       # Dotted key path to describe, with the keys under it; omit for the whole file
-    --cd (-C): path@"nusage complete",    # Run as if mise were started in DIR
-    --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                         # Suppress non-error messages
-    --verbose (-v): int,                  # Show extra output (use -vv for even more)
-    --yes (-y),                           # Answer yes to all confirmation prompts
-    --raw,                                # Connect tasks and install commands directly to the terminal
-    --locked,                             # Require download URLs from the lockfile when installing
-    --silent,                             # Suppress all task output and mise non-error messages
-    --file (-f): path@"nusage complete",  # Config file to read, or a directory whose config file to read
-    --global (-g),                        # Read the global config file
-    --system,                             # Read the system config file
-    --override,                           # Read the global override file, `config.override.toml`
+    key?: string@"nus complete",       # Dotted key path to describe, with the keys under it; omit for the whole file
+    --cd (-C): path@"nus complete",    # Run as if mise were started in DIR
+    --env_ (-E): list<string>,         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,               # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                      # Suppress non-error messages
+    --verbose (-v): int,               # Show extra output (use -vv for even more)
+    --yes (-y),                        # Answer yes to all confirmation prompts
+    --raw,                             # Connect tasks and install commands directly to the terminal
+    --locked,                          # Require download URLs from the lockfile when installing
+    --silent,                          # Suppress all task output and mise non-error messages
+    --file (-f): path@"nus complete",  # Config file to read, or a directory whose config file to read
+    --global (-g),                     # Read the global config file
+    --system,                          # Read the system config file
+    --override,                        # Read the global override file, `config.override.toml`
 ]: nothing -> table<key: string, path: list<string>, line: int, description: oneof<string, nothing>, deprecated: bool, known: bool, suggestion: oneof<string, nothing>> {
-    let text = ^mise config explain --json ...(nusage argv [$key] {
+    let text = ^mise config explain --json ...(nus argv [$key] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4404,7 +4404,7 @@ export def "mise config explain" [
         --system: $system
         --override: $override
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise config explain --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"key\":{\"type\":\"string\"},\"path\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"line\":{\"type\":\"integer\",\"minimum\":0},\"description\":{\"type\":[\"string\",\"null\"]},\"deprecated\":{\"type\":\"boolean\"},\"known\":{\"type\":\"boolean\"},\"suggestion\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"key\",\"path\",\"line\",\"description\",\"deprecated\",\"known\",\"suggestion\"],\"additionalProperties\":false}}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise config explain --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"key\":{\"type\":\"string\"},\"path\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"line\":{\"type\":\"integer\",\"minimum\":0},\"description\":{\"type\":[\"string\",\"null\"]},\"deprecated\":{\"type\":\"boolean\"},\"known\":{\"type\":\"boolean\"},\"suggestion\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"key\",\"path\",\"line\",\"description\",\"deprecated\",\"known\",\"suggestion\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Print a value from one mise TOML file
@@ -4450,22 +4450,22 @@ mise config get tools.python
 @usage 'complete file type=path'
 @usage 'complete key run="mise __complete_word__ --candidates key --line={{ words | shell_join | shell_quote }}"'
 export def "mise config get" [
-    key?: string@"nusage complete",       # Dotted key path to print, such as `tools.python`; omit to print the whole file
-    --cd (-C): path@"nusage complete",    # Run as if mise were started in DIR
-    --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                         # Suppress non-error messages
-    --verbose (-v): int,                  # Show extra output (use -vv for even more)
-    --yes (-y),                           # Answer yes to all confirmation prompts
-    --raw,                                # Connect tasks and install commands directly to the terminal
-    --locked,                             # Require download URLs from the lockfile when installing
-    --silent,                             # Suppress all task output and mise non-error messages
-    --file (-f): path@"nusage complete",  # Config file to read, or a directory whose config file to read
-    --global (-g),                        # Read the global config file
-    --system,                             # Read the system config file
-    --override,                           # Read the global override file, `config.override.toml`
+    key?: string@"nus complete",       # Dotted key path to print, such as `tools.python`; omit to print the whole file
+    --cd (-C): path@"nus complete",    # Run as if mise were started in DIR
+    --env_ (-E): list<string>,         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,               # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                      # Suppress non-error messages
+    --verbose (-v): int,               # Show extra output (use -vv for even more)
+    --yes (-y),                        # Answer yes to all confirmation prompts
+    --raw,                             # Connect tasks and install commands directly to the terminal
+    --locked,                          # Require download URLs from the lockfile when installing
+    --silent,                          # Suppress all task output and mise non-error messages
+    --file (-f): path@"nus complete",  # Config file to read, or a directory whose config file to read
+    --global (-g),                     # Read the global config file
+    --system,                          # Read the system config file
+    --override,                        # Read the global override file, `config.override.toml`
 ]: nothing -> string {
-    ^mise config get ...(nusage argv [$key] {
+    ^mise config get ...(nus argv [$key] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4519,21 +4519,21 @@ Path                        Tools
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"path\": {\n        \"type\": \"string\"\n      },\n      \"tools\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"override\": {\n        \"type\": \"boolean\"\n      }\n    },\n    \"required\": [\n      \"path\",\n      \"tools\",\n      \"override\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
 }'
 export def "mise config ls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --truncate,                         # Truncate long terminal output to fit the available width
-    --no-truncate,                      # Turn off --truncate
-    --no-header,                        # Do not print the table header
-    --tracked-configs,                  # List every config file mise has loaded, in any project
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --truncate,                      # Truncate long terminal output to fit the available width
+    --no-truncate,                   # Turn off --truncate
+    --no-header,                     # Do not print the table header
+    --tracked-configs,               # List every config file mise has loaded, in any project
 ]: nothing -> table<path: string, tools: list<string>, override: bool> {
-    let text = ^mise config ls --json ...(nusage argv [] {
+    let text = ^mise config ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4548,7 +4548,7 @@ export def "mise config ls" [
         --no-header: $no_header
         --tracked-configs: $tracked_configs
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"tools\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"override\":{\"type\":\"boolean\"}},\"required\":[\"path\",\"tools\",\"override\"],\"additionalProperties\":false}}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"tools\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"override\":{\"type\":\"boolean\"}},\"required\":[\"path\",\"tools\",\"override\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Set a value in one mise TOML file
@@ -4636,9 +4636,9 @@ Quote a key with a dot in its name as TOML does, inside shell quotes: `'tasks."b
 @usage 'complete file type=path'
 @usage 'complete key run="mise __complete_word__ --candidates key --line={{ words | shell_join | shell_quote }}"'
 export def "mise config set" [
-    key: string@"nusage complete",                                   # Dotted key path to set, such as `tools.python`
+    key: string@"nus complete",                                      # Dotted key path to set, such as `tools.python`
     value?: string,                                                  # The value to set the key to (optional if provided as KEY=VALUE)
-    --cd (-C): path@"nusage complete",                               # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",                                  # Run as if mise were started in DIR
     --env_ (-E): list<string>,                                       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                                             # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                                                    # Suppress non-error messages
@@ -4647,7 +4647,7 @@ export def "mise config set" [
     --raw,                                                           # Connect tasks and install commands directly to the terminal
     --locked,                                                        # Require download URLs from the lockfile when installing
     --silent,                                                        # Suppress all task output and mise non-error messages
-    --file (-f): path@"nusage complete",                             # Config file to edit, or a directory whose config file to edit
+    --file (-f): path@"nus complete",                                # Config file to edit, or a directory whose config file to edit
     --global (-g),                                                   # Edit the global config file
     --override,                                                      # Edit the global override file, `config.override.toml`
     --system,                                                        # Edit the system config file
@@ -4655,7 +4655,7 @@ export def "mise config set" [
     --remove,                                                        # Remove the value from an existing list
     --type (-t): string@[infer string integer float bool list set],  # TOML type to store the value as; inferred from the value by default
 ]: nothing -> string {
-    ^mise config set ...(nusage argv [$key $value] {
+    ^mise config set ...(nus argv [$key $value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4696,17 +4696,17 @@ shell startup file to stop that.
 @usage 'example "eval \"$(command mise deactivate)\"" help="Bash or Zsh, calling the executable rather than the activation function"'
 @usage 'example "command mise deactivate | source" help="Fish, calling the executable rather than the activation function"'
 export def "mise deactivate" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise deactivate ...(nusage argv [] {
+    ^mise deactivate ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4743,17 +4743,17 @@ See https://mise.jdx.dev/daemons.html
 @usage 'example "mise daemons stop" help="Stop every registered project daemon"'
 @usage 'output json framing=json select=--json'
 export def "mise daemons" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^mise daemons --json ...(nusage argv [] {
+    ^mise daemons --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4778,17 +4778,17 @@ A shared server is one PostgreSQL, CockroachDB, or NATS server declared in your 
 @usage 'example "mise daemons providers ls" help="List shared servers"'
 @usage 'example "mise daemons providers start local-postgres" help="Start the shared server named local-postgres"'
 export def "mise daemons providers" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons providers ...(nusage argv [] {
+    ^mise daemons providers ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4806,17 +4806,17 @@ export def "mise daemons providers" [
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise daemons providers ls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^mise daemons providers ls --json ...(nusage argv [] {
+    ^mise daemons providers ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4834,17 +4834,17 @@ export def "mise daemons providers ls" [
 @usage 'arg "[NAMES]…" required=#false var=#true'
 export def "mise daemons providers start" [
     ...names: string,
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons providers start ...(nusage argv [...$names] {
+    ^mise daemons providers start ...(nus argv [...$names] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4862,17 +4862,17 @@ export def "mise daemons providers start" [
 @usage 'arg "[NAMES]…" required=#false var=#true'
 export def "mise daemons providers stop" [
     ...names: string,
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons providers stop ...(nusage argv [...$names] {
+    ^mise daemons providers stop ...(nus argv [...$names] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4890,17 +4890,17 @@ export def "mise daemons providers stop" [
 @usage 'arg "[NAMES]…" required=#false var=#true'
 export def "mise daemons providers restart" [
     ...names: string,
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons providers restart ...(nusage argv [...$names] {
+    ^mise daemons providers restart ...(nus argv [...$names] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4931,18 +4931,18 @@ Select daemons by name (`api` or a qualified ID such as `shop/api`), by group wi
 @usage 'example "mise daemons start api" help="Start api and the daemons it depends on"'
 @usage 'example "mise daemons start --group backend" help="Start a group declared in [daemon_groups]"'
 export def "mise daemons start" [
-    ...args: string,                    # Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...args: string,                 # Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons start ...(nusage argv [...$args] {
+    ^mise daemons start ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4970,17 +4970,17 @@ A running pitchfork supervisor with its proxy enabled can then start a registere
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'example "mise daemons register" help="Register every project daemon"'
 export def "mise daemons register" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons register ...(nusage argv [] {
+    ^mise daemons register ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5005,18 +5005,18 @@ With no names, stops every daemon the project has registered, including daemons 
 @usage 'arg "[ARGS]…" help="Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork" required=#false double_dash=automatic var=#true'
 @usage 'example "mise daemons stop postgres" help="Stop one daemon"'
 export def "mise daemons stop" [
-    ...args: string,                    # Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...args: string,                 # Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons stop ...(nusage argv [...$args] {
+    ^mise daemons stop ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5041,18 +5041,18 @@ Installs missing tools first and selects daemons as `mise daemons start` does: w
 @usage 'arg "[ARGS]…" help="Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork" required=#false double_dash=automatic var=#true'
 @usage 'example "mise daemons restart api" help="Restart api with its current declaration"'
 export def "mise daemons restart" [
-    ...args: string,                    # Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...args: string,                 # Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons restart ...(nusage argv [...$args] {
+    ^mise daemons restart ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5079,17 +5079,17 @@ Shows each daemon's ID, status, and source without starting a supervisor or regi
 @usage 'example "mise daemons ls --json" help="Include ports, URLs, and data directories"'
 @usage 'output json framing=json select=--json'
 export def "mise daemons ls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^mise daemons ls --json ...(nusage argv [] {
+    ^mise daemons ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5119,17 +5119,17 @@ See https://mise.jdx.dev/daemons/worktrees.html#stable-urls-per-worktree
 @usage 'example "mise daemons urls" help="Show the URLs for this checkout"'
 @usage 'output json framing=json select=--json'
 export def "mise daemons urls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^mise daemons urls --json ...(nusage argv [] {
+    ^mise daemons urls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5155,18 +5155,18 @@ Requires a running pitchfork supervisor. With no names, shows every daemon the p
 @usage r#'example "mise daemons logs api -n 50" help="Show the last 50 lines of api's output"'#
 @usage 'example "mise daemons logs --since 5min" help="Show the last five minutes of output"'
 export def "mise daemons logs" [
-    ...args: string,                    # Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...args: string,                 # Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons logs ...(nusage argv [...$args] {
+    ^mise daemons logs ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5191,18 +5191,18 @@ Prints pitchfork's status for each selected daemon. With no names, covers every 
 @usage 'arg "[ARGS]…" help="Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork" required=#false double_dash=automatic var=#true'
 @usage 'example "mise daemons status api" help="Show the status of api"'
 export def "mise daemons status" [
-    ...args: string,                    # Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...args: string,                 # Daemon names (short, such as `api`, or qualified, such as `shop/api`), `--group NAME`, and flags passed to pitchfork
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons status ...(nusage argv [...$args] {
+    ^mise daemons status ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5226,18 +5226,18 @@ Requires a running pitchfork supervisor. Takes `pitchfork tui` flags, not daemon
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'arg "[ARGS]…" help="Flags passed to `pitchfork tui`" required=#false double_dash=automatic var=#true'
 export def "mise daemons tui" [
-    ...args: string,                    # Flags passed to `pitchfork tui`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...args: string,                 # Flags passed to `pitchfork tui`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons tui ...(nusage argv [...$args] {
+    ^mise daemons tui ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5271,18 +5271,18 @@ pitchfork must be available. State is kept when mise cannot confirm that the dae
 @usage 'example "mise daemons prune --dry-run" help="Preview what would be removed"'
 @usage 'example "mise daemons prune" help="Review the list and confirm removal"'
 export def "mise daemons prune" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would be removed without deleting anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would be removed without deleting anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise daemons prune ...(nusage argv [] {
+    ^mise daemons prune ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5321,18 +5321,18 @@ See https://mise.jdx.dev/dotfiles.html and https://mise.jdx.dev/dotfiles/history
 @usage 'example "mise dot track ~/.config/nvim" help="Save the history of a directory in place"'
 @usage 'example "mise dot history" help="List saved checkpoints"'
 export def "mise dotfiles" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --local,                            # Work on this machine's local-only history (`mode = "track-local"`), which is never shared
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --local,                         # Work on this machine's local-only history (`mode = "track-local"`), which is never shared
 ]: nothing -> string {
-    ^mise dotfiles ...(nusage argv [] {
+    ^mise dotfiles ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5406,29 +5406,29 @@ A relative path starts from the current directory. The entry records it relative
 @usage r#'example "mise dot add --group home ~/.config/starship.toml" help="Capture the file into a dotfile group's tree"'#
 @usage 'example "mise dot add --changed" help="Copy edits of every changed copy-mode file back to its source"'
 export def "mise dotfiles add" [
-    ...target: string,                  # Targets to add or update
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                       # Overwrite existing sources without prompting
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Print the config and source changes without writing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --local (-l),                       # Write to the project config instead of the global config
-    --changed,                          # Update the sources of every changed file managed in copy mode
-    --global (-g),                      # Write to the global config (the default)
-    --mode (-m): string,                # Mode for a target that is not managed yet: symlink, symlink-each, copy, or template (default: the `dotfiles.default_mode` setting)
-    --no-apply,                         # Add the entry without applying it
-    --path (-p): string,                # Write to this config file or directory
-    --source (-s): string,              # Source path to use for a single target
-    --prompt-secrets,                   # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
-    --group: string,                    # Capture into the tree of this dotfile group
+    ...target: string,               # Targets to add or update
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                    # Overwrite existing sources without prompting
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Print the config and source changes without writing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --local (-l),                    # Write to the project config instead of the global config
+    --changed,                       # Update the sources of every changed file managed in copy mode
+    --global (-g),                   # Write to the global config (the default)
+    --mode (-m): string,             # Mode for a target that is not managed yet: symlink, symlink-each, copy, or template (default: the `dotfiles.default_mode` setting)
+    --no-apply,                      # Add the entry without applying it
+    --path (-p): string,             # Write to this config file or directory
+    --source (-s): string,           # Source path to use for a single target
+    --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
+    --group: string,                 # Capture into the tree of this dotfile group
 ]: nothing -> string {
-    ^mise dotfiles add ...(nusage argv [...$target] {
+    ^mise dotfiles add ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -5488,22 +5488,22 @@ With `--prune`, also removes files that dotfile groups deployed but no active en
 @usage 'example "mise dot apply --prune" help="Also remove files left by dotfile groups"'
 @usage 'example "mise dot apply --force --yes" help="Overwrite conflicting files without prompting"'
 export def "mise dotfiles apply" [
-    ...target: string,                  # Only apply these targets
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                       # Overwrite existing files that conflict with whole-file dotfile entries
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Print the actions that would run without writing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --prune,                            # Also remove files that dotfile groups deployed but no active entry deploys now
-    --prompt-secrets,                   # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
+    ...target: string,               # Only apply these targets
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                    # Overwrite existing files that conflict with whole-file dotfile entries
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Print the actions that would run without writing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --prune,                         # Also remove files that dotfile groups deployed but no active entry deploys now
+    --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
 ]: nothing -> string {
-    ^mise dotfiles apply ...(nusage argv [...$target] {
+    ^mise dotfiles apply ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -5536,19 +5536,19 @@ Runs the command with your terminal and environment and saves a checkpoint befor
 @usage 'example "mise dot capture -- brew upgrade" help="Record what an upgrade changes"'
 @usage 'example "mise dot capture --label \"theme switch\" -- ./switch-theme.sh" help="Label the operation in history"'
 export def "mise dotfiles capture" [
-    ...command: string,                 # Command and arguments to run, after --
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --label: string,                    # Describe this operation in history
+    ...command: string,              # Command and arguments to run, after --
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --label: string,                 # Describe this operation in history
 ]: nothing -> string {
-    ^mise dotfiles capture ...(nusage argv [...$command] {
+    ^mise dotfiles capture ...(nus argv [...$command] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5581,20 +5581,20 @@ Prints a unified diff from this machine's saved version to the version fetched f
 @usage r#'example "mise dot conflicts --difftool ~/.zshrc" help="Open the comparison in Git's diff tool"'#
 @usage 'example "mise dot conflicts --difftool --tool meld ~/.zshrc" help="Use a specific diff tool"'
 export def "mise dotfiles conflicts" [
-    ...path: string,                    # Only inspect these conflicted paths
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --tool: string@"nusage complete",   # Use this Git diff tool instead of the configured default
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --difftool,                         # Open the comparison in Git's configured diff or merge tool
+    ...path: string,                 # Only inspect these conflicted paths
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --tool: string@"nus complete",   # Use this Git diff tool instead of the configured default
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --difftool,                      # Open the comparison in Git's configured diff or merge tool
 ]: nothing -> string {
-    ^mise dotfiles conflicts ...(nusage argv [...$path] {
+    ^mise dotfiles conflicts ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5623,19 +5623,19 @@ Prints a unified diff for every whole-file entry and edit that `mise dot apply` 
 @usage 'example "mise dot diff" help="Show every pending change"'
 @usage 'example "mise dot diff ~/.zshrc" help="Show the change for one target"'
 export def "mise dotfiles diff" [
-    ...target: string,                  # Only show these targets
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --prompt-secrets,                   # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
+    ...target: string,               # Only show these targets
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
 ]: nothing -> string {
-    ^mise dotfiles diff ...(nusage argv [...$target] {
+    ^mise dotfiles diff ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5678,23 +5678,23 @@ An unmanaged target is first added to the global `[dotfiles]`, as `mise dot add 
 @usage 'example "mise dot edit ~/.zshrc" help="Edit the source of ~/.zshrc"'
 @usage 'example "mise dot edit --apply ~/.config/starship.toml" help="Edit the source, then deploy it"'
 export def "mise dotfiles edit" [
-    target: string,                     # Target to edit
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --apply,                            # Apply this target after the editor exits
-    --mode (-m): string,                # Mode to use if the target is not managed yet: symlink, symlink-each, copy, or template (default: the `dotfiles.default_mode` setting)
-    --source (-s): string,              # Source path to use if the target is not yet managed
-    --group: string,                    # Dotfile group whose tree holds the target, when several groups deploy into its directory
-    --prompt-secrets,                   # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
+    target: string,                  # Target to edit
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --apply,                         # Apply this target after the editor exits
+    --mode (-m): string,             # Mode to use if the target is not managed yet: symlink, symlink-each, copy, or template (default: the `dotfiles.default_mode` setting)
+    --source (-s): string,           # Source path to use if the target is not yet managed
+    --group: string,                 # Dotfile group whose tree holds the target, when several groups deploy into its directory
+    --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
 ]: nothing -> string {
-    ^mise dotfiles edit ...(nusage argv [$target] {
+    ^mise dotfiles edit ...(nus argv [$target] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5728,18 +5728,18 @@ Use exclusions for logs, caches, databases, and session state. For files you wan
 @usage 'arg <GLOB> help="A glob such as `~/.config/hypr/plugins/**`"'
 @usage r#'example "mise dot exclude '~/.codex/sessions/**'" help="Never save Codex session logs"'#
 export def "mise dotfiles exclude" [
-    glob: string,                       # A glob such as `~/.config/hypr/plugins/**`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    glob: string,                    # A glob such as `~/.config/hypr/plugins/**`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise dotfiles exclude ...(nusage argv [$glob] {
+    ^mise dotfiles exclude ...(nus argv [$glob] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5791,22 +5791,22 @@ Only checkpoints with this trigger, such as edit, save, agent, bootstrap, apply,
 @usage 'example "mise dot history diff" help="Show unsaved changes"'
 @usage 'output json framing=json select=--json'
 export def "mise dotfiles history" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --limit (-n): string,               # Show at most this many checkpoints (0 for all)
-    --path: string,                     # Only checkpoints where this path (or something under it) changed
-    --trigger: string,                  # Only checkpoints with this trigger, such as edit, save, agent, bootstrap, apply, rollback, or undo
-    --label: string,                    # Only checkpoints with this label
-    --pending,                          # Only checkpoints recorded by operations that did not finish
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --limit (-n): string,            # Show at most this many checkpoints (0 for all)
+    --path: string,                  # Only checkpoints where this path (or something under it) changed
+    --trigger: string,               # Only checkpoints with this trigger, such as edit, save, agent, bootstrap, apply, rollback, or undo
+    --label: string,                 # Only checkpoints with this label
+    --pending,                       # Only checkpoints recorded by operations that did not finish
 ] {
-    ^mise dotfiles history --json ...(nusage argv [] {
+    ^mise dotfiles history --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5830,19 +5830,19 @@ export def "mise dotfiles history" [
 @usage 'arg <TEXT> help="The new description"'
 @usage 'example "mise dot history describe latest \"before the theme change\"" help="Describe the newest checkpoint"'
 export def "mise dotfiles history describe" [
-    ref: string,                        # Numeric checkpoint ID, `latest`, `latest~N`, or `commit:<sha>`
-    text: string,                       # The new description
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ref: string,                     # Numeric checkpoint ID, `latest`, `latest~N`, or `commit:<sha>`
+    text: string,                    # The new description
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise dotfiles history describe ...(nusage argv [$ref $text] {
+    ^mise dotfiles history describe ...(nus argv [$ref $text] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5883,23 +5883,23 @@ With no reference, uses the newest operation, ignoring later saves. With one ref
 @usage 'example "mise dot history diff 11 12 --patch" help="Print the full patch between two checkpoints"'
 @usage 'example "mise dot history diff --operation" help="Show what the newest operation changed"'
 export def "mise dotfiles history diff" [
-    a?: string,                         # Numeric checkpoint ID, `latest`, `latest~N`, or `commit:<sha>`
-    b?: string,                         # Compare `A` with this checkpoint instead of its predecessor
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --path: string,                     # Restrict to one path (a file or a directory)
-    --operation,                        # Compare an operation with the checkpoint it saved before it ran
-    --patch (-p),                       # Print the full patch instead of a per-file summary
-    --exit-code,                        # Exit 1 when the two sides differ
+    a?: string,                      # Numeric checkpoint ID, `latest`, `latest~N`, or `commit:<sha>`
+    b?: string,                      # Compare `A` with this checkpoint instead of its predecessor
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --path: string,                  # Restrict to one path (a file or a directory)
+    --operation,                     # Compare an operation with the checkpoint it saved before it ran
+    --patch (-p),                    # Print the full patch instead of a per-file summary
+    --exit-code,                     # Exit 1 when the two sides differ
 ]: nothing -> string {
-    ^mise dotfiles history diff ...(nusage argv [$a $b] {
+    ^mise dotfiles history diff ...(nus argv [$a $b] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5942,22 +5942,22 @@ Only checkpoints with this trigger, such as edit, save, agent, bootstrap, apply,
 @usage 'example "mise dot history ls --pending" help="List operations that did not finish"'
 @usage 'output json framing=json select=--json'
 export def "mise dotfiles history ls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --limit (-n): string,               # Show at most this many checkpoints (0 for all)
-    --path: string,                     # Only checkpoints where this path (or something under it) changed
-    --trigger: string,                  # Only checkpoints with this trigger, such as edit, save, agent, bootstrap, apply, rollback, or undo
-    --label: string,                    # Only checkpoints with this label
-    --pending,                          # Only checkpoints recorded by operations that did not finish
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --limit (-n): string,            # Show at most this many checkpoints (0 for all)
+    --path: string,                  # Only checkpoints where this path (or something under it) changed
+    --trigger: string,               # Only checkpoints with this trigger, such as edit, save, agent, bootstrap, apply, rollback, or undo
+    --label: string,                 # Only checkpoints with this label
+    --pending,                       # Only checkpoints recorded by operations that did not finish
 ] {
-    ^mise dotfiles history ls --json ...(nusage argv [] {
+    ^mise dotfiles history ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6010,21 +6010,21 @@ The backup still holds the content you are erasing; delete it with `git update-r
 @usage 'example "mise dot history purge ~/.aws/credentials --dry-run" help="List the checkpoints that hold the file"'
 @usage 'example "mise dot history purge ~/.aws/credentials --yes" help="Erase every saved version of the file"'
 export def "mise dotfiles history purge" [
-    ...path: string,                    # Files or directories to erase from history
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --backup,                           # Keep the replaced history in the repository under `refs/mise/purge-backup/`
-    --keep-objects,                     # Leave the replaced objects on disk instead of deleting them
+    ...path: string,                 # Files or directories to erase from history
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --backup,                        # Keep the replaced history in the repository under `refs/mise/purge-backup/`
+    --keep-objects,                  # Leave the replaced objects on disk instead of deleting them
 ]: nothing -> string {
-    ^mise dotfiles history purge ...(nusage argv [...$path] {
+    ^mise dotfiles history purge ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6059,20 +6059,20 @@ Prints the checkpoint's trigger, description, time, and machine, the files that 
 @usage 'example "mise dot history show latest~2 --files" help="List every file in an older checkpoint"'
 @usage 'output json framing=json select=--json'
 export def "mise dotfiles history show" [
-    ref?: string,                       # Numeric checkpoint ID, `latest` (the default), `latest~N`, or `commit:<sha>`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --path: string,                     # Resolve `latest~N` among the checkpoints where this path changed
-    --files,                            # List every file in the snapshot
+    ref?: string,                    # Numeric checkpoint ID, `latest` (the default), `latest~N`, or `commit:<sha>`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --path: string,                  # Resolve `latest~N` among the checkpoints where this path changed
+    --files,                         # List every file in the snapshot
 ] {
-    ^mise dotfiles history show --json ...(nusage argv [$ref] {
+    ^mise dotfiles history show --json ...(nus argv [$ref] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6099,18 +6099,18 @@ Removes a glob that `mise dot exclude` added to `[history] exclude` in the globa
 @usage 'arg <GLOB> help="The glob as written by `mise dot exclude`"'
 @usage r#'example "mise dot include '~/.codex/sessions/**'" help="Save Codex session logs again"'#
 export def "mise dotfiles include" [
-    glob: string,                       # The glob as written by `mise dot exclude`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    glob: string,                    # The glob as written by `mise dot exclude`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise dotfiles include ...(nusage argv [$glob] {
+    ^mise dotfiles include ...(nus argv [$glob] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6138,17 +6138,17 @@ mise notifies you only when a sync conflict pauses syncing. Other problems, such
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'example "mise dot notify" help="Send a test notification"'
 export def "mise dotfiles notify" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise dotfiles notify ...(nusage argv [] {
+    ^mise dotfiles notify ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6179,18 +6179,18 @@ See https://mise.jdx.dev/dotfiles/sync.html
 @usage 'example "mise dot origin set git@github.com:you/dotfiles.git" help="Connect a repository"'
 @usage 'example "mise dot origin --remove" help="Disconnect the repository"'
 export def "mise dotfiles origin" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --remove,                           # Disconnect the origin by removing `[history.origin]`; local checkpoints and fetched history stay
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --remove,                        # Disconnect the origin by removing `[history.origin]`; local checkpoints and fetched history stay
 ]: nothing -> string {
-    ^mise dotfiles origin ...(nusage argv [] {
+    ^mise dotfiles origin ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6238,20 +6238,20 @@ How to sync with the repository: sync, fetch-only, or manual
 @usage 'example "mise dot origin set https://github.com/you/dotfiles.git" help="Connect and choose a sync mode at the prompt"'
 @usage 'example "mise dot origin set git@github.com:you/dotfiles.git --sync manual" help="Connect without automatic network activity"'
 export def "mise dotfiles origin set" [
-    url: string,                        # The repository URL (any Git URL; use a private repository)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --branch: string,                   # The branch to sync (default: the repository's default branch)
-    --sync: string,                     # How to sync with the repository: sync, fetch-only, or manual
+    url: string,                     # The repository URL (any Git URL; use a private repository)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --branch: string,                # The branch to sync (default: the repository's default branch)
+    --sync: string,                  # How to sync with the repository: sync, fetch-only, or manual
 ]: nothing -> string {
-    ^mise dotfiles origin set ...(nusage argv [$url] {
+    ^mise dotfiles origin set ...(nus argv [$url] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6285,19 +6285,19 @@ Shows each tracked entry with the config file that declares it, whether it saves
 @usage 'example "mise dot paths --noisy" help="List files the watcher saves less often"'
 @usage 'output json framing=json select=--json'
 export def "mise dotfiles paths" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --preview: string,                  # List the files that tracking this path would save, without tracking it
-    --noisy,                            # List the paths the watcher found changing constantly and saves less often
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --preview: string,               # List the files that tracking this path would save, without tracking it
+    --noisy,                         # List the paths the watcher found changing constantly and saves less often
 ] {
-    ^mise dotfiles paths --json ...(nusage argv [] {
+    ^mise dotfiles paths --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6357,23 +6357,23 @@ Paths named by `--take-remote` take the origin's version; every other conflict k
 @usage r#'example "mise dot pull --keep-local ~/.zshrc" help="Resolve a conflict by keeping this machine's version"'#
 @usage r#'example "mise dot pull --take-remote-all --keep-local ~/.zshrc" help="Take the origin's version of every conflict except one"'#
 export def "mise dotfiles pull" [
-    ...path: string,                    # Not supported; a pull always applies every incoming change
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show the plan without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --take-remote: list<string>,        # Resolve a conflict with the origin's version
-    --keep-local: list<string>,         # Resolve a conflict by keeping this machine's version; the next sync pushes it
-    --take-remote-all,                  # Resolve every remaining conflict with the origin's version
-    --keep-local-all,                   # Resolve every remaining conflict by keeping this machine's version
+    ...path: string,                 # Not supported; a pull always applies every incoming change
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show the plan without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --take-remote: list<string>,     # Resolve a conflict with the origin's version
+    --keep-local: list<string>,      # Resolve a conflict by keeping this machine's version; the next sync pushes it
+    --take-remote-all,               # Resolve every remaining conflict with the origin's version
+    --keep-local-all,                # Resolve every remaining conflict by keeping this machine's version
 ]: nothing -> string {
-    ^mise dotfiles pull ...(nusage argv [...$path] {
+    ^mise dotfiles pull ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6406,19 +6406,19 @@ Finishes recovering from an operation that was interrupted, for example by a cra
 @usage 'example "mise dot recover" help="Recover every interrupted operation"'
 @usage 'example "mise dot recover 42 --keep-current --yes" help="Keep the files on disk for operation 42"'
 export def "mise dotfiles recover" [
-    operation?: string,                 # The operation's checkpoint ID (see `mise dot history --pending`) or a unique prefix of its UUID
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --keep-current,                     # Keep the files on disk instead of restoring the recovery copies
+    operation?: string,              # The operation's checkpoint ID (see `mise dot history --pending`) or a unique prefix of its UUID
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --keep-current,                  # Keep the files on disk instead of restoring the recovery copies
 ]: nothing -> string {
-    ^mise dotfiles recover ...(nusage argv [$operation] {
+    ^mise dotfiles recover ...(nus argv [$operation] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6453,22 +6453,22 @@ Without `--to`, each path returns to its most recent saved version that differs 
 @usage 'example "mise dot rollback ~/.zshrc --to 42" help="Restore ~/.zshrc as checkpoint 42 holds it"'
 @usage 'example "mise dot rollback --to latest~3 --all --dry-run" help="Preview restoring every file from three checkpoints ago"'
 export def "mise dotfiles rollback" [
-    ...path: string,                    # Paths to roll back (files or directories)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force,                            # Replace a path whose type changed (file, symlink, directory)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show the plan without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --to: string,                       # The checkpoint to roll back to: numeric ID, `latest`, `latest~N`, or `commit:<sha>`
-    --all,                              # With `--to`, restore everything the checkpoint covers
+    ...path: string,                 # Paths to roll back (files or directories)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force,                         # Replace a path whose type changed (file, symlink, directory)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show the plan without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --to: string,                    # The checkpoint to roll back to: numeric ID, `latest`, `latest~N`, or `commit:<sha>`
+    --all,                           # With `--to`, restore everything the checkpoint covers
 ]: nothing -> string {
-    ^mise dotfiles rollback ...(nusage argv [...$path] {
+    ^mise dotfiles rollback ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -6522,24 +6522,24 @@ A save re-encrypts the files it captures to the current `[history.encryption] re
 @usage 'example "mise dot save --best-effort" help="Warn instead of failing in a script"'
 @usage 'example "mise dot save --re-encrypt" help="Re-encrypt every encrypted file after changing recipients"'
 export def "mise dotfiles save" [
-    ...path: string,                    # Paths to save; every one must be tracked
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --description (-d): string,         # A description for the checkpoint
-    --trigger: string,                  # Record the checkpoint as a save, agent, or update checkpoint
-    --task: string,                     # The ID of the task an agent is working on, recorded with the checkpoint
-    --label: list<string>,              # A label to find the checkpoint by later
-    --best-effort,                      # Warn instead of failing when the checkpoint cannot be written
-    --re-encrypt,                       # Re-encrypt every saved encrypted file to the current recipients
+    ...path: string,                 # Paths to save; every one must be tracked
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --description (-d): string,      # A description for the checkpoint
+    --trigger: string,               # Record the checkpoint as a save, agent, or update checkpoint
+    --task: string,                  # The ID of the task an agent is working on, recorded with the checkpoint
+    --label: list<string>,           # A label to find the checkpoint by later
+    --best-effort,                   # Warn instead of failing when the checkpoint cannot be written
+    --re-encrypt,                    # Re-encrypt every saved encrypted file to the current recipients
 ]: nothing -> string {
-    ^mise dotfiles save ...(nusage argv [...$path] {
+    ^mise dotfiles save ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6595,22 +6595,22 @@ By default the table lists only entries that need attention or have omitted file
 @usage 'example "mise dot status --missing" help="Exit 1 if anything is out of date, for scripts and CI"'
 @usage 'output json framing=json select=--json'
 export def "mise dotfiles status" [
-    ...target: string,                  # Only show these targets
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --truncate,                         # Truncate long terminal output to fit the available width
-    --no-truncate,                      # Turn off --truncate
-    --missing,                          # Exit with code 1 if any dotfile is not in its desired state (missing, source missing, or differs)
-    --prompt-secrets,                   # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
+    ...target: string,               # Only show these targets
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --truncate,                      # Truncate long terminal output to fit the available width
+    --no-truncate,                   # Turn off --truncate
+    --missing,                       # Exit with code 1 if any dotfile is not in its desired state (missing, source missing, or differs)
+    --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
 ] {
-    ^mise dotfiles status --json ...(nusage argv [...$target] {
+    ^mise dotfiles status --json ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6646,20 +6646,20 @@ The watcher does this on its own in `sync` and `fetch-only` mode (the `history.s
 @usage 'example "mise dot sync" help="Push and fetch now"'
 @usage 'example "mise dot sync --fetch-only" help="Fetch without pushing"'
 export def "mise dotfiles sync" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --fetch-only,                       # Fetch without pushing
-    --allow-plaintext-history,          # Allow pushing older unencrypted versions of files that are now encrypted, and versions that look like they contain secrets
-    --best-effort,                      # Warn instead of failing when the origin is unreachable
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --fetch-only,                    # Fetch without pushing
+    --allow-plaintext-history,       # Allow pushing older unencrypted versions of files that are now encrypted, and versions that look like they contain secrets
+    --best-effort,                   # Warn instead of failing when the origin is unreachable
 ]: nothing -> string {
-    ^mise dotfiles sync ...(nusage argv [] {
+    ^mise dotfiles sync ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6714,25 +6714,25 @@ See https://mise.jdx.dev/dotfiles/history.html
 @usage 'example "mise dot track ~/.config/app/credentials --encrypt" help="Encrypt the file before saving it"'
 @usage 'example "mise dot track ~/.config/app/state.json --no-autosave" help="Save the file only when you run mise dot save"'
 export def "mise dotfiles track" [
-    ...path: string,                    # Paths to track (absolute or starting with ~/)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what each path expands to (files, size, what is left out) without tracking it
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --local,                            # Keep this file's history on this machine only; it is never shared
-    --os: string,                       # Declare a variant for this platform (macos, linux, linux/arm64, …)
-    --machine,                          # Keep a separate stream on every machine, never applied on another
-    --no-autosave,                      # Save only on `mise dot save <path>`, never automatically
-    --encrypt,                          # Encrypt contents before saving them to history (requires `[history.encryption] recipients`)
-    --allow-plaintext,                  # Save an explicitly tracked credential-named file in plaintext
+    ...path: string,                 # Paths to track (absolute or starting with ~/)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what each path expands to (files, size, what is left out) without tracking it
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --local,                         # Keep this file's history on this machine only; it is never shared
+    --os: string,                    # Declare a variant for this platform (macos, linux, linux/arm64, …)
+    --machine,                       # Keep a separate stream on every machine, never applied on another
+    --no-autosave,                   # Save only on `mise dot save <path>`, never automatically
+    --encrypt,                       # Encrypt contents before saving them to history (requires `[history.encryption] recipients`)
+    --allow-plaintext,               # Save an explicitly tracked credential-named file in plaintext
 ]: nothing -> string {
-    ^mise dotfiles track ...(nusage argv [...$path] {
+    ^mise dotfiles track ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6779,22 +6779,22 @@ With `--group`, removes only that dotfile group's files, using what mise recorde
 @usage 'example "mise dot unapply --dry-run" help="Preview what would be removed"'
 @usage 'example "mise dot unapply --force --yes" help="Also remove modified targets, without prompting"'
 export def "mise dotfiles unapply" [
-    ...target: string,                  # Only unapply these targets
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                       # Remove modified or otherwise ambiguous managed files and lines
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Print the actions that would run without writing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --group: list<string>,              # Only unapply the files of this dotfile group, even one that is no longer selected or declared
-    --prompt-secrets,                   # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
+    ...target: string,               # Only unapply these targets
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                    # Remove modified or otherwise ambiguous managed files and lines
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Print the actions that would run without writing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --group: list<string>,           # Only unapply the files of this dotfile group, even one that is no longer selected or declared
+    --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
 ]: nothing -> string {
-    ^mise dotfiles unapply ...(nusage argv [...$target] {
+    ^mise dotfiles unapply ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -6831,19 +6831,19 @@ Works for operations that changed tracked files: `mise bootstrap`, `mise dot add
 @usage 'example "mise dot undo --dry-run" help="Show what would be restored"'
 @usage 'example "mise dot undo 42" help="Reverse the operation recorded as checkpoint 42"'
 export def "mise dotfiles undo" [
-    ref?: string,                       # The operation's checkpoint: numeric ID, `latest`, `latest~N`, or `commit:<sha>`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show the plan without changing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ref?: string,                    # The operation's checkpoint: numeric ID, `latest`, `latest~N`, or `commit:<sha>`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show the plan without changing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise dotfiles undo ...(nusage argv [$ref] {
+    ^mise dotfiles undo ...(nus argv [$ref] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6874,18 +6874,18 @@ A path inside a tracked directory has no entry of its own: mise adds a rule for 
 @usage 'example "mise dot untrack ~/.zshrc" help="Stop saving ~/.zshrc"'
 @usage 'example "mise dot untrack ~/.config/hypr/plugins" help="Exclude one directory inside a tracked directory"'
 export def "mise dotfiles untrack" [
-    ...path: string,                    # Paths to stop tracking
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...path: string,                 # Paths to stop tracking
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise dotfiles untrack ...(nusage argv [...$path] {
+    ^mise dotfiles untrack ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6932,18 +6932,18 @@ Exits 0 when history is disabled or another watcher is already running, and 1 wh
 @usage 'example "mise dot watch --json" help="Print JSON lines instead of log lines"'
 @usage 'output json framing=json select=--json'
 export def "mise dotfiles watch" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --once,                             # Rescan and sync once, then exit (for timers and cron)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --once,                          # Rescan and sync once, then exit (for timers and cron)
 ] {
-    ^mise dotfiles watch --json ...(nusage argv [] {
+    ^mise dotfiles watch --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6978,17 +6978,17 @@ when it finds a problem. Include this output when you report a bug.
 @usage 'example "mise doctor --json" help="Print the report as JSON"'
 @usage 'output json framing=json select=--json'
 export def "mise doctor" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^mise doctor --json ...(nusage argv [] {
+    ^mise doctor --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7021,18 +7021,18 @@ mise doctor path
 """# help="Print the directories mise adds to PATH"'
 @usage 'example "mise doctor path --full" help="Print the whole PATH mise would set"'
 export def "mise doctor path" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --full (-f),                        # Print every PATH entry, including those mise does not provide
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --full (-f),                     # Print every PATH entry, including those mise does not provide
 ]: nothing -> string {
-    ^mise doctor path ...(nusage argv [] {
+    ^mise doctor path ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7070,17 +7070,17 @@ https://mise.jdx.dev/configuration/project-diagnostics.html.
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise doctor project --json\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"errors\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"checks\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"name\": {\n            \"type\": \"string\"\n          },\n          \"description\": {\n            \"type\": [\n              \"string\",\n              \"null\"\n            ]\n          },\n          \"source\": {\n            \"type\": [\n              \"string\",\n              \"null\"\n            ]\n          },\n          \"status\": {\n            \"enum\": [\n              \"pass\",\n              \"fail\",\n              \"error\",\n              \"skipped\",\n              \"blocked\"\n            ]\n          },\n          \"message\": {\n            \"type\": [\n              \"string\",\n              \"null\"\n            ]\n          },\n          \"hint\": {\n            \"type\": [\n              \"string\",\n              \"null\"\n            ]\n          }\n        },\n        \"required\": [\n          \"name\",\n          \"description\",\n          \"source\",\n          \"status\",\n          \"message\",\n          \"hint\"\n        ],\n        \"additionalProperties\": false\n      }\n    }\n  },\n  \"required\": [\n    \"errors\",\n    \"checks\"\n  ],\n  \"additionalProperties\": false\n}\n"
 }'
 export def "mise doctor project" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> record<errors: list<string>, checks: table<name: string, description: oneof<string, nothing>, source: oneof<string, nothing>, status: string, message: oneof<string, nothing>, hint: oneof<string, nothing>>> {
-    let text = ^mise doctor project --json ...(nusage argv [] {
+    let text = ^mise doctor project --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7091,7 +7091,7 @@ export def "mise doctor project" [
         --locked: $locked
         --silent: $silent
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise doctor project --json\",\"type\":\"object\",\"properties\":{\"errors\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"checks\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"description\":{\"type\":[\"string\",\"null\"]},\"source\":{\"type\":[\"string\",\"null\"]},\"status\":{\"enum\":[\"pass\",\"fail\",\"error\",\"skipped\",\"blocked\"]},\"message\":{\"type\":[\"string\",\"null\"]},\"hint\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"name\",\"description\",\"source\",\"status\",\"message\",\"hint\"],\"additionalProperties\":false}}},\"required\":[\"errors\",\"checks\"],\"additionalProperties\":false}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise doctor project --json\",\"type\":\"object\",\"properties\":{\"errors\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"checks\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"description\":{\"type\":[\"string\",\"null\"]},\"source\":{\"type\":[\"string\",\"null\"]},\"status\":{\"enum\":[\"pass\",\"fail\",\"error\",\"skipped\",\"blocked\"]},\"message\":{\"type\":[\"string\",\"null\"]},\"hint\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"name\",\"description\",\"source\",\"status\",\"message\",\"hint\"],\"additionalProperties\":false}}},\"required\":[\"errors\",\"checks\"],\"additionalProperties\":false}" { from json }
 }
 
 # Start a subshell with mise's tools and environment
@@ -7119,19 +7119,19 @@ Type `exit` to leave it.
 @usage 'example "mise en -s \"zsh -f\"" help="Skip loading .zshrc"'
 @usage 'complete dir type=dir'
 export def "mise en" [
-    dir?: path@"nusage complete",       # Directory to start the shell in
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --shell (-s): string,               # Shell to start; defaults to $SHELL
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    dir?: path@"nus complete",       # Directory to start the shell in
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --shell (-s): string,            # Shell to start; defaults to $SHELL
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise en ...(nusage argv [$dir] {
+    ^mise en ...(nus argv [$dir] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7202,8 +7202,8 @@ missing tools from the config are reported, not installed.
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\": \"object\",\n  \"additionalProperties\": {\n    \"type\": \"string\"\n  }\n}\n"
 }'
 export def "mise env" [
-    ...tool_version: string@"nusage complete",                  # Tools to include in addition to those in the config, such as `node@24`
-    --cd (-C): path@"nusage complete",                          # Run as if mise were started in DIR
+    ...tool_version: string@"nus complete",                     # Tools to include in addition to those in the config, such as `node@24`
+    --cd (-C): path@"nus complete",                             # Run as if mise were started in DIR
     --env_ (-E): list<string>,                                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                                        # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                                               # Suppress non-error messages
@@ -7219,7 +7219,7 @@ export def "mise env" [
     --values,                                                   # Only show values of environment variables
     --paths,                                                    # Print the PATH entries mise manages, in PATH order, one per line
 ]: nothing -> record {
-    let text = ^mise env --json ...(nusage argv [...$tool_version] {
+    let text = ^mise env --json ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7236,7 +7236,7 @@ export def "mise env" [
         --values: $values
         --paths: $paths
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}" { from json }
 }
 
 # Run a command with mise's tools and environment
@@ -7334,32 +7334,32 @@ SystemRoot and TEMP.
 @usage r#'example "mise x --secrets GH_TOKEN -- gh release list" help="[experimental] Pass one secret from the project's secrets source"'#
 @usage 'complete command type=command'
 export def "mise exec" [
-    ...tool_version: string@"nusage complete",  # Tools to add or override, such as `node@24 python@3.13`
-    --cd (-C): path@"nusage complete",          # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                        # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                               # Suppress non-error messages
-    --verbose (-v): int,                        # Show extra output (use -vv for even more)
-    --yes (-y),                                 # Answer yes to all confirmation prompts
-    --raw,                                      # Connect tasks and install commands directly to the terminal
-    --locked,                                   # Require download URLs from the lockfile when installing
-    --silent,                                   # Suppress all task output and mise non-error messages
-    --command (-c): string@"nusage complete",   # Command string to run through a shell (supports pipes and redirection)
-    --allow-env: list<string>,                  # Pass only VAR through from the environment (implies --deny-env)
-    --allow-net: list<string>,                  # Allow network access only to HOST (not supported on any platform)
-    --allow-read: list<string>,                 # Allow reads from PATH (implies --deny-read for everything else)
-    --allow-write: list<string>,                # Allow writes to PATH (implies --deny-write for everything else)
-    --deny-all,                                 # Block reads, writes, network, and env vars
-    --deny-env,                                 # Block env var inheritance except PATH, HOME, USER, SHELL, TERM, COLORTERM, LANG
-    --deny-net,                                 # Block all network access
-    --deny-read,                                # Block filesystem reads (system libs and tool dirs still accessible)
-    --deny-write,                               # Block filesystem writes except temporary and device paths (/tmp, /dev)
-    --fresh-env,                                # Bypass the environment cache and recompute the environment
-    --no-deps,                                  # Skip automatic dependency preparation
-    --secrets: list<string>@"nusage complete",  # [experimental] Give the command these secrets (comma-separated); by default it gets none
-    --secrets-all,                              # [experimental] Give the command every secret the project can inject, except file secrets
+    ...tool_version: string@"nus complete",  # Tools to add or override, such as `node@24 python@3.13`
+    --cd (-C): path@"nus complete",          # Run as if mise were started in DIR
+    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                            # Suppress non-error messages
+    --verbose (-v): int,                     # Show extra output (use -vv for even more)
+    --yes (-y),                              # Answer yes to all confirmation prompts
+    --raw,                                   # Connect tasks and install commands directly to the terminal
+    --locked,                                # Require download URLs from the lockfile when installing
+    --silent,                                # Suppress all task output and mise non-error messages
+    --command (-c): string@"nus complete",   # Command string to run through a shell (supports pipes and redirection)
+    --allow-env: list<string>,               # Pass only VAR through from the environment (implies --deny-env)
+    --allow-net: list<string>,               # Allow network access only to HOST (not supported on any platform)
+    --allow-read: list<string>,              # Allow reads from PATH (implies --deny-read for everything else)
+    --allow-write: list<string>,             # Allow writes to PATH (implies --deny-write for everything else)
+    --deny-all,                              # Block reads, writes, network, and env vars
+    --deny-env,                              # Block env var inheritance except PATH, HOME, USER, SHELL, TERM, COLORTERM, LANG
+    --deny-net,                              # Block all network access
+    --deny-read,                             # Block filesystem reads (system libs and tool dirs still accessible)
+    --deny-write,                            # Block filesystem writes except temporary and device paths (/tmp, /dev)
+    --fresh-env,                             # Bypass the environment cache and recompute the environment
+    --no-deps,                               # Skip automatic dependency preparation
+    --secrets: list<string>@"nus complete",  # [experimental] Give the command these secrets (comma-separated); by default it gets none
+    --secrets-all,                           # [experimental] Give the command every secret the project can inject, except file secrets
 ]: nothing -> string {
-    ^mise exec ...(nusage argv [...$tool_version] {
+    ^mise exec ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7430,20 +7430,20 @@ with a `!` exclusion or a comment is left as written.
 @usage 'example "mise fmt --check" help="Exit 1 if any config file needs formatting"'
 @usage 'example "mise fmt --stdin < mise.toml" help="Print a formatted copy without changing the file"'
 export def "mise fmt" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --all (-a),                         # Format every config file mise loads, not only those in the current directory
-    --check (-c),                       # Check whether the configs are formatted without rewriting them; exits 1 if any are not
-    --stdin (-s),                       # Format TOML from stdin and print it to stdout, without touching any file
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --all (-a),                      # Format every config file mise loads, not only those in the current directory
+    --check (-c),                    # Check whether the configs are formatted without rewriting them; exits 1 if any are not
+    --stdin (-s),                    # Format TOML from stdin and print it to stdout, without touching any file
 ]: nothing -> string {
-    ^mise fmt ...(nusage argv [] {
+    ^mise fmt ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7463,17 +7463,17 @@ export def "mise fmt" [
 @usage 'alias gen g'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise generate" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise generate ...(nusage argv [] {
+    ^mise generate ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7513,22 +7513,22 @@ the file; pass --force to replace it.
 @usage 'complete path type=path'
 @usage 'complete file type=path'
 export def "mise generate config" [
-    path?: path@"nusage complete",                 # Config file to edit or create; defaults to mise.toml
-    --cd (-C): path@"nusage complete",             # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                     # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                                  # Replace an existing file with the starter template when not opening the editor
-    --jobs (-j): string,                           # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                                # Print the result instead of writing it to the file
-    --quiet (-q),                                  # Suppress non-error messages
-    --verbose (-v): int,                           # Show extra output (use -vv for even more)
-    --yes (-y),                                    # Answer yes to all confirmation prompts
-    --raw,                                         # Connect tasks and install commands directly to the terminal
-    --locked,                                      # Require download URLs from the lockfile when installing
-    --silent,                                      # Suppress all task output and mise non-error messages
-    --global (-g),                                 # Generate the global config file (~/.config/mise/config.toml)
-    --tool-versions (-t): path@"nusage complete",  # Copy the tools from this .tool-versions file into the config, without opening the editor
+    path?: path@"nus complete",                 # Config file to edit or create; defaults to mise.toml
+    --cd (-C): path@"nus complete",             # Run as if mise were started in DIR
+    --env_ (-E): list<string>,                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                               # Replace an existing file with the starter template when not opening the editor
+    --jobs (-j): string,                        # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                             # Print the result instead of writing it to the file
+    --quiet (-q),                               # Suppress non-error messages
+    --verbose (-v): int,                        # Show extra output (use -vv for even more)
+    --yes (-y),                                 # Answer yes to all confirmation prompts
+    --raw,                                      # Connect tasks and install commands directly to the terminal
+    --locked,                                   # Require download URLs from the lockfile when installing
+    --silent,                                   # Suppress all task output and mise non-error messages
+    --global (-g),                              # Generate the global config file (~/.config/mise/config.toml)
+    --tool-versions (-t): path@"nus complete",  # Copy the tools from this .tool-versions file into the config, without opening the editor
 ]: nothing -> string {
-    ^mise generate config ...(nusage argv [$path] {
+    ^mise generate config ...(nus argv [$path] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -7576,21 +7576,21 @@ shims directory to PATH.
 @usage 'example "mise generate devcontainer" help="Print the configuration"'
 @usage 'example "mise generate devcontainer --mount-mise-data --write" help="Keep installed tools in a volume and save .devcontainer/devcontainer.json"'
 export def "mise generate devcontainer" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --image (-i): string,               # Base image; defaults to mcr.microsoft.com/devcontainers/base:ubuntu
-    --mount-mise-data (-m),             # Keep installed tools in a `mise-data-volume` Docker volume so they survive rebuilds
-    --name (-n): string,                # Container name; defaults to mise
-    --write (-w),                       # Write to .devcontainer/devcontainer.json instead of printing
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --image (-i): string,            # Base image; defaults to mcr.microsoft.com/devcontainers/base:ubuntu
+    --mount-mise-data (-m),          # Keep installed tools in a `mise-data-volume` Docker volume so they survive rebuilds
+    --name (-n): string,             # Container name; defaults to mise
+    --write (-w),                    # Write to .devcontainer/devcontainer.json instead of printing
 ]: nothing -> string {
-    ^mise generate devcontainer ...(nusage argv [] {
+    ^mise generate devcontainer ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7658,21 +7658,21 @@ since git runs hooks from the top level: `-- -C subdir` makes the hook find it.
 @usage 'example "mise generate git-pre-commit --write --task=pre-commit" help="Install the hook; each commit then runs `mise run pre-commit`"'
 @usage 'example "mise generate git-pre-commit --write -- -C subdir" help="Use the config in subdir, since git runs hooks from the repository root"'
 export def "mise generate git-pre-commit" [
-    ...mise_arg: string,                    # mise flags to embed in the generated hook, given after `--`
-    --cd (-C): path@"nusage complete",      # Run as if mise were started in DIR
-    --env_ (-E): list<string>,              # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                    # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                           # Suppress non-error messages
-    --verbose (-v): int,                    # Show extra output (use -vv for even more)
-    --yes (-y),                             # Answer yes to all confirmation prompts
-    --raw,                                  # Connect tasks and install commands directly to the terminal
-    --locked,                               # Require download URLs from the lockfile when installing
-    --silent,                               # Suppress all task output and mise non-error messages
-    --task (-t): string@"nusage complete",  # The task to run when the hook is triggered
-    --write (-w),                           # Write the hook to the hooks directory and make it executable
-    --hook: string,                         # Which git hook to write, such as pre-push
+    ...mise_arg: string,                 # mise flags to embed in the generated hook, given after `--`
+    --cd (-C): path@"nus complete",      # Run as if mise were started in DIR
+    --env_ (-E): list<string>,           # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                 # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                        # Suppress non-error messages
+    --verbose (-v): int,                 # Show extra output (use -vv for even more)
+    --yes (-y),                          # Answer yes to all confirmation prompts
+    --raw,                               # Connect tasks and install commands directly to the terminal
+    --locked,                            # Require download URLs from the lockfile when installing
+    --silent,                            # Suppress all task output and mise non-error messages
+    --task (-t): string@"nus complete",  # The task to run when the hook is triggered
+    --write (-w),                        # Write the hook to the hooks directory and make it executable
+    --hook: string,                      # Which git hook to write, such as pre-push
 ]: nothing -> string {
-    ^mise generate git-pre-commit ...(nusage argv [...$mise_arg] {
+    ^mise generate git-pre-commit ...(nus argv [...$mise_arg] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7716,20 +7716,20 @@ committing the workflow.
 @usage 'example "mise generate github-action --write" help="Save it as .github/workflows/ci.yml"'
 @usage 'example "mise generate github-action --task lint --name lint --write" help="Save a workflow that runs the lint task as .github/workflows/lint.yml"'
 export def "mise generate github-action" [
-    --cd (-C): path@"nusage complete",      # Run as if mise were started in DIR
-    --env_ (-E): list<string>,              # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                    # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                           # Suppress non-error messages
-    --verbose (-v): int,                    # Show extra output (use -vv for even more)
-    --yes (-y),                             # Answer yes to all confirmation prompts
-    --raw,                                  # Connect tasks and install commands directly to the terminal
-    --locked,                               # Require download URLs from the lockfile when installing
-    --silent,                               # Suppress all task output and mise non-error messages
-    --task (-t): string@"nusage complete",  # The task to run when the workflow is triggered
-    --write (-w),                           # Write the workflow to `.github/workflows/<NAME>.yml` instead of printing it
-    --name: string,                         # Name of the workflow and its file
+    --cd (-C): path@"nus complete",      # Run as if mise were started in DIR
+    --env_ (-E): list<string>,           # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                 # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                        # Suppress non-error messages
+    --verbose (-v): int,                 # Show extra output (use -vv for even more)
+    --yes (-y),                          # Answer yes to all confirmation prompts
+    --raw,                               # Connect tasks and install commands directly to the terminal
+    --locked,                            # Require download URLs from the lockfile when installing
+    --silent,                            # Suppress all task output and mise non-error messages
+    --task (-t): string@"nus complete",  # The task to run when the workflow is triggered
+    --write (-w),                        # Write the workflow to `.github/workflows/<NAME>.yml` instead of printing it
+    --name: string,                      # Name of the workflow and its file
 ]: nothing -> string {
-    ^mise generate github-action ...(nusage argv [] {
+    ^mise generate github-action ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7796,22 +7796,22 @@ it for contributors on Windows. Requires --write.
 @usage 'example "mise generate install-script --write ./bin/mise --windows" help="Also write bin/mise.cmd for contributors on Windows"'
 @usage 'complete dir type=dir'
 export def "mise generate install-script" [
-    --cd (-C): path@"nusage complete",        # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                      # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                             # Suppress non-error messages
-    --verbose (-v): int,                      # Show extra output (use -vv for even more)
-    --version (-V): string,                   # mise version to pin; defaults to the release `mise self-update` would install
-    --yes (-y),                               # Answer yes to all confirmation prompts
-    --raw,                                    # Connect tasks and install commands directly to the terminal
-    --locked,                                 # Require download URLs from the lockfile when installing
-    --silent,                                 # Suppress all task output and mise non-error messages
-    --localize (-l),                          # Keep mise data and cache in a project-local directory (`.mise` by default)
-    --write (-w): string,                     # Write the script to PATH (./bin/mise when no path is given) and make it executable, instead of printing it
-    --localized-dir: path@"nusage complete",  # Directory for mise data when using --localize, relative to the project
-    --windows,                                # Also write a Windows launcher, `<PATH>.cmd`
+    --cd (-C): path@"nus complete",        # Run as if mise were started in DIR
+    --env_ (-E): list<string>,             # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                   # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                          # Suppress non-error messages
+    --verbose (-v): int,                   # Show extra output (use -vv for even more)
+    --version (-V): string,                # mise version to pin; defaults to the release `mise self-update` would install
+    --yes (-y),                            # Answer yes to all confirmation prompts
+    --raw,                                 # Connect tasks and install commands directly to the terminal
+    --locked,                              # Require download URLs from the lockfile when installing
+    --silent,                              # Suppress all task output and mise non-error messages
+    --localize (-l),                       # Keep mise data and cache in a project-local directory (`.mise` by default)
+    --write (-w): string,                  # Write the script to PATH (./bin/mise when no path is given) and make it executable, instead of printing it
+    --localized-dir: path@"nus complete",  # Directory for mise data when using --localize, relative to the project
+    --windows,                             # Also write a Windows launcher, `<PATH>.cmd`
 ]: nothing -> string {
-    ^mise generate install-script ...(nusage argv [] {
+    ^mise generate install-script ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7873,21 +7873,21 @@ unchanged if either is missing.
 @usage 'example "mise generate task-docs --inject --output README.md" help="Update the marked section of README.md"'
 @usage 'complete root type=dir'
 export def "mise generate task-docs" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --output (-o): string,              # Write the generated docs to a file or directory
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --inject (-i),                      # Replace the marked section of the --output file
-    --index (-I),                       # Write only an index of tasks, intended for use with `--multi`
-    --multi (-m),                       # Render each task as a separate document; requires `--output` to be a directory
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --output (-o): string,           # Write the generated docs to a file or directory
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --inject (-i),                   # Replace the marked section of the --output file
+    --index (-I),                    # Write only an index of tasks, intended for use with `--multi`
+    --multi (-m),                    # Render each task as a separate document; requires `--output` to be a directory
 ]: nothing -> string {
-    ^mise generate task-docs ...(nusage argv [] {
+    ^mise generate task-docs ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7966,7 +7966,7 @@ normally committed.
 @usage 'example "mise generate task-stubs --mise-bin ./bin/mise" help="Make the stubs run the mise that `mise generate install-script` wrote"'
 @usage 'complete dir type=dir'
 export def "mise generate task-stubs" [
-    --cd (-C): path@"nusage complete",     # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",        # Run as if mise were started in DIR
     --env_ (-E): list<string>,             # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                   # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                          # Suppress non-error messages
@@ -7975,11 +7975,11 @@ export def "mise generate task-stubs" [
     --raw,                                 # Connect tasks and install commands directly to the terminal
     --locked,                              # Require download URLs from the lockfile when installing
     --silent,                              # Suppress all task output and mise non-error messages
-    --dir (-d): path@"nusage complete",    # Directory to create task stubs inside of
+    --dir (-d): path@"nus complete",       # Directory to create task stubs inside of
     --mise-bin (-m): string,               # mise executable the stubs run; defaults to mise from PATH
     --windows-launcher: string@[cmd exe],  # What to write beside each stub for Windows to launch
 ]: nothing -> string {
-    ^mise generate task-stubs ...(nusage argv [] {
+    ^mise generate task-stubs ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8107,8 +8107,8 @@ With a bare URL, mise detects the platform from the file name, such as `--platfo
 @usage 'example "mise generate tool-stub ./bin/registry-node --lock --version 24" help="Resolve and record the version and platform lock data of an existing registry-backed stub"'
 @usage 'complete output type=path'
 export def "mise generate tool-stub" [
-    output: path@"nusage complete",                    # Output file path for the tool stub
-    --cd (-C): path@"nusage complete",                 # Run as if mise were started in DIR
+    output: path@"nus complete",                       # Output file path for the tool stub
+    --cd (-C): path@"nus complete",                    # Run as if mise were started in DIR
     --env_ (-E): list<string>,                         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                               # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                                      # Suppress non-error messages
@@ -8129,7 +8129,7 @@ export def "mise generate tool-stub" [
     --skip-download,                                   # Do not download artifacts, so checksums, sizes, and the detected binary path are left out
     --url (-u): string,                                # URL to download the tool from
 ]: nothing -> string {
-    ^mise generate tool-stub ...(nusage argv [$output] {
+    ^mise generate tool-stub ...(nus argv [$output] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8184,19 +8184,19 @@ https://mise.jdx.dev/installing-mise.html#uninstalling.
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'example "mise implode --dry-run" help="List what would be removed"'
 export def "mise implode" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Print what would be removed, without removing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --config,                           # Also remove the config directory
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Print what would be removed, without removing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --config,                        # Also remove the config directory
 ]: nothing -> string {
-    ^mise implode ...(nusage argv [] {
+    ^mise implode ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8253,22 +8253,22 @@ without writing it.
 @usage 'complete path type=path'
 @usage 'complete file type=path'
 export def "mise edit" [
-    path?: path@"nusage complete",                 # Config file to edit or create; defaults to mise.toml
-    --cd (-C): path@"nusage complete",             # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                     # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                                  # Replace an existing file with the starter template when not opening the editor
-    --jobs (-j): string,                           # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                                # Print the result instead of writing it to the file
-    --quiet (-q),                                  # Suppress non-error messages
-    --verbose (-v): int,                           # Show extra output (use -vv for even more)
-    --yes (-y),                                    # Answer yes to all confirmation prompts
-    --raw,                                         # Connect tasks and install commands directly to the terminal
-    --locked,                                      # Require download URLs from the lockfile when installing
-    --silent,                                      # Suppress all task output and mise non-error messages
-    --global (-g),                                 # Edit the global config file (~/.config/mise/config.toml)
-    --tool-versions (-t): path@"nusage complete",  # Copy the tools from this .tool-versions file into the config, without opening the editor
+    path?: path@"nus complete",                 # Config file to edit or create; defaults to mise.toml
+    --cd (-C): path@"nus complete",             # Run as if mise were started in DIR
+    --env_ (-E): list<string>,                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                               # Replace an existing file with the starter template when not opening the editor
+    --jobs (-j): string,                        # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                             # Print the result instead of writing it to the file
+    --quiet (-q),                               # Suppress non-error messages
+    --verbose (-v): int,                        # Show extra output (use -vv for even more)
+    --yes (-y),                                 # Answer yes to all confirmation prompts
+    --raw,                                      # Connect tasks and install commands directly to the terminal
+    --locked,                                   # Require download URLs from the lockfile when installing
+    --silent,                                   # Suppress all task output and mise non-error messages
+    --global (-g),                              # Edit the global config file (~/.config/mise/config.toml)
+    --tool-versions (-t): path@"nus complete",  # Copy the tools from this .tool-versions file into the config, without opening the editor
 ]: nothing -> string {
-    ^mise edit ...(nusage argv [$path] {
+    ^mise edit ...(nus argv [$path] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -8405,27 +8405,27 @@ your user, without sudo.
 @usage 'example "mise install --include-task-tools" help="Also install the tools your tasks need"'
 @usage 'complete dir type=dir'
 export def "mise install" [
-    ...tool_version: string@"nusage complete",  # Tools to install, such as `node@24`; defaults to every tool in the config
-    --cd (-C): path@"nusage complete",          # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                               # Reinstall even if already installed
-    --jobs (-j): string,                        # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                             # Show what would be installed, without installing anything
-    --quiet (-q),                               # Suppress non-error messages
-    --verbose (-v): int,                        # Show extra output (use -vv for even more)
-    --yes (-y),                                 # Answer yes to all confirmation prompts
-    --raw,                                      # Connect tasks and install commands directly to the terminal
-    --locked,                                   # Require download URLs from the lockfile when installing
-    --silent,                                   # Suppress all task output and mise non-error messages
-    --dry-run-code,                             # Like --dry-run, but exit with status 1 when anything needs installing
-    --include-task-tools,                       # Also install tools required by tasks in the current scope
-    --include-lazy,                             # Also install tools configured with `lazy = true`
-    --minimum-release-age: string,              # Only install versions released before a date or at least a duration ago
-    --monorepo,                                 # Also install tools from every config root in `[monorepo].config_roots`
-    --shared: path@"nusage complete",           # Install into DIR instead of the mise data directory
-    --system,                                   # Install into the system-wide shared directory
+    ...tool_version: string@"nus complete",  # Tools to install, such as `node@24`; defaults to every tool in the config
+    --cd (-C): path@"nus complete",          # Run as if mise were started in DIR
+    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                            # Reinstall even if already installed
+    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                          # Show what would be installed, without installing anything
+    --quiet (-q),                            # Suppress non-error messages
+    --verbose (-v): int,                     # Show extra output (use -vv for even more)
+    --yes (-y),                              # Answer yes to all confirmation prompts
+    --raw,                                   # Connect tasks and install commands directly to the terminal
+    --locked,                                # Require download URLs from the lockfile when installing
+    --silent,                                # Suppress all task output and mise non-error messages
+    --dry-run-code,                          # Like --dry-run, but exit with status 1 when anything needs installing
+    --include-task-tools,                    # Also install tools required by tasks in the current scope
+    --include-lazy,                          # Also install tools configured with `lazy = true`
+    --minimum-release-age: string,           # Only install versions released before a date or at least a duration ago
+    --monorepo,                              # Also install tools from every config root in `[monorepo].config_roots`
+    --shared: path@"nus complete",           # Install into DIR instead of the mise data directory
+    --system,                                # Install into the system-wide shared directory
 ]: nothing -> string {
-    ^mise install ...(nusage argv [...$tool_version] {
+    ^mise install ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -8472,19 +8472,19 @@ v24.11.0
 """# help="Install node 24 into ./mynode and run it"'
 @usage 'complete path type=dir'
 export def "mise install-into" [
-    tool_version: string@"nusage complete",  # Tool and version to install, such as `node@24`
-    path: path@"nusage complete",            # Directory to install into; its existing contents are deleted
-    --cd (-C): path@"nusage complete",       # Run as if mise were started in DIR
-    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                            # Suppress non-error messages
-    --verbose (-v): int,                     # Show extra output (use -vv for even more)
-    --yes (-y),                              # Answer yes to all confirmation prompts
-    --raw,                                   # Connect tasks and install commands directly to the terminal
-    --locked,                                # Require download URLs from the lockfile when installing
-    --silent,                                # Suppress all task output and mise non-error messages
+    tool_version: string@"nus complete",  # Tool and version to install, such as `node@24`
+    path: path@"nus complete",            # Directory to install into; its existing contents are deleted
+    --cd (-C): path@"nus complete",       # Run as if mise were started in DIR
+    --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                         # Suppress non-error messages
+    --verbose (-v): int,                  # Show extra output (use -vv for even more)
+    --yes (-y),                           # Answer yes to all confirmation prompts
+    --raw,                                # Connect tasks and install commands directly to the terminal
+    --locked,                             # Require download URLs from the lockfile when installing
+    --silent,                             # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise install-into ...(nusage argv [$tool_version $path] {
+    ^mise install-into ...(nus argv [$tool_version $path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8519,17 +8519,17 @@ https://mise.jdx.dev/dev-tools/install-layout.html.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise installs" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise installs ...(nusage argv [] {
+    ^mise installs ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8569,19 +8569,19 @@ installations in a read-only shared installs directory (`shared`).
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise installs ls --json\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"dir\": {\n        \"type\": \"string\"\n      },\n      \"backend\": {\n        \"type\": \"string\"\n      },\n      \"version\": {\n        \"type\": \"string\"\n      },\n      \"platform\": {\n        \"type\": \"string\"\n      },\n      \"mode\": {\n        \"enum\": [\n          \"fallback\",\n          \"resolved\"\n        ]\n      },\n      \"options\": {\n        \"type\": \"object\",\n        \"additionalProperties\": {\n          \"type\": \"string\"\n        }\n      },\n      \"requested_as\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"checksum\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"pinned\": {\n        \"type\": \"boolean\"\n      },\n      \"selected\": {\n        \"type\": \"boolean\"\n      },\n      \"shared\": {\n        \"type\": \"boolean\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"dir\",\n      \"backend\",\n      \"version\",\n      \"platform\",\n      \"mode\",\n      \"options\",\n      \"requested_as\",\n      \"checksum\",\n      \"pinned\",\n      \"selected\",\n      \"shared\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
 }'
 export def "mise installs ls" [
-    ...tool: string@"nusage complete",  # Only show the installations of these tools
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --no-header,                        # Do not print the table header
+    ...tool: string@"nus complete",  # Only show the installations of these tools
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --no-header,                     # Do not print the table header
 ]: nothing -> table<name: string, dir: string, backend: string, version: string, platform: string, mode: string, options: record, requested_as: oneof<string, nothing>, checksum: oneof<string, nothing>, pinned: bool, selected: bool, shared: bool> {
-    let text = ^mise installs ls --json ...(nusage argv [...$tool] {
+    let text = ^mise installs ls --json ...(nus argv [...$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8593,7 +8593,7 @@ export def "mise installs ls" [
         --silent: $silent
         --no-header: $no_header
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise installs ls --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"dir\":{\"type\":\"string\"},\"backend\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"platform\":{\"type\":\"string\"},\"mode\":{\"enum\":[\"fallback\",\"resolved\"]},\"options\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}},\"requested_as\":{\"type\":[\"string\",\"null\"]},\"checksum\":{\"type\":[\"string\",\"null\"]},\"pinned\":{\"type\":\"boolean\"},\"selected\":{\"type\":\"boolean\"},\"shared\":{\"type\":\"boolean\"}},\"required\":[\"name\",\"dir\",\"backend\",\"version\",\"platform\",\"mode\",\"options\",\"requested_as\",\"checksum\",\"pinned\",\"selected\",\"shared\"],\"additionalProperties\":false}}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise installs ls --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"dir\":{\"type\":\"string\"},\"backend\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"platform\":{\"type\":\"string\"},\"mode\":{\"enum\":[\"fallback\",\"resolved\"]},\"options\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}},\"requested_as\":{\"type\":[\"string\",\"null\"]},\"checksum\":{\"type\":[\"string\",\"null\"]},\"pinned\":{\"type\":\"boolean\"},\"selected\":{\"type\":\"boolean\"},\"shared\":{\"type\":\"boolean\"}},\"required\":[\"name\",\"dir\",\"backend\",\"version\",\"platform\",\"mode\",\"options\",\"requested_as\",\"checksum\",\"pinned\",\"selected\",\"shared\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Reinstall legacy installations into the identity install layout
@@ -8654,19 +8654,19 @@ Defaults to every legacy installation.
 @usage 'example "mise installs migrate --dry-run" help="List the legacy installations that would move"'
 @usage 'example "mise installs migrate node python@3.12.1" help="Move every installed node and one python version"'
 export def "mise installs migrate" [
-    ...tool_version: string@"nusage complete",  # Only migrate these tools, or these versions of them
-    --cd (-C): path@"nusage complete",          # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                        # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                             # Show what would move without changing anything
-    --quiet (-q),                               # Suppress non-error messages
-    --verbose (-v): int,                        # Show extra output (use -vv for even more)
-    --yes (-y),                                 # Answer yes to all confirmation prompts
-    --raw,                                      # Connect tasks and install commands directly to the terminal
-    --locked,                                   # Require download URLs from the lockfile when installing
-    --silent,                                   # Suppress all task output and mise non-error messages
+    ...tool_version: string@"nus complete",  # Only migrate these tools, or these versions of them
+    --cd (-C): path@"nus complete",          # Run as if mise were started in DIR
+    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                          # Show what would move without changing anything
+    --quiet (-q),                            # Suppress non-error messages
+    --verbose (-v): int,                     # Show extra output (use -vv for even more)
+    --yes (-y),                              # Answer yes to all confirmation prompts
+    --raw,                                   # Connect tasks and install commands directly to the terminal
+    --locked,                                # Require download URLs from the lockfile when installing
+    --silent,                                # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise installs migrate ...(nusage argv [...$tool_version] {
+    ^mise installs migrate ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8711,18 +8711,18 @@ is pointed at the selected installation.
 @usage r#'example "mise installs ls jq" help="Find jq's installations"'#
 @usage 'example "mise installs select jq-hm3qa4vb" help="Use this one for requests with no lockfile entry"'
 export def "mise installs select" [
-    installation: string,               # The installation to select: its directory name, or its path
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    installation: string,            # The installation to select: its directory name, or its path
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise installs select ...(nusage argv [$installation] {
+    ^mise installs select ...(nus argv [$installation] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8768,21 +8768,21 @@ Overrides the `minimum_release_age` setting and tool option.
 @usage 'example "mise latest node@22 --installed" help="Print the latest installed node 22.x version"'
 @usage 'example "mise latest node --minimum-release-age 30d" help="Skip releases from the last 30 days"'
 export def "mise latest" [
-    tool_version: string@"nusage complete",  # Tool, optionally with a version prefix, such as `node` or `node@22`
-    asdf_version?: string,                   # The version prefix to use when querying the latest version same as the first argument after the "@" used for asdf compatibility
-    --cd (-C): path@"nusage complete",       # Run as if mise were started in DIR
-    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                            # Suppress non-error messages
-    --verbose (-v): int,                     # Show extra output (use -vv for even more)
-    --yes (-y),                              # Answer yes to all confirmation prompts
-    --raw,                                   # Connect tasks and install commands directly to the terminal
-    --locked,                                # Require download URLs from the lockfile when installing
-    --silent,                                # Suppress all task output and mise non-error messages
-    --installed (-i),                        # Print the latest installed version instead of the latest available one
-    --minimum-release-age: string,           # Only consider versions released before a date or at least a duration ago
+    tool_version: string@"nus complete",  # Tool, optionally with a version prefix, such as `node` or `node@22`
+    asdf_version?: string,                # The version prefix to use when querying the latest version same as the first argument after the "@" used for asdf compatibility
+    --cd (-C): path@"nus complete",       # Run as if mise were started in DIR
+    --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                         # Suppress non-error messages
+    --verbose (-v): int,                  # Show extra output (use -vv for even more)
+    --yes (-y),                           # Answer yes to all confirmation prompts
+    --raw,                                # Connect tasks and install commands directly to the terminal
+    --locked,                             # Require download URLs from the lockfile when installing
+    --silent,                             # Suppress all task output and mise non-error messages
+    --installed (-i),                     # Print the latest installed version instead of the latest available one
+    --minimum-release-age: string,        # Only consider versions released before a date or at least a duration ago
 ]: nothing -> string {
-    ^mise latest ...(nusage argv [$tool_version $asdf_version] {
+    ^mise latest ...(nus argv [$tool_version $asdf_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8818,20 +8818,20 @@ of your own like `node@brew`; `latest`, aliases, and channels are rejected.
 @usage r#'example "mise link node@brew \"$(brew --prefix node)\"" help="Register Homebrew's node as node@brew; then run `mise use node@brew`"'#
 @usage 'complete path type=dir'
 export def "mise link" [
-    tool_version: string@"nusage complete",  # Tool and version to create a symlink for
-    path: path@"nusage complete",            # Directory of the existing installation, such as `~/.nvm/versions/node/v24.11.0`
-    --cd (-C): path@"nusage complete",       # Run as if mise were started in DIR
-    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                            # Replace an existing installation of this version
-    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                            # Suppress non-error messages
-    --verbose (-v): int,                     # Show extra output (use -vv for even more)
-    --yes (-y),                              # Answer yes to all confirmation prompts
-    --raw,                                   # Connect tasks and install commands directly to the terminal
-    --locked,                                # Require download URLs from the lockfile when installing
-    --silent,                                # Suppress all task output and mise non-error messages
+    tool_version: string@"nus complete",  # Tool and version to create a symlink for
+    path: path@"nus complete",            # Directory of the existing installation, such as `~/.nvm/versions/node/v24.11.0`
+    --cd (-C): path@"nus complete",       # Run as if mise were started in DIR
+    --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                         # Replace an existing installation of this version
+    --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                         # Suppress non-error messages
+    --verbose (-v): int,                  # Show extra output (use -vv for even more)
+    --yes (-y),                           # Answer yes to all confirmation prompts
+    --raw,                                # Connect tasks and install commands directly to the terminal
+    --locked,                             # Require download URLs from the lockfile when installing
+    --silent,                             # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise link ...(nusage argv [$tool_version $path] {
+    ^mise link ...(nus argv [$tool_version $path] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -8982,26 +8982,26 @@ request, mise.toml is updated to match.
 @usage 'example "mise lock --global" help="Update only the global lockfiles"'
 @usage 'output json framing=json select=--json'
 export def "mise lock" [
-    ...tool: string@"nusage complete",  # Tools to lock, such as `node python`; defaults to every configured tool and every tool a task needs
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show what would change, without writing anything
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --global (-g),                      # Lock only the global and system config lockfiles
-    --platform (-p): list<string>,      # Platforms to lock, comma-separated, such as `linux-x64,macos-arm64`
-    --bump,                             # Re-resolve version requests against the latest available versions
-    --local,                            # Update mise.local.lock, for tools in mise.local.toml, instead of mise.lock
-    --minimum-release-age: string,      # Only lock versions released before a date or at least a duration ago
-    --upgrade,                          # Upgrade lockfiles to the latest format
-    --sidecars,                         # List native dependency sidecars instead of updating lockfiles
+    ...tool: string@"nus complete",  # Tools to lock, such as `node python`; defaults to every configured tool and every tool a task needs
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show what would change, without writing anything
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --global (-g),                   # Lock only the global and system config lockfiles
+    --platform (-p): list<string>,   # Platforms to lock, comma-separated, such as `linux-x64,macos-arm64`
+    --bump,                          # Re-resolve version requests against the latest available versions
+    --local,                         # Update mise.local.lock, for tools in mise.local.toml, instead of mise.lock
+    --minimum-release-age: string,   # Only lock versions released before a date or at least a duration ago
+    --upgrade,                       # Upgrade lockfiles to the latest format
+    --sidecars,                      # List native dependency sidecars instead of updating lockfiles
 ] {
-    ^mise lock --json ...(nusage argv [...$tool] {
+    ^mise lock --json ...(nus argv [...$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9109,33 +9109,33 @@ monorepo root's config. Uses the active MISE_ENV.
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"$defs\": {\n    \"source\": {\n      \"oneOf\": [\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \".tool-versions\",\n                \"mise.toml\",\n                \"mise.toml-daemon\",\n                \"idiomatic-version-file\",\n                \"tool-stub\"\n              ]\n            },\n            \"path\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"path\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \"argument\",\n                \"unknown\"\n              ]\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"environment\"\n            },\n            \"key\": {\n              \"type\": \"string\"\n            },\n            \"value\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"key\",\n            \"value\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"sourceWithRequest\": {\n      \"oneOf\": [\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \".tool-versions\",\n                \"mise.toml\",\n                \"mise.toml-daemon\",\n                \"idiomatic-version-file\",\n                \"tool-stub\"\n              ]\n            },\n            \"path\": {\n              \"type\": \"string\"\n            },\n            \"requested_version\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"path\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \"argument\",\n                \"unknown\"\n              ]\n            },\n            \"requested_version\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"environment\"\n            },\n            \"key\": {\n              \"type\": \"string\"\n            },\n            \"value\": {\n              \"type\": \"string\"\n            },\n            \"requested_version\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"key\",\n            \"value\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"version\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"version\": {\n          \"type\": \"string\"\n        },\n        \"requested_version\": {\n          \"type\": \"string\"\n        },\n        \"install_path\": {\n          \"type\": \"string\"\n        },\n        \"source\": {\n          \"$ref\": \"#/$defs/source\"\n        },\n        \"sources\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"$ref\": \"#/$defs/sourceWithRequest\"\n          }\n        },\n        \"symlinked_to\": {\n          \"type\": \"string\"\n        },\n        \"broken\": {\n          \"const\": true\n        },\n        \"scheduled_for_pruning\": {\n          \"const\": true\n        },\n        \"prune_after\": {\n          \"type\": \"string\"\n        },\n        \"installed\": {\n          \"type\": \"boolean\"\n        },\n        \"active\": {\n          \"type\": \"boolean\"\n        }\n      },\n      \"required\": [\n        \"version\",\n        \"install_path\",\n        \"installed\",\n        \"active\"\n      ],\n      \"additionalProperties\": false\n    },\n    \"filtered\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"$ref\": \"#/$defs/version\"\n      }\n    },\n    \"all\": {\n      \"type\": \"object\",\n      \"additionalProperties\": {\n        \"$ref\": \"#/$defs/filtered\"\n      }\n    }\n  },\n  \"oneOf\": [\n    {\n      \"$ref\": \"#/$defs/all\"\n    },\n    {\n      \"$ref\": \"#/$defs/filtered\"\n    }\n  ]\n}\n"
 }'
 export def "mise ls" [
-    ...installed_tool: string@"nusage complete",     # Only show these tools
-    --cd (-C): path@"nusage complete",               # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                             # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                                    # Suppress non-error messages
-    --verbose (-v): int,                             # Show extra output (use -vv for even more)
-    --yes (-y),                                      # Answer yes to all confirmation prompts
-    --raw,                                           # Connect tasks and install commands directly to the terminal
-    --locked,                                        # Require download URLs from the lockfile when installing
-    --silent,                                        # Suppress all task output and mise non-error messages
-    --truncate,                                      # Truncate long terminal output to fit the available width
-    --no-truncate,                                   # Turn off --truncate
-    --backend (-b): list<string>@"nusage complete",  # Only show tools from this backend, such as aqua, cargo, core, or go
-    --current (-c),                                  # Only show versions the loaded config files request
-    --global (-g),                                   # Only show versions the global config requests
-    --installed (-i),                                # Only show installed versions
-    --grouped,                                       # List tools in a separate section for each backend
-    --local (-l),                                    # Only show versions the local config requests
-    --missing (-m),                                  # Only show requested versions that are not installed
-    --all-sources,                                   # Show requests from every config file mise has seen, not only loaded ones
-    --monorepo,                                      # Also list tools from every config root in `[monorepo].config_roots`
-    --no-header,                                     # Do not print the header row
-    --outdated,                                      # Show whether each version is outdated
-    --prefix: string@"nusage complete",              # Only show versions starting with PREFIX (requires a tool argument)
-    --prunable,                                      # List only tools that can be pruned with `mise prune`
+    ...installed_tool: string@"nus complete",     # Only show these tools
+    --cd (-C): path@"nus complete",               # Run as if mise were started in DIR
+    --env_ (-E): list<string>,                    # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                          # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                                 # Suppress non-error messages
+    --verbose (-v): int,                          # Show extra output (use -vv for even more)
+    --yes (-y),                                   # Answer yes to all confirmation prompts
+    --raw,                                        # Connect tasks and install commands directly to the terminal
+    --locked,                                     # Require download URLs from the lockfile when installing
+    --silent,                                     # Suppress all task output and mise non-error messages
+    --truncate,                                   # Truncate long terminal output to fit the available width
+    --no-truncate,                                # Turn off --truncate
+    --backend (-b): list<string>@"nus complete",  # Only show tools from this backend, such as aqua, cargo, core, or go
+    --current (-c),                               # Only show versions the loaded config files request
+    --global (-g),                                # Only show versions the global config requests
+    --installed (-i),                             # Only show installed versions
+    --grouped,                                    # List tools in a separate section for each backend
+    --local (-l),                                 # Only show versions the local config requests
+    --missing (-m),                               # Only show requested versions that are not installed
+    --all-sources,                                # Show requests from every config file mise has seen, not only loaded ones
+    --monorepo,                                   # Also list tools from every config root in `[monorepo].config_roots`
+    --no-header,                                  # Do not print the header row
+    --outdated,                                   # Show whether each version is outdated
+    --prefix: string@"nus complete",              # Only show versions starting with PREFIX (requires a tool argument)
+    --prunable,                                   # List only tools that can be pruned with `mise prune`
 ]: nothing -> oneof<record, table<version: string, install_path: string, installed: bool, active: bool>> {
-    let text = ^mise ls --json ...(nusage argv [...$installed_tool] {
+    let text = ^mise ls --json ...(nus argv [...$installed_tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9161,7 +9161,7 @@ export def "mise ls" [
         --prefix: $prefix
         --prunable: $prunable
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$defs\":{\"source\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\".tool-versions\",\"mise.toml\",\"mise.toml-daemon\",\"idiomatic-version-file\",\"tool-stub\"]},\"path\":{\"type\":\"string\"}},\"required\":[\"type\",\"path\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"argument\",\"unknown\"]}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"environment\"},\"key\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"}},\"required\":[\"type\",\"key\",\"value\"],\"additionalProperties\":false}]},\"sourceWithRequest\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\".tool-versions\",\"mise.toml\",\"mise.toml-daemon\",\"idiomatic-version-file\",\"tool-stub\"]},\"path\":{\"type\":\"string\"},\"requested_version\":{\"type\":\"string\"}},\"required\":[\"type\",\"path\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"argument\",\"unknown\"]},\"requested_version\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"environment\"},\"key\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"},\"requested_version\":{\"type\":\"string\"}},\"required\":[\"type\",\"key\",\"value\"],\"additionalProperties\":false}]},\"version\":{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"},\"requested_version\":{\"type\":\"string\"},\"install_path\":{\"type\":\"string\"},\"source\":{\"$ref\":\"#/$defs/source\"},\"sources\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/sourceWithRequest\"}},\"symlinked_to\":{\"type\":\"string\"},\"broken\":{\"const\":true},\"scheduled_for_pruning\":{\"const\":true},\"prune_after\":{\"type\":\"string\"},\"installed\":{\"type\":\"boolean\"},\"active\":{\"type\":\"boolean\"}},\"required\":[\"version\",\"install_path\",\"installed\",\"active\"],\"additionalProperties\":false},\"filtered\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/version\"}},\"all\":{\"type\":\"object\",\"additionalProperties\":{\"$ref\":\"#/$defs/filtered\"}}},\"oneOf\":[{\"$ref\":\"#/$defs/all\"},{\"$ref\":\"#/$defs/filtered\"}]}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$defs\":{\"source\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\".tool-versions\",\"mise.toml\",\"mise.toml-daemon\",\"idiomatic-version-file\",\"tool-stub\"]},\"path\":{\"type\":\"string\"}},\"required\":[\"type\",\"path\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"argument\",\"unknown\"]}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"environment\"},\"key\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"}},\"required\":[\"type\",\"key\",\"value\"],\"additionalProperties\":false}]},\"sourceWithRequest\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\".tool-versions\",\"mise.toml\",\"mise.toml-daemon\",\"idiomatic-version-file\",\"tool-stub\"]},\"path\":{\"type\":\"string\"},\"requested_version\":{\"type\":\"string\"}},\"required\":[\"type\",\"path\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"argument\",\"unknown\"]},\"requested_version\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"environment\"},\"key\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"},\"requested_version\":{\"type\":\"string\"}},\"required\":[\"type\",\"key\",\"value\"],\"additionalProperties\":false}]},\"version\":{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"},\"requested_version\":{\"type\":\"string\"},\"install_path\":{\"type\":\"string\"},\"source\":{\"$ref\":\"#/$defs/source\"},\"sources\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/sourceWithRequest\"}},\"symlinked_to\":{\"type\":\"string\"},\"broken\":{\"const\":true},\"scheduled_for_pruning\":{\"const\":true},\"prune_after\":{\"type\":\"string\"},\"installed\":{\"type\":\"boolean\"},\"active\":{\"type\":\"boolean\"}},\"required\":[\"version\",\"install_path\",\"installed\",\"active\"],\"additionalProperties\":false},\"filtered\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/version\"}},\"all\":{\"type\":\"object\",\"additionalProperties\":{\"$ref\":\"#/$defs/filtered\"}}},\"oneOf\":[{\"$ref\":\"#/$defs/all\"},{\"$ref\":\"#/$defs/filtered\"}]}" { from json }
 }
 
 # List tool versions available to install
@@ -9226,24 +9226,24 @@ without release dates, or an empty one. Requires --json and
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise ls-remote --json\",\n  \"$comment\": \"The --all mode omits release_url/rolling/checksum and always includes nullable prerelease. anyOf allows an empty list in either mode.\",\n  \"$defs\": {\n    \"single\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"version\": {\n          \"type\": \"string\"\n        },\n        \"created_at\": {\n          \"type\": \"string\"\n        },\n        \"release_url\": {\n          \"type\": \"string\"\n        },\n        \"rolling\": {\n          \"const\": true\n        },\n        \"checksum\": {\n          \"type\": \"string\"\n        },\n        \"prerelease\": {\n          \"type\": \"boolean\"\n        }\n      },\n      \"required\": [\n        \"version\"\n      ],\n      \"additionalProperties\": false\n    },\n    \"all\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"tool\": {\n          \"type\": \"string\"\n        },\n        \"version\": {\n          \"type\": \"string\"\n        },\n        \"created_at\": {\n          \"type\": \"string\"\n        },\n        \"prerelease\": {\n          \"type\": [\n            \"boolean\",\n            \"null\"\n          ]\n        }\n      },\n      \"required\": [\n        \"tool\",\n        \"version\",\n        \"prerelease\"\n      ],\n      \"additionalProperties\": false\n    }\n  },\n  \"anyOf\": [\n    {\n      \"type\": \"array\",\n      \"items\": {\n        \"$ref\": \"#/$defs/single\"\n      }\n    },\n    {\n      \"type\": \"array\",\n      \"items\": {\n        \"$ref\": \"#/$defs/all\"\n      }\n    }\n  ]\n}\n"
 }'
 export def "mise ls-remote" [
-    tool_version?: string@"nusage complete",  # Tool to get versions for
-    prefix?: string@"nusage complete",        # Version prefix to filter by; same as `TOOL@PREFIX`
-    --cd (-C): path@"nusage complete",        # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                      # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                             # Suppress non-error messages
-    --verbose (-v): int,                      # Show extra output (use -vv for even more)
-    --yes (-y),                               # Answer yes to all confirmation prompts
-    --raw,                                    # Connect tasks and install commands directly to the terminal
-    --locked,                                 # Require download URLs from the lockfile when installing
-    --silent,                                 # Suppress all task output and mise non-error messages
-    --all,                                    # List available versions for every tool mise currently knows about
-    --minimum-release-age: string,            # Only show versions released before a date or at least a duration ago
-    --no-versions-host,                       # Fetch versions from the tool's upstream instead of mise's version mirror
-    --prerelease,                             # Include prerelease versions
-    --strict-metadata,                        # Exit with an error when release metadata cannot be fetched
+    tool_version?: string@"nus complete",  # Tool to get versions for
+    prefix?: string@"nus complete",        # Version prefix to filter by; same as `TOOL@PREFIX`
+    --cd (-C): path@"nus complete",        # Run as if mise were started in DIR
+    --env_ (-E): list<string>,             # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                   # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                          # Suppress non-error messages
+    --verbose (-v): int,                   # Show extra output (use -vv for even more)
+    --yes (-y),                            # Answer yes to all confirmation prompts
+    --raw,                                 # Connect tasks and install commands directly to the terminal
+    --locked,                              # Require download URLs from the lockfile when installing
+    --silent,                              # Suppress all task output and mise non-error messages
+    --all,                                 # List available versions for every tool mise currently knows about
+    --minimum-release-age: string,         # Only show versions released before a date or at least a duration ago
+    --no-versions-host,                    # Fetch versions from the tool's upstream instead of mise's version mirror
+    --prerelease,                          # Include prerelease versions
+    --strict-metadata,                     # Exit with an error when release metadata cannot be fetched
 ]: nothing -> oneof<table<version: string>, table<tool: string, version: string, prerelease: oneof<bool, nothing>>> {
-    let text = ^mise ls-remote --json ...(nusage argv [$tool_version $prefix] {
+    let text = ^mise ls-remote --json ...(nus argv [$tool_version $prefix] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9259,7 +9259,7 @@ export def "mise ls-remote" [
         --prerelease: $prerelease
         --strict-metadata: $strict_metadata
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise ls-remote --json\",\"$comment\":\"The --all mode omits release_url/rolling/checksum and always includes nullable prerelease. anyOf allows an empty list in either mode.\",\"$defs\":{\"single\":{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"},\"created_at\":{\"type\":\"string\"},\"release_url\":{\"type\":\"string\"},\"rolling\":{\"const\":true},\"checksum\":{\"type\":\"string\"},\"prerelease\":{\"type\":\"boolean\"}},\"required\":[\"version\"],\"additionalProperties\":false},\"all\":{\"type\":\"object\",\"properties\":{\"tool\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"created_at\":{\"type\":\"string\"},\"prerelease\":{\"type\":[\"boolean\",\"null\"]}},\"required\":[\"tool\",\"version\",\"prerelease\"],\"additionalProperties\":false}},\"anyOf\":[{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/single\"}},{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/all\"}}]}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise ls-remote --json\",\"$comment\":\"The --all mode omits release_url/rolling/checksum and always includes nullable prerelease. anyOf allows an empty list in either mode.\",\"$defs\":{\"single\":{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"},\"created_at\":{\"type\":\"string\"},\"release_url\":{\"type\":\"string\"},\"rolling\":{\"const\":true},\"checksum\":{\"type\":\"string\"},\"prerelease\":{\"type\":\"boolean\"}},\"required\":[\"version\"],\"additionalProperties\":false},\"all\":{\"type\":\"object\",\"properties\":{\"tool\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"created_at\":{\"type\":\"string\"},\"prerelease\":{\"type\":[\"boolean\",\"null\"]}},\"required\":[\"tool\",\"version\",\"prerelease\"],\"additionalProperties\":false}},\"anyOf\":[{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/single\"}},{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/all\"}}]}" { from json }
 }
 
 # Run the language server for mise config files over stdin/stdout
@@ -9317,17 +9317,17 @@ See https://mise.jdx.dev/ide-integration.html for editor configuration.
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage r#'example "mise lsp" help="Start the server; an editor's LSP configuration runs this command"'#
 export def "mise lsp" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise lsp ...(nusage argv [] {
+    ^mise lsp ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9395,17 +9395,17 @@ See https://mise.jdx.dev/mcp.html for client configuration and access controls.
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'example "mise --cd /path/to/project mcp" help="Serve a project from another directory, as an MCP client config does"'
 export def "mise mcp" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise mcp ...(nusage argv [] {
+    ^mise mcp ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9438,17 +9438,17 @@ See https://mise.jdx.dev/dev-tools/mise-oci.html
 """#'#
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise oci" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise oci ...(nusage argv [] {
+    ^mise oci ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9549,26 +9549,26 @@ Overrides [oci].user_id and [oci].group_id. Defaults to 0:0. If GID is omitted, 
 @usage 'example "mise oci run --image-dir ./img -- /bin/sh" help="Open a shell in it"'
 @usage 'complete output type=dir'
 export def "mise oci build" [
-    --cd (-C): path@"nusage complete",      # Run as if mise were started in DIR
-    --env_ (-E): list<string>,              # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                    # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                           # Suppress non-error messages
-    --verbose (-v): int,                    # Show extra output (use -vv for even more)
-    --yes (-y),                             # Answer yes to all confirmation prompts
-    --output (-o): path@"nusage complete",  # Output directory for the OCI image layout
-    --raw,                                  # Connect tasks and install commands directly to the terminal
-    --locked,                               # Require download URLs from the lockfile when installing
-    --silent,                               # Suppress all task output and mise non-error messages
-    --copy: list<string>,                   # Copy a host file, directory, or symlink into the image (repeatable, HOST:IMAGE)
-    --from: string,                         # Base image reference (overrides [oci].from and the oci.default_from setting)
-    --include-global,                       # Also package tools from the global and system configs
-    --tag (-t): string,                     # Tag to record in the image index (the org.opencontainers.image.ref.name annotation)
-    --mount-point: string,                  # Where tools install inside the image
-    --no-mise,                              # Do not embed the currently-running mise binary at /usr/local/bin/mise
-    --no-cache,                             # Rebuild tool layers without reading or writing the local layer cache
-    --owner: string,                        # UID[:GID] to assign to every tar entry in generated layers
+    --cd (-C): path@"nus complete",      # Run as if mise were started in DIR
+    --env_ (-E): list<string>,           # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                 # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                        # Suppress non-error messages
+    --verbose (-v): int,                 # Show extra output (use -vv for even more)
+    --yes (-y),                          # Answer yes to all confirmation prompts
+    --output (-o): path@"nus complete",  # Output directory for the OCI image layout
+    --raw,                               # Connect tasks and install commands directly to the terminal
+    --locked,                            # Require download URLs from the lockfile when installing
+    --silent,                            # Suppress all task output and mise non-error messages
+    --copy: list<string>,                # Copy a host file, directory, or symlink into the image (repeatable, HOST:IMAGE)
+    --from: string,                      # Base image reference (overrides [oci].from and the oci.default_from setting)
+    --include-global,                    # Also package tools from the global and system configs
+    --tag (-t): string,                  # Tag to record in the image index (the org.opencontainers.image.ref.name annotation)
+    --mount-point: string,               # Where tools install inside the image
+    --no-mise,                           # Do not embed the currently-running mise binary at /usr/local/bin/mise
+    --no-cache,                          # Rebuild tool layers without reading or writing the local layer cache
+    --owner: string,                     # UID[:GID] to assign to every tar entry in generated layers
 ]: nothing -> string {
-    ^mise oci build ...(nusage argv [] {
+    ^mise oci build ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9695,27 +9695,27 @@ mise oci push --image-dir ./img ghcr.io/me/devenv:v1
 """# help="Push an image built earlier"'
 @usage 'complete image_dir type=dir'
 export def "mise oci push" [
-    ref: string,                          # Destination registry reference (e.g. `ghcr.io/me/devenv:latest`)
-    --cd (-C): path@"nusage complete",    # Run as if mise were started in DIR
-    --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                         # Suppress non-error messages
-    --verbose (-v): int,                  # Show extra output (use -vv for even more)
-    --yes (-y),                           # Answer yes to all confirmation prompts
-    --raw,                                # Connect tasks and install commands directly to the terminal
-    --locked,                             # Require download URLs from the lockfile when installing
-    --silent,                             # Suppress all task output and mise non-error messages
-    --cache-from: string,                 # Reuse unchanged tool layers from this image instead of the destination's current tag
-    --from: string,                       # Base image for the build
-    --image-dir: path@"nusage complete",  # Push an existing OCI image layout instead of building one
-    --include-global,                     # Also package tools from the global and system configs
-    --mount-point: string,                # Where tools install inside the image
-    --no-cache,                           # Rebuild tool layers without using the remote or local layer cache
-    --no-mise,                            # Do not embed the running mise binary at /usr/local/bin/mise
-    --owner: string,                      # UID[:GID] to assign to every tar entry when building
-    --update-index,                       # Maintain the tag as a multi-arch image index
+    ref: string,                       # Destination registry reference (e.g. `ghcr.io/me/devenv:latest`)
+    --cd (-C): path@"nus complete",    # Run as if mise were started in DIR
+    --env_ (-E): list<string>,         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,               # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                      # Suppress non-error messages
+    --verbose (-v): int,               # Show extra output (use -vv for even more)
+    --yes (-y),                        # Answer yes to all confirmation prompts
+    --raw,                             # Connect tasks and install commands directly to the terminal
+    --locked,                          # Require download URLs from the lockfile when installing
+    --silent,                          # Suppress all task output and mise non-error messages
+    --cache-from: string,              # Reuse unchanged tool layers from this image instead of the destination's current tag
+    --from: string,                    # Base image for the build
+    --image-dir: path@"nus complete",  # Push an existing OCI image layout instead of building one
+    --include-global,                  # Also package tools from the global and system configs
+    --mount-point: string,             # Where tools install inside the image
+    --no-cache,                        # Rebuild tool layers without using the remote or local layer cache
+    --no-mise,                         # Do not embed the running mise binary at /usr/local/bin/mise
+    --owner: string,                   # UID[:GID] to assign to every tar entry when building
+    --update-index,                    # Maintain the tag as a multi-arch image index
 ]: nothing -> string {
-    ^mise oci push ...(nusage argv [$ref] {
+    ^mise oci push ...(nus argv [$ref] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9839,7 +9839,7 @@ Unlike `docker run`, there is no `-v` short form because mise uses `-v` for --ve
 @usage 'complete image_dir type=dir'
 export def "mise oci run" [
     ...cmd: string,                         # Command and arguments to run inside the container (after `--`)
-    --cd (-C): path@"nusage complete",      # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",         # Run as if mise were started in DIR
     --env_ (-E): list<string>,              # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                    # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                           # Suppress non-error messages
@@ -9850,7 +9850,7 @@ export def "mise oci run" [
     --silent,                               # Suppress all task output and mise non-error messages
     --engine: string@[auto podman docker],  # Container engine to use; `auto` prefers podman and falls back to docker
     --from: string,                         # Base image for the build
-    --image-dir: path@"nusage complete",    # Use an existing OCI image layout instead of building one
+    --image-dir: path@"nus complete",       # Use an existing OCI image layout instead of building one
     --include-global,                       # Also package tools from the global and system configs
     --keep,                                 # Keep the loaded image in the engine's storage after the run
     --mount-point: string,                  # Where tools install inside the image
@@ -9861,7 +9861,7 @@ export def "mise oci run" [
     --tty (-t),                             # Allocate a TTY (pass `-t` to the engine)
     --workdir (-w): string,                 # Working directory inside the container
 ]: nothing -> string {
-    ^mise oci run ...(nusage argv [...$cmd] {
+    ^mise oci run ...(nus argv [...$cmd] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9914,17 +9914,17 @@ See https://mise.jdx.dev/dev-tools/backends/packslip.html#pinned-signers
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise packslip" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise packslip ...(nusage argv [] {
+    ^mise packslip ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9961,18 +9961,18 @@ delete the tool's entries and run `mise lock`.
 @usage 'arg <PROJECT> help="The project whose pin to drop"'
 @usage 'example "mise packslip forget github.com/jdx/hk" help="Accept whichever signer the next hk release uses"'
 export def "mise packslip forget" [
-    project: string,                    # The project whose pin to drop
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    project: string,                 # The project whose pin to drop
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise packslip forget ...(nusage argv [$project] {
+    ^mise packslip forget ...(nus argv [$project] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10010,17 +10010,17 @@ github.com/jdx/hk  sigstore-oidc  https://github.com/jdx/hk/.github/workflows/re
 @usage 'example "mise packslip pins --json" help="Include the issuer, pin time, and forge repository ID"'
 @usage 'output json framing=json select=--json'
 export def "mise packslip pins" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^mise packslip pins --json ...(nusage argv [] {
+    ^mise packslip pins --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10120,23 +10120,23 @@ mise outdated --json
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise outdated --json\",\n  \"$defs\": {\n    \"source\": {\n      \"oneOf\": [\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \".tool-versions\",\n                \"mise.toml\",\n                \"mise.toml-daemon\",\n                \"idiomatic-version-file\",\n                \"tool-stub\"\n              ]\n            },\n            \"path\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"path\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \"argument\",\n                \"unknown\"\n              ]\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"environment\"\n            },\n            \"key\": {\n              \"type\": \"string\"\n            },\n            \"value\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"key\",\n            \"value\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    }\n  },\n  \"type\": \"object\",\n  \"additionalProperties\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"requested\": {\n        \"type\": \"string\"\n      },\n      \"current\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"bump\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"latest\": {\n        \"type\": \"string\"\n      },\n      \"release_url\": {\n        \"type\": \"string\"\n      },\n      \"source\": {\n        \"$ref\": \"#/$defs/source\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"requested\",\n      \"current\",\n      \"bump\",\n      \"latest\",\n      \"source\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
 }'
 export def "mise outdated" [
-    ...tool_version: string@"nusage complete",  # Tools to check, such as `node@20 python@3.10`
-    --cd (-C): path@"nusage complete",          # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                        # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                               # Suppress non-error messages
-    --verbose (-v): int,                        # Show extra output (use -vv for even more)
-    --yes (-y),                                 # Answer yes to all confirmation prompts
-    --raw,                                      # Connect tasks and install commands directly to the terminal
-    --locked,                                   # Require download URLs from the lockfile when installing
-    --silent,                                   # Suppress all task output and mise non-error messages
-    --bump (-b),                                # Compare against the newest release overall, not only the configured range
-    --inactive,                                 # Also check installed tools that the current config does not request
-    --global,                                   # Only check tools defined in the global config
-    --local,                                    # Only check tools defined in project config files
-    --no-header,                                # Do not print the table header
+    ...tool_version: string@"nus complete",  # Tools to check, such as `node@20 python@3.10`
+    --cd (-C): path@"nus complete",          # Run as if mise were started in DIR
+    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                            # Suppress non-error messages
+    --verbose (-v): int,                     # Show extra output (use -vv for even more)
+    --yes (-y),                              # Answer yes to all confirmation prompts
+    --raw,                                   # Connect tasks and install commands directly to the terminal
+    --locked,                                # Require download URLs from the lockfile when installing
+    --silent,                                # Suppress all task output and mise non-error messages
+    --bump (-b),                             # Compare against the newest release overall, not only the configured range
+    --inactive,                              # Also check installed tools that the current config does not request
+    --global,                                # Only check tools defined in the global config
+    --local,                                 # Only check tools defined in project config files
+    --no-header,                             # Do not print the table header
 ]: nothing -> record {
-    let text = ^mise outdated --json ...(nusage argv [...$tool_version] {
+    let text = ^mise outdated --json ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10152,7 +10152,7 @@ export def "mise outdated" [
         --local: $local
         --no-header: $no_header
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise outdated --json\",\"$defs\":{\"source\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\".tool-versions\",\"mise.toml\",\"mise.toml-daemon\",\"idiomatic-version-file\",\"tool-stub\"]},\"path\":{\"type\":\"string\"}},\"required\":[\"type\",\"path\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"argument\",\"unknown\"]}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"environment\"},\"key\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"}},\"required\":[\"type\",\"key\",\"value\"],\"additionalProperties\":false}]}},\"type\":\"object\",\"additionalProperties\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"requested\":{\"type\":\"string\"},\"current\":{\"type\":[\"string\",\"null\"]},\"bump\":{\"type\":[\"string\",\"null\"]},\"latest\":{\"type\":\"string\"},\"release_url\":{\"type\":\"string\"},\"source\":{\"$ref\":\"#/$defs/source\"}},\"required\":[\"name\",\"requested\",\"current\",\"bump\",\"latest\",\"source\"],\"additionalProperties\":false}}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise outdated --json\",\"$defs\":{\"source\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\".tool-versions\",\"mise.toml\",\"mise.toml-daemon\",\"idiomatic-version-file\",\"tool-stub\"]},\"path\":{\"type\":\"string\"}},\"required\":[\"type\",\"path\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"argument\",\"unknown\"]}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"environment\"},\"key\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"}},\"required\":[\"type\",\"key\",\"value\"],\"additionalProperties\":false}]}},\"type\":\"object\",\"additionalProperties\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"requested\":{\"type\":\"string\"},\"current\":{\"type\":[\"string\",\"null\"]},\"bump\":{\"type\":[\"string\",\"null\"]},\"latest\":{\"type\":\"string\"},\"release_url\":{\"type\":\"string\"},\"source\":{\"$ref\":\"#/$defs/source\"}},\"required\":[\"name\",\"requested\",\"current\",\"bump\",\"latest\",\"source\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Show the individuals supporting mise as Patron-tier members
@@ -10178,18 +10178,18 @@ To appear here, become a patron at https://jdx.dev/sponsors.html.
 @usage 'example "mise patrons --refresh -J" help="Fetch the list now and print it as JSON"'
 @usage 'output json framing=json select=--json'
 export def "mise patrons" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --refresh,                          # Fetch the list now instead of using the cached copy
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --refresh,                       # Fetch the list now instead of using the cached copy
 ] {
-    ^mise patrons --json ...(nusage argv [] {
+    ^mise patrons --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10240,20 +10240,20 @@ to show core and user plugins
     }'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise plugins" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --core (-c),                        # List the core tools built into mise instead of installed plugins
-    --urls (-u),                        # Show each plugin's Git URL, ref, and commit
-    --user,                             # List installed plugins
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --core (-c),                     # List the core tools built into mise instead of installed plugins
+    --urls (-u),                     # Show each plugin's Git URL, ref, and commit
+    --user,                          # List installed plugins
 ]: nothing -> string {
-    ^mise plugins ...(nusage argv [] {
+    ^mise plugins ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10324,22 +10324,22 @@ Only plugins with a registry shorthand or a `[plugins]` entry can be installed t
 @usage 'example "mise plugins install --all" help="Install the plugins that the current config needs"'
 @usage 'complete git_url type=url'
 export def "mise plugins install" [
-    new_plugin?: string@"nusage complete",  # The plugin to install, or a URL to infer its name from
-    git_url?: string@"nusage complete",     # Where to install from: a Git URL (optionally ending in #ref) or an archive URL
+    new_plugin?: string@"nus complete",  # The plugin to install, or a URL to infer its name from
+    git_url?: string@"nus complete",     # Where to install from: a Git URL (optionally ending in #ref) or an archive URL
     ...rest: string,
-    --cd (-C): path@"nusage complete",      # Run as if mise were started in DIR
-    --env_ (-E): list<string>,              # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                           # Reinstall even if the plugin is already installed
-    --jobs (-j): string,                    # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                           # Suppress non-error messages
-    --verbose (-v): int,                    # Show extra output (use -vv for even more)
-    --yes (-y),                             # Answer yes to all confirmation prompts
-    --raw,                                  # Connect tasks and install commands directly to the terminal
-    --locked,                               # Require download URLs from the lockfile when installing
-    --silent,                               # Suppress all task output and mise non-error messages
-    --all (-a),                             # Install every plugin the current config needs that is not installed yet
+    --cd (-C): path@"nus complete",      # Run as if mise were started in DIR
+    --env_ (-E): list<string>,           # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                        # Reinstall even if the plugin is already installed
+    --jobs (-j): string,                 # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                        # Suppress non-error messages
+    --verbose (-v): int,                 # Show extra output (use -vv for even more)
+    --yes (-y),                          # Answer yes to all confirmation prompts
+    --raw,                               # Connect tasks and install commands directly to the terminal
+    --locked,                            # Require download URLs from the lockfile when installing
+    --silent,                            # Suppress all task output and mise non-error messages
+    --all (-a),                          # Install every plugin the current config needs that is not installed yet
 ]: nothing -> string {
-    ^mise plugins install ...(nusage argv [$new_plugin $git_url ...$rest] {
+    ^mise plugins install ...(nus argv [$new_plugin $git_url ...$rest] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -10380,20 +10380,20 @@ directory. This does not install a tool version.
 @usage 'example "mise ls-remote my-tool" help="List versions through the linked plugin"'
 @usage 'complete dir type=dir'
 export def "mise plugins link" [
-    name: string,                       # The plugin name, or the plugin directory when DIR is omitted
-    dir?: path@"nusage complete",       # The local path to the plugin, such as ./mise-my-tool
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                       # Replace an existing plugin with the same name
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    name: string,                    # The plugin name, or the plugin directory when DIR is omitted
+    dir?: path@"nus complete",       # The local path to the plugin, such as ./mise-my-tool
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                    # Replace an existing plugin with the same name
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise plugins link ...(nusage argv [$name $dir] {
+    ^mise plugins link ...(nus argv [$name $dir] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -10443,21 +10443,21 @@ to show core and user plugins
 @usage 'example "mise plugins ls --core --user" help="List core tools and installed plugins"'
 @usage 'example "mise plugins ls --outdated" help="List plugins whose Git remote has newer commits"'
 export def "mise plugins ls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --core (-c),                        # List the core tools built into mise instead of installed plugins
-    --urls (-u),                        # Show each plugin's Git URL, ref, and commit
-    --user,                             # List installed plugins
-    --outdated (-o),                    # Only show plugins whose Git remote has newer commits
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --core (-c),                     # List the core tools built into mise instead of installed plugins
+    --urls (-u),                     # Show each plugin's Git URL, ref, and commit
+    --user,                          # List installed plugins
+    --outdated (-o),                 # Only show plugins whose Git remote has newer commits
 ]: nothing -> string {
-    ^mise plugins ls ...(nusage argv [] {
+    ^mise plugins ls ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10496,19 +10496,19 @@ backends in order.
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'example "mise plugins ls-remote" help="List registry tools with a plugin backend"'
 export def "mise plugins ls-remote" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --urls (-u),                        # Show the plugin source for each shorthand, e.g. vfox:jdx/vfox-poetry
-    --only-names,                       # Only show the name of each plugin, without the `*` marking installed plugins
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --urls (-u),                     # Show the plugin source for each shorthand, e.g. vfox:jdx/vfox-poetry
+    --only-names,                    # Only show the name of each plugin, without the `*` marking installed plugins
 ]: nothing -> string {
-    ^mise plugins ls-remote ...(nusage argv [] {
+    ^mise plugins ls-remote ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10545,20 +10545,20 @@ first with `mise uninstall --all <plugin>:<tool>`.
 @usage 'example "mise plugins uninstall my-tool" help="Remove the plugin and keep the versions it installed"'
 @usage 'example "mise plugins uninstall --purge my-tool" help="Also delete the versions it installed"'
 export def "mise plugins uninstall" [
-    ...plugin: string@"nusage complete",  # Plugins to remove
-    --cd (-C): path@"nusage complete",    # Run as if mise were started in DIR
-    --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                         # Suppress non-error messages
-    --verbose (-v): int,                  # Show extra output (use -vv for even more)
-    --yes (-y),                           # Answer yes to all confirmation prompts
-    --raw,                                # Connect tasks and install commands directly to the terminal
-    --locked,                             # Require download URLs from the lockfile when installing
-    --silent,                             # Suppress all task output and mise non-error messages
-    --all (-a),                           # Remove all plugins
-    --purge (-p),                         # Also remove a tool plugin's installs, downloads, and cache
+    ...plugin: string@"nus complete",  # Plugins to remove
+    --cd (-C): path@"nus complete",    # Run as if mise were started in DIR
+    --env_ (-E): list<string>,         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,               # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                      # Suppress non-error messages
+    --verbose (-v): int,               # Show extra output (use -vv for even more)
+    --yes (-y),                        # Answer yes to all confirmation prompts
+    --raw,                             # Connect tasks and install commands directly to the terminal
+    --locked,                          # Require download URLs from the lockfile when installing
+    --silent,                          # Suppress all task output and mise non-error messages
+    --all (-a),                        # Remove all plugins
+    --purge (-p),                      # Also remove a tool plugin's installs, downloads, and cache
 ]: nothing -> string {
-    ^mise plugins uninstall ...(nusage argv [...$plugin] {
+    ^mise plugins uninstall ...(nus argv [...$plugin] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10595,18 +10595,18 @@ installed from an archive cannot be updated with Git.
 @usage 'example "mise plugins update my-tool" help="Update one plugin"'
 @usage 'example "mise plugins update my-tool#main" help="Switch a plugin to its main branch"'
 export def "mise plugins update" [
-    ...plugin: string@"nusage complete",  # Plugins to update; append #ref to switch to a branch, tag, or commit
-    --cd (-C): path@"nusage complete",    # Run as if mise were started in DIR
-    --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                         # Suppress non-error messages
-    --verbose (-v): int,                  # Show extra output (use -vv for even more)
-    --yes (-y),                           # Answer yes to all confirmation prompts
-    --raw,                                # Connect tasks and install commands directly to the terminal
-    --locked,                             # Require download URLs from the lockfile when installing
-    --silent,                             # Suppress all task output and mise non-error messages
+    ...plugin: string@"nus complete",  # Plugins to update; append #ref to switch to a branch, tag, or commit
+    --cd (-C): path@"nus complete",    # Run as if mise were started in DIR
+    --env_ (-E): list<string>,         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,               # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                      # Suppress non-error messages
+    --verbose (-v): int,               # Show extra output (use -vv for even more)
+    --yes (-y),                        # Answer yes to all confirmation prompts
+    --raw,                             # Connect tasks and install commands directly to the terminal
+    --locked,                          # Require download URLs from the lockfile when installing
+    --silent,                          # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise plugins update ...(nusage argv [...$plugin] {
+    ^mise plugins update ...(nus argv [...$plugin] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10666,25 +10666,25 @@ monorepo root's config. Provider names then include their root, such as
 @usage 'example "mise deps install npm --explain" help="Show why the npm provider would or would not run"'
 @usage 'example "mise deps --monorepo" help="Include providers from every monorepo config root"'
 export def "mise deps" [
-    provider?: string,                  # Run only this provider, or explain it with --explain
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                       # Run providers even when their outputs are up to date
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show which providers would run, without running them
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --explain,                          # Show why a provider is fresh or stale, and exit non-zero unless it is fresh (requires a PROVIDER argument)
-    --list,                             # List configured providers with their status, sources, and outputs
-    --monorepo,                         # Also run providers from every config root in `[monorepo].config_roots`
-    --only: list<string>,               # Run only these providers
-    --skip: list<string>,               # Skip these providers
+    provider?: string,               # Run only this provider, or explain it with --explain
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                    # Run providers even when their outputs are up to date
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show which providers would run, without running them
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --explain,                       # Show why a provider is fresh or stale, and exit non-zero unless it is fresh (requires a PROVIDER argument)
+    --list,                          # List configured providers with their status, sources, and outputs
+    --monorepo,                      # Also run providers from every config root in `[monorepo].config_roots`
+    --only: list<string>,            # Run only these providers
+    --skip: list<string>,            # Skip these providers
 ]: nothing -> string {
-    ^mise deps ...(nusage argv [$provider] {
+    ^mise deps ...(nus argv [$provider] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -10728,19 +10728,19 @@ https://mise.jdx.dev/dev-tools/deps.html#adding-and-removing-packages.
 @usage 'example "mise deps add npm:react" help="Add react to package.json"'
 @usage 'example "mise deps add -D npm:vitest" help="Add vitest as a dev dependency"'
 export def "mise deps add" [
-    ...packages: string,                # Packages to add, such as `npm:react` or `npm:@types/react@19`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --dev (-D),                         # Add as a development dependency
+    ...packages: string,             # Packages to add, such as `npm:react` or `npm:@types/react@19`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --dev (-D),                      # Add as a development dependency
 ]: nothing -> string {
-    ^mise deps add ...(nusage argv [...$packages] {
+    ^mise deps add ...(nus argv [...$packages] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10793,25 +10793,25 @@ monorepo root's config. Provider names then include their root, such as
 @usage 'example "mise deps install --force" help="Run every provider, even fresh ones"'
 @usage 'example "mise deps install --dry-run" help="Show which providers would run"'
 export def "mise deps install" [
-    provider?: string,                  # Run only this provider, or explain it with --explain
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                       # Run providers even when their outputs are up to date
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                     # Show which providers would run, without running them
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --explain,                          # Show why a provider is fresh or stale, and exit non-zero unless it is fresh (requires a PROVIDER argument)
-    --list,                             # List configured providers with their status, sources, and outputs
-    --monorepo,                         # Also run providers from every config root in `[monorepo].config_roots`
-    --only: list<string>,               # Run only these providers
-    --skip: list<string>,               # Skip these providers
+    provider?: string,               # Run only this provider, or explain it with --explain
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                    # Run providers even when their outputs are up to date
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                  # Show which providers would run, without running them
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --explain,                       # Show why a provider is fresh or stale, and exit non-zero unless it is fresh (requires a PROVIDER argument)
+    --list,                          # List configured providers with their status, sources, and outputs
+    --monorepo,                      # Also run providers from every config root in `[monorepo].config_roots`
+    --only: list<string>,            # Run only these providers
+    --skip: list<string>,            # Skip these providers
 ]: nothing -> string {
-    ^mise deps install ...(nusage argv [$provider] {
+    ^mise deps install ...(nus argv [$provider] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -10847,18 +10847,18 @@ such as `npm:lodash`.
 @usage 'arg <PACKAGES>… help="Packages to remove, such as `npm:lodash`" var=#true'
 @usage 'example "mise deps remove npm:lodash" help="Remove lodash from package.json"'
 export def "mise deps remove" [
-    ...packages: string,                # Packages to remove, such as `npm:lodash`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...packages: string,             # Packages to remove, such as `npm:lodash`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise deps remove ...(nusage argv [...$packages] {
+    ^mise deps remove ...(nus argv [...$packages] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10919,22 +10919,22 @@ mise node@20.0.0 [dryrun]  remove ~/.local/share/mise/installs/node/20.0.0, ~/.c
 """# help="Preview what would be deleted and why"'
 @usage 'example "mise prune --tools node" help="Delete unused node versions only"'
 export def "mise prune" [
-    ...installed_tool: string@"nusage complete",  # Prune only these tools
-    --cd (-C): path@"nusage complete",            # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                    # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                          # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                               # Show what would change without changing anything
-    --quiet (-q),                                 # Suppress non-error messages
-    --verbose (-v): int,                          # Show extra output (use -vv for even more)
-    --yes (-y),                                   # Answer yes to all confirmation prompts
-    --raw,                                        # Connect tasks and install commands directly to the terminal
-    --locked,                                     # Require download URLs from the lockfile when installing
-    --silent,                                     # Suppress all task output and mise non-error messages
-    --configs,                                    # Only forget tracked, trusted, and ignored config files that no longer exist
-    --dry-run-code,                               # Like --dry-run, but exit with code 1 if there are tools to prune
-    --tools,                                      # Only delete unused tool versions
+    ...installed_tool: string@"nus complete",  # Prune only these tools
+    --cd (-C): path@"nus complete",            # Run as if mise were started in DIR
+    --env_ (-E): list<string>,                 # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                       # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                            # Show what would change without changing anything
+    --quiet (-q),                              # Suppress non-error messages
+    --verbose (-v): int,                       # Show extra output (use -vv for even more)
+    --yes (-y),                                # Answer yes to all confirmation prompts
+    --raw,                                     # Connect tasks and install commands directly to the terminal
+    --locked,                                  # Require download URLs from the lockfile when installing
+    --silent,                                  # Suppress all task output and mise non-error messages
+    --configs,                                 # Only forget tracked, trusted, and ignored config files that no longer exist
+    --dry-run-code,                            # Like --dry-run, but exit with code 1 if there are tools to prune
+    --tools,                                   # Only delete unused tool versions
 ]: nothing -> string {
-    ^mise prune ...(nusage argv [...$installed_tool] {
+    ^mise prune ...(nus argv [...$installed_tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10999,21 +10999,21 @@ aqua:jqlang/jq asdf:mise-plugins/asdf-jq
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise registry [tool] --json\",\n  \"$defs\": {\n    \"security\": {\n      \"oneOf\": [\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"checksum\"\n            },\n            \"algorithm\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"github_attestations\"\n            },\n            \"signer_workflow\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"slsa\"\n            },\n            \"level\": {\n              \"type\": \"integer\",\n              \"minimum\": 0,\n              \"maximum\": 255\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"minisign\"\n            },\n            \"public_key\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \"cosign\",\n                \"packslip\",\n                \"gpg\"\n              ]\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"tool\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"short\": {\n          \"type\": \"string\"\n        },\n        \"backends\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          }\n        },\n        \"bins\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          },\n          \"minItems\": 1\n        },\n        \"description\": {\n          \"type\": \"string\"\n        },\n        \"url\": {\n          \"type\": \"string\"\n        },\n        \"aliases\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          },\n          \"minItems\": 1\n        },\n        \"security\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"$ref\": \"#/$defs/security\"\n          },\n          \"minItems\": 1\n        }\n      },\n      \"required\": [\n        \"short\",\n        \"backends\"\n      ],\n      \"additionalProperties\": false\n    }\n  },\n  \"oneOf\": [\n    {\n      \"$ref\": \"#/$defs/tool\"\n    },\n    {\n      \"type\": \"array\",\n      \"items\": {\n        \"$ref\": \"#/$defs/tool\"\n      }\n    }\n  ]\n}\n"
 }'
 export def "mise registry" [
-    name?: string,                             # Show only this tool's backends, in the order mise prefers them
-    --cd (-C): path@"nusage complete",         # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                 # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                       # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                              # Suppress non-error messages
-    --verbose (-v): int,                       # Show extra output (use -vv for even more)
-    --yes (-y),                                # Answer yes to all confirmation prompts
-    --raw,                                     # Connect tasks and install commands directly to the terminal
-    --locked,                                  # Require download URLs from the lockfile when installing
-    --silent,                                  # Suppress all task output and mise non-error messages
-    --backend (-b): string@"nusage complete",  # Show only tools for this backend
-    --hide-aliased,                            # Hide names that are aliases of another registry tool
-    --security,                                # Include security features for each tool's backends in JSON output
+    name?: string,                          # Show only this tool's backends, in the order mise prefers them
+    --cd (-C): path@"nus complete",         # Run as if mise were started in DIR
+    --env_ (-E): list<string>,              # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                    # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                           # Suppress non-error messages
+    --verbose (-v): int,                    # Show extra output (use -vv for even more)
+    --yes (-y),                             # Answer yes to all confirmation prompts
+    --raw,                                  # Connect tasks and install commands directly to the terminal
+    --locked,                               # Require download URLs from the lockfile when installing
+    --silent,                               # Suppress all task output and mise non-error messages
+    --backend (-b): string@"nus complete",  # Show only tools for this backend
+    --hide-aliased,                         # Hide names that are aliases of another registry tool
+    --security,                             # Include security features for each tool's backends in JSON output
 ]: nothing -> oneof<record<short: string, backends: list<string>>, table<short: string, backends: list<string>>> {
-    let text = ^mise registry --json ...(nusage argv [$name] {
+    let text = ^mise registry --json ...(nus argv [$name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11027,7 +11027,7 @@ export def "mise registry" [
         --hide-aliased: $hide_aliased
         --security: $security
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise registry [tool] --json\",\"$defs\":{\"security\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"checksum\"},\"algorithm\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"github_attestations\"},\"signer_workflow\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"slsa\"},\"level\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":255}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"minisign\"},\"public_key\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"cosign\",\"packslip\",\"gpg\"]}},\"required\":[\"type\"],\"additionalProperties\":false}]},\"tool\":{\"type\":\"object\",\"properties\":{\"short\":{\"type\":\"string\"},\"backends\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"bins\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"description\":{\"type\":\"string\"},\"url\":{\"type\":\"string\"},\"aliases\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"security\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/security\"},\"minItems\":1}},\"required\":[\"short\",\"backends\"],\"additionalProperties\":false}},\"oneOf\":[{\"$ref\":\"#/$defs/tool\"},{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/tool\"}}]}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise registry [tool] --json\",\"$defs\":{\"security\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"checksum\"},\"algorithm\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"github_attestations\"},\"signer_workflow\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"slsa\"},\"level\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":255}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"minisign\"},\"public_key\":{\"type\":\"string\"}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"cosign\",\"packslip\",\"gpg\"]}},\"required\":[\"type\"],\"additionalProperties\":false}]},\"tool\":{\"type\":\"object\",\"properties\":{\"short\":{\"type\":\"string\"},\"backends\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"bins\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"description\":{\"type\":\"string\"},\"url\":{\"type\":\"string\"},\"aliases\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"security\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/security\"},\"minItems\":1}},\"required\":[\"short\",\"backends\"],\"additionalProperties\":false}},\"oneOf\":[{\"$ref\":\"#/$defs/tool\"},{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/tool\"}}]}" { from json }
 }
 
 # Create shims for executables provided by installed tools
@@ -11065,21 +11065,21 @@ mise reshim
 v24.11.0
 """# help="Rebuild shims, then run node through its shim"'
 export def "mise reshim" [
-    tool?: string@"nusage complete",
+    tool?: string@"nus complete",
     version?: string,
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                       # Rebuild all mise-owned shims
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --system,                           # Rebuild the system shims, for tools installed with `mise install --system`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                    # Rebuild all mise-owned shims
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --system,                        # Rebuild the system shims, for tools installed with `mise install --system`
 ]: nothing -> string {
-    ^mise reshim ...(nusage argv [$tool $version] {
+    ^mise reshim ...(nus argv [$tool $version] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -11344,14 +11344,14 @@ Set `task.timings = true` to show it by default.
 @usage 'complete dir type=dir'
 export def "mise run" [
     --continue-on-error (-c),                                               # Continue running tasks even if one fails
-    --cd (-C): path@"nusage complete",                                      # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",                                         # Run as if mise were started in DIR
     --env_ (-E): list<string>,                                              # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --force (-f),                                                           # Run the tasks even if their outputs are up to date
     --jobs (-j): string,                                                    # How many jobs to run in parallel; defaults to the `jobs` setting
     --dry-run (-n),                                                         # Print the tasks in the order they would run, without running them
     --quiet (-q),                                                           # Suppress non-error messages
     --shell (-s): string,                                                   # Shell used to run TOML tasks that do not set their own `shell`
-    --tool (-t): list<string>@"nusage complete",                            # Extra tools to use with the tasks, e.g. node@24 python@3.13
+    --tool (-t): list<string>@"nus complete",                               # Extra tools to use with the tasks, e.g. node@24 python@3.13
     --verbose (-v): int,                                                    # Show extra output (use -vv for even more)
     --yes (-y),                                                             # Answer yes to all confirmation prompts
     --no-timings,                                                           # Hide the elapsed time printed after each task completes
@@ -11368,7 +11368,7 @@ export def "mise run" [
     --affected-uncommitted,                                                 # Count staged and unstaged changes to tracked files
     --affected-untracked,                                                   # Count untracked files that Git does not ignore
     --all,                                                                  # Open the task picker with tasks from every project in the monorepo
-    --secrets: list<string>@"nusage complete",                              # [experimental] Give the named tasks these secrets (comma-separated); their dependencies and subtasks do not get them
+    --secrets: list<string>@"nus complete",                                 # [experimental] Give the named tasks these secrets (comma-separated); their dependencies and subtasks do not get them
     --secrets-all,                                                          # [experimental] Give the named tasks every secret the project can inject; their dependencies and subtasks do not get them
     --allow-env: list<string>,                                              # Allow a specific env var through (implies `--deny-env` for everything else)
     --allow-net: list<string>,                                              # Allow network access only to HOST (not supported on any platform)
@@ -11390,7 +11390,7 @@ export def "mise run" [
     --task-cache-stats,                                                     # [experimental] Report artifact cache hits, restored bytes, and time saved
     --timeout: string,                                                      # Stop the run if it takes longer than this, e.g. 30s or 5m
 ]: nothing -> string {
-    ^mise run ...(nusage argv [] {
+    ^mise run ...(nus argv [] {
         --continue-on-error: $continue_on_error
         --cd: $cd
         --env: $env_
@@ -11496,7 +11496,7 @@ npm:typescript-language-server  Language Server Protocol (LSP) implementation fo
 @usage 'example "mise search --interactive" help="Pick a tool from a filterable list"'
 export def "mise search" [
     name?: string,                                     # The tool to search for
-    --cd (-C): path@"nusage complete",                 # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",                    # Run as if mise were started in DIR
     --env_ (-E): list<string>,                         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                               # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                                      # Suppress non-error messages
@@ -11510,7 +11510,7 @@ export def "mise search" [
     --match-type (-m): string@[equal contains fuzzy],  # Match type: equal, contains, or fuzzy
     --no-header,                                       # Do not print the table header
 ]: nothing -> string {
-    ^mise search ...(nusage argv [$name] {
+    ^mise search ...(nus argv [$name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11542,18 +11542,18 @@ below are passed to it). See https://mise.jdx.dev/environments/secrets/fnox.html
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'output json framing=json select=--json'
 export def "mise secrets" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --no-header,                        # Do not print the table header
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --no-header,                     # Do not print the table header
 ] {
-    ^mise secrets --json ...(nusage argv [] {
+    ^mise secrets --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11614,18 +11614,18 @@ SIGNING_KEY        false  no    -                  release signing key
 """# help="List the secret names and how each can be granted"'
 @usage 'output json framing=json select=--json'
 export def "mise secrets ls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --no-header,                        # Do not print the table header
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --no-header,                     # Do not print the table header
 ] {
-    ^mise secrets ls --json ...(nusage argv [] {
+    ^mise secrets ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11688,21 +11688,21 @@ Also updates when the package that installed mise has disabled self-update.
 @usage 'example "mise self-update 2026.10.4" help="Install a specific release"'
 @usage 'example "mise self-update -y --no-plugins" help="Update without prompting or touching plugins"'
 export def "mise self-update" [
-    version?: string,                   # Update to a specific version, skipping the minimum release age
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                       # Update even if already up to date
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --minimum-release-age: string,      # Minimum release age for this update, such as 7d
-    --no-plugins,                       # Do not update installed plugins
+    version?: string,                # Update to a specific version, skipping the minimum release age
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                    # Update even if already up to date
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --minimum-release-age: string,   # Minimum release age for this update, such as 7d
+    --no-plugins,                    # Do not update installed plugins
 ]: nothing -> string {
-    ^mise self-update ...(nusage argv [$version] {
+    ^mise self-update ...(nus argv [$version] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -11820,28 +11820,28 @@ production
 @usage 'complete path type=path'
 @usage 'complete file type=path'
 export def "mise set" [
-    ...env_var: string@"nusage complete",    # Environment variables to set, such as NODE_ENV=production
-    --cd (-C): path@"nusage complete",       # Run as if mise were started in DIR
-    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                            # Suppress non-error messages
-    --verbose (-v): int,                     # Show extra output (use -vv for even more)
-    --yes (-y),                              # Answer yes to all confirmation prompts
-    --raw,                                   # Connect tasks and install commands directly to the terminal
-    --locked,                                # Require download URLs from the lockfile when installing
-    --silent,                                # Suppress all task output and mise non-error messages
-    --global (-g),                           # Set the environment variable in the global config file
-    --override,                              # Set the environment variable in the global override file, `config.override.toml`
-    --age-encrypt,                           # [experimental] Encrypt the value with age before storing
-    --age-key-file: path@"nusage complete",  # [experimental] Age identity file whose public keys to encrypt to
-    --age-recipient: list<string>,           # [experimental] Age recipient (x25519 public key) for encryption
-    --age-ssh-recipient: list<string>,       # [experimental] SSH recipient (public key or path) for age encryption
-    --file: path@"nusage complete",          # The TOML file to update
-    --no-redact,                             # Show raw values instead of redacting secrets
-    --prompt,                                # Prompt for environment variable values (input is masked only with --age-encrypt)
-    --stdin,                                 # Read the value from stdin, for multiline input
+    ...env_var: string@"nus complete",    # Environment variables to set, such as NODE_ENV=production
+    --cd (-C): path@"nus complete",       # Run as if mise were started in DIR
+    --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                         # Suppress non-error messages
+    --verbose (-v): int,                  # Show extra output (use -vv for even more)
+    --yes (-y),                           # Answer yes to all confirmation prompts
+    --raw,                                # Connect tasks and install commands directly to the terminal
+    --locked,                             # Require download URLs from the lockfile when installing
+    --silent,                             # Suppress all task output and mise non-error messages
+    --global (-g),                        # Set the environment variable in the global config file
+    --override,                           # Set the environment variable in the global override file, `config.override.toml`
+    --age-encrypt,                        # [experimental] Encrypt the value with age before storing
+    --age-key-file: path@"nus complete",  # [experimental] Age identity file whose public keys to encrypt to
+    --age-recipient: list<string>,        # [experimental] Age recipient (x25519 public key) for encryption
+    --age-ssh-recipient: list<string>,    # [experimental] SSH recipient (public key or path) for age encryption
+    --file: path@"nus complete",          # The TOML file to update
+    --no-redact,                          # Show raw values instead of redacting secrets
+    --prompt,                             # Prompt for environment variable values (input is masked only with --age-encrypt)
+    --stdin,                              # Read the value from stdin, for multiline input
 ]: nothing -> string {
-    ^mise set ...(nusage argv [...$env_var] {
+    ^mise set ...(nus argv [...$env_var] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11904,23 +11904,23 @@ Reads only its explicit settings, or writes to it instead of the global config.
 @usage 'example "mise settings --local node.mirror_url https://npmmirror.com/mirrors/node/" help="Set a setting in the project config"'
 @usage 'output json framing=json select=--json'
 export def "mise settings" [
-    setting?: string@"nusage complete",  # Only show this setting, or the settings under this prefix such as `python`
-    value?: string,                      # The value to set
-    --cd (-C): path@"nusage complete",   # Run as if mise were started in DIR
-    --env_ (-E): list<string>,           # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                 # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                        # Suppress non-error messages
-    --verbose (-v): int,                 # Show extra output (use -vv for even more)
-    --yes (-y),                          # Answer yes to all confirmation prompts
-    --raw,                               # Connect tasks and install commands directly to the terminal
-    --locked,                            # Require download URLs from the lockfile when installing
-    --silent,                            # Suppress all task output and mise non-error messages
-    --all (-a),                          # List all settings
-    --local (-l),                        # Use only the nearest project config
-    --toml (-T),                         # Output in TOML format
-    --json-extended,                     # Output in JSON format with sources
+    setting?: string@"nus complete",  # Only show this setting, or the settings under this prefix such as `python`
+    value?: string,                   # The value to set
+    --cd (-C): path@"nus complete",   # Run as if mise were started in DIR
+    --env_ (-E): list<string>,        # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,              # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                     # Suppress non-error messages
+    --verbose (-v): int,              # Show extra output (use -vv for even more)
+    --yes (-y),                       # Answer yes to all confirmation prompts
+    --raw,                            # Connect tasks and install commands directly to the terminal
+    --locked,                         # Require download URLs from the lockfile when installing
+    --silent,                         # Suppress all task output and mise non-error messages
+    --all (-a),                       # List all settings
+    --local (-l),                     # Use only the nearest project config
+    --toml (-T),                      # Output in TOML format
+    --json-extended,                  # Output in JSON format with sources
 ] {
-    ^mise settings --json ...(nusage argv [$setting $value] {
+    ^mise settings --json ...(nus argv [$setting $value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11968,21 +11968,21 @@ The override file outranks all project config, so the setting wins over the same
 @usage 'arg "[VALUE]" help="The value to append (or pass SETTING=VALUE)" required=#false'
 @usage 'example "mise settings add disable_hints python_multi" help="Stop showing the python_multi hint"'
 export def "mise settings add" [
-    setting: string@"nusage complete",  # The array setting to append to
-    value?: string,                     # The value to append (or pass SETTING=VALUE)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --local (-l),                       # Use only the nearest project config
-    --override,                         # Write to the global override file, `config.override.toml`
+    setting: string@"nus complete",  # The array setting to append to
+    value?: string,                  # The value to append (or pass SETTING=VALUE)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --local (-l),                    # Use only the nearest project config
+    --override,                      # Write to the global override file, `config.override.toml`
 ]: nothing -> string {
-    ^mise settings add ...(nusage argv [$setting $value] {
+    ^mise settings add ...(nus argv [$setting $value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12021,19 +12021,19 @@ as not set and exits with an error. To inspect one file, use
 @usage 'example "mise settings get jobs" help="Show the effective number of parallel jobs"'
 @usage 'example "mise settings get --local experimental" help="Show the value set in the project config"'
 export def "mise settings get" [
-    setting: string@"nusage complete",  # The setting to show
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --local (-l),                       # Use only the nearest project config
+    setting: string@"nus complete",  # The setting to show
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --local (-l),                    # Use only the nearest project config
 ]: nothing -> string {
-    ^mise settings get ...(nusage argv [$setting] {
+    ^mise settings get ...(nus argv [$setting] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12082,22 +12082,22 @@ Reads only its explicit settings, or writes to it instead of the global config.
 @usage 'example "mise settings ls python --json-extended" help="Show the python settings as JSON with their sources"'
 @usage 'output json framing=json select=--json'
 export def "mise settings ls" [
-    setting?: string@"nusage complete",  # Only show this setting, or the settings under this prefix such as `python`
-    --cd (-C): path@"nusage complete",   # Run as if mise were started in DIR
-    --env_ (-E): list<string>,           # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                 # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                        # Suppress non-error messages
-    --verbose (-v): int,                 # Show extra output (use -vv for even more)
-    --yes (-y),                          # Answer yes to all confirmation prompts
-    --raw,                               # Connect tasks and install commands directly to the terminal
-    --locked,                            # Require download URLs from the lockfile when installing
-    --silent,                            # Suppress all task output and mise non-error messages
-    --all (-a),                          # List all settings
-    --local (-l),                        # Use only the nearest project config
-    --toml (-T),                         # Output in TOML format
-    --json-extended,                     # Output in JSON format with sources
+    setting?: string@"nus complete",  # Only show this setting, or the settings under this prefix such as `python`
+    --cd (-C): path@"nus complete",   # Run as if mise were started in DIR
+    --env_ (-E): list<string>,        # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,              # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                     # Suppress non-error messages
+    --verbose (-v): int,              # Show extra output (use -vv for even more)
+    --yes (-y),                       # Answer yes to all confirmation prompts
+    --raw,                            # Connect tasks and install commands directly to the terminal
+    --locked,                         # Require download URLs from the lockfile when installing
+    --silent,                         # Suppress all task output and mise non-error messages
+    --all (-a),                       # List all settings
+    --local (-l),                     # Use only the nearest project config
+    --toml (-T),                      # Output in TOML format
+    --json-extended,                  # Output in JSON format with sources
 ] {
-    ^mise settings ls --json ...(nusage argv [$setting] {
+    ^mise settings ls --json ...(nus argv [$setting] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12155,21 +12155,21 @@ The override file outranks all project config, so the setting wins over the same
 @usage 'example "mise settings set jobs 4" help="Run up to 4 jobs in parallel"'
 @usage 'example "mise settings set --local experimental=true" help="Enable experimental features in the project config"'
 export def "mise settings set" [
-    setting: string@"nusage complete",  # The setting to set
-    value?: string,                     # The value to set (or pass SETTING=VALUE)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --local (-l),                       # Use only the nearest project config
-    --override,                         # Write to the global override file, `config.override.toml`
+    setting: string@"nus complete",  # The setting to set
+    value?: string,                  # The value to set (or pass SETTING=VALUE)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --local (-l),                    # Use only the nearest project config
+    --override,                      # Write to the global override file, `config.override.toml`
 ]: nothing -> string {
-    ^mise settings set ...(nusage argv [$setting $value] {
+    ^mise settings set ...(nus argv [$setting $value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12215,20 +12215,20 @@ The override file outranks all project config, so the setting wins over the same
 @usage 'arg <KEY> help="The setting to remove"'
 @usage 'example "mise settings unset jobs" help="Remove jobs from the global config"'
 export def "mise settings unset" [
-    key: string,                        # The setting to remove
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --local (-l),                       # Use only the nearest project config
-    --override,                         # Write to the global override file, `config.override.toml`
+    key: string,                     # The setting to remove
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --local (-l),                    # Use only the nearest project config
+    --override,                      # Write to the global override file, `config.override.toml`
 ]: nothing -> string {
-    ^mise settings unset ...(nusage argv [$key] {
+    ^mise settings unset ...(nus argv [$key] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12280,19 +12280,19 @@ v20.19.5
 """# help="Use node 20 in this shell"'
 @usage 'example "mise shell --unset node" help="Go back to the version the config requests"'
 export def "mise shell" [
-    ...tool_version: string@"nusage complete",  # Tools to set, such as node@20
-    --cd (-C): path@"nusage complete",          # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                        # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                               # Suppress non-error messages
-    --verbose (-v): int,                        # Show extra output (use -vv for even more)
-    --yes (-y),                                 # Answer yes to all confirmation prompts
-    --raw,                                      # Connect tasks and install commands directly to the terminal
-    --locked,                                   # Require download URLs from the lockfile when installing
-    --silent,                                   # Suppress all task output and mise non-error messages
-    --unset (-u),                               # Remove a version set earlier with `mise shell`
+    ...tool_version: string@"nus complete",  # Tools to set, such as node@20
+    --cd (-C): path@"nus complete",          # Run as if mise were started in DIR
+    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                            # Suppress non-error messages
+    --verbose (-v): int,                     # Show extra output (use -vv for even more)
+    --yes (-y),                              # Answer yes to all confirmation prompts
+    --raw,                                   # Connect tasks and install commands directly to the terminal
+    --locked,                                # Require download URLs from the lockfile when installing
+    --silent,                                # Suppress all task output and mise non-error messages
+    --unset (-u),                            # Remove a version set earlier with `mise shell`
 ]: nothing -> string {
-    ^mise shell ...(nusage argv [...$tool_version] {
+    ^mise shell ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12383,7 +12383,7 @@ See https://mise.jdx.dev/bootstrap/github-relay.html
 export def "mise ssh" [
     destination?: string,                 # OpenSSH destination or SSH config alias (required)
     ...command: string,                   # Command to execute after --; omit for an interactive shell
-    --cd (-C): path@"nusage complete",    # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",       # Run as if mise were started in DIR
     --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                         # Suppress non-error messages
@@ -12403,7 +12403,7 @@ export def "mise ssh" [
     --github-relay-log-format: string,    # Relay log and summary format: text or jsonl (default: the github_relay.log_format setting)
     --github-relay-max-duration: string,  # End borrowed access after a duration such as 1h; 0s lasts the whole session
 ]: nothing -> string {
-    ^mise ssh ...(nusage argv [$destination ...$command] {
+    ^mise ssh ...(nus argv [$destination ...$command] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12443,18 +12443,18 @@ removes them when you leave. With no subcommand, lists them (same as
 @usage 'flag --no-header help="Do not print the table header"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise shell-alias" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --no-header,                        # Do not print the table header
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --no-header,                     # Do not print the table header
 ]: nothing -> string {
-    ^mise shell-alias ...(nusage argv [] {
+    ^mise shell-alias ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12476,18 +12476,18 @@ mise shell-alias get ll
 ls -la
 """# help="Print the command that ll runs"'
 export def "mise shell-alias get" [
-    shell_alias: string,                # The alias to show
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    shell_alias: string,             # The alias to show
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise shell-alias get ...(nusage argv [$shell_alias] {
+    ^mise shell-alias get ...(nus argv [$shell_alias] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12520,18 +12520,18 @@ ll       ls -la
 gs       git status
 """# help="List the aliases set in this directory"'
 export def "mise shell-alias ls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --no-header,                        # Do not print the table header
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --no-header,                     # Do not print the table header
 ]: nothing -> string {
-    ^mise shell-alias ls ...(nusage argv [] {
+    ^mise shell-alias ls ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12564,19 +12564,19 @@ mise.toml.
 @usage 'example "mise shell-alias set ll \"ls -la\"" help="Define ll in every directory"'
 @usage 'example "mise shell-alias set gs=\"git status\"" help="Use the ALIAS=COMMAND form"'
 export def "mise shell-alias set" [
-    shell_alias: string,                # The alias name
-    command?: string,                   # The command to run (or pass ALIAS=COMMAND)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    shell_alias: string,             # The alias name
+    command?: string,                # The command to run (or pass ALIAS=COMMAND)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise shell-alias set ...(nusage argv [$shell_alias $command] {
+    ^mise shell-alias set ...(nus argv [$shell_alias $command] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12604,18 +12604,18 @@ defined in a project's mise.toml has to be removed there.
 @usage 'arg <shell_alias> help="The alias to remove"'
 @usage 'example "mise shell-alias unset ll" help="Remove ll from the global config"'
 export def "mise shell-alias unset" [
-    shell_alias: string,                # The alias to remove
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    shell_alias: string,             # The alias to remove
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise shell-alias unset ...(nusage argv [$shell_alias] {
+    ^mise shell-alias unset ...(nus argv [$shell_alias] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12651,17 +12651,17 @@ See https://mise.jdx.dev/dev-tools/packslip-resources.html#skills
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise skills" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise skills ...(nusage argv [] {
+    ^mise skills ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12699,17 +12699,17 @@ hk-debug      packslip:github.com/jdx/hk  2.5.0    ~/.local/share/mise/installs/
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise skills ls --json\",\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"tool\": {\n        \"type\": \"string\"\n      },\n      \"version\": {\n        \"type\": \"string\"\n      },\n      \"path\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"tool\",\n      \"version\",\n      \"path\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
 }'
 export def "mise skills ls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> table<name: string, tool: string, version: string, path: string> {
-    let text = ^mise skills ls --json ...(nusage argv [] {
+    let text = ^mise skills ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12720,7 +12720,7 @@ export def "mise skills ls" [
         --locked: $locked
         --silent: $silent
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise skills ls --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"tool\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"}},\"required\":[\"name\",\"tool\",\"version\",\"path\"],\"additionalProperties\":false}}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise skills ls --json\",\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"tool\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"}},\"required\":[\"name\",\"tool\",\"version\",\"path\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Link the active tools' skills where an agent looks for them
@@ -12767,20 +12767,20 @@ With the default skills.dir, that is ~/.claude/skills.
 @usage 'example "mise skills sync --dir .agents/skills --prune" help="Link into .agents/skills and remove links for skills that are no longer active"'
 @usage 'complete dir type=dir'
 export def "mise skills sync" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --dir: path@"nusage complete",      # The directory to link skills into
-    --global (-g),                      # Link into the skills.dir directory under your home directory instead of the project's
-    --prune,                            # Remove links mise made for skills that are no longer active
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --dir: path@"nus complete",      # The directory to link skills into
+    --global (-g),                   # Link into the skills.dir directory under your home directory instead of the project's
+    --prune,                         # Remove links mise made for skills that are no longer active
 ]: nothing -> string {
-    ^mise skills sync ...(nusage argv [] {
+    ^mise skills sync ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12799,17 +12799,17 @@ export def "mise skills sync" [
 # Show the companies sponsoring mise and the jdx.dev open source tools
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise sponsors" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise sponsors ...(nusage argv [] {
+    ^mise sponsors ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12836,17 +12836,17 @@ them without reinstalling.
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise sync" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise sync ...(nusage argv [] {
+    ^mise sync ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12882,20 +12882,20 @@ mise sync node --brew
 mise use -g node@24
 """# help="Use the node that Homebrew installed"'
 export def "mise sync node" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --brew,                             # Get tool versions from Homebrew
-    --nodenv,                           # Get tool versions from nodenv
-    --nvm,                              # Get tool versions from nvm
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --brew,                          # Get tool versions from Homebrew
+    --nodenv,                        # Get tool versions from nodenv
+    --nvm,                           # Get tool versions from nvm
 ]: nothing -> string {
-    ^mise sync node ...(nusage argv [] {
+    ^mise sync node ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12941,19 +12941,19 @@ mise exec python@3.13.0 -- python -V
 uv run -p 3.12.0 -- python -V
 """# help="Share python versions with uv in both directions"'
 export def "mise sync python" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --pyenv,                            # Get tool versions from pyenv
-    --uv,                               # Link uv's python versions into mise and mise's python versions into uv
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --pyenv,                         # Get tool versions from pyenv
+    --uv,                            # Link uv's python versions into mise and mise's python versions into uv
 ]: nothing -> string {
-    ^mise sync python ...(nusage argv [] {
+    ^mise sync python ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12990,18 +12990,18 @@ mise sync ruby --brew
 mise ls ruby --installed
 """# help="Link the Homebrew ruby@3.4, then list it with the other installed versions"'
 export def "mise sync ruby" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --brew,                             # Get tool versions from Homebrew
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --brew,                          # Get tool versions from Homebrew
 ]: nothing -> string {
-    ^mise sync ruby ...(nusage argv [] {
+    ^mise sync ruby ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13065,8 +13065,8 @@ With no subcommand, lists tasks like `mise tasks ls` and accepts the same flags.
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise tasks [ls] --json\",\n  \"$defs\": {\n    \"dependency\": {\n      \"oneOf\": [\n        {\n          \"type\": \"string\"\n        },\n        {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          },\n          \"minItems\": 1\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"task\": {\n              \"type\": \"string\"\n            },\n            \"args\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              },\n              \"minItems\": 1\n            },\n            \"env\": {\n              \"type\": \"object\",\n              \"additionalProperties\": {\n                \"type\": \"string\"\n              },\n              \"minProperties\": 1\n            },\n            \"optional\": {\n              \"const\": true\n            }\n          },\n          \"required\": [\n            \"task\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"run\": {\n      \"oneOf\": [\n        {\n          \"type\": \"string\"\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"task\": {\n              \"type\": \"string\"\n            },\n            \"args\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              },\n              \"minItems\": 1\n            },\n            \"env\": {\n              \"type\": \"object\",\n              \"additionalProperties\": {\n                \"type\": \"string\"\n              },\n              \"minProperties\": 1\n            }\n          },\n          \"required\": [\n            \"task\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"tasks\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              }\n            }\n          },\n          \"required\": [\n            \"tasks\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    }\n  },\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"aliases\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"description\": {\n        \"type\": \"string\"\n      },\n      \"source\": {\n        \"type\": \"string\"\n      },\n      \"config_sources\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"depends\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"daemons\": {\n        \"oneOf\": [\n          {\n            \"type\": \"boolean\"\n          },\n          {\n            \"type\": \"string\"\n          },\n          {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"type\": \"null\"\n          }\n        ]\n      },\n      \"secrets\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"depends_post\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"wait_for\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"env\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"dir\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"hide\": {\n        \"type\": \"boolean\"\n      },\n      \"global\": {\n        \"type\": \"boolean\"\n      },\n      \"raw\": {\n        \"type\": \"boolean\"\n      },\n      \"interactive\": {\n        \"type\": \"boolean\"\n      },\n      \"sources\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"outputs\": {\n        \"oneOf\": [\n          {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"type\": \"object\",\n            \"properties\": {\n              \"auto\": {\n                \"const\": true\n              }\n            },\n            \"required\": [\n              \"auto\"\n            ],\n            \"additionalProperties\": false\n          }\n        ]\n      },\n      \"shell\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"quiet\": {\n        \"type\": \"boolean\"\n      },\n      \"silent\": {\n        \"oneOf\": [\n          {\n            \"type\": \"boolean\"\n          },\n          {\n            \"enum\": [\n              \"stdout\",\n              \"stderr\"\n            ]\n          }\n        ]\n      },\n      \"tools\": {\n        \"type\": \"object\",\n        \"additionalProperties\": {\n          \"oneOf\": [\n            {\n              \"type\": \"string\"\n            },\n            {\n              \"type\": \"object\",\n              \"properties\": {\n                \"version\": {\n                  \"type\": \"string\"\n                }\n              },\n              \"required\": [\n                \"version\"\n              ],\n              \"additionalProperties\": true\n            }\n          ]\n        }\n      },\n      \"usage\": {\n        \"type\": \"string\"\n      },\n      \"timeout\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"run\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/run\"\n        }\n      },\n      \"args\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"file\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"aliases\",\n      \"description\",\n      \"source\",\n      \"config_sources\",\n      \"depends\",\n      \"daemons\",\n      \"secrets\",\n      \"depends_post\",\n      \"wait_for\",\n      \"env\",\n      \"dir\",\n      \"hide\",\n      \"global\",\n      \"raw\",\n      \"interactive\",\n      \"sources\",\n      \"outputs\",\n      \"shell\",\n      \"quiet\",\n      \"silent\",\n      \"tools\",\n      \"usage\",\n      \"timeout\",\n      \"run\",\n      \"args\",\n      \"file\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
 }'
 export def "mise tasks" [
-    task?: string@"nusage complete",                 # Task to show, as `mise tasks info` does
-    --cd (-C): path@"nusage complete",               # Run as if mise were started in DIR
+    task?: string@"nus complete",                    # Task to show, as `mise tasks info` does
+    --cd (-C): path@"nus complete",                  # Run as if mise were started in DIR
     --env_ (-E): list<string>,                       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                             # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                                    # Suppress non-error messages
@@ -13085,7 +13085,7 @@ export def "mise tasks" [
     --sort: string@[name alias description source],  # Column to sort by (default: name)
     --sort-order: string@[asc desc],                 # Sort direction (default: asc)
 ]: nothing -> table<name: string, aliases: list<string>, description: string, source: string, config_sources: list<string>, depends: list<oneof<string, list<string>, record<task: string>>>, daemons: oneof<bool, string, list<string>, nothing>, secrets: list<string>, depends_post: list<oneof<string, list<string>, record<task: string>>>, wait_for: list<oneof<string, list<string>, record<task: string>>>, env: list<string>, dir: oneof<string, nothing>, hide: bool, global: bool, raw: bool, interactive: bool, sources: list<string>, outputs: oneof<list<string>, record<auto: bool>>, shell: oneof<string, nothing>, quiet: bool, silent: oneof<bool, string>, tools: record, usage: string, timeout: oneof<string, nothing>, run: list<oneof<string, record<task: string>, record<tasks: list<string>>>>, args: list<string>, file: oneof<string, nothing>> {
-    let text = ^mise tasks --json ...(nusage argv [$task] {
+    let text = ^mise tasks --json ...(nus argv [$task] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13105,7 +13105,7 @@ export def "mise tasks" [
         --sort: $sort
         --sort-order: $sort_order
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks [ls] --json\",\"$defs\":{\"dependency\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1},\"optional\":{\"const\":true}},\"required\":[\"task\"],\"additionalProperties\":false}]},\"run\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1}},\"required\":[\"task\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tasks\"],\"additionalProperties\":false}]}},\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"aliases\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"description\":{\"type\":\"string\"},\"source\":{\"type\":\"string\"},\"config_sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"daemons\":{\"oneOf\":[{\"type\":\"boolean\"},{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"null\"}]},\"secrets\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends_post\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"wait_for\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"env\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"dir\":{\"type\":[\"string\",\"null\"]},\"hide\":{\"type\":\"boolean\"},\"global\":{\"type\":\"boolean\"},\"raw\":{\"type\":\"boolean\"},\"interactive\":{\"type\":\"boolean\"},\"sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"outputs\":{\"oneOf\":[{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"object\",\"properties\":{\"auto\":{\"const\":true}},\"required\":[\"auto\"],\"additionalProperties\":false}]},\"shell\":{\"type\":[\"string\",\"null\"]},\"quiet\":{\"type\":\"boolean\"},\"silent\":{\"oneOf\":[{\"type\":\"boolean\"},{\"enum\":[\"stdout\",\"stderr\"]}]},\"tools\":{\"type\":\"object\",\"additionalProperties\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"}},\"required\":[\"version\"],\"additionalProperties\":true}]}},\"usage\":{\"type\":\"string\"},\"timeout\":{\"type\":[\"string\",\"null\"]},\"run\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/run\"}},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"file\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"name\",\"aliases\",\"description\",\"source\",\"config_sources\",\"depends\",\"daemons\",\"secrets\",\"depends_post\",\"wait_for\",\"env\",\"dir\",\"hide\",\"global\",\"raw\",\"interactive\",\"sources\",\"outputs\",\"shell\",\"quiet\",\"silent\",\"tools\",\"usage\",\"timeout\",\"run\",\"args\",\"file\"],\"additionalProperties\":false}}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks [ls] --json\",\"$defs\":{\"dependency\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1},\"optional\":{\"const\":true}},\"required\":[\"task\"],\"additionalProperties\":false}]},\"run\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1}},\"required\":[\"task\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tasks\"],\"additionalProperties\":false}]}},\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"aliases\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"description\":{\"type\":\"string\"},\"source\":{\"type\":\"string\"},\"config_sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"daemons\":{\"oneOf\":[{\"type\":\"boolean\"},{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"null\"}]},\"secrets\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends_post\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"wait_for\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"env\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"dir\":{\"type\":[\"string\",\"null\"]},\"hide\":{\"type\":\"boolean\"},\"global\":{\"type\":\"boolean\"},\"raw\":{\"type\":\"boolean\"},\"interactive\":{\"type\":\"boolean\"},\"sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"outputs\":{\"oneOf\":[{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"object\",\"properties\":{\"auto\":{\"const\":true}},\"required\":[\"auto\"],\"additionalProperties\":false}]},\"shell\":{\"type\":[\"string\",\"null\"]},\"quiet\":{\"type\":\"boolean\"},\"silent\":{\"oneOf\":[{\"type\":\"boolean\"},{\"enum\":[\"stdout\",\"stderr\"]}]},\"tools\":{\"type\":\"object\",\"additionalProperties\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"}},\"required\":[\"version\"],\"additionalProperties\":true}]}},\"usage\":{\"type\":\"string\"},\"timeout\":{\"type\":[\"string\",\"null\"]},\"run\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/run\"}},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"file\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"name\",\"aliases\",\"description\",\"source\",\"config_sources\",\"depends\",\"daemons\",\"secrets\",\"depends_post\",\"wait_for\",\"env\",\"dir\",\"hide\",\"global\",\"raw\",\"interactive\",\"sources\",\"outputs\",\"shell\",\"quiet\",\"silent\",\"tools\",\"usage\",\"timeout\",\"run\",\"args\",\"file\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Add a task
@@ -13162,31 +13162,31 @@ With `--file`, creates an executable script in the project's task directory (for
 @usage 'example "mise tasks add --file lint -- eslint ." help="Create an executable lint script in the task directory"'
 @usage 'example "mise tasks add ci --depends lint --depends test -- echo done" help="Add a task that runs after lint and test"'
 export def "mise tasks add" [
-    task: string@"nusage complete",                   # Name of the task to add
-    ...run: string,                                   # Command to run, given after `--`
-    --cd (-C): path@"nusage complete",                # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                        # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                              # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                                     # Suppress non-error messages
-    --shell: string,                                  # Run the task in a specific shell
-    --verbose (-v): int,                              # Show extra output (use -vv for even more)
-    --yes (-y),                                       # Answer yes to all confirmation prompts
-    --raw (-r),                                       # Connect tasks and install commands directly to the terminal
-    --locked,                                         # Require download URLs from the lockfile when installing
-    --silent,                                         # Suppress all task output and mise non-error messages
-    --alias (-a): list<string>@"nusage complete",     # Other names for the task
-    --depends (-d): list<string>@"nusage complete",   # Tasks to run before this one
-    --dir (-D): path@"nusage complete",               # Run the task in a specific directory
-    --file (-f),                                      # Create a file task instead of a TOML task
-    --hide (-H),                                      # Hide the task from `mise tasks` and completions
-    --sources (-s): list<string>,                     # Glob patterns of files this task uses as input
-    --wait-for (-w): list<string>@"nusage complete",  # Wait for these tasks to finish if they are also being run
-    --depends-post: list<string>@"nusage complete",   # Tasks to run after this one
-    --description: string,                            # Description of the task
-    --outputs: list<string>,                          # Glob patterns of files this task creates, used to skip it when they are up to date
-    --run-windows: string,                            # Command to run on Windows (TOML tasks only; ignored with `--file`)
+    task: string@"nus complete",                   # Name of the task to add
+    ...run: string,                                # Command to run, given after `--`
+    --cd (-C): path@"nus complete",                # Run as if mise were started in DIR
+    --env_ (-E): list<string>,                     # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                           # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                                  # Suppress non-error messages
+    --shell: string,                               # Run the task in a specific shell
+    --verbose (-v): int,                           # Show extra output (use -vv for even more)
+    --yes (-y),                                    # Answer yes to all confirmation prompts
+    --raw (-r),                                    # Connect tasks and install commands directly to the terminal
+    --locked,                                      # Require download URLs from the lockfile when installing
+    --silent,                                      # Suppress all task output and mise non-error messages
+    --alias (-a): list<string>@"nus complete",     # Other names for the task
+    --depends (-d): list<string>@"nus complete",   # Tasks to run before this one
+    --dir (-D): path@"nus complete",               # Run the task in a specific directory
+    --file (-f),                                   # Create a file task instead of a TOML task
+    --hide (-H),                                   # Hide the task from `mise tasks` and completions
+    --sources (-s): list<string>,                  # Glob patterns of files this task uses as input
+    --wait-for (-w): list<string>@"nus complete",  # Wait for these tasks to finish if they are also being run
+    --depends-post: list<string>@"nus complete",   # Tasks to run after this one
+    --description: string,                         # Description of the task
+    --outputs: list<string>,                       # Glob patterns of files this task creates, used to skip it when they are up to date
+    --run-windows: string,                         # Command to run on Windows (TOML tasks only; ignored with `--file`)
 ]: nothing -> string {
-    ^mise tasks add ...(nusage argv [$task ...$run] {
+    ^mise tasks add ...(nus argv [$task ...$run] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13229,21 +13229,21 @@ The tree is built from declared dependencies: `depends`, `depends_post`, and `wa
 @usage 'example "mise tasks deps --dot" help="Show dependencies in DOT format"'
 @usage 'example "mise tasks deps --compact" help="Collapse repeated dependencies"'
 export def "mise tasks deps" [
-    ...tasks: string,                   # Tasks to show (default: all tasks)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --hidden,                           # Show hidden tasks
-    --compact,                          # Collapse repeated dependencies after their first occurrence
-    --dot,                              # Display dependencies in DOT format
+    ...tasks: string,                # Tasks to show (default: all tasks)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --hidden,                        # Show hidden tasks
+    --compact,                       # Collapse repeated dependencies after their first occurrence
+    --dot,                           # Display dependencies in DOT format
 ]: nothing -> string {
-    ^mise tasks deps ...(nusage argv [...$tasks] {
+    ^mise tasks deps ...(nus argv [...$tasks] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13273,19 +13273,19 @@ Opens the file that defines the task in `$VISUAL` or `$EDITOR`: the script for a
 @usage 'example "mise tasks edit build" help="Edit the build task"'
 @usage r#'example "mise tasks edit --path build" help="Print the build task's file path"'#
 export def "mise tasks edit" [
-    task: string@"nusage complete",     # Task to edit
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --path (-p),                        # Print the task's file path instead of opening it
+    task: string@"nus complete",     # Task to edit
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --path (-p),                     # Print the task's file path instead of opening it
 ]: nothing -> string {
-    ^mise tasks edit ...(nusage argv [$task] {
+    ^mise tasks edit ...(nus argv [$task] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13322,19 +13322,19 @@ See https://mise.jdx.dev/tasks/workspace-graph.html
 @usage 'example "mise tasks graph --explain" help="Show which workspace file each project, dependency, and task came from"'
 @usage 'output json framing=json select=--json'
 export def "mise tasks graph" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --no-header,                        # Do not print table headers
-    --explain,                          # Show which provider and workspace file each project, dependency, and task field came from
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --no-header,                     # Do not print table headers
+    --explain,                       # Show which provider and workspace file each project, dependency, and task field came from
 ] {
-    ^mise tasks graph --json ...(nusage argv [] {
+    ^mise tasks graph --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13364,18 +13364,18 @@ Prints the task's description, source file, dependencies, sources, outputs, run 
 @usage 'example "mise tasks info test --json" help="Get the full structured task definition"'
 @usage 'output json framing=json select=--json'
 export def "mise tasks info" [
-    task: string@"nusage complete",     # Name of the task to get information about
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    task: string@"nus complete",     # Name of the task to get information about
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^mise tasks info --json ...(nusage argv [$task] {
+    ^mise tasks info --json ...(nus argv [$task] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13441,7 +13441,7 @@ See https://mise.jdx.dev/tasks/task-discovery.html
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise tasks [ls] --json\",\n  \"$defs\": {\n    \"dependency\": {\n      \"oneOf\": [\n        {\n          \"type\": \"string\"\n        },\n        {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          },\n          \"minItems\": 1\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"task\": {\n              \"type\": \"string\"\n            },\n            \"args\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              },\n              \"minItems\": 1\n            },\n            \"env\": {\n              \"type\": \"object\",\n              \"additionalProperties\": {\n                \"type\": \"string\"\n              },\n              \"minProperties\": 1\n            },\n            \"optional\": {\n              \"const\": true\n            }\n          },\n          \"required\": [\n            \"task\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"run\": {\n      \"oneOf\": [\n        {\n          \"type\": \"string\"\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"task\": {\n              \"type\": \"string\"\n            },\n            \"args\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              },\n              \"minItems\": 1\n            },\n            \"env\": {\n              \"type\": \"object\",\n              \"additionalProperties\": {\n                \"type\": \"string\"\n              },\n              \"minProperties\": 1\n            }\n          },\n          \"required\": [\n            \"task\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"tasks\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              }\n            }\n          },\n          \"required\": [\n            \"tasks\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    }\n  },\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"aliases\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"description\": {\n        \"type\": \"string\"\n      },\n      \"source\": {\n        \"type\": \"string\"\n      },\n      \"config_sources\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"depends\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"daemons\": {\n        \"oneOf\": [\n          {\n            \"type\": \"boolean\"\n          },\n          {\n            \"type\": \"string\"\n          },\n          {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"type\": \"null\"\n          }\n        ]\n      },\n      \"secrets\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"depends_post\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"wait_for\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"env\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"dir\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"hide\": {\n        \"type\": \"boolean\"\n      },\n      \"global\": {\n        \"type\": \"boolean\"\n      },\n      \"raw\": {\n        \"type\": \"boolean\"\n      },\n      \"interactive\": {\n        \"type\": \"boolean\"\n      },\n      \"sources\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"outputs\": {\n        \"oneOf\": [\n          {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"type\": \"object\",\n            \"properties\": {\n              \"auto\": {\n                \"const\": true\n              }\n            },\n            \"required\": [\n              \"auto\"\n            ],\n            \"additionalProperties\": false\n          }\n        ]\n      },\n      \"shell\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"quiet\": {\n        \"type\": \"boolean\"\n      },\n      \"silent\": {\n        \"oneOf\": [\n          {\n            \"type\": \"boolean\"\n          },\n          {\n            \"enum\": [\n              \"stdout\",\n              \"stderr\"\n            ]\n          }\n        ]\n      },\n      \"tools\": {\n        \"type\": \"object\",\n        \"additionalProperties\": {\n          \"oneOf\": [\n            {\n              \"type\": \"string\"\n            },\n            {\n              \"type\": \"object\",\n              \"properties\": {\n                \"version\": {\n                  \"type\": \"string\"\n                }\n              },\n              \"required\": [\n                \"version\"\n              ],\n              \"additionalProperties\": true\n            }\n          ]\n        }\n      },\n      \"usage\": {\n        \"type\": \"string\"\n      },\n      \"timeout\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"run\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/run\"\n        }\n      },\n      \"args\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"file\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"aliases\",\n      \"description\",\n      \"source\",\n      \"config_sources\",\n      \"depends\",\n      \"daemons\",\n      \"secrets\",\n      \"depends_post\",\n      \"wait_for\",\n      \"env\",\n      \"dir\",\n      \"hide\",\n      \"global\",\n      \"raw\",\n      \"interactive\",\n      \"sources\",\n      \"outputs\",\n      \"shell\",\n      \"quiet\",\n      \"silent\",\n      \"tools\",\n      \"usage\",\n      \"timeout\",\n      \"run\",\n      \"args\",\n      \"file\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
 }'
 export def "mise tasks ls" [
-    --cd (-C): path@"nusage complete",               # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",                  # Run as if mise were started in DIR
     --env_ (-E): list<string>,                       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                             # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                                    # Suppress non-error messages
@@ -13460,7 +13460,7 @@ export def "mise tasks ls" [
     --sort: string@[name alias description source],  # Column to sort by (default: name)
     --sort-order: string@[asc desc],                 # Sort direction (default: asc)
 ]: nothing -> table<name: string, aliases: list<string>, description: string, source: string, config_sources: list<string>, depends: list<oneof<string, list<string>, record<task: string>>>, daemons: oneof<bool, string, list<string>, nothing>, secrets: list<string>, depends_post: list<oneof<string, list<string>, record<task: string>>>, wait_for: list<oneof<string, list<string>, record<task: string>>>, env: list<string>, dir: oneof<string, nothing>, hide: bool, global: bool, raw: bool, interactive: bool, sources: list<string>, outputs: oneof<list<string>, record<auto: bool>>, shell: oneof<string, nothing>, quiet: bool, silent: oneof<bool, string>, tools: record, usage: string, timeout: oneof<string, nothing>, run: list<oneof<string, record<task: string>, record<tasks: list<string>>>>, args: list<string>, file: oneof<string, nothing>> {
-    let text = ^mise tasks ls --json ...(nusage argv [] {
+    let text = ^mise tasks ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13480,7 +13480,7 @@ export def "mise tasks ls" [
         --sort: $sort
         --sort-order: $sort_order
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks [ls] --json\",\"$defs\":{\"dependency\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1},\"optional\":{\"const\":true}},\"required\":[\"task\"],\"additionalProperties\":false}]},\"run\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1}},\"required\":[\"task\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tasks\"],\"additionalProperties\":false}]}},\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"aliases\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"description\":{\"type\":\"string\"},\"source\":{\"type\":\"string\"},\"config_sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"daemons\":{\"oneOf\":[{\"type\":\"boolean\"},{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"null\"}]},\"secrets\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends_post\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"wait_for\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"env\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"dir\":{\"type\":[\"string\",\"null\"]},\"hide\":{\"type\":\"boolean\"},\"global\":{\"type\":\"boolean\"},\"raw\":{\"type\":\"boolean\"},\"interactive\":{\"type\":\"boolean\"},\"sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"outputs\":{\"oneOf\":[{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"object\",\"properties\":{\"auto\":{\"const\":true}},\"required\":[\"auto\"],\"additionalProperties\":false}]},\"shell\":{\"type\":[\"string\",\"null\"]},\"quiet\":{\"type\":\"boolean\"},\"silent\":{\"oneOf\":[{\"type\":\"boolean\"},{\"enum\":[\"stdout\",\"stderr\"]}]},\"tools\":{\"type\":\"object\",\"additionalProperties\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"}},\"required\":[\"version\"],\"additionalProperties\":true}]}},\"usage\":{\"type\":\"string\"},\"timeout\":{\"type\":[\"string\",\"null\"]},\"run\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/run\"}},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"file\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"name\",\"aliases\",\"description\",\"source\",\"config_sources\",\"depends\",\"daemons\",\"secrets\",\"depends_post\",\"wait_for\",\"env\",\"dir\",\"hide\",\"global\",\"raw\",\"interactive\",\"sources\",\"outputs\",\"shell\",\"quiet\",\"silent\",\"tools\",\"usage\",\"timeout\",\"run\",\"args\",\"file\"],\"additionalProperties\":false}}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks [ls] --json\",\"$defs\":{\"dependency\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1},\"optional\":{\"const\":true}},\"required\":[\"task\"],\"additionalProperties\":false}]},\"run\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1}},\"required\":[\"task\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tasks\"],\"additionalProperties\":false}]}},\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"aliases\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"description\":{\"type\":\"string\"},\"source\":{\"type\":\"string\"},\"config_sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"daemons\":{\"oneOf\":[{\"type\":\"boolean\"},{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"null\"}]},\"secrets\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends_post\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"wait_for\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"env\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"dir\":{\"type\":[\"string\",\"null\"]},\"hide\":{\"type\":\"boolean\"},\"global\":{\"type\":\"boolean\"},\"raw\":{\"type\":\"boolean\"},\"interactive\":{\"type\":\"boolean\"},\"sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"outputs\":{\"oneOf\":[{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"object\",\"properties\":{\"auto\":{\"const\":true}},\"required\":[\"auto\"],\"additionalProperties\":false}]},\"shell\":{\"type\":[\"string\",\"null\"]},\"quiet\":{\"type\":\"boolean\"},\"silent\":{\"oneOf\":[{\"type\":\"boolean\"},{\"enum\":[\"stdout\",\"stderr\"]}]},\"tools\":{\"type\":\"object\",\"additionalProperties\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"}},\"required\":[\"version\"],\"additionalProperties\":true}]}},\"usage\":{\"type\":\"string\"},\"timeout\":{\"type\":[\"string\",\"null\"]},\"run\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/run\"}},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"file\":{\"type\":[\"string\",\"null\"]}},\"required\":[\"name\",\"aliases\",\"description\",\"source\",\"config_sources\",\"depends\",\"daemons\",\"secrets\",\"depends_post\",\"wait_for\",\"env\",\"dir\",\"hide\",\"global\",\"raw\",\"interactive\",\"sources\",\"outputs\",\"shell\",\"quiet\",\"silent\",\"tools\",\"usage\",\"timeout\",\"run\",\"args\",\"file\"],\"additionalProperties\":false}}" { from json }
 }
 
 # Check task definitions for errors
@@ -13507,19 +13507,19 @@ Exits 1 if any error is found, so you can run it in CI. Warnings are reported bu
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise tasks validate --json\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"tasks_validated\": {\n      \"type\": \"integer\",\n      \"minimum\": 0\n    },\n    \"errors\": {\n      \"type\": \"integer\",\n      \"minimum\": 0\n    },\n    \"warnings\": {\n      \"type\": \"integer\",\n      \"minimum\": 0\n    },\n    \"issues\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"task\": {\n            \"type\": \"string\"\n          },\n          \"severity\": {\n            \"enum\": [\n              \"error\",\n              \"warning\",\n              \"info\"\n            ]\n          },\n          \"category\": {\n            \"type\": \"string\"\n          },\n          \"message\": {\n            \"type\": \"string\"\n          },\n          \"details\": {\n            \"type\": \"string\"\n          }\n        },\n        \"required\": [\n          \"task\",\n          \"severity\",\n          \"category\",\n          \"message\"\n        ],\n        \"additionalProperties\": false\n      }\n    }\n  },\n  \"required\": [\n    \"tasks_validated\",\n    \"errors\",\n    \"warnings\",\n    \"issues\"\n  ],\n  \"additionalProperties\": false\n}\n"
 }'
 export def "mise tasks validate" [
-    ...tasks: string,                   # Tasks to validate (default: all tasks)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --errors-only,                      # Only show errors (skip warnings)
+    ...tasks: string,                # Tasks to validate (default: all tasks)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --errors-only,                   # Only show errors (skip warnings)
 ]: nothing -> record<tasks_validated: int, errors: int, warnings: int, issues: table<task: string, severity: string, category: string, message: string, details: oneof<string, nothing>>> {
-    let text = ^mise tasks validate --json ...(nusage argv [...$tasks] {
+    let text = ^mise tasks validate --json ...(nus argv [...$tasks] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13531,7 +13531,7 @@ export def "mise tasks validate" [
         --silent: $silent
         --errors-only: $errors_only
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks validate --json\",\"type\":\"object\",\"properties\":{\"tasks_validated\":{\"type\":\"integer\",\"minimum\":0},\"errors\":{\"type\":\"integer\",\"minimum\":0},\"warnings\":{\"type\":\"integer\",\"minimum\":0},\"issues\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"severity\":{\"enum\":[\"error\",\"warning\",\"info\"]},\"category\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"details\":{\"type\":\"string\"}},\"required\":[\"task\",\"severity\",\"category\",\"message\"],\"additionalProperties\":false}}},\"required\":[\"tasks_validated\",\"errors\",\"warnings\",\"issues\"],\"additionalProperties\":false}" { from json | update issues { default null details } }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks validate --json\",\"type\":\"object\",\"properties\":{\"tasks_validated\":{\"type\":\"integer\",\"minimum\":0},\"errors\":{\"type\":\"integer\",\"minimum\":0},\"warnings\":{\"type\":\"integer\",\"minimum\":0},\"issues\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"severity\":{\"enum\":[\"error\",\"warning\",\"info\"]},\"category\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"details\":{\"type\":\"string\"}},\"required\":[\"task\",\"severity\",\"category\",\"message\"],\"additionalProperties\":false}}},\"required\":[\"tasks_validated\",\"errors\",\"warnings\",\"issues\"],\"additionalProperties\":false}" { from json | update issues { default null details } }
 }
 
 # Test that a tool installs and runs
@@ -13598,21 +13598,21 @@ Implies `--jobs=1`.
 @usage 'example "mise test-tool ripgrep" help="Reinstall ripgrep and run its registry test"'
 @usage 'example "MISE_DATA_DIR=$(mktemp -d) MISE_CACHE_DIR=$(mktemp -d) mise test-tool --all-config" help="Test every tool in the config without touching your installs"'
 export def "mise test-tool" [
-    ...tools: string,                   # Tools to test
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --all (-a),                         # Test every registry tool that defines a `test` and supports this OS
-    --all-config,                       # Test all tools specified in config files
-    --include-non-defined,              # Also test registry tools that have no `test` entry by running `<tool> --version`
+    ...tools: string,                # Tools to test
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --all (-a),                      # Test every registry tool that defines a `test` and supports this OS
+    --all-config,                    # Test all tools specified in config files
+    --include-non-defined,           # Also test registry tools that have no `test` entry by running `<tool> --version`
 ]: nothing -> string {
-    ^mise test-tool ...(nusage argv [...$tools] {
+    ^mise test-tool ...(nus argv [...$tools] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13642,17 +13642,17 @@ See https://mise.jdx.dev/dev-tools/github-tokens.html
 """#'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise token" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise token ...(nusage argv [] {
+    ^mise token ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13691,19 +13691,19 @@ mise token forgejo forgejo.mycompany.com
 forgejo.mycompany.com: (none)
 """# help="Check a self-hosted Forgejo instance"'
 export def "mise token forgejo" [
-    host?: string,                      # Forgejo hostname
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --unmask,                           # Show the full unmasked token
+    host?: string,                   # Forgejo hostname
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --unmask,                        # Show the full unmasked token
 ]: nothing -> string {
-    ^mise token forgejo ...(nusage argv [$host] {
+    ^mise token forgejo ...(nus argv [$host] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13754,21 +13754,21 @@ github.com: gho_…xxxx (source: GitHub OAuth)
 """# help="Get a new token through native GitHub OAuth"'
 @usage 'example "GH_TOKEN=$(mise token github --raw) gh api user" help="Pass the resolved token to another tool"'
 export def "mise token github" [
-    host?: string,                      # GitHub hostname
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --oauth,                            # Use only native GitHub OAuth (a cached token, a refresh, or the device-code flow), ignoring other token sources
-    --refresh,                          # With --oauth, get a new OAuth token even if the cached one has not expired, through the refresh-token grant or a new device-code flow. Use it after changing the GitHub App's installations or permissions: cached tokens keep their original access until they expire.
-    --unmask,                           # Show the full unmasked token
+    host?: string,                   # GitHub hostname
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --oauth,                         # Use only native GitHub OAuth (a cached token, a refresh, or the device-code flow), ignoring other token sources
+    --refresh,                       # With --oauth, get a new OAuth token even if the cached one has not expired, through the refresh-token grant or a new device-code flow. Use it after changing the GitHub App's installations or permissions: cached tokens keep their original access until they expire.
+    --unmask,                        # Show the full unmasked token
 ]: nothing -> string {
-    ^mise token github ...(nusage argv [$host] {
+    ^mise token github ...(nus argv [$host] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13810,19 +13810,19 @@ mise token gitlab gitlab.mycompany.com
 gitlab.mycompany.com: (none)
 """# help="Check a self-managed GitLab instance"'
 export def "mise token gitlab" [
-    host?: string,                      # GitLab hostname
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --unmask,                           # Show the full unmasked token
+    host?: string,                   # GitLab hostname
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --unmask,                        # Show the full unmasked token
 ]: nothing -> string {
-    ^mise token gitlab ...(nusage argv [$host] {
+    ^mise token gitlab ...(nus argv [$host] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13878,26 +13878,26 @@ core:node
 """# help="Print only the backend"'
 @usage 'output json framing=json select=--json'
 export def "mise tool" [
-    tool: string@"nusage complete",     # The tool, such as `node` or `aqua:jqlang/jq`
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --active,                           # Only show active versions
-    --backend,                          # Only show backend field
-    --config-source,                    # Only show config source
-    --description,                      # Only show description field
-    --installed,                        # Only show installed versions
-    --requested,                        # Only show requested versions
-    --tool-options,                     # Only show tool options
-    --url,                              # Only show the project URL from the registry
+    tool: string@"nus complete",     # The tool, such as `node` or `aqua:jqlang/jq`
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --active,                        # Only show active versions
+    --backend,                       # Only show backend field
+    --config-source,                 # Only show config source
+    --description,                   # Only show description field
+    --installed,                     # Only show installed versions
+    --requested,                     # Only show requested versions
+    --tool-options,                  # Only show tool options
+    --url,                           # Only show the project URL from the registry
 ] {
-    ^mise tool --json ...(nusage argv [$tool] {
+    ^mise tool --json ...(nus argv [$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13967,19 +13967,19 @@ Arguments to pass to the tool
 Every argument after the stub path is passed to the tool unchanged, including a literal `--`.
 """# required=#false double_dash=automatic var=#true'
 export def "mise tool-stub" [
-    file: string,                       # Path to the TOML tool stub file to execute
-    ...args: string,                    # Arguments to pass to the tool
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    file: string,                    # Path to the TOML tool stub file to execute
+    ...args: string,                 # Arguments to pass to the tool
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise tool-stub ...(nusage argv [$file ...$args] {
+    ^mise tool-stub ...(nus argv [$file ...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14066,22 +14066,22 @@ Does not trust or untrust any files.
 @usage 'example "mise trust --show" help="List configs here and above with their trust status"'
 @usage 'complete config_file type=path'
 export def "mise trust" [
-    config_file?: path@"nusage complete",  # The config file whose trust status to change
-    --cd (-C): path@"nusage complete",     # Run as if mise were started in DIR
-    --env_ (-E): list<string>,             # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                   # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                          # Suppress non-error messages
-    --verbose (-v): int,                   # Show extra output (use -vv for even more)
-    --yes (-y),                            # Answer yes to all confirmation prompts
-    --raw,                                 # Connect tasks and install commands directly to the terminal
-    --locked,                              # Require download URLs from the lockfile when installing
-    --silent,                              # Suppress all task output and mise non-error messages
-    --all (-a),                            # Trust all config files in the current directory, its parents, and its subdirectories
-    --ignore,                              # Do not trust this config and ignore it in the future
-    --show,                                # Show the trust status of config files in the current directory and its parents
-    --untrust,                             # Remove explicit trust for this config
+    config_file?: path@"nus complete",  # The config file whose trust status to change
+    --cd (-C): path@"nus complete",     # Run as if mise were started in DIR
+    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                       # Suppress non-error messages
+    --verbose (-v): int,                # Show extra output (use -vv for even more)
+    --yes (-y),                         # Answer yes to all confirmation prompts
+    --raw,                              # Connect tasks and install commands directly to the terminal
+    --locked,                           # Require download URLs from the lockfile when installing
+    --silent,                           # Suppress all task output and mise non-error messages
+    --all (-a),                         # Trust all config files in the current directory, its parents, and its subdirectories
+    --ignore,                           # Do not trust this config and ignore it in the future
+    --show,                             # Show the trust status of config files in the current directory and its parents
+    --untrust,                          # Remove explicit trust for this config
 ]: nothing -> string {
-    ^mise trust ...(nusage argv [$config_file] {
+    ^mise trust ...(nus argv [$config_file] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14127,21 +14127,21 @@ Use it in scripts that check whether tools need uninstalling.
 @usage 'example "mise uninstall node" help="Uninstall node when exactly one version is installed"'
 @usage 'example "mise uninstall --all node" help="Uninstall every installed version of node"'
 export def "mise uninstall" [
-    ...installed_tool_version: string@"nusage complete",  # Tools to remove, such as node@22.0.0
-    --cd (-C): path@"nusage complete",                    # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                                  # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                                       # Show what would change without changing anything
-    --quiet (-q),                                         # Suppress non-error messages
-    --verbose (-v): int,                                  # Show extra output (use -vv for even more)
-    --yes (-y),                                           # Answer yes to all confirmation prompts
-    --raw,                                                # Connect tasks and install commands directly to the terminal
-    --locked,                                             # Require download URLs from the lockfile when installing
-    --silent,                                             # Suppress all task output and mise non-error messages
-    --all (-a),                                           # Remove every installed version of the named tools, or of every tool when none is named
-    --dry-run-code,                                       # Like --dry-run, but exit with code 1 if there are tools to uninstall
+    ...installed_tool_version: string@"nus complete",  # Tools to remove, such as node@22.0.0
+    --cd (-C): path@"nus complete",                    # Run as if mise were started in DIR
+    --env_ (-E): list<string>,                         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                               # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                                    # Show what would change without changing anything
+    --quiet (-q),                                      # Suppress non-error messages
+    --verbose (-v): int,                               # Show extra output (use -vv for even more)
+    --yes (-y),                                        # Answer yes to all confirmation prompts
+    --raw,                                             # Connect tasks and install commands directly to the terminal
+    --locked,                                          # Require download URLs from the lockfile when installing
+    --silent,                                          # Suppress all task output and mise non-error messages
+    --all (-a),                                        # Remove every installed version of the named tools, or of every tool when none is named
+    --dry-run-code,                                    # Like --dry-run, but exit with code 1 if there are tools to uninstall
 ]: nothing -> string {
-    ^mise uninstall ...(nusage argv [...$installed_tool_version] {
+    ^mise uninstall ...(nus argv [...$installed_tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14192,21 +14192,21 @@ See https://mise.jdx.dev/configuration.html#override-file
 @usage 'example "mise unset -g NODE_ENV" help="Remove NODE_ENV from the global config"'
 @usage 'complete file type=path'
 export def "mise unset" [
-    ...env_key: string@"nusage complete",  # Environment variables to remove, such as NODE_ENV
-    --cd (-C): path@"nusage complete",     # Run as if mise were started in DIR
-    --env_ (-E): list<string>,             # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                   # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                          # Suppress non-error messages
-    --verbose (-v): int,                   # Show extra output (use -vv for even more)
-    --yes (-y),                            # Answer yes to all confirmation prompts
-    --raw,                                 # Connect tasks and install commands directly to the terminal
-    --locked,                              # Require download URLs from the lockfile when installing
-    --silent,                              # Suppress all task output and mise non-error messages
-    --file (-f): path@"nusage complete",   # The TOML file to edit instead of the default target
-    --global (-g),                         # Use the global config file
-    --override,                            # Use the global override file, `config.override.toml`
+    ...env_key: string@"nus complete",  # Environment variables to remove, such as NODE_ENV
+    --cd (-C): path@"nus complete",     # Run as if mise were started in DIR
+    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                       # Suppress non-error messages
+    --verbose (-v): int,                # Show extra output (use -vv for even more)
+    --yes (-y),                         # Answer yes to all confirmation prompts
+    --raw,                              # Connect tasks and install commands directly to the terminal
+    --locked,                           # Require download URLs from the lockfile when installing
+    --silent,                           # Suppress all task output and mise non-error messages
+    --file (-f): path@"nus complete",   # The TOML file to edit instead of the default target
+    --global (-g),                      # Use the global config file
+    --override,                         # Use the global override file, `config.override.toml`
 ]: nothing -> string {
-    ^mise unset ...(nusage argv [...$env_key] {
+    ^mise unset ...(nus argv [...$env_key] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14239,18 +14239,18 @@ no file, untrusts the nearest config in this directory or a parent. Same as
 @usage 'example "mise untrust ~/src/app/mise.toml" help="Stop trusting a specific file"'
 @usage 'complete config_file type=path'
 export def "mise untrust" [
-    config_file?: path@"nusage complete",  # The config file to untrust
-    --cd (-C): path@"nusage complete",     # Run as if mise were started in DIR
-    --env_ (-E): list<string>,             # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                   # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                          # Suppress non-error messages
-    --verbose (-v): int,                   # Show extra output (use -vv for even more)
-    --yes (-y),                            # Answer yes to all confirmation prompts
-    --raw,                                 # Connect tasks and install commands directly to the terminal
-    --locked,                              # Require download URLs from the lockfile when installing
-    --silent,                              # Suppress all task output and mise non-error messages
+    config_file?: path@"nus complete",  # The config file to untrust
+    --cd (-C): path@"nus complete",     # Run as if mise were started in DIR
+    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                       # Suppress non-error messages
+    --verbose (-v): int,                # Show extra output (use -vv for even more)
+    --yes (-y),                         # Answer yes to all confirmation prompts
+    --raw,                              # Connect tasks and install commands directly to the terminal
+    --locked,                           # Require download URLs from the lockfile when installing
+    --silent,                           # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise untrust ...(nusage argv [$config_file] {
+    ^mise untrust ...(nus argv [$config_file] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14326,22 +14326,22 @@ The override file outranks all project config. With `--env`, writes `config.<ENV
 @usage 'example "mise unuse --env staging node@20" help="Remove the node@20 request from mise.staging.toml"'
 @usage 'complete path type=path'
 export def "mise unuse" [
-    ...installed_tool_version: string@"nusage complete",  # Tools to remove from the config, with the version written as in the config
-    --cd (-C): path@"nusage complete",                    # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                                  # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                                         # Suppress non-error messages
-    --verbose (-v): int,                                  # Show extra output (use -vv for even more)
-    --yes (-y),                                           # Answer yes to all confirmation prompts
-    --raw,                                                # Connect tasks and install commands directly to the terminal
-    --locked,                                             # Require download URLs from the lockfile when installing
-    --silent,                                             # Suppress all task output and mise non-error messages
-    --global (-g),                                        # Use the global config file (`~/.config/mise/config.toml`) instead of the local one
-    --path (-p): path@"nusage complete",                  # Edit this config file, or the config file in this directory
-    --override,                                           # Write to the global override file, `config.override.toml`
-    --no-prune,                                           # Do not also prune the installed version
+    ...installed_tool_version: string@"nus complete",  # Tools to remove from the config, with the version written as in the config
+    --cd (-C): path@"nus complete",                    # Run as if mise were started in DIR
+    --env_ (-E): list<string>,                         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                               # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                                      # Suppress non-error messages
+    --verbose (-v): int,                               # Show extra output (use -vv for even more)
+    --yes (-y),                                        # Answer yes to all confirmation prompts
+    --raw,                                             # Connect tasks and install commands directly to the terminal
+    --locked,                                          # Require download URLs from the lockfile when installing
+    --silent,                                          # Suppress all task output and mise non-error messages
+    --global (-g),                                     # Use the global config file (`~/.config/mise/config.toml`) instead of the local one
+    --path (-p): path@"nus complete",                  # Edit this config file, or the config file in this directory
+    --override,                                        # Write to the global override file, `config.override.toml`
+    --no-prune,                                        # Do not also prune the installed version
 ]: nothing -> string {
-    ^mise unuse ...(nusage argv [...$installed_tool_version] {
+    ^mise unuse ...(nus argv [...$installed_tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14477,30 +14477,30 @@ Upgrades every configured tool when omitted.
 @usage 'example "mise upgrade --interactive" help="Choose tools from a menu"'
 @usage r#'example "mise upgrade --global claude" help="Upgrade claude within the global config's request, leaving project config alone"'#
 export def "mise upgrade" [
-    ...installed_tool_version: string@"nusage complete",  # Tools to upgrade, such as node@20 python@3.10
-    --cd (-C): path@"nusage complete",                    # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                                  # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                                       # Show what would change without changing anything
-    --quiet (-q),                                         # Suppress non-error messages
-    --verbose (-v): int,                                  # Show extra output (use -vv for even more)
-    --yes (-y),                                           # Answer yes to all confirmation prompts
-    --raw,                                                # Connect tasks and install commands directly to the terminal
-    --locked,                                             # Require download URLs from the lockfile when installing
-    --silent,                                             # Suppress all task output and mise non-error messages
-    --bump (-b),                                          # Upgrade past the configured range to the newest release, and update the config to match
-    --pin,                                                # With --bump, write the resolved version instead of keeping the request's precision
-    --interactive (-i),                                   # Choose which tools to upgrade from a multiselect menu
-    --exclude (-x): list<string>@"nusage complete",       # Tools to exclude from upgrading, such as go python
-    --dry-run-code,                                       # Like --dry-run, but exit with code 1 if there are outdated tools
-    --inactive,                                           # Also upgrade installed tools that the current config does not request
-    --global,                                             # Only upgrade tools defined in the global config
-    --local,                                              # Only upgrade tools defined in project config files
-    --minimum-release-age: string,                        # Only upgrade to versions released before this date or older than this duration
-    --no-prune,                                           # Do not uninstall the versions that were upgraded away from
-    --prune,                                              # Immediately uninstall the versions that were upgraded away from
+    ...installed_tool_version: string@"nus complete",  # Tools to upgrade, such as node@20 python@3.10
+    --cd (-C): path@"nus complete",                    # Run as if mise were started in DIR
+    --env_ (-E): list<string>,                         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                               # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                                    # Show what would change without changing anything
+    --quiet (-q),                                      # Suppress non-error messages
+    --verbose (-v): int,                               # Show extra output (use -vv for even more)
+    --yes (-y),                                        # Answer yes to all confirmation prompts
+    --raw,                                             # Connect tasks and install commands directly to the terminal
+    --locked,                                          # Require download URLs from the lockfile when installing
+    --silent,                                          # Suppress all task output and mise non-error messages
+    --bump (-b),                                       # Upgrade past the configured range to the newest release, and update the config to match
+    --pin,                                             # With --bump, write the resolved version instead of keeping the request's precision
+    --interactive (-i),                                # Choose which tools to upgrade from a multiselect menu
+    --exclude (-x): list<string>@"nus complete",       # Tools to exclude from upgrading, such as go python
+    --dry-run-code,                                    # Like --dry-run, but exit with code 1 if there are outdated tools
+    --inactive,                                        # Also upgrade installed tools that the current config does not request
+    --global,                                          # Only upgrade tools defined in the global config
+    --local,                                           # Only upgrade tools defined in project config files
+    --minimum-release-age: string,                     # Only upgrade to versions released before this date or older than this duration
+    --no-prune,                                        # Do not uninstall the versions that were upgraded away from
+    --prune,                                           # Immediately uninstall the versions that were upgraded away from
 ]: nothing -> string {
-    ^mise upgrade ...(nusage argv [...$installed_tool_version] {
+    ^mise upgrade ...(nus argv [...$installed_tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14676,30 +14676,30 @@ Tool options can also be set inline:
 @usage 'example "mise use --env staging node@24" help="Write mise.staging.toml, which mise loads when MISE_ENV=staging"'
 @usage 'complete path type=path'
 export def "mise use" [
-    ...tool_version: string@"nusage complete",  # Tool to add to the config file, such as node@24, cargo:ripgrep@latest, or npm:prettier@3
-    --cd (-C): path@"nusage complete",          # Run as if mise were started in DIR
-    --env_ (-E): list<string>,                  # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --force (-f),                               # Reinstall even if already installed
-    --jobs (-j): string,                        # How many jobs to run in parallel; defaults to the `jobs` setting
-    --dry-run (-n),                             # Show what would change without changing anything
-    --quiet (-q),                               # Suppress non-error messages
-    --verbose (-v): int,                        # Show extra output (use -vv for even more)
-    --yes (-y),                                 # Answer yes to all confirmation prompts
-    --raw,                                      # Connect tasks and install commands directly to the terminal
-    --locked,                                   # Require download URLs from the lockfile when installing
-    --silent,                                   # Suppress all task output and mise non-error messages
-    --global (-g),                              # Write to the global config instead of the project config
-    --path (-p): path@"nusage complete",        # Write to this config file, or to the config file in this directory
-    --override,                                 # Write to the global override file, `config.override.toml`
-    --dry-run-code,                             # Like --dry-run, but exit with code 1 if there are changes to make
-    --fuzzy,                                    # Write the version as requested, such as `20` for node@20
-    --minimum-release-age: string,              # Only install versions released before this date or older than this duration
-    --pin,                                      # Write the resolved version, such as `20.19.5` for node@20
-    --remove: list<string>@"nusage complete",   # Remove these tools from the config file
-    --postinstall: string,                      # Command to run after installing this tool
-    --tool-option: list<string>,                # Set an option for the tool that follows; repeat for several options
+    ...tool_version: string@"nus complete",  # Tool to add to the config file, such as node@24, cargo:ripgrep@latest, or npm:prettier@3
+    --cd (-C): path@"nus complete",          # Run as if mise were started in DIR
+    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-f),                            # Reinstall even if already installed
+    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                          # Show what would change without changing anything
+    --quiet (-q),                            # Suppress non-error messages
+    --verbose (-v): int,                     # Show extra output (use -vv for even more)
+    --yes (-y),                              # Answer yes to all confirmation prompts
+    --raw,                                   # Connect tasks and install commands directly to the terminal
+    --locked,                                # Require download URLs from the lockfile when installing
+    --silent,                                # Suppress all task output and mise non-error messages
+    --global (-g),                           # Write to the global config instead of the project config
+    --path (-p): path@"nus complete",        # Write to this config file, or to the config file in this directory
+    --override,                              # Write to the global override file, `config.override.toml`
+    --dry-run-code,                          # Like --dry-run, but exit with code 1 if there are changes to make
+    --fuzzy,                                 # Write the version as requested, such as `20` for node@20
+    --minimum-release-age: string,           # Only install versions released before this date or older than this duration
+    --pin,                                   # Write the resolved version, such as `20.19.5` for node@20
+    --remove: list<string>@"nus complete",   # Remove these tools from the config file
+    --postinstall: string,                   # Command to run after installing this tool
+    --tool-option: list<string>,             # Set an option for the tool that follows; repeat for several options
 ]: nothing -> string {
-    ^mise use ...(nusage argv [...$tool_version] {
+    ^mise use ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -14749,19 +14749,19 @@ See https://mise.jdx.dev/configuration/vars.html#prompt
 @usage 'example "mise vars git_name" help="Print the saved value of git_name"'
 @usage 'example "mise vars" help="List every var and its source"'
 export def "mise vars" [
-    ...name_value: string,              # Values to save (`NAME=VALUE`) or to print (`NAME`)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --no-header,                        # Do not print the table header
+    ...name_value: string,           # Values to save (`NAME=VALUE`) or to print (`NAME`)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --no-header,                     # Do not print the table header
 ]: nothing -> string {
-    ^mise vars ...(nusage argv [...$name_value] {
+    ^mise vars ...(nus argv [...$name_value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14793,18 +14793,18 @@ warns here.
 @usage 'flag --no-header help="Do not print the table header"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 export def "mise vars ls" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
-    --no-header,                        # Do not print the table header
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --no-header,                     # Do not print the table header
 ]: nothing -> string {
-    ^mise vars ls ...(nusage argv [] {
+    ^mise vars ls ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14842,18 +14842,18 @@ env var, so it needs no terminal.
 @usage 'example "mise vars prompt git_name" help="Ask for git_name only"'
 @usage 'example "mise vars prompt git_name=\"Ada Lovelace\"" help="Set the answer for git_name without asking"'
 export def "mise vars prompt" [
-    ...name_value: string,              # Vars to ask for (`NAME`) or answers to save (`NAME=VALUE`)
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...name_value: string,           # Vars to ask for (`NAME`) or answers to save (`NAME=VALUE`)
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise vars prompt ...(nusage argv [...$name_value] {
+    ^mise vars prompt ...(nus argv [...$name_value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14881,18 +14881,18 @@ Edits `$MISE_STATE_DIR/vars.toml`; no config is loaded. The next
 @usage 'arg "[NAME]…" help="The vars whose answers to forget" required=#false var=#true'
 @usage 'example "mise vars unset git_name" help="Be asked for git_name again"'
 export def "mise vars unset" [
-    ...name: string,                    # The vars whose answers to forget
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    ...name: string,                 # The vars whose answers to forget
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise vars unset ...(nusage argv [...$name] {
+    ^mise vars unset ...(nus argv [...$name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14929,17 +14929,17 @@ mise version
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"version\": {\n      \"type\": \"string\"\n    },\n    \"latest\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"os\": {\n      \"type\": \"string\"\n    },\n    \"arch\": {\n      \"type\": \"string\"\n    },\n    \"build_time\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"version\",\n    \"latest\",\n    \"os\",\n    \"arch\",\n    \"build_time\"\n  ],\n  \"additionalProperties\": false\n}\n"
 }'
 export def "mise version" [
-    --cd (-C): path@"nusage complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                       # Suppress non-error messages
-    --verbose (-v): int,                # Show extra output (use -vv for even more)
-    --yes (-y),                         # Answer yes to all confirmation prompts
-    --raw,                              # Connect tasks and install commands directly to the terminal
-    --locked,                           # Require download URLs from the lockfile when installing
-    --silent,                           # Suppress all task output and mise non-error messages
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> record<version: string, latest: oneof<string, nothing>, os: string, arch: string, build_time: string> {
-    let text = ^mise version --json ...(nusage argv [] {
+    let text = ^mise version --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14950,7 +14950,7 @@ export def "mise version" [
         --locked: $locked
         --silent: $silent
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"},\"latest\":{\"type\":[\"string\",\"null\"]},\"os\":{\"type\":\"string\"},\"arch\":{\"type\":\"string\"},\"build_time\":{\"type\":\"string\"}},\"required\":[\"version\",\"latest\",\"os\",\"arch\",\"build_time\"],\"additionalProperties\":false}" { from json }
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"},\"latest\":{\"type\":[\"string\",\"null\"]},\"os\":{\"type\":\"string\"},\"arch\":{\"type\":\"string\"},\"build_time\":{\"type\":\"string\"}},\"required\":[\"version\",\"latest\",\"os\",\"arch\",\"build_time\"],\"additionalProperties\":false}" { from json }
 }
 
 # Run tasks and rerun them when files change
@@ -15531,9 +15531,9 @@ This shows the manual page for Watchexec, if the output is a terminal and the 'm
 @usage 'complete path type=path'
 @usage 'complete directory type=dir'
 export def "mise watch" [
-    task?: string@"nusage complete",                                              # Task to watch (default: `default`); separate several tasks with `:::`
+    task?: string@"nus complete",                                                 # Task to watch (default: `default`); separate several tasks with `:::`
     ...args: string,                                                              # Arguments for the task; `:::` starts the next task
-    --cd (-C): path@"nusage complete",                                            # Run as if mise were started in DIR
+    --cd (-C): path@"nus complete",                                               # Run as if mise were started in DIR
     --env_ (-E): list<string>,                                                    # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                                                          # How many jobs to run in parallel; defaults to the `jobs` setting
     --quiet (-q),                                                                 # Suppress non-error messages
@@ -15546,9 +15546,9 @@ export def "mise watch" [
     --timings,                                                                    # Print how long the command took to run
     --glob (-g): list<string>,                                                    # Globs to watch instead of the tasks' sources
     --skip-deps,                                                                  # Run and watch only the named tasks, not the tasks they depend on
-    --watch (-w): list<path>@"nusage complete",                                   # Watch a file or directory
-    --watch-non-recursive (-W): list<path>@"nusage complete",                     # Watch a directory without recursing into it
-    --watch-file (-F): path@"nusage complete",                                    # Read paths to watch from a file, one per line
+    --watch (-w): list<path>@"nus complete",                                      # Watch a file or directory
+    --watch-non-recursive (-W): list<path>@"nus complete",                        # Watch a directory without recursing into it
+    --watch-file (-F): path@"nus complete",                                       # Read paths to watch from a file, one per line
     --clear (-c): string@[clear reset],                                           # Clear the screen before each run
     --on-busy-update (-o): string@[queue do-nothing restart signal],              # What to do when files change while the tasks are running
     --restart (-r),                                                               # Restart the tasks if they are still running when files change
@@ -15576,19 +15576,19 @@ export def "mise watch" [
     --color: string@[auto always never],                                          # When to use terminal colours
     --watchexec-quiet,                                                            # Don't print starting and stopping messages
     --bell,                                                                       # Ring the terminal bell on command completion
-    --project-origin: path@"nusage complete",                                     # Set the project origin
+    --project-origin: path@"nus complete",                                        # Set the project origin
     --exts (-e): list<string>,                                                    # Only react to files with these extensions, e.g. js,ts
     --filter (-f): list<string>,                                                  # Only react to files that match this glob
-    --filter-file: list<path>@"nusage complete",                                  # Files to load filters from
+    --filter-file: list<path>@"nus complete",                                     # Files to load filters from
     --filter-prog (-J): list<string>,                                             # [experimental] Filter programs.
     --ignore (-i): list<string>,                                                  # Ignore files that match this glob
-    --ignore-file: list<path>@"nusage complete",                                  # Read ignore patterns from a file, one per line
+    --ignore-file: list<path>@"nus complete",                                     # Read ignore patterns from a file, one per line
     --fs-events: list<string>@[access create remove rename modify metadata],      # Filesystem events to filter to
     --no-meta,                                                                    # Don't emit fs events for metadata changes
     --print-events,                                                               # Print the events that trigger each run
     --manual,                                                                     # Show the manual page
 ]: nothing -> string {
-    ^mise watch ...(nusage argv [$task ...$args] {
+    ^mise watch ...(nus argv [$task ...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -15674,19 +15674,19 @@ mise where node
 ~/.local/share/mise/installs/node/20.0.0
 """# help="Show the active node, or the newest installed node if no config requests one"'
 export def "mise where" [
-    tool_version: string@"nusage complete",  # Tool to look up, such as ruby@3
-    asdf_version?: string,                   # the version prefix to use when querying the latest version same as the first argument after the "@" used for asdf compatibility
-    --cd (-C): path@"nusage complete",       # Run as if mise were started in DIR
-    --env_ (-E): list<string>,               # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                     # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                            # Suppress non-error messages
-    --verbose (-v): int,                     # Show extra output (use -vv for even more)
-    --yes (-y),                              # Answer yes to all confirmation prompts
-    --raw,                                   # Connect tasks and install commands directly to the terminal
-    --locked,                                # Require download URLs from the lockfile when installing
-    --silent,                                # Suppress all task output and mise non-error messages
+    tool_version: string@"nus complete",  # Tool to look up, such as ruby@3
+    asdf_version?: string,                # the version prefix to use when querying the latest version same as the first argument after the "@" used for asdf compatibility
+    --cd (-C): path@"nus complete",       # Run as if mise were started in DIR
+    --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                         # Suppress non-error messages
+    --verbose (-v): int,                  # Show extra output (use -vv for even more)
+    --yes (-y),                           # Answer yes to all confirmation prompts
+    --raw,                                # Connect tasks and install commands directly to the terminal
+    --locked,                             # Require download URLs from the lockfile when installing
+    --silent,                             # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^mise where ...(nusage argv [$tool_version $asdf_version] {
+    ^mise where ...(nus argv [$tool_version $asdf_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -15732,21 +15732,21 @@ mise which node --version
 20.0.0
 """# help="Show the version that provides it"'
 export def "mise which" [
-    bin_name?: string@"nusage complete",    # The executable to look up
-    --cd (-C): path@"nusage complete",      # Run as if mise were started in DIR
-    --env_ (-E): list<string>,              # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,                    # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                           # Suppress non-error messages
-    --tool (-t): string@"nusage complete",  # Look in a specific tool version, such as `mise which npm --tool=node@20`
-    --verbose (-v): int,                    # Show extra output (use -vv for even more)
-    --version,                              # Show the version instead of the path
-    --yes (-y),                             # Answer yes to all confirmation prompts
-    --raw,                                  # Connect tasks and install commands directly to the terminal
-    --locked,                               # Require download URLs from the lockfile when installing
-    --silent,                               # Suppress all task output and mise non-error messages
-    --plugin,                               # Show the name of the tool that provides the executable
+    bin_name?: string@"nus complete",    # The executable to look up
+    --cd (-C): path@"nus complete",      # Run as if mise were started in DIR
+    --env_ (-E): list<string>,           # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                 # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                        # Suppress non-error messages
+    --tool (-t): string@"nus complete",  # Look in a specific tool version, such as `mise which npm --tool=node@20`
+    --verbose (-v): int,                 # Show extra output (use -vv for even more)
+    --version,                           # Show the version instead of the path
+    --yes (-y),                          # Answer yes to all confirmation prompts
+    --raw,                               # Connect tasks and install commands directly to the terminal
+    --locked,                            # Require download URLs from the lockfile when installing
+    --silent,                            # Suppress all task output and mise non-error messages
+    --plugin,                            # Show the name of the tool that provides the executable
 ]: nothing -> string {
-    ^mise which ...(nusage argv [$bin_name] {
+    ^mise which ...(nus argv [$bin_name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs

@@ -68,7 +68,7 @@ jactionlint = "2.3.0"
 shellcheck = "0.11.0"
 release-plz = "0.4.2"
 
-# The repository's tasks run through the nusage built here, which `//nusage:build` links
+# The repository's tasks run through the nus built here, which `//nusage:build` links
 # into `.bin`, not through a release; the root's own are the files under `.mise/tasks`. jj
 # reads the formatters from `jj.toml` here, after
 # the user's own configuration files in the order jj itself reads them, from the home and

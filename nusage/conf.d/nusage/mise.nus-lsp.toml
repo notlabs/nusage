@@ -1,8 +1,8 @@
-# `MISE_ENV=nusage-lsp`: mise starts every `nu` as `nusage nu`, so an editor that starts
+# `MISE_ENV=nus-lsp`: mise starts every `nu` as `nus nu`, so an editor that starts
 # `nu --lsp` gets nusage's language server without being told of it, which checks a script
 # nusage runs as nusage runs it. Any other `nu` is Nushell itself. kakehashi, when the
-# `nusage-kakehashi` environment installs it too, highlights a script's header. A project's
+# `nus-kakehashi` environment installs it too, highlights a script's header. A project's
 # own `[wrappers.nu]` takes this one's place, so one that needs a wrapper names nusage too.
 [wrappers.nu]
-command = "nusage"
+command = "nus"
 args = ["nu"]

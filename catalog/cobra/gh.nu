@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Export gh's command tree through Usage's Cobra adapter, from a checkout of cli/cli at the pinned tag"
 #USAGE flag "--json-fields" help="Print the fields each command's `--json` accepts, as JSON, instead of the spec"
 # gh's root command is constructed from internal packages, which only code inside the

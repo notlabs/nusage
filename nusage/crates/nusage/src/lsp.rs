@@ -1,6 +1,6 @@
-//! `nusage lsp`: Nushell's language server for the scripts nusage runs. It stands between an
+//! `nus lsp`: Nushell's language server for the scripts nusage runs. It stands between an
 //! editor and the `nu --lsp` it starts. A document whose shebang names nusage reaches Nushell
-//! with its first line replaced by the line `nusage prelude` writes ([`crate::prelude`]),
+//! with its first line replaced by the line `nus prelude` writes ([`crate::prelude`]),
 //! which binds `$usage` with its type and defines the shadows of the scripts it calls, so
 //! Nushell checks the script as nusage runs it. Every other line is the editor's own, so a
 //! position there means the same on both sides. Line 0 is the editor's, and what Nushell
@@ -496,7 +496,7 @@ impl Document {
             found.push(json!({
                 "range": {"start": {"line": line, "character": 0}, "end": {"line": line, "character": width}},
                 "severity": 1,
-                "source": "nusage",
+                "source": "nus",
                 "message": header.message,
             }));
         }
@@ -507,7 +507,7 @@ impl Document {
                     "end": self.position(finding.span.end, encoding),
                 },
                 "severity": 1,
-                "source": "nusage",
+                "source": "nus",
                 "message": finding.message,
             }));
         }
@@ -754,17 +754,14 @@ mod tests {
     fn an_edit_lands_where_the_editor_says() {
         let mut document = Document {
             path: PathBuf::from("/x.nu"),
-            text: "#!/usr/bin/env nusage\nlet é = 1\nprint $é\n".into(),
+            text: "#!/usr/bin/env nus\nlet é = 1\nprint $é\n".into(),
             analysis: None,
         };
         document.apply(
             &json!({"range": {"start": {"line": 2, "character": 7}, "end": {"line": 2, "character": 8}}, "text": "e"}),
             Encoding::Utf16,
         );
-        assert_eq!(
-            document.text,
-            "#!/usr/bin/env nusage\nlet é = 1\nprint $e\n"
-        );
+        assert_eq!(document.text, "#!/usr/bin/env nus\nlet é = 1\nprint $e\n");
         document.apply(&json!({"text": "whole"}), Encoding::Utf16);
         assert_eq!(document.text, "whole");
     }

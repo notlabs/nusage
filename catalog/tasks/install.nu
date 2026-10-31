@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Write the line that loads each entry's module into Nushell's user autoload directory"
 #USAGE arg "[tool]" help="One entry; every entry when absent"
 # Nushell sources every file of its user autoload directory when an interactive session

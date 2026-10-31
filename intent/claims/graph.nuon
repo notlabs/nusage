@@ -9,10 +9,10 @@
     given: {
       script: a.nu
       files: {
-        "a.nu": "#!/usr/bin/env nusage
+        "a.nu": "#!/usr/bin/env nus
 ./b.nu
 "
-        "b.nu": "#!/usr/bin/env nusage
+        "b.nu": "#!/usr/bin/env nus
 42
 "
       }
@@ -31,10 +31,10 @@
     given: {
       script: a.nu
       files: {
-        "a.nu": "#!/usr/bin/env nusage
+        "a.nu": "#!/usr/bin/env nus
 mise run greet world
 "
-        "mise-tasks/greet": "#!/usr/bin/env nusage
+        "mise-tasks/greet": "#!/usr/bin/env nus
 #USAGE arg \"<name>\"
 $'hello ($usage.args.name)'
 "
@@ -82,7 +82,7 @@ run = 'cargo test'
     given: {
       script: a.nu
       files: {
-        "a.nu": "#!/usr/bin/env nusage
+        "a.nu": "#!/usr/bin/env nus
 use lib.nu double
 double 21
 "

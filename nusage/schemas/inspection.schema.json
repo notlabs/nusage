@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "nusage inspect",
+  "title": "nus inspect",
   "description": "Resolved command shadows and findings from the script analyzer. This is not a complete call or dependency graph.",
   "type": "object",
   "required": [
@@ -35,7 +35,7 @@
           },
           "command": {
             "type": "object",
-            "description": "The command model serialized by nusage model."
+            "description": "The command model serialized by nus model."
           },
           "through": {
             "oneOf": [
@@ -43,7 +43,7 @@
                 "type": "object",
                 "properties": {
                   "kind": {
-                    "const": "nusage"
+                    "const": "nus"
                   }
                 },
                 "required": [

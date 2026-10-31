@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Exercise the shared schema checker with valid and deliberately invalid output"
 use std/assert
 use lib.nu [validate-result schema-overlay]

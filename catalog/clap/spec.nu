@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Writes the usage spec of a binary on PATH from the clap command its crate builds"
 #USAGE arg "<dir>" help="The extractor: a Cargo package whose `main` hands the command to clap-spec, and whose `package.metadata.clap-spec` names the binary and its crate"
 #USAGE flag "--out <file>" required=#true help="The spec, left untouched when it already describes this version"

@@ -1,6 +1,6 @@
 # Where the service is: `$env.<SERVICE>_URL` when set, else the base the mapping names, with
 # no `/` at the end; `<SERVICE>` is the service's name in upper case, `-` as `_`.
-def "nusage base" [service: string, base]: nothing -> string {
+def "nus base" [service: string, base]: nothing -> string {
     let prefix = $service | str uppercase | str replace --all "-" "_"
     let base = $env | get --optional $"($prefix)_URL" | default $base
     if $base == null {
@@ -14,30 +14,30 @@ def "nusage base" [service: string, base]: nothing -> string {
 # A record's fields that have a value, each as a query or header carries it: a list as a
 # list of words, anything else as one word. A null is no value, and so is `false`, a switch
 # the call left off.
-def "nusage given" []: record -> record {
+def "nus given" []: record -> record {
     $in | transpose name value | where value != null and value != false | reduce --fold {} {|field, given|
         let value = if ($field.value | describe --detailed | get type) == list {
-            $field.value | each { nusage word }
+            $field.value | each { nus word }
         } else {
-            $field.value | nusage word
+            $field.value | nus word
         }
         $given | insert $field.name $value
     }
 }
 
 # The request a wrapper makes, and the response's text. The URL is the service's base, as
-# `nusage base` finds it, the path with each `{param}` filled in, and the query after it, a
+# `nus base` finds it, the path with each `{param}` filled in, and the query after it, a
 # null dropped and a list repeated. The credentials are the environment's: `$env.<SERVICE>_TOKEN`
 # is the bearer token, or the key the service asks for in a header or the query, and
 # `$env.<SERVICE>_USER` with `$env.<SERVICE>_PASSWORD` is basic authentication; a credential
 # the environment lacks is not sent. A body goes as `http post` sends a value of its media
 # type: a record as JSON for `application/json`. A response that is not a success is an
 # error naming the status, with the response's text.
-def "nusage request" [request: record]: nothing -> string {
+def "nus request" [request: record]: nothing -> string {
     let prefix = $request.service | str uppercase | str replace --all "-" "_"
-    let base = nusage base $request.service $request.base
+    let base = nus base $request.service $request.base
     let path = $request.params | transpose name value | reduce --fold $request.path {|param, path|
-        $path | str replace --all $"{($param.name)}" ($param.value | nusage word | url encode)
+        $path | str replace --all $"{($param.name)}" ($param.value | nus word | url encode)
     }
     let token = $env | get --optional $"($prefix)_TOKEN"
     let user = $env | get --optional $"($prefix)_USER"
@@ -60,8 +60,8 @@ def "nusage request" [request: record]: nothing -> string {
             _ => $carried
         }
     }
-    let headers = ($request.headers | nusage given) | merge $credentials.headers
-    let query = ($request.query | nusage given) | merge $credentials.query
+    let headers = ($request.headers | nus given) | merge $credentials.headers
+    let query = ($request.query | nus given) | merge $credentials.query
     let url = if ($query | is-empty) {
         $"($base)($path)"
     } else {
@@ -75,7 +75,7 @@ def "nusage request" [request: record]: nothing -> string {
             "post" => (http post --full --allow-errors --raw --headers $headers $url "")
             "put" => (http put --full --allow-errors --raw --headers $headers $url "")
             "patch" => (http patch --full --allow-errors --raw --headers $headers $url "")
-            _ => (nusage unsent $request.method)
+            _ => (nus unsent $request.method)
         }
     } else {
         let data = $body
@@ -93,7 +93,7 @@ def "nusage request" [request: record]: nothing -> string {
             "patch" => (
                 http patch --full --allow-errors --raw --headers $headers --content-type $media $url $data
             )
-            _ => (nusage unsent $request.method)
+            _ => (nus unsent $request.method)
         }
     }
     if $response.status >= 400 {
@@ -104,6 +104,6 @@ def "nusage request" [request: record]: nothing -> string {
     $response.body
 }
 
-def "nusage unsent" [method: string]: nothing -> error {
+def "nus unsent" [method: string]: nothing -> error {
     error make --unspanned {msg: $"the wrapper sends no ($method | str uppercase) request"}
 }

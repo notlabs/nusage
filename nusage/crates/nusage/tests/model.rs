@@ -1,4 +1,4 @@
-//! `nusage model` prints what a target is handed, as NUON a script reads back: the stage
+//! `nus model` prints what a target is handed, as NUON a script reads back: the stage
 //! between the assembled spec and the module.
 
 use std::path::{Path, PathBuf};
@@ -11,7 +11,7 @@ fn fixtures() -> PathBuf {
 }
 
 fn model(args: &[&str]) -> Value {
-    let output = Command::new(env!("CARGO_BIN_EXE_nusage"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nus"))
         .arg("model")
         .args(args)
         .output()
@@ -25,7 +25,7 @@ fn model(args: &[&str]) -> Value {
         &String::from_utf8_lossy(&output.stdout),
         Some(Span::unknown()),
     )
-    .expect("nusage model prints NUON")
+    .expect("nus model prints NUON")
 }
 
 fn at(value: &Value, path: &[&str]) -> Value {

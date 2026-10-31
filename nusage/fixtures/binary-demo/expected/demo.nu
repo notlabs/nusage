@@ -1,7 +1,7 @@
 alias "attr usage" = echo
 
 # A value as an argv word: a datetime in ISO 8601, anything else as Nushell writes it.
-def "nusage word" []: any -> string {
+def "nus word" []: any -> string {
     if ($in | describe --detailed | get type) == datetime {
         $in | format date "%+"
     } else {
@@ -13,32 +13,32 @@ def "nusage word" []: any -> string {
 # preceded by the clause-scoped flags, then the other flags. A flag goes by its value: a
 # switch once when on, a count that many times, a list once per item with its value, any
 # other value once with its value; null and false add nothing.
-def "nusage argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
-    let scoped = $scoped | nusage flag-words
-    let words = $positionals | compact | each { nusage word }
+def "nus argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
+    let scoped = $scoped | nus flag-words
+    let words = $positionals | compact | each { nus word }
     let instances = if ($words | is-empty) {
         $scoped
     } else {
         $words | each {|word| $scoped ++ [$word] } | flatten
     }
-    $instances ++ ($flags | nusage flag-words)
+    $instances ++ ($flags | nus flag-words)
 }
 
-def "nusage flag-words" []: record -> list<string> {
+def "nus flag-words" []: record -> list<string> {
     $in | transpose name value | each {|flag|
         match ($flag.value | describe --detailed | get type) {
             bool => (if $flag.value { [$flag.name] } else { [] })
             int => (0..<$flag.value | each { $flag.name })
-            list => ($flag.value | each {|value| [$flag.name ($value | nusage word)] } | flatten)
+            list => ($flag.value | each {|value| [$flag.name ($value | nus word)] } | flatten)
             nothing => []
-            _ => [$flag.name ($flag.value | nusage word)]
+            _ => [$flag.name ($flag.value | nus word)]
         }
     } | flatten
 }
 
 # Completions from usage's own completer, against the spec this module was generated
 # from, with the words typed so far. Nothing when the `usage` CLI is not installed.
-def "nusage complete" [place: record] {
+def "nus complete" [place: record] {
     const spec = (path self | path dirname | path join "../demo.usage.kdl")
     if (which usage | is-empty) {
         return []
@@ -57,7 +57,7 @@ def "nusage complete" [place: record] {
 export def main [
     --verbose (-v): int,  # Say more
 ]: nothing -> string {
-    ^demo ...(nusage argv [] {--verbose: $verbose})
+    ^demo ...(nus argv [] {--verbose: $verbose})
 }
 
 # Install a plugin
@@ -67,14 +67,14 @@ export def main [
 @usage 'flag "-d --dir <dir>" help="Install into this directory"'
 @usage 'flag "--env <env>" help="Environment to install into"'
 export def "demo install" [
-    plugin: string@"nusage complete",  # Plugin to install
-    version?: string,                  # Version to install
-    --verbose (-v): int,               # Say more
-    --global (-g),                     # Install for every project
-    --dir (-d): path,                  # Install into this directory
-    --env_: string,                    # Environment to install into
+    plugin: string@"nus complete",  # Plugin to install
+    version?: string,               # Version to install
+    --verbose (-v): int,            # Say more
+    --global (-g),                  # Install for every project
+    --dir (-d): path,               # Install into this directory
+    --env_: string,                 # Environment to install into
 ]: nothing -> string {
-    ^demo install ...(nusage argv [$plugin $version] {
+    ^demo install ...(nus argv [$plugin $version] {
         --verbose: $verbose
         --global: $global
         --dir: $dir
@@ -88,12 +88,12 @@ export def "demo install" [
 @usage 'flag "-e --set <var>" help="Variable to set, repeatable" var=#true'
 @usage 'complete "task" descriptions=#true run="echo \"build:Build it\ntest:Test it\""'
 export def "demo run" [
-    task: string@"nusage complete",  # Task to run
-    ...args: string,                 # Arguments for the task
-    --verbose (-v): int,             # Say more
-    --set (-e): list<string>,        # Variable to set, repeatable
+    task: string@"nus complete",  # Task to run
+    ...args: string,              # Arguments for the task
+    --verbose (-v): int,          # Say more
+    --set (-e): list<string>,     # Variable to set, repeatable
 ]: nothing -> string {
-    ^demo run ...(nusage argv [$task ...$args] {--verbose: $verbose, --set: $set})
+    ^demo run ...(nus argv [$task ...$args] {--verbose: $verbose, --set: $set})
 }
 
 # Show status
@@ -104,7 +104,7 @@ export def "demo run" [
 export def "demo status" [
     --verbose (-v): int,  # Say more
 ]: nothing -> record<ok: bool, tasks: list<string>> {
-    ^demo status --format json ...(nusage argv [] {--verbose: $verbose}) | from json
+    ^demo status --format json ...(nus argv [] {--verbose: $verbose}) | from json
 }
 
 # Stream events
@@ -114,7 +114,7 @@ export def "demo status" [
 export def "demo events" [
     --verbose (-v): int,  # Say more
 ]: nothing -> table<at: datetime, kind: string> {
-    ^demo events --json ...(nusage argv [] {--verbose: $verbose}) | from json --objects | into datetime at
+    ^demo events --json ...(nus argv [] {--verbose: $verbose}) | from json --objects | into datetime at
 }
 
 # Tag items
@@ -127,5 +127,5 @@ export def "demo tag" [
     --verbose (-v): int,   # Say more
     --label (-l): string,  # Label for the item that follows
 ]: nothing -> string {
-    ^demo tag ...(nusage argv [...$item] {--verbose: $verbose} {--label: $label})
+    ^demo tag ...(nus argv [...$item] {--verbose: $verbose} {--label: $label})
 }

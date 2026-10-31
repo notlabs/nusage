@@ -1,6 +1,6 @@
 # When a script's analysis must be worked out again, said by what a change does to it, not
 # by how it is kept: an engine of revisions (Salsa), a memo by content, or a build engine
-# could each meet these. The checked ones hold today's `nusage prelude` to them.
+# could each meet these. The checked ones hold today's `nus prelude` to them.
 [
   {
     id: line-without-calls
@@ -9,12 +9,12 @@
     given: {
       script: caller.nu
       files: {
-        "caller.nu": "#!/usr/bin/env nusage
+        "caller.nu": "#!/usr/bin/env nus
 #USAGE arg \"<who>\"
 let greeting = ./callee.nu $usage.args.who
 print $greeting
 "
-        "callee.nu": "#!/usr/bin/env nusage
+        "callee.nu": "#!/usr/bin/env nus
 #USAGE arg \"<name>\"
 #USAGE output (\"string\")\"nuon\" default=#true
 $'hello ($usage.args.name)'
@@ -23,7 +23,7 @@ $'hello ($usage.args.name)'
     }
     change: {
       files: {
-        "caller.nu": "#!/usr/bin/env nusage
+        "caller.nu": "#!/usr/bin/env nus
 #USAGE arg \"<who>\"
 let greeting = ./callee.nu $usage.args.who
 print ($greeting | str upcase)
@@ -39,10 +39,10 @@ print ($greeting | str upcase)
     given: {
       script: caller.nu
       files: {
-        "caller.nu": "#!/usr/bin/env nusage
+        "caller.nu": "#!/usr/bin/env nus
 ./callee.nu world
 "
-        "callee.nu": "#!/usr/bin/env nusage
+        "callee.nu": "#!/usr/bin/env nus
 #USAGE arg \"<name>\"
 $'hello ($usage.args.name)'
 "
@@ -50,7 +50,7 @@ $'hello ($usage.args.name)'
     }
     change: {
       files: {
-        "callee.nu": "#!/usr/bin/env nusage
+        "callee.nu": "#!/usr/bin/env nus
 #USAGE arg \"<name>\"
 #USAGE flag \"--loud\"
 $'hello ($usage.args.name)'
@@ -66,7 +66,7 @@ $'hello ($usage.args.name)'
     given: {
       script: caller.nu
       files: {
-        "caller.nu": "#!/usr/bin/env nusage
+        "caller.nu": "#!/usr/bin/env nus
 #USAGE arg \"<who>\"
 $usage.args.who
 "
@@ -74,7 +74,7 @@ $usage.args.who
     }
     change: {
       files: {
-        "caller.nu": "#!/usr/bin/env nusage
+        "caller.nu": "#!/usr/bin/env nus
 #USAGE arg \"<who>\"
 #USAGE flag \"--twice\"
 $usage.args.who
@@ -90,14 +90,14 @@ $usage.args.who
     given: {
       script: caller.nu
       files: {
-        "caller.nu": "#!/usr/bin/env nusage
+        "caller.nu": "#!/usr/bin/env nus
 ./callee.nu world
 "
-        "callee.nu": "#!/usr/bin/env nusage
+        "callee.nu": "#!/usr/bin/env nus
 #USAGE arg \"<name>\"
 $'hello ($usage.args.name)'
 "
-        "other.nu": "#!/usr/bin/env nusage
+        "other.nu": "#!/usr/bin/env nus
 #USAGE arg \"<x>\"
 $usage.args.x
 "
@@ -105,7 +105,7 @@ $usage.args.x
     }
     change: {
       files: {
-        "other.nu": "#!/usr/bin/env nusage
+        "other.nu": "#!/usr/bin/env nus
 #USAGE arg \"<x>\"
 #USAGE flag \"--y\"
 $usage.args.x
@@ -121,10 +121,10 @@ $usage.args.x
     given: {
       script: caller.nu
       files: {
-        "caller.nu": "#!/usr/bin/env nusage
+        "caller.nu": "#!/usr/bin/env nus
 mise run greet world
 "
-        "mise-tasks/greet": "#!/usr/bin/env nusage
+        "mise-tasks/greet": "#!/usr/bin/env nus
 #USAGE arg \"<name>\"
 $'hello ($usage.args.name)'
 "
@@ -132,7 +132,7 @@ $'hello ($usage.args.name)'
     }
     change: {
       files: {
-        "mise-tasks/greet": "#!/usr/bin/env nusage
+        "mise-tasks/greet": "#!/usr/bin/env nus
 #USAGE arg \"<name>\"
 #USAGE flag \"--loud\"
 $'hello ($usage.args.name)'

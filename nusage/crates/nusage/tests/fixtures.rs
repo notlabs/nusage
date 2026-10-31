@@ -156,7 +156,7 @@ fn fixtures_parse_with_nu_parser() {
     );
 }
 
-/// Every single-script case parses through `nusage parse` into the record it expects: the
+/// Every single-script case parses through `nus parse` into the record it expects: the
 /// interpreter's half of the contract, without a Nushell.
 #[test]
 fn script_cases_parse_through_the_interpreter() {
@@ -190,7 +190,7 @@ fn script_cases_parse_through_the_interpreter() {
             let expected = case_value
                 .get_data_by_key("usage")
                 .expect("a script case has usage");
-            let output = Command::new(env!("CARGO_BIN_EXE_nusage"))
+            let output = Command::new(env!("CARGO_BIN_EXE_nus"))
                 .arg("parse")
                 .arg(&script)
                 .arg("--")
@@ -207,7 +207,7 @@ fn script_cases_parse_through_the_interpreter() {
                 &String::from_utf8_lossy(&output.stdout),
                 Some(Span::unknown()),
             )
-            .expect("nusage parse prints NUON");
+            .expect("nus parse prints NUON");
             assert_eq!(got, expected, "{}", case.display());
             checked += 1;
         }

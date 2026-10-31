@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "The intent's claims, as a table to read: what each says and whether it is checked"
 #USAGE flag "--status <status>" help="Only the claims of this status" { choices "open" "checked" }
 #USAGE arg "[topic]" help="Only the claims of this file, as `purity` for claims/purity.nuon"

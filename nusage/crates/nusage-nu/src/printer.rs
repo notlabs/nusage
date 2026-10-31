@@ -508,7 +508,7 @@ export def main [
                         args: vec![
                             Expr::Str("status".into()),
                             Expr::Spread(Box::new(Expr::Call {
-                                name: CommandName::new("nusage argv").unwrap(),
+                                name: CommandName::new("nus argv").unwrap(),
                                 args: vec![
                                     Expr::List(vec![Expr::Spread(Box::new(Expr::Var(ident(
                                         "args",
@@ -522,7 +522,7 @@ export def main [
                         ],
                     },
                     Expr::Call {
-                        name: CommandName::new("nusage decode").unwrap(),
+                        name: CommandName::new("nus decode").unwrap(),
                         args: vec![
                             Expr::Var(ident("output")),
                             Expr::Record(vec![(
@@ -553,7 +553,7 @@ export def "demo status" [
     --format: string@[human json],  # Output format
 ]: nothing -> oneof<string, record<ok: bool>> {
     let output = if $json { "json" } else { $format | default "human" }
-    ^demo status ...(nusage argv [...$args] {--format: $format}) | nusage decode $output {
+    ^demo status ...(nus argv [...$args] {--format: $format}) | nus decode $output {
         json: { from json }
     }
 }

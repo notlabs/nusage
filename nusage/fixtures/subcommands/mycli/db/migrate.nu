@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Run migrations"
 #USAGE arg "<target>" help="Target environment" { choices run="./targets.nu" }
 #USAGE flag "--dry-run" help="Plan without applying"

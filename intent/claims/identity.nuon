@@ -38,11 +38,11 @@
     given: {
       script: caller.nu
       files: {
-        "caller.nu": "#!/usr/bin/env nusage
+        "caller.nu": "#!/usr/bin/env nus
 #USAGE arg \"<who>\"
 ./callee.nu $usage.args.who
 "
-        "callee.nu": "#!/usr/bin/env nusage
+        "callee.nu": "#!/usr/bin/env nus
 #USAGE arg \"<name>\"
 #USAGE output (\"string\")\"nuon\" default=#true
 $'hello ($usage.args.name)'

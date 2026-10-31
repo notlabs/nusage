@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Greets, as the script another one calls"
 #USAGE arg "<name>"
 #USAGE flag "-l --loud"

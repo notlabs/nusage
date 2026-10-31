@@ -1,5 +1,5 @@
-#!/usr/bin/env nusage
-#USAGE about "Generate each entry's module from its spec, schema suite and overlays, with the nusage on PATH"
+#!/usr/bin/env nus
+#USAGE about "Generate each entry's module from its spec, schema suite and overlays, with the nus on PATH"
 #USAGE arg "[tool]" help="One entry; every entry when absent"
 use catalog.nu *
 

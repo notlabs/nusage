@@ -1,7 +1,7 @@
 alias "attr usage" = echo
 
 # A value as an argv word: a datetime in ISO 8601, anything else as Nushell writes it.
-def "nusage word" []: any -> string {
+def "nus word" []: any -> string {
     if ($in | describe --detailed | get type) == datetime {
         $in | format date "%+"
     } else {
@@ -13,32 +13,32 @@ def "nusage word" []: any -> string {
 # preceded by the clause-scoped flags, then the other flags. A flag goes by its value: a
 # switch once when on, a count that many times, a list once per item with its value, any
 # other value once with its value; null and false add nothing.
-def "nusage argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
-    let scoped = $scoped | nusage flag-words
-    let words = $positionals | compact | each { nusage word }
+def "nus argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
+    let scoped = $scoped | nus flag-words
+    let words = $positionals | compact | each { nus word }
     let instances = if ($words | is-empty) {
         $scoped
     } else {
         $words | each {|word| $scoped ++ [$word] } | flatten
     }
-    $instances ++ ($flags | nusage flag-words)
+    $instances ++ ($flags | nus flag-words)
 }
 
-def "nusage flag-words" []: record -> list<string> {
+def "nus flag-words" []: record -> list<string> {
     $in | transpose name value | each {|flag|
         match ($flag.value | describe --detailed | get type) {
             bool => (if $flag.value { [$flag.name] } else { [] })
             int => (0..<$flag.value | each { $flag.name })
-            list => ($flag.value | each {|value| [$flag.name ($value | nusage word)] } | flatten)
+            list => ($flag.value | each {|value| [$flag.name ($value | nus word)] } | flatten)
             nothing => []
-            _ => [$flag.name ($flag.value | nusage word)]
+            _ => [$flag.name ($flag.value | nus word)]
         }
     } | flatten
 }
 
 # A tool whose outputs name their media type: Nushell's reader for it decodes them
 export def main []: nothing -> string {
-    ^sizes ...(nusage argv [] {})
+    ^sizes ...(nus argv [] {})
 }
 
 # List things
@@ -46,7 +46,7 @@ export def main []: nothing -> string {
 @usage 'output "text" default=#true'
 @usage 'output ("table<name: string, size: filesize>")"csv" media_type="text/csv" select="--csv" help="One row per thing"'
 export def "sizes ls" []: nothing -> table<name: string, size: filesize> {
-    ^sizes ls --csv ...(nusage argv [] {}) | from csv | into filesize size
+    ^sizes ls --csv ...(nus argv [] {}) | from csv | into filesize size
 }
 
 # Describe one thing
@@ -57,5 +57,5 @@ export def "sizes ls" []: nothing -> table<name: string, size: filesize> {
 export def "sizes info" [
     name: string,  # The thing
 ]: nothing -> record<name: string, built: datetime> {
-    ^sizes info --yaml ...(nusage argv [$name] {}) | from yaml | into datetime built
+    ^sizes info --yaml ...(nus argv [$name] {}) | from yaml | into datetime built
 }

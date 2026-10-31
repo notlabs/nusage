@@ -1,4 +1,4 @@
-//! `nusage lsp` in front of the pinned `nu --lsp`: requests are sent together, then answers
+//! `nus lsp` in front of the pinned `nu --lsp`: requests are sent together, then answers
 //! are read through the shutdown acknowledgment before exit, draining all complete frames.
 //! Without `nu` on PATH the session is skipped, except in CI, where it fails.
 
@@ -42,7 +42,7 @@ fn session(
     session_with(&["lsp"], &[], open, change, requests)
 }
 
-/// [`session`], with the server started as `nusage` and these arguments, in this
+/// [`session`], with the server started as `nus` and these arguments, in this
 /// environment.
 fn session_with(
     server: &[&str],
@@ -106,12 +106,12 @@ fn exchange_session(
     // Nushell's own files go to a home of the session's; sessions run side by side.
     static SESSIONS: AtomicUsize = AtomicUsize::new(0);
     let home = std::env::temp_dir().join(format!(
-        "nusage-lsp-{}-{}",
+        "nus-lsp-{}-{}",
         std::process::id(),
         SESSIONS.fetch_add(1, Ordering::Relaxed)
     ));
     std::fs::create_dir_all(&home).unwrap();
-    let mut server = Command::new(env!("CARGO_BIN_EXE_nusage"))
+    let mut server = Command::new(env!("CARGO_BIN_EXE_nus"))
         .args(server)
         .envs(vars.iter().map(|(name, value)| (*name, value)))
         .env("HOME", &home)
@@ -252,7 +252,7 @@ fn said(diagnostics: &[Json]) -> Vec<(u64, String)> {
 fn a_server_that_exits_early_or_never_answers_cannot_stall_the_session() {
     use std::os::unix::fs::PermissionsExt;
 
-    let dir = std::env::temp_dir().join(format!("nusage-lsp-unresponsive-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("nus-lsp-unresponsive-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let nu = dir.join("nu");
     let vars = [("PATH", dir.to_string_lossy().into_owned())];
@@ -375,7 +375,7 @@ fn a_header_that_does_not_read_is_said_and_the_script_still_checks() {
 fn a_script_nusage_does_not_run_passes_as_it_is() {
     let text = std::fs::read_to_string(caller())
         .unwrap()
-        .replace("#!/usr/bin/env nusage", "#!/usr/bin/env nu");
+        .replace("#!/usr/bin/env nus", "#!/usr/bin/env nu");
     let Some((_, diagnostics)) = session(&text, None, &[]) else {
         return;
     };
@@ -391,7 +391,7 @@ fn a_script_nusage_does_not_run_passes_as_it_is() {
 #[test]
 fn a_shebang_typed_or_taken_away_changes_what_nushell_sees() {
     let text = std::fs::read_to_string(caller()).unwrap();
-    let plain = text.replace("#!/usr/bin/env nusage", "#!/usr/bin/env nu");
+    let plain = text.replace("#!/usr/bin/env nus", "#!/usr/bin/env nu");
     let unknown = |diagnostics: &[Json]| {
         said(diagnostics)
             .iter()
@@ -431,9 +431,9 @@ fn an_editor_that_goes_without_saying_exit_ends_the_session() {
         write!(input, "Content-Length: {}\r\n\r\n", body.len()).unwrap();
         input.extend(body);
     }
-    let home = std::env::temp_dir().join(format!("nusage-lsp-gone-{}", std::process::id()));
+    let home = std::env::temp_dir().join(format!("nus-lsp-gone-{}", std::process::id()));
     std::fs::create_dir_all(&home).unwrap();
-    let mut server = Command::new(env!("CARGO_BIN_EXE_nusage"))
+    let mut server = Command::new(env!("CARGO_BIN_EXE_nus"))
         .args(["lsp", "--", "-n"])
         .env("HOME", &home)
         .stdin(Stdio::piped())
@@ -490,7 +490,7 @@ fn the_nu_a_server_of_nusages_starts_is_nushells_own() {
         "textDocument/hover",
         json!({"position": at(&text, "$usage.args.who", 1)}),
     )];
-    let vars = [("NUSAGE_LSP", "1".to_string())];
+    let vars = [("NUS_LSP", "1".to_string())];
     // `-n`: a Nushell of a home of its own says so on standard output as it writes its
     // configuration files.
     let server = ["nu", "--lsp", "-n"];
@@ -511,7 +511,7 @@ fn anything_else_is_nu_itself() {
         );
         return;
     }
-    let output = Command::new(env!("CARGO_BIN_EXE_nusage"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nus"))
         .args(["nu", "-n", "-c", "print ([a b] | str join)"])
         .output()
         .unwrap();
@@ -519,7 +519,7 @@ fn anything_else_is_nu_itself() {
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "ab");
 }
 
-/// A `nu` first on PATH that runs `nusage nu` again, as a wrapper of mise's would that
+/// A `nu` first on PATH that runs `nus nu` again, as a wrapper of mise's would that
 /// nusage cannot tell for one: the second time round, the same process stops.
 #[cfg(unix)]
 #[test]
@@ -528,12 +528,12 @@ fn a_nu_that_leads_back_here_stops() {
     let dir = std::env::temp_dir().join(format!("nusage-nu-loop-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let nu = dir.join("nu");
-    std::fs::write(&nu, "#!/bin/sh\nexec \"$NUSAGE_UNDER_TEST\" nu \"$@\"\n").unwrap();
+    std::fs::write(&nu, "#!/bin/sh\nexec \"$NUS_UNDER_TEST\" nu \"$@\"\n").unwrap();
     std::fs::set_permissions(&nu, std::fs::Permissions::from_mode(0o755)).unwrap();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_nusage"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_nus"))
         .args(["nu", "-c", "print hi"])
         .env("PATH", &dir)
-        .env("NUSAGE_UNDER_TEST", env!("CARGO_BIN_EXE_nusage"))
+        .env("NUS_UNDER_TEST", env!("CARGO_BIN_EXE_nus"))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -542,7 +542,7 @@ fn a_nu_that_leads_back_here_stops() {
     while child.try_wait().unwrap().is_none() {
         if std::time::Instant::now() > deadline {
             child.kill().unwrap();
-            panic!("`nusage nu` is still going round");
+            panic!("`nus nu` is still going round");
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
@@ -550,7 +550,7 @@ fn a_nu_that_leads_back_here_stops() {
     std::fs::remove_dir_all(&dir).unwrap();
     assert!(!output.status.success(), "{output:?}");
     assert!(
-        String::from_utf8_lossy(&output.stderr).contains("leads back to `nusage nu`"),
+        String::from_utf8_lossy(&output.stderr).contains("leads back to `nus nu`"),
         "{output:?}"
     );
 }
@@ -564,10 +564,10 @@ fn a_nu_another_one_ran_runs() {
         );
         return;
     }
-    // The mark of a `nusage nu` that ran this process's parent, as a `nu` Nushell starts has.
-    let output = Command::new(env!("CARGO_BIN_EXE_nusage"))
+    // The mark of a `nus nu` that ran this process's parent, as a `nu` Nushell starts has.
+    let output = Command::new(env!("CARGO_BIN_EXE_nus"))
         .args(["nu", "-n", "-c", "print inner"])
-        .env("NUSAGE_NU_PID", "1")
+        .env("NUS_NU_PID", "1")
         .output()
         .unwrap();
     assert!(output.status.success(), "{output:?}");

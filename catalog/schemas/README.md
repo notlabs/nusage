@@ -12,7 +12,7 @@ run the binary: an `id`, the `output`, the whole `argv`, the `exit_codes` accept
 `expect` schema the output must also satisfy, and `records` for a JSON lines count.
 
 `overlay.nu <manifest>` prints the usage overlay declaring each attached output with its
-schema embedded, for `nusage generate --overlay`. `lib.nu` runs a suite: `load-suite`,
-`run-suite`, which holds the binary's raw stdout to the schemas through `nusage validate`
+schema embedded, for `nus generate --overlay`. `lib.nu` runs a suite: `load-suite`,
+`run-suite`, which holds the binary's raw stdout to the schemas through `nus validate`
 before anything decodes it, and `finish`. `verify.nu` holds the runner to the failures it
 must report; `mise run //catalog/schemas:check` runs it.

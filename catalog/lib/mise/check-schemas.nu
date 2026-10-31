@@ -1,7 +1,7 @@
 #!/usr/bin/env nu
 # Check mise's raw JSON against the reviewed output schemas. The catalog's `check` runs this;
 # `--bin` names a candidate mise binary, the one on PATH otherwise. A plain Nushell script: to
-# the nusage interpreter, the package's `mod.nu` beside it would read as the root of a tree.
+# the nus interpreter, the package's `mod.nu` beside it would read as the root of a tree.
 use ../../schemas/lib.nu [load-suite check-examples run-suite finish]
 
 const here = path self | path dirname

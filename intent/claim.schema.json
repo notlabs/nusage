@@ -78,7 +78,7 @@
       "properties": {
         "analysis": {
           "enum": ["kept", "changed", "relocated"],
-          "description": "What the change does to the script's analysis, as `nusage prelude` prints it, with `nusage inspect` confirming no findings: the same, different, or the same but for the directory it names."
+          "description": "What the change does to the script's analysis, as `nus prelude` prints it, with `nus inspect` confirming no findings: the same, different, or the same but for the directory it names."
         },
         "traits": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
         "calls": {

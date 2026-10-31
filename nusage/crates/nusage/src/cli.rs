@@ -1,4 +1,4 @@
-//! The command line: the subcommands of `nusage`, as usage-rs derives them, and what each
+//! The command line: the subcommands of `nus`, as usage-rs derives them, and what each
 //! runs. Here rather than in `main.rs` so that the CLI's own usage spec, [`Nusage::to_kdl`],
 //! is a library value: a plugin takes its signatures from it, so a command inside Nushell and
 //! the same command on the command line are one interface, declared once.
@@ -9,17 +9,17 @@ use usage_rs::{Args, Cli, Run, Subcommands};
 
 /// Typed Nushell commands from usage-annotated scripts
 ///
-/// As an interpreter, `nusage <script> [args...]` runs a script whose first line is
-/// `#!/usr/bin/env nusage`: the arguments are parsed against its `#USAGE` header and the
+/// As an interpreter, `nus <script> [args...]` runs a script whose first line is
+/// `#!/usr/bin/env nus`: the arguments are parsed against its `#USAGE` header and the
 /// script runs in Nushell with its `$usage` record, as the generated module would run it.
 ///
-/// Such a script calls another by its path, `./x.nu ...`, or as `nusage x.nu ...` or `nu x.nu
+/// Such a script calls another by its path, `./x.nu ...`, or as `nus x.nu ...` or `nu x.nu
 /// ...`: the call is that script's typed command, which runs it and returns its value typed,
 /// while what it prints passes through. The path is the calling script's, not the working
 /// directory's: `./x.nu` is the script beside it, wherever it runs from. `^./x.nu` is the plain
 /// external, which returns text.
 #[derive(Cli)]
-#[usage(bin = "nusage", version)]
+#[usage(name = "nus", bin = "nus", version)]
 pub struct Nusage {
     #[usage(subcommand)]
     pub command: Commands,
@@ -245,7 +245,7 @@ impl Run for Validate {
             Ok(findings) => findings,
             // Not a finding: nothing was held to anything, as the exit code says.
             Err(why) => {
-                eprintln!("nusage: {why}");
+                eprintln!("nus: {why}");
                 std::process::exit(2)
             }
         };
@@ -261,7 +261,7 @@ impl Run for Validate {
 
 /// Print the `$usage` record a script would see for the arguments, as NUON
 ///
-/// What `nusage <script> [args...]` hands the script, without running it: the arguments
+/// What `nus <script> [args...]` hands the script, without running it: the arguments
 /// parsed by usage against the `#USAGE` header. Put the script's arguments after `--`.
 #[derive(Args)]
 pub struct Parse {
@@ -321,7 +321,7 @@ impl Run for Inspect {
 ///
 /// For an editor or a linter: with this line in place of the shebang, Nushell checks the
 /// script as nusage runs it. The line binds `$usage` with its type, and defines a shadow for
-/// each script the script calls by its path, as `./x.nu`, `nusage x.nu` or `nu x.nu`: that
+/// each script the script calls by its path, as `./x.nu`, `nus x.nu` or `nu x.nu`: that
 /// script's typed command, named as the call writes it, which the interpreter and the module
 /// define too. Every other line stays where it was. What the calls get wrong goes to
 /// standard error, a line each, `<script>:<line>:<column>: <what>`.
@@ -381,10 +381,10 @@ impl Run for Lsp {
 
 /// Run as `nu`, as mise's command wrapper does
 ///
-/// In the `nusage-lsp` environment mise starts every `nu` as `nusage nu`, so an editor that
+/// In the `nus-lsp` environment mise starts every `nu` as `nus nu`, so an editor that
 /// starts `nu --lsp` gets nusage's language server unasked: kakehashi with nusage's layer when
 /// kakehashi is on PATH, which highlights a script's header and bridges the script to `nusage
-/// lsp`, else `nusage lsp` alone. Anything else is `nu` itself, as it was asked for. The
+/// lsp`, else `nus lsp` alone. Anything else is `nu` itself, as it was asked for. The
 /// arguments are Nushell's, flags included.
 #[derive(Args)]
 pub struct Nu {

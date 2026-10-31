@@ -75,7 +75,7 @@ pub fn generate_with(
     let name = out
         .and_then(|out| out.file_stem())
         .and_then(|stem| stem.to_str())
-        .unwrap_or("nusage");
+        .unwrap_or("nus");
     let dir = out.and_then(Path::parent);
     nusage_nu::check_module(name, &text, dir)
         .map_err(|err| Diagnostic::new(source, err.to_string()))?;
@@ -110,7 +110,7 @@ pub fn check(
     let name = module
         .file_stem()
         .and_then(|stem| stem.to_str())
-        .unwrap_or("nusage");
+        .unwrap_or("nus");
     let findings = conform::conform(&assembled, name, &text, module.parent())
         .map_err(|err| Diagnostic::new(module, err.to_string()))?;
     if findings.is_empty() {
@@ -165,7 +165,7 @@ pub fn lsp(args: &[String]) -> std::io::Result<i32> {
     lsp::serve(args)
 }
 
-/// Run as `nu`, as mise's command wrapper does in the `nusage-lsp` environment: `nu --lsp`
+/// Run as `nu`, as mise's command wrapper does in the `nus-lsp` environment: `nu --lsp`
 /// is nusage's language server, through kakehashi when it is on PATH, and anything else is
 /// `nu` itself. The exit code is what ran's.
 pub fn nu(args: &[String]) -> std::io::Result<i32> {
@@ -173,7 +173,7 @@ pub fn nu(args: &[String]) -> std::io::Result<i32> {
 }
 
 /// What the interpreter runs before the script: the shadows of the scripts it calls, which
-/// run them with `nusage`, and the helpers they use. Empty when it calls none.
+/// run them with `nus`, and the helpers they use. Empty when it calls none.
 pub fn prelude_run(script: &Path, nusage: &Path) -> Result<String, Diagnostic> {
     prelude::runtime(script, nusage)
 }

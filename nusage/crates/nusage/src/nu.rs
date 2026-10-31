@@ -1,7 +1,7 @@
-//! `nusage nu`: `nu`, as mise's command wrapper starts it in the `nusage-lsp` environment, so
+//! `nus nu`: `nu`, as mise's command wrapper starts it in the `nus-lsp` environment, so
 //! an editor that starts `nu --lsp` gets nusage's language server without being told of it:
 //! kakehashi with nusage's layer when kakehashi is on PATH, which highlights a script's header
-//! and bridges the script to `nusage lsp`, else `nusage lsp` alone. Anything else is `nu`, as
+//! and bridges the script to `nus lsp`, else `nus lsp` alone. Anything else is `nu`, as
 //! it was asked for.
 
 use std::ffi::OsStr;
@@ -10,13 +10,13 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Set for the `nu` a language server of nusage's starts: that one is Nushell's own.
-pub const SERVING: &str = "NUSAGE_LSP";
+pub const SERVING: &str = "NUS_LSP";
 
 /// Set on the `nu` this runs, to this process's id. Should that `nu` lead back here, through
-/// a shim or wrapper [`real_nu`] did not see for one, the `nusage nu` it reaches is this same
+/// a shim or wrapper [`real_nu`] did not see for one, the `nus nu` it reaches is this same
 /// process, as mise's shims and wrappers exec on unix, and it stops instead of going round
 /// for ever. A `nu` that Nushell starts in turn is a process of its own, and runs.
-const RAN: &str = "NUSAGE_NU_PID";
+const RAN: &str = "NUS_NU_PID";
 
 /// nusage's layer for kakehashi: the queries it adds, by path under the layer.
 const LAYER: &[(&str, &str)] = &[
@@ -35,7 +35,7 @@ pub fn run(args: &[String]) -> io::Result<i32> {
     let pid = std::process::id().to_string();
     if std::env::var(RAN).is_ok_and(|ran| ran == pid) {
         return Err(io::Error::other(
-            "the `nu` on PATH leads back to `nusage nu`: there is no Nushell past it",
+            "the `nu` on PATH leads back to `nus nu`: there is no Nushell past it",
         ));
     }
     let Some(rest) = lsp_requested(args).filter(|_| std::env::var_os(SERVING).is_none()) else {
@@ -134,7 +134,7 @@ fn on_path(program: &str) -> Option<PathBuf> {
 
 /// Write nusage's layer for kakehashi where it can be read, and return its configuration
 /// file: the queries that inject a script's header and its `run=` scripts, and the
-/// configuration that bridges a script to `nusage lsp` with Nushell's other arguments. The
+/// configuration that bridges a script to `nus lsp` with Nushell's other arguments. The
 /// layer is named by what it holds, so one written for other arguments stands beside it.
 fn layer(nusage: &Path, args: &[String]) -> io::Result<PathBuf> {
     let config = config(nusage, args);
@@ -160,7 +160,7 @@ fn layer(nusage: &Path, args: &[String]) -> io::Result<PathBuf> {
 /// kakehashi's configuration in nusage's layer. Its queries come first and kakehashi's data
 /// after, which holds the parsers and queries it installs; this kakehashi serves Nushell
 /// documents alone, so what the layer adds to KDL is for headers. A script, under either
-/// language id an editor gives Nushell, is bridged to `nusage lsp` as itself; the scripts
+/// language id an editor gives Nushell, is bridged to `nus lsp` as itself; the scripts
 /// its header's `run=` names are not, being a word each. `sh` is read with bash's parser.
 fn config(nusage: &Path, args: &[String]) -> String {
     let quoted = |text: &str| serde_json::to_string(text).expect("a string");
@@ -171,7 +171,7 @@ fn config(nusage: &Path, args: &[String]) -> String {
     ];
     cmd.extend(args.iter().map(|arg| quoted(arg)));
     format!(
-        r#"# nusage's layer for kakehashi, written by `nusage nu --lsp`.
+        r#"# nusage's layer for kakehashi, written by `nus nu --lsp`.
 searchPaths = [".", "${{KAKEHASHI_DATA_DIR}}"]
 
 [languages.nushell]
@@ -192,7 +192,7 @@ enabled = true
 [languages.nushell.bridge.nu]
 enabled = false
 
-[languageServers.nusage]
+[languageServers.nus]
 cmd = [{}]
 languages = ["nu", "nushell"]
 "#,
@@ -278,9 +278,9 @@ mod tests {
 
     #[test]
     fn the_layer_bridges_a_script_to_nusage_with_nushells_arguments() {
-        let config = config(Path::new("/bin/nusage"), &words("--config x.nu"));
+        let config = config(Path::new("/bin/nus"), &words("--config x.nu"));
         assert!(
-            config.contains(r#"cmd = ["/bin/nusage", "lsp", "--", "--config", "x.nu"]"#),
+            config.contains(r#"cmd = ["/bin/nus", "lsp", "--", "--config", "x.nu"]"#),
             "{config}"
         );
         assert!(config.contains(r#"searchPaths = [".", "${KAKEHASHI_DATA_DIR}"]"#));
