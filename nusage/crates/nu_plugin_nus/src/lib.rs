@@ -10,7 +10,8 @@
 //! the CLI: those are added as a consumer asks for them.
 
 use nusage_plugin::nu_plugin::{Plugin, PluginCommand};
-use nusage_plugin::{CommandTree, Diagnostic};
+use nusage_plugin::nu_protocol::engine::Command;
+use nusage_plugin::{Adapter, CommandTree, Diagnostic, Native};
 
 mod validate;
 
@@ -30,14 +31,24 @@ impl NusagePlugin {
     }
 }
 
+impl NusagePlugin {
+    fn validate(&self) -> Validate {
+        Validate::new(&self.tree).expect("the CLI's spec declares `validate`")
+    }
+
+    /// The same commands as an engine's own, for the engine a script runs in inside the
+    /// plugin, where a call of one reaches this code with no plugin between.
+    pub fn natives(&self) -> Vec<Box<dyn Command>> {
+        vec![Box::new(Native(self.validate()))]
+    }
+}
+
 impl Plugin for NusagePlugin {
     fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").into()
     }
 
     fn commands(&self) -> Vec<Box<dyn PluginCommand<Plugin = Self>>> {
-        vec![Box::new(
-            Validate::new(&self.tree).expect("the CLI's spec declares `validate`"),
-        )]
+        vec![Box::new(Adapter::new(self.validate()))]
     }
 }
