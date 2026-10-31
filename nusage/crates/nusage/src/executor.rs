@@ -247,6 +247,44 @@ pub fn describe(err: &LabeledError) -> String {
     text
 }
 
+/// A context inside another: the same process, in a directory and an environment of its
+/// own, as a task of mise's runs in the task's directory with mise's variables over the
+/// caller's.
+pub struct Within<'a> {
+    pub inner: &'a dyn Context,
+    pub cwd: String,
+    pub env: HashMap<String, String>,
+}
+
+impl Context for Within<'_> {
+    fn env(&self, name: &str) -> Result<Option<String>, LabeledError> {
+        match self.env.get(name) {
+            Some(value) => Ok(Some(value.clone())),
+            None => self.inner.env(name),
+        }
+    }
+
+    fn environment(&self) -> Result<HashMap<String, Value>, LabeledError> {
+        let mut vars = self.inner.environment()?;
+        for (name, value) in &self.env {
+            vars.insert(name.clone(), Value::string(value, Span::unknown()));
+        }
+        Ok(vars)
+    }
+
+    fn cwd(&self) -> Result<String, LabeledError> {
+        Ok(self.cwd.clone())
+    }
+
+    fn stdout_is_free(&self) -> bool {
+        self.inner.stdout_is_free()
+    }
+
+    fn keep_alive(&self) -> Result<(), LabeledError> {
+        self.inner.keep_alive()
+    }
+}
+
 /// The process itself as a context: the CLI's, whose environment and directory are its own
 /// and whose standard output is the terminal. Variables named in `without` are kept from
 /// what runs: the ones that address this process, which a script's own calls must not see.
