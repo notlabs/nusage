@@ -7,12 +7,14 @@ from anyone, and what it cannot merge keeps its markers. Mergiraf does not know 
 so it is built here from its published source with the patches beside it applied.
 
 - `mise.toml`: the source, pinned as a mise tool with its checksum, and the tasks.
-  `mise run //mergiraf:build` applies the patches and builds the binary into the repository's
-  `.bin`, where the root's `[env] _.path` finds it; `//mergiraf:test` merges each case the
-  Nushell patch carries with that binary, as `jj resolve` would, and holds it to the case's
-  expected result; `//mergiraf:check`, which CI runs, holds the patches to the pinned source
-  without building. In GitHub Actions a failure of any of them is an annotation on the file
-  at fault, a patch or this configuration, through the module at `.mise/lib/actions.nu` that
+  `mise run //mergiraf:build` applies the patches and builds the release binary into the repository's
+  `.bin`, where the root's `[env] _.path` finds it. `//mergiraf:test` builds the same patched
+  source with Cargo's dev profile into `target/mergiraf-test/mergiraf`, then merges all 11
+  Nushell cases with the flags `jj resolve` uses and checks the exact output and exit code.
+  Tests leave the release binary in `.bin` alone. Cargo and Mr Boxington reuse builds by
+  their source, toolchain and platform identity. `//mergiraf:check` holds the patches to
+  the pinned source without building; `//mergiraf:check:platform` runs it on both CI platforms.
+  In GitHub Actions a failure of any of them is an annotation on the file at fault, a patch or this configuration, through the module at `.mise/lib/actions.nu` that
   the lint and the catalog's check annotate with too.
 - `patches/`: the changes, as a series `git format-patch` wrote against the source as
   published, applied in name order.

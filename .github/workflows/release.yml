@@ -1,22 +1,26 @@
 name: release
 
-# Every push to main: release-plz tags the version Cargo.toml declares when no tag for it
-# exists, with the changelog's section as the draft release's notes; the Linux binary is
-# built for that tag and attached, and the release is published. The version and the
-# changelog are committed beforehand (`mise run release`), so the push that bumps them is
-# the release, and main takes a pull request only with the checks green, so nothing is
-# checked again here. The workflow's own token is enough: a tag it pushes runs no other
-# workflow, and none has to run.
+# After CI succeeds for the current main commit, release-plz tags the version Cargo.toml
+# declares at that exact checked commit when no tag exists. Its Linux binary is attached and the
+# draft release published. The version and changelog are committed beforehand
+# (`mise run release`); validation is CI's, so release assembly need not repeat it.
+# The workflow's own token is enough: a tag it pushes runs no other workflow.
 #
 # The other targets are built on demand: run this workflow with the tag and the targets,
 # `all` or a comma-separated list, and they are attached to that release.
 #
-# The catalog releases apart, by the same rule: a push to main whose `catalog_version` in
-# catalog/mise.toml has no release yet is its release, tagged `catalog/v<version>` with the
-# tarball `//catalog:package` builds attached, and the tasks pushed to GHCR as the OCI task
+# The catalog releases apart, by the same rule: a checked main commit whose
+# `catalog_version` has no release yet is tagged `catalog/v<version>`, with the tarball
+# `//catalog:assemble` writes attached, and the tasks pushed to GHCR as the OCI task
 # catalog `ghcr.io/<repository>-tasks:<version>`.
 on:
-  push:
+  # Jobs accept only successful same-repository pushes whose checked SHA is still main's
+  # event SHA, matching the attestation's OIDC source. Superseded completions are skipped.
+  # No artifact from the triggering workflow is consumed.
+  # jactionlint ignore=dangerous-triggers
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -37,7 +41,13 @@ concurrency:
 
 jobs:
   tag:
-    if: github.event_name == 'push'
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_sha == github.sha &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -52,6 +62,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
@@ -68,7 +79,7 @@ jobs:
           tag=$(jq -r '.[] | select(.package_name == "nusage") | .tag' <<< "${RELEASES:-[]}")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-  # The tag and the targets: on a push, the tag release-plz made and Linux x86_64; on a
+  # The tag and the targets: after CI, the tag release-plz made and Linux x86_64; on a
   # dispatch, the given tag and targets.
   plan:
     needs: tag
@@ -83,7 +94,7 @@ jobs:
       - id: plan
         env:
           EVENT: ${{ github.event_name }}
-          PUSHED_TAG: ${{ needs.tag.outputs.tag }}
+          RELEASED_TAG: ${{ needs.tag.outputs.tag }}
           INPUT_TAG: ${{ inputs.tag }}
           INPUT_TARGETS: ${{ inputs.targets }}
           ALL: |
@@ -98,8 +109,8 @@ jobs:
               {"target": "aarch64-pc-windows-msvc", "os": "windows-latest", "build-tool": "cargo"}
             ]
         run: |
-          if [ "$EVENT" = push ]; then
-            tag=$PUSHED_TAG
+          if [ "$EVENT" = workflow_run ]; then
+            tag=$RELEASED_TAG
             targets=x86_64-unknown-linux-gnu
           else
             tag=$INPUT_TAG
@@ -182,7 +193,13 @@ jobs:
       - run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
 
   catalog:
-    if: github.event_name == 'push'
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_sha == github.sha &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -196,11 +213,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
-      # No cache: what is published is built from the checkout alone, as the assets are.
+      # Read the version with mise alone; an already released catalog installs no tools.
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
+          install: false
           cache: false
       # The version catalog/mise.toml declares, and whether it is released already.
       - id: version
@@ -217,10 +236,12 @@ jobs:
             echo "tag=$tag"
             echo "released=$released"
           } >> "$GITHUB_OUTPUT"
-      # `package` checks the catalog first: the committed files against their inputs and
-      # against the mise this workflow pins, then drives mise through the module.
+      # This exact commit passed CI. Build its interpreter and assemble its committed
+      # catalog without repeating validation. Published builds still use no cache.
       - if: steps.version.outputs.released == 'false'
-        run: mise run //catalog:package
+        run: mise install --monorepo --locked
+      - if: steps.version.outputs.released == 'false'
+        run: mise run //catalog:assemble
       - if: steps.version.outputs.released == 'false'
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -237,8 +258,10 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
           TAG: ${{ steps.version.outputs.tag }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           gh release create "$TAG" "catalog/dist/nusage-catalog-$VERSION.tar.gz" \
             --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" \
             --title "catalog $VERSION" \
             --notes "The catalog's module packages, for the \`nusage-catalog\` tool; the tasks are \`oci::ghcr.io/$GITHUB_REPOSITORY-tasks:$VERSION\`."

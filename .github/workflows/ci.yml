@@ -1,8 +1,8 @@
 name: ci
 
-# The checks on every pull request, and on main, where the run fills the build cache that
-# pull requests read. Releasing waits on no check of its own: main takes a pull request only
-# with this check green.
+# Pull requests check affected projects; main checks all projects before release assembly.
+# Main supplies the shared build cache, while same-repository PR revisions can also reuse
+# their own scoped cache. Both platform checks remain required.
 on:
   pull_request:
   push:
@@ -34,6 +34,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Native affected-project selection needs the merge base, including on restacks.
+          fetch-depth: 0
           persist-credentials: false
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
@@ -46,16 +48,13 @@ jobs:
         with:
           github-cache-mode: objects
           isolate-objects-cache: true
+          # Revisions of a same-repository PR can reuse their scoped build cache.
+          save-on-pull-request: true
           clean-target-before-export: true
       # rustc's and clippy's findings as annotations, through mise's task prefix.
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      # The catalog's gh checks read this repository through gh; the workflow's token reads
-      # and nothing more.
-      - run: mise run '//...:check'
-        env:
-          GH_TOKEN: ${{ github.token }}
-      # Patch application is checked on every run; build and exercise the semantic cases
-      # when their implementation, runner or toolchain changes.
+      # Check Mergiraf when its implementation, runner or toolchain changes. Main also
+      # applies every patch as part of its full check, even when semantic cases are unchanged.
       - id: mergiraf-changes
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -66,11 +65,30 @@ jobs:
           else
             # Checkout leaves no credential behind; supply its read-only token for this fetch.
             git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --no-tags --depth=1 origin "$BASE_SHA"
+            echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
             if git diff --quiet "$BASE_SHA" HEAD -- mergiraf jj.toml mise.toml mise.lock .mise/lib/actions.nu .github/workflows/ci.yml; then
               echo "run=false" >> "$GITHUB_OUTPUT"
             else
               echo "run=true" >> "$GITHUB_OUTPUT"
             fi
           fi
+      # Formatting, workflow lint and documentation run once on Linux. Both platforms
+      # retain Rust tests, Clippy and the runtime/consumer checks.
+      - name: Check repository
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ -n "$AFFECTED_BASE" ]; then
+            # Root formatting and selection-regression checks cover the whole repository.
+            if [ "$RUNNER_OS" = Linux ]; then
+              mise run //:check
+            fi
+            mise run --affected --affected-base "$AFFECTED_BASE" --affected-head HEAD --affected-committed "$NUSAGE_CHECK_TASK"
+          else
+            # Main is the full validation boundary used by release assembly.
+            mise run "$NUSAGE_CHECK_TASK"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AFFECTED_BASE: ${{ steps.mergiraf-changes.outputs.base }}
+          NUSAGE_CHECK_TASK: ${{ runner.os == 'Linux' && '//...:check' || '//...:check:platform' }}
       - if: steps.mergiraf-changes.outputs.run == 'true'
         run: mise run //mergiraf:test

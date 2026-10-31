@@ -46,3 +46,7 @@ if $exported.stdout != (open --raw ../docker-compose.usage.kdl) {
     error make {msg: "The isolated Cobra export differs from the committed spec"}
 }
 '''
+
+[tasks."check:platform"]
+description = "Reproduce the Compose spec on this platform"
+depends = [":check"]
