@@ -19,8 +19,6 @@ bench = false
 [dependencies]
 nusage.workspace = true
 nusage-plugin.workspace = true
-nushell-schema = { workspace = true, features = ["validate"] }
-serde_json.workspace = true
 
 [dev-dependencies]
 nusage-plugin = { workspace = true, features = ["test"] }

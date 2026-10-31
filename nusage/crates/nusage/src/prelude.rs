@@ -82,15 +82,27 @@ pub fn line(script: &Path) -> Result<(String, Calls), Diagnostic> {
 /// The Nushell the interpreter runs before the script: the helpers and the shadows, which
 /// run the scripts they stand for with this `nus`. Empty when the script calls none.
 pub fn runtime(script: &Path, nusage: &Path) -> Result<String, Diagnostic> {
+    runtime_with(script, nusage, true)
+}
+
+/// [`runtime`] for an engine that has `nus call` as a command of its own, the executor's:
+/// the shadows run their scripts through it, and the helper that would spawn a process for
+/// each is left out. The shadows name `nus` as the runner, which the command reads as
+/// itself.
+pub fn runtime_in_engine(script: &Path) -> Result<String, Diagnostic> {
+    runtime_with(script, Path::new("nus"), false)
+}
+
+fn runtime_with(script: &Path, nusage: &Path, call_helper: bool) -> Result<String, Diagnostic> {
     let source = read(script)?;
     let calls = calls::scan(script, &source, &Texts::new());
     if calls.shadows.is_empty() {
         return Ok(String::new());
     }
-    let mut items = vec![
-        Item::Verbatim(HELPERS.to_string()),
-        Item::Verbatim(CALL_HELPER.to_string()),
-    ];
+    let mut items = vec![Item::Verbatim(HELPERS.to_string())];
+    if call_helper {
+        items.push(Item::Verbatim(CALL_HELPER.to_string()));
+    }
     for shadow in &calls.shadows {
         let def = calls::shadow_def(shadow, Runner::Absolute(nusage))
             .map_err(|err| syntax(script, err))?;

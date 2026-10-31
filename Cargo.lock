@@ -3593,8 +3593,6 @@ version = "0.1.1"
 dependencies = [
  "nusage",
  "nusage-plugin",
- "nushell-schema",
- "serde_json",
 ]
 
 [[package]]
@@ -3734,6 +3732,7 @@ dependencies = [
  "nuon",
  "nusage-model",
  "nusage-nu",
+ "nusage-plugin",
  "nusage-spec",
  "nushell-schema",
  "serde_json",

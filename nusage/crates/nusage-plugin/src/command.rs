@@ -9,6 +9,7 @@
 // `ShellError` is Nushell's size, as every engine command's `Result` of it is.
 #![allow(clippy::result_large_err)]
 
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use nu_engine::CallExt;
@@ -28,6 +29,15 @@ pub struct Args {
 }
 
 impl Args {
+    /// Arguments given directly, as a process's command line is.
+    pub fn new(head: Span, positional: Vec<Value>, named: Vec<(String, Option<Value>)>) -> Self {
+        Args {
+            head,
+            positional,
+            named,
+        }
+    }
+
     /// The arguments as the plugin protocol delivered them.
     pub fn from_plugin(call: &EvaluatedCall) -> Self {
         Args {
@@ -111,12 +121,20 @@ impl Args {
 
 /// What a command asks of where it was called from: the caller's environment and working
 /// directory, which a plugin reads over the protocol and an engine's command reads from the
-/// stack.
+/// stack, and two things about the process it runs in.
 pub trait Context {
     /// The environment variable, as text, when set.
     fn env(&self, name: &str) -> Result<Option<String>, LabeledError>;
+    /// The whole environment, as the caller's shell has it.
+    fn environment(&self) -> Result<HashMap<String, Value>, LabeledError>;
     /// The caller's working directory, absolute.
     fn cwd(&self) -> Result<String, LabeledError>;
+    /// Whether what runs here may write to standard output and reach the terminal: not in
+    /// a plugin that talks to its engine over standard output.
+    fn stdout_is_free(&self) -> bool;
+    /// Keep the process running between calls, for the state it now holds; nothing where
+    /// the process is the caller's own.
+    fn keep_alive(&self) -> Result<(), LabeledError>;
 }
 
 impl Context for EngineInterface {
@@ -127,8 +145,20 @@ impl Context for EngineInterface {
         })
     }
 
+    fn environment(&self) -> Result<HashMap<String, Value>, LabeledError> {
+        Ok(self.get_env_vars()?)
+    }
+
     fn cwd(&self) -> Result<String, LabeledError> {
         Ok(self.get_current_dir()?)
+    }
+
+    fn stdout_is_free(&self) -> bool {
+        !self.is_using_stdio()
+    }
+
+    fn keep_alive(&self) -> Result<(), LabeledError> {
+        Ok(self.set_gc_disabled(true)?)
     }
 }
 
@@ -151,12 +181,24 @@ impl Context for EngineContext<'_> {
             .transpose()
     }
 
+    fn environment(&self) -> Result<HashMap<String, Value>, LabeledError> {
+        Ok(self.stack.get_env_vars(self.engine_state))
+    }
+
     fn cwd(&self) -> Result<String, LabeledError> {
         Ok(self
             .engine_state
             .cwd(Some(self.stack))?
             .to_string_lossy()
             .into_owned())
+    }
+
+    fn stdout_is_free(&self) -> bool {
+        true
+    }
+
+    fn keep_alive(&self) -> Result<(), LabeledError> {
+        Ok(())
     }
 }
 
@@ -258,10 +300,13 @@ impl<P: Plugin, R: Run> PluginCommand for Adapter<P, R> {
 
 /// An engine with Nushell's commands and `natives` as its own: what a script runs in inside
 /// the plugin, where a call of a command the plugin serves reaches the same code directly.
+/// `print` is Nushell's shell's, not its command set's, so the engine carries one of its
+/// own, which writes to the process's standard output and error as the shell's does.
 pub fn engine(natives: Vec<Box<dyn Command>>) -> Result<EngineState, ShellError> {
     let mut state = nu_command::add_shell_command_context(nu_cmd_lang::create_default_context());
     let delta = {
         let mut working_set = StateWorkingSet::new(&state);
+        working_set.add_decl(Box::new(Print));
         for native in natives {
             working_set.add_decl(native);
         }
@@ -269,6 +314,82 @@ pub fn engine(natives: Vec<Box<dyn Command>>) -> Result<EngineState, ShellError>
     };
     state.merge_delta(delta)?;
     Ok(state)
+}
+
+/// `print`, as the shell has it: each value given, or the input, written to standard
+/// output, or to standard error with `--stderr`, a newline after each unless
+/// `--no-newline`; `--raw` writes a string or binary as it is.
+#[derive(Clone)]
+struct Print;
+
+impl Command for Print {
+    fn name(&self) -> &str {
+        "print"
+    }
+
+    fn signature(&self) -> Signature {
+        Signature::build("print")
+            .input_output_types(vec![
+                (nu_protocol::Type::Nothing, nu_protocol::Type::Nothing),
+                (nu_protocol::Type::Any, nu_protocol::Type::Nothing),
+            ])
+            .rest("rest", nu_protocol::SyntaxShape::Any, "The values to print")
+            .switch(
+                "no-newline",
+                "Print without a newline after each value",
+                Some('n'),
+            )
+            .switch("stderr", "Print to standard error instead", Some('e'))
+            .switch("raw", "Print a string or binary as it is", Some('r'))
+            .category(nu_protocol::Category::Strings)
+    }
+
+    fn description(&self) -> &str {
+        "Print the given values to stdout."
+    }
+
+    fn run(
+        &self,
+        engine_state: &EngineState,
+        stack: &mut Stack,
+        call: &Call,
+        input: PipelineData,
+    ) -> Result<PipelineData, ShellError> {
+        use std::io::Write;
+        let values: Vec<Value> = call.rest(engine_state, stack, 0)?;
+        let no_newline = call.has_flag(engine_state, stack, "no-newline")?;
+        let to_stderr = call.has_flag(engine_state, stack, "stderr")?;
+        let raw = call.has_flag(engine_state, stack, "raw")?;
+        let config = stack.get_config(engine_state);
+        let values = if values.is_empty() {
+            match input {
+                PipelineData::Empty => Vec::new(),
+                other => vec![other.into_value(call.head)?],
+            }
+        } else {
+            values
+        };
+        let mut text = Vec::new();
+        for value in values {
+            match value {
+                Value::String { val, .. } if raw => text.extend_from_slice(val.as_bytes()),
+                Value::Binary { val, .. } if raw => text.extend_from_slice(&val),
+                other => text.extend_from_slice(other.to_expanded_string("\n", &config).as_bytes()),
+            }
+            if !no_newline {
+                text.push(b'\n');
+            }
+        }
+        let written = if to_stderr {
+            std::io::stderr().write_all(&text)
+        } else {
+            std::io::stdout()
+                .write_all(&text)
+                .and_then(|()| std::io::stdout().flush())
+        };
+        written.map_err(|err| ShellError::from(LabeledError::new(format!("print: {err}"))))?;
+        Ok(PipelineData::empty())
+    }
 }
 
 /// `source` parsed into `engine_state` and run in `cwd` with `input`: the shape of a call

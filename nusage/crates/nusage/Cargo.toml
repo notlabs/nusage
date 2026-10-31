@@ -22,6 +22,8 @@ nusage-nu.workspace = true
 usage-rs.workspace = true
 nushell-schema = { workspace = true, features = ["validate"] }
 serde_json.workspace = true
+nusage-plugin.workspace = true
+nuon.workspace = true
 
 [dev-dependencies]
 nu-parser.workspace = true

@@ -10,8 +10,10 @@
 mod binary;
 mod calls;
 pub mod cli;
+pub mod commands;
 mod common;
 mod conform;
+pub mod executor;
 mod http;
 mod inspect;
 mod interpret;
@@ -26,7 +28,7 @@ mod validate;
 use std::path::{Path, PathBuf};
 
 pub use inspect::inspect;
-pub use interpret::{Parsed, interpret, parse};
+pub use interpret::{Parsed, interpret, parse, route};
 pub use validate::validate;
 
 pub use nusage_spec::Diagnostic;
