@@ -122,7 +122,7 @@ impl Executor {
         let block = self
             .block(&code, &text, &path, &cwd)
             .map_err(|err| at(err.to_string()))?;
-        let engine = self
+        let mut engine = self
             .engine()?
             .lock()
             .expect("no panic holds the engine")
@@ -136,6 +136,9 @@ impl Executor {
             "NUS_USAGE".into(),
             Value::string(nusage_nu::nuon(&record), span),
         );
+        // The variables as Nushell has them at its start: `PATH` a list, whatever
+        // `ENV_CONVERSIONS` reads converted.
+        nusage_plugin::nu_engine::convert_env_values(&mut engine, &mut stack)?;
         let data = nusage_plugin::nu_engine::eval_block::<
             nusage_plugin::nu_protocol::debugger::WithoutDebug,
         >(&engine, &mut stack, &block, input)?;
