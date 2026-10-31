@@ -1,8 +1,0 @@
-name "NAME"
-bin "NAME"
-about "What NAME does, in a line"
-cmd hello help="Greet the input" {
-    flag "-s --shout" help="In upper case"
-    arg <who> help="Who is greeted"
-    output ("string")"json" framing="json" default=#true
-}

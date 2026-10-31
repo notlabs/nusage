@@ -8,6 +8,10 @@
 //! A plugin registered under the CLI's name shadows the external of the same words, and a
 //! shell without the plugin runs the external where the plugin would answer.
 //!
+//! A plugin is the exception, not the pattern: one for nusage itself, and one for what only
+//! Rust reaches, as a library without a command line. A binary or a service is a module,
+//! and its hot path is nusage's plugin serving the helpers the module calls.
+//!
 //! The rest is the boundary: [`value`] carries values across it as JSON and back, [`env()`]
 //! reads the caller's environment, [`serve`] runs the plugin, and [`test`] runs it in
 //! process for its tests. The Nushell crates a plugin needs are re-exported, so a plugin
