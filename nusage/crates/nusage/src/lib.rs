@@ -59,6 +59,31 @@ pub fn generate_with(
     overlays: &[PathBuf],
     http: Option<&Path>,
 ) -> Result<String, Diagnostic> {
+    generate_for(source, out, overlays, http, Carrier::Inline)
+}
+
+/// Where the helpers a module calls come from. A module carries its helpers inline, so it
+/// stands on its own in any Nushell; or it calls them by their names and defines none, for
+/// a session with `nu_plugin_nus` registered, where the names are the plugin's commands
+/// and a called script runs in the plugin's process. The two modules differ only in what
+/// they define, and the fixture harness holds them to the same cases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Carrier {
+    /// The helpers defined in the module, as Nushell.
+    Inline,
+    /// The helpers the plugin serves called and not defined; the rest inline, until the
+    /// plugin serves them too.
+    Plugin,
+}
+
+/// [`generate_with`], for the helpers' [`Carrier`].
+pub fn generate_for(
+    source: &Path,
+    out: Option<&Path>,
+    overlays: &[PathBuf],
+    http: Option<&Path>,
+    carrier: Carrier,
+) -> Result<String, Diagnostic> {
     let assembled = assemble(source, overlays, http)?;
     let tree = nusage_model::model(&assembled)?;
     // Paths inside the module, a shim's `run` and a binary's spec, are relative to where it
@@ -68,7 +93,7 @@ pub fn generate_with(
         None => std::env::current_dir().map_err(|err| Diagnostic::new(source, err.to_string()))?,
     };
     let module = match &assembled.source {
-        Source::Scripts { .. } => shim::module(&tree, &base),
+        Source::Scripts { .. } => shim::module(&tree, &base, carrier),
         Source::Binary if tree.service.is_some() => http::module(&tree),
         Source::Binary => binary::module(&tree, &common::relative(&base, source)),
     }

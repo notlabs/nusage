@@ -72,17 +72,29 @@ pub struct Generate {
     /// and `$env.<NAME>_TOKEN`, as the module's helpers say
     #[usage(long)]
     http: Option<PathBuf>,
+    /// Write the module for a session with `nu_plugin_nus` registered: the helpers the
+    /// plugin serves, `nus call` first, are called by name and not defined, so a called
+    /// script runs in the plugin's process. Without it the module carries its helpers and
+    /// stands on its own in any Nushell
+    #[usage(long)]
+    plugin: bool,
 }
 
 impl Run for Generate {
     type Output = Result<(), String>;
 
     fn run(self) -> Self::Output {
-        let module = crate::generate_with(
+        let carrier = if self.plugin {
+            crate::Carrier::Plugin
+        } else {
+            crate::Carrier::Inline
+        };
+        let module = crate::generate_for(
             &self.source,
             self.out.as_deref(),
             &self.overlay,
             self.http.as_deref(),
+            carrier,
         )
         .map_err(|e| e.to_string())?;
         match &self.out {

@@ -217,3 +217,32 @@ fn script_cases_parse_through_the_interpreter() {
         "expected at least four script cases, found {checked}"
     );
 }
+
+/// The module for a session with the plugin registered differs from the one that stands on
+/// its own only in what it defines: `nus call` is called, not defined, so the shadows reach
+/// the plugin's executor. Everything else is the same text.
+#[test]
+fn the_plugin_carrier_omits_what_the_plugin_serves() {
+    let fixture = fixtures_dir().join("script-calls");
+    let out = fixture.join("expected/caller.nu");
+    let inline = nusage::generate_with(&fixture.join("script.nu"), Some(&out), &[], None).unwrap();
+    let plugin = nusage::generate_for(
+        &fixture.join("script.nu"),
+        Some(&out),
+        &[],
+        None,
+        nusage::Carrier::Plugin,
+    )
+    .unwrap();
+    assert!(inline.contains("def \"nus call\""));
+    assert!(!plugin.contains("def \"nus call\""));
+    assert!(plugin.contains("nus call $script"));
+    // The same definitions: the plugin module is the inline one less the helper.
+    let defs = |text: &str| -> Vec<String> {
+        text.lines()
+            .filter(|line| line.starts_with("export def "))
+            .map(str::to_string)
+            .collect()
+    };
+    assert_eq!(defs(&inline), defs(&plugin));
+}

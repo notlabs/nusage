@@ -35,9 +35,11 @@ declares, while what it prints passes through. The path is the calling script's:
 external call they replace would look in the working directory; `^./x.nu` is still that
 external. The interpreter and the module define the shadows before the script, and `nusage
 prelude` writes them as the line that stands in for the script's first where Nushell checks it.
-`script-calls` calls `callee.nu` the three ways. The harness runs each script case a third
-way too, through the plugin's `nus call`, which runs the script in an engine inside the
-plugin's process; the value and what the script prints must be the interpreter's.
+`script-calls` calls `callee.nu` the three ways. The harness runs each script case two more
+ways: through the plugin's `nus call`, which runs the script in an engine inside the
+plugin's process, and through the module `nus generate --plugin` writes for a session with
+the plugin registered, whose shadows call `nus call` without defining it; the value and
+what the script prints must be the interpreter's each way.
 
 A task of mise's whose file is a script nusage runs is called the same way, as `mise run
 <task>` or `mise r <task>`: the shadow runs the task through mise, which runs what the task
