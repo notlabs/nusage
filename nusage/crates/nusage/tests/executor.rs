@@ -22,7 +22,7 @@ fn call(commands: &Commands, words: &[&str]) -> Result<Value, String> {
     );
     commands
         .call
-        .run(&ProcessContext, &args, PipelineData::empty())
+        .run(&ProcessContext::default(), &args, PipelineData::empty())
         .map_err(|err| format!("{err:?}"))
         .and_then(|data| {
             data.into_value(Span::test_data())
@@ -61,4 +61,41 @@ fn a_script_calling_scripts_runs_inside_the_engine() {
     assert!(help.coerce_string().unwrap().contains("<who>"));
     let refused = call(&commands, &[&script, "nus", &script]).unwrap_err();
     assert!(refused.contains("who"), "{refused}");
+}
+
+#[test]
+fn the_path_is_a_list_as_nushell_has_it() {
+    // A script adds a directory to `$env.PATH` and runs what is there, as it would in `nu`.
+    let dir = std::env::temp_dir().join(format!("nusage-path-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let script = dir.join("pathed.nu");
+    std::fs::write(
+        &script,
+        "#!/usr/bin/env nus\n#USAGE about \"Held to a path\"\n$env.PATH | describe\n",
+    )
+    .unwrap();
+    let script = script.to_string_lossy();
+    let commands = Commands::new(Arc::new(Executor::new())).unwrap();
+    let value = call(&commands, &[&script, "nus", &script]).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(value, Value::test_string("list<string>"));
+}
+
+#[test]
+fn the_engine_has_the_standard_library() {
+    // A script's `use std/...` finds the library `nu` loads, in this engine as in `nu`.
+    let dir = std::env::temp_dir().join(format!("nusage-std-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let script = dir.join("checked.nu");
+    std::fs::write(
+        &script,
+        "#!/usr/bin/env nus\n#USAGE about \"Held to std\"\nuse std/assert\nassert equal 1 1\n\
+         \"held\"\n",
+    )
+    .unwrap();
+    let script = script.to_string_lossy();
+    let commands = Commands::new(Arc::new(Executor::new())).unwrap();
+    let value = call(&commands, &[&script, "nus", &script]).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(value, Value::test_string("held"));
 }

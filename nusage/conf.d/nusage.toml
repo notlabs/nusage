@@ -1,5 +1,5 @@
-# The released nusage, with what it runs: the interpreter starts `nu`, and a generated
-# module's completions run `usage`. Beside it the catalog, the typed commands for other tools,
+# The released nusage, with what it runs: `nus nu` and the language server start `nu`, and
+# a generated module's completions run `usage`. Beside it the catalog, the typed commands for other tools,
 # released from the same repository under its own tags: `v<version>` is nusage's,
 # `catalog/v<version>` the catalog's, so each lists only its own.
 [tool_alias]

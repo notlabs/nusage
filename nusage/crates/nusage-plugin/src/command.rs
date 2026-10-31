@@ -313,6 +313,15 @@ pub fn engine(natives: Vec<Box<dyn Command>>) -> Result<EngineState, ShellError>
         working_set.render()
     };
     state.merge_delta(delta)?;
+    // The standard library, for a script's `use std/...`, as `nu` loads it.
+    nu_std::load_standard_library(&mut state).map_err(|err| {
+        ShellError::from(LabeledError::new(format!(
+            "the standard library does not load: {err}"
+        )))
+    })?;
+    // `$nu`, as a script expects it: its `current-exe` is this process, which answers as
+    // Nushell when started with Nushell's flags.
+    state.generate_nu_constant();
     Ok(state)
 }
 
@@ -355,39 +364,28 @@ impl Command for Print {
         call: &Call,
         input: PipelineData,
     ) -> Result<PipelineData, ShellError> {
-        use std::io::Write;
         let values: Vec<Value> = call.rest(engine_state, stack, 0)?;
         let no_newline = call.has_flag(engine_state, stack, "no-newline")?;
         let to_stderr = call.has_flag(engine_state, stack, "stderr")?;
         let raw = call.has_flag(engine_state, stack, "raw")?;
-        let config = stack.get_config(engine_state);
-        let values = if values.is_empty() {
-            match input {
-                PipelineData::Empty => Vec::new(),
-                other => vec![other.into_value(call.head)?],
+        // As the shell's `print`: a value through `table`, or as it is with `--raw`; a
+        // stream through as it comes, with nothing added.
+        let print = |data: PipelineData, stack: &mut Stack| {
+            if raw {
+                data.print_raw(engine_state, no_newline, to_stderr)
+            } else {
+                data.print_table(engine_state, stack, no_newline, to_stderr)
+            }
+        };
+        if values.is_empty() {
+            if !matches!(input, PipelineData::Empty) {
+                print(input, stack)?;
             }
         } else {
-            values
-        };
-        let mut text = Vec::new();
-        for value in values {
-            match value {
-                Value::String { val, .. } if raw => text.extend_from_slice(val.as_bytes()),
-                Value::Binary { val, .. } if raw => text.extend_from_slice(&val),
-                other => text.extend_from_slice(other.to_expanded_string("\n", &config).as_bytes()),
-            }
-            if !no_newline {
-                text.push(b'\n');
+            for value in values {
+                print(PipelineData::value(value, None), stack)?;
             }
         }
-        let written = if to_stderr {
-            std::io::stderr().write_all(&text)
-        } else {
-            std::io::stdout()
-                .write_all(&text)
-                .and_then(|()| std::io::stdout().flush())
-        };
-        written.map_err(|err| ShellError::from(LabeledError::new(format!("print: {err}"))))?;
         Ok(PipelineData::empty())
     }
 }

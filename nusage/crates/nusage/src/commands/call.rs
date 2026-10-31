@@ -57,7 +57,8 @@ impl Run for Call {
             };
             return self
                 .executor
-                .run(cx, std::path::Path::new(&script), argv, input, span);
+                .run(cx, std::path::Path::new(&script), argv, input, span)
+                .map_err(LabeledError::from);
         }
         spawn(cx, &script, &program, &rest, input, span)
     }
