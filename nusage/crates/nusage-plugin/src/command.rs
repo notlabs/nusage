@@ -313,6 +313,9 @@ pub fn engine(natives: Vec<Box<dyn Command>>) -> Result<EngineState, ShellError>
         working_set.render()
     };
     state.merge_delta(delta)?;
+    // `$nu`, as a script expects it: its `current-exe` is this process, which answers as
+    // Nushell when started with Nushell's flags.
+    state.generate_nu_constant();
     Ok(state)
 }
 

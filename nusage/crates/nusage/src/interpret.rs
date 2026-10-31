@@ -3,20 +3,22 @@
 //!
 //! usage's own parser reads the arguments against the script's header, so help, errors,
 //! defaults and `negate` are usage's. The record a shim would hand the script is built from
-//! the parse the same way, from the same model, and Nushell runs the script with it exactly
-//! as the shim does: `let usage = ...; $in | run <script>`. A script inside a tree (a
-//! `mod.nu` beside it) is parsed as that tree's command, with its siblings as providers and
-//! its ancestors' globals; a script on its own is its own root.
+//! the parse the same way, from the same model, and the script runs with it in an engine of
+//! this process, the executor's ([`crate::executor`]), exactly as the shim runs it: `let
+//! usage = ...; $in | run <script>`. A script inside a tree (a `mod.nu` beside it) is parsed
+//! as that tree's command, with its siblings as providers and its ancestors' globals; a
+//! script on its own is its own root.
 //!
-//! Before the script, Nushell defines the shadows of the scripts it calls, which run them
-//! through this same interpreter ([`crate::calls`]). Run by one, with `NUS_OUTPUT_FILE`
-//! naming a file, the interpreter writes the script's value there as NUON for the shadow to
-//! read, when `NUS_OUTPUT_SCRIPT` names this script or nothing: mise runs a task's
-//! dependencies with the same variables. The script's own calls see neither.
+//! Before the script, the engine defines the shadows of the scripts it calls, which run them
+//! in the same engine ([`crate::calls`]). Run by a shadow of another process's, with
+//! `NUS_OUTPUT_FILE` naming a file, the interpreter writes the script's value there as NUON
+//! for the shadow to read, when `NUS_OUTPUT_SCRIPT` names this script or nothing: mise runs
+//! a task's dependencies with the same variables. The script's own calls see neither. The
+//! value is otherwise printed as Nushell shows it, and an error reported as Nushell reports
+//! it, with the exit code the script gave.
 
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use nu_protocol::{Record, Span, Value};
 use nusage_model::{Execution, Param, ParamKind, value_from_text};
@@ -93,62 +95,79 @@ pub fn route(script: &Path, args: &[String]) -> Result<(Parsed, PathBuf), Diagno
 /// Run the script with the arguments; the exit code is the script's, or 0 after printing
 /// help, or 2 when usage rejects the arguments.
 pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
+    use nusage_plugin::nu_protocol::{ByteStream, PipelineData, ShellError};
+
     let (parsed, run) = route(script, args)?;
-    let record = match parsed {
-        Parsed::Record(record) => record,
-        Parsed::Help(page) => {
-            println!("{page}");
-            return Ok(0);
-        }
-        Parsed::Rejected(why) => {
-            eprintln!("{why}");
-            return Ok(2);
-        }
-    };
+    if let Parsed::Help(page) = &parsed {
+        println!("{page}");
+        return Ok(0);
+    }
+    if let Parsed::Rejected(why) = &parsed {
+        eprintln!("{why}");
+        return Ok(2);
+    }
     let path = std::path::absolute(&run)
         .map_err(|err| Diagnostic::new(script, format!("cannot resolve: {err}")))?;
-    // The script's `$in` is standard input when something is piped in, read only if the
-    // script reads it: `nu --stdin` would read a pipe to its end before the script runs, so
-    // on unix a pipe or a file is opened as a stream through `/dev/stdin` instead. A
-    // terminal, a socket or a closed descriptor gives the script no input.
-    let script_word = nusage_nu::word(&path.to_string_lossy());
-    let nusage = std::env::current_exe()
-        .map_err(|err| Diagnostic::new(script, format!("cannot find nusage itself: {err}")))?;
-    let prelude = crate::prelude::runtime(&path, &nusage)?;
-    let to_nuon = match std::env::var_os(crate::calls::OUTPUT_VAR) {
-        Some(file) if !file.is_empty() && value_is_asked_of(&path) => format!(
-            " | to nuon | save --raw --force {}",
-            nusage_nu::word(&file.to_string_lossy())
-        ),
-        _ => String::new(),
+    // The script runs in an engine of this process, as a called script does in the plugin's.
+    // What addresses this process, the value file the caller named, is kept from the
+    // script's own calls, which return their values inside the engine.
+    let executor = std::sync::Arc::new(crate::executor::Executor::new());
+    crate::commands::Commands::new(executor.clone()).map_err(|err| Diagnostic::new(script, err))?;
+    let asked = match std::env::var_os(crate::calls::OUTPUT_VAR) {
+        Some(file) if !file.is_empty() && value_is_asked_of(&path) => Some(PathBuf::from(file)),
+        _ => None,
     };
-    let mut nu = Command::new("nu");
-    let code = if cfg!(unix) {
-        if stdin_is_stream() {
-            format!(
-                "let usage = ($env.NUS_USAGE | from nuon); open --raw /dev/stdin | run {script_word}{to_nuon}"
-            )
-        } else {
-            format!("let usage = ($env.NUS_USAGE | from nuon); run {script_word}{to_nuon}")
+    let cx = crate::executor::ProcessContext::without(&[
+        crate::calls::OUTPUT_VAR,
+        crate::calls::OUTPUT_SCRIPT_VAR,
+    ]);
+    let span = Span::unknown();
+    // The script's `$in` is standard input when something is piped in, read only if the
+    // script reads it. A terminal, a socket or a closed descriptor gives the script no input.
+    let input = if stdin_is_stream() || (!cfg!(unix) && !std::io::stdin().is_terminal()) {
+        match ByteStream::stdin(span) {
+            Ok(stream) => PipelineData::byte_stream(stream, None),
+            Err(_) => PipelineData::empty(),
         }
     } else {
-        if !std::io::stdin().is_terminal() {
-            nu.arg("--stdin");
-        }
-        format!("let usage = ($env.NUS_USAGE | from nuon); $in | run {script_word}{to_nuon}")
+        PipelineData::empty()
     };
-    let code = format!("{prelude}{code}");
-    let status = nu
-        .args(["-c", &code])
-        .env("NUS_USAGE", nusage_nu::nuon(&record))
-        .env_remove(crate::calls::OUTPUT_VAR)
-        .env_remove(crate::calls::OUTPUT_SCRIPT_VAR)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
-        .map_err(|err| Diagnostic::new(script, format!("cannot run `nu`: {err}")))?;
-    Ok(status.code().unwrap_or(1))
+    let named = std::path::absolute(script)
+        .map_err(|err| Diagnostic::new(script, format!("cannot resolve: {err}")))?;
+    let outcome = match executor.run(&cx, &named, args, input, span) {
+        Ok(data) => deliver(&executor, data, asked.as_deref(), span),
+        Err(err) => Err(err),
+    };
+    match outcome {
+        Ok(()) => Ok(0),
+        Err(ShellError::Exit { code, .. }) => Ok(code),
+        Err(err) => {
+            let code = err.exit_code().unwrap_or(1);
+            executor.report(&err);
+            Ok(if code == 0 { 1 } else { code })
+        }
+    }
+}
+
+/// The script's value where the caller wants it: as NUON in the file the caller named, or
+/// on standard output as Nushell shows it.
+#[allow(clippy::result_large_err)]
+fn deliver(
+    executor: &crate::executor::Executor,
+    data: nusage_plugin::nu_protocol::PipelineData,
+    asked: Option<&Path>,
+    span: Span,
+) -> Result<(), nusage_plugin::nu_protocol::ShellError> {
+    use nusage_plugin::nu_protocol::{LabeledError, ShellError};
+    match asked {
+        Some(file) => {
+            let value = data.into_value(span)?;
+            std::fs::write(file, nusage_nu::nuon(&value)).map_err(|err| {
+                ShellError::from(LabeledError::new(format!("{}: {err}", file.display())))
+            })
+        }
+        None => executor.print(data),
+    }
 }
 
 /// Whether the caller asks this script for its value: the one it names, or any when it names

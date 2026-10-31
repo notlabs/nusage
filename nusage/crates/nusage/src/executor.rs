@@ -8,6 +8,9 @@
 //! process's standard output, as the interpreter's does; a plugin that talks to its engine
 //! over that output cannot run a script, and says so.
 
+// `ShellError` is Nushell's size, as every engine call's `Result` of it is.
+#![allow(clippy::result_large_err)]
+
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::Path;
@@ -66,7 +69,9 @@ impl Executor {
 
     /// Run `script` with `args` as the interpreter would, with `input` as its `$in`, in the
     /// caller's environment and working directory, and return its value. `--help` returns
-    /// the help page as text; arguments usage rejects are an error saying why.
+    /// the help page as text; arguments usage rejects are an error saying why. An error is
+    /// the engine's own, with its spans in the script, and an `exit` in the script is
+    /// [`ShellError::Exit`].
     pub fn run(
         &self,
         cx: &dyn Context,
@@ -74,14 +79,15 @@ impl Executor {
         args: &[String],
         input: PipelineData,
         span: Span,
-    ) -> Result<PipelineData, LabeledError> {
+    ) -> Result<PipelineData, ShellError> {
         if !cx.stdout_is_free() {
             return Err(LabeledError::new(
                 "a script runs only where what it prints reaches the terminal: the plugin is \
                  talking to Nushell over its standard output",
             )
             .with_help("Nushell runs a plugin over a local socket by default; this one is not")
-            .with_label("this call", span));
+            .with_label("this call", span)
+            .into());
         }
         let at = |err: String| LabeledError::new(err).with_label("this call", span);
         let cwd = cx.cwd()?;
@@ -94,7 +100,7 @@ impl Executor {
         let record = match parsed {
             Parsed::Record(record) => record,
             Parsed::Help(page) => return Ok(PipelineData::value(Value::string(page, span), None)),
-            Parsed::Rejected(why) => return Err(at(why)),
+            Parsed::Rejected(why) => return Err(at(why).into()),
         };
         let path =
             std::path::absolute(&routed).map_err(|err| at(format!("cannot resolve: {err}")))?;
@@ -106,7 +112,7 @@ impl Executor {
         );
         let text = std::fs::read(&path).map_err(|err| at(format!("{}: {err}", path.display())))?;
         let block = self
-            .block(&code, &text, &path)
+            .block(&code, &text, &path, &cwd)
             .map_err(|err| at(err.to_string()))?;
         let engine = self
             .engine()?
@@ -128,10 +134,44 @@ impl Executor {
         Ok(data.body)
     }
 
+    /// `data` written to standard output as Nushell shows a value, a table where the value
+    /// is one, with the engine's own `table`.
+    pub fn print(&self, data: PipelineData) -> Result<(), ShellError> {
+        let engine = self
+            .engine()?
+            .lock()
+            .expect("no panic holds the engine")
+            .clone();
+        let mut stack = Stack::new().collect_value();
+        let cwd = std::env::current_dir().unwrap_or_default();
+        stack.add_env_var(
+            "PWD".into(),
+            Value::string(cwd.to_string_lossy(), Span::unknown()),
+        );
+        data.print_table(&engine, &mut stack, false, false)
+    }
+
+    /// `err` reported on standard error as Nushell reports it, with its spans in the source
+    /// the engine holds.
+    pub fn report(&self, err: &ShellError) {
+        match self.engine() {
+            Ok(engine) => {
+                let engine = engine.lock().expect("no panic holds the engine");
+                nusage_plugin::nu_protocol::report_shell_error(None, &engine, err);
+            }
+            Err(_) => eprintln!("Error: {err}"),
+        }
+    }
+
     /// The code parsed into the engine, kept by the content of the code and of the script
     /// it runs, which `run` reads at parse time.
-    #[allow(clippy::result_large_err)]
-    fn block(&self, code: &str, script_text: &[u8], path: &Path) -> Result<Arc<Block>, ShellError> {
+    fn block(
+        &self,
+        code: &str,
+        script_text: &[u8],
+        path: &Path,
+        cwd: &str,
+    ) -> Result<Arc<Block>, ShellError> {
         let mut hasher = DefaultHasher::new();
         code.hash(&mut hasher);
         script_text.hash(&mut hasher);
@@ -146,6 +186,8 @@ impl Executor {
         }
         let engine = self.engine().map_err(ShellError::from)?;
         let mut state = engine.lock().expect("no panic holds the engine");
+        // The caller's working directory, for what a `const` works out at parse time.
+        state.add_env_var("PWD".into(), Value::string(cwd, Span::unknown()));
         let block = {
             let mut working_set = StateWorkingSet::new(&state);
             let name = path.to_string_lossy();
@@ -195,16 +237,33 @@ pub fn describe(err: &LabeledError) -> String {
 }
 
 /// The process itself as a context: the CLI's, whose environment and directory are its own
-/// and whose standard output is the terminal.
-pub struct ProcessContext;
+/// and whose standard output is the terminal. Variables named in `without` are kept from
+/// what runs: the ones that address this process, which a script's own calls must not see.
+#[derive(Default)]
+pub struct ProcessContext {
+    pub without: Vec<String>,
+}
+
+impl ProcessContext {
+    /// The process's environment less `names`.
+    pub fn without(names: &[&str]) -> Self {
+        ProcessContext {
+            without: names.iter().map(|name| name.to_string()).collect(),
+        }
+    }
+}
 
 impl Context for ProcessContext {
     fn env(&self, name: &str) -> Result<Option<String>, LabeledError> {
+        if self.without.iter().any(|kept| kept == name) {
+            return Ok(None);
+        }
         Ok(std::env::var(name).ok())
     }
 
     fn environment(&self) -> Result<HashMap<String, Value>, LabeledError> {
         Ok(std::env::vars()
+            .filter(|(name, _)| !self.without.iter().any(|kept| kept == name))
             .map(|(name, value)| (name, Value::string(value, Span::unknown())))
             .collect())
     }

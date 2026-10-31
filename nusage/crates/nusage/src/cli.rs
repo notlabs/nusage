@@ -309,7 +309,7 @@ impl Run for Call {
         );
         let out = nusage_plugin::Run::run(
             &commands.call,
-            &crate::executor::ProcessContext,
+            &crate::executor::ProcessContext::default(),
             &args,
             PipelineData::empty(),
         )

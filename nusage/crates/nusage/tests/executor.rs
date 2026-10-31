@@ -22,7 +22,7 @@ fn call(commands: &Commands, words: &[&str]) -> Result<Value, String> {
     );
     commands
         .call
-        .run(&ProcessContext, &args, PipelineData::empty())
+        .run(&ProcessContext::default(), &args, PipelineData::empty())
         .map_err(|err| format!("{err:?}"))
         .and_then(|data| {
             data.into_value(Span::test_data())
