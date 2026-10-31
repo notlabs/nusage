@@ -15,12 +15,12 @@
 //!
 //! A task of mise's is called the same way, `mise run <task> ...` or `mise r <task> ...`:
 //! when the file it runs is a script nusage runs, the call is shadowed too, and the shadow
-//! runs the task through mise, with its dependencies, its environment and its tools, from
-//! the caller's directory, which is where mise is asked what the name means
-//! ([`crate::tasks`]). A task mise finds up to date does not run and returns nothing.
-//! `^mise run` is still the external, and so is a call with mise's own flags before the
-//! task; one that runs more tasks after `:::` needs the caret, or the shadow takes them for
-//! the script's arguments.
+//! runs the task as mise would, with the tasks it depends on and its environment, from the
+//! caller's directory, which is where mise is asked what the name means ([`crate::tasks`]):
+//! in the engine the caller runs in when the shadow's `nus call` is the engine's own
+//! command, by mise in a process of its own otherwise. `^mise run` is still the external,
+//! and so is a call with mise's own flags before the task; one that runs more tasks after
+//! `:::` needs the caret, or the shadow takes them for the script's arguments.
 
 use std::collections::BTreeMap;
 use std::ops::Range;
