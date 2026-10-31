@@ -445,7 +445,7 @@ $env.NUS_BIN = $env.NUS_BIN? | default (
     $root
     | path dirname
     | path dirname
-    | path join .bin nusage
+    | path join .bin nus
 )
 let fixtures = if ($usage.args.fixtures | is-empty) {
     ls $root | where type == dir | get name
