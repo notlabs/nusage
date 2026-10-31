@@ -89,7 +89,15 @@ impl Executor {
             .with_label("this call", span)
             .into());
         }
-        let at = |err: String| LabeledError::new(err).with_label("this call", span);
+        // The call's span, where there is one: the interpreter's call has none to point at.
+        let at = |err: String| {
+            let err = LabeledError::new(err);
+            if span == Span::unknown() {
+                err
+            } else {
+                err.with_label("this call", span)
+            }
+        };
         let cwd = cx.cwd()?;
         let script = if script.is_absolute() {
             script.to_path_buf()

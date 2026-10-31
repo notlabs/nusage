@@ -3515,6 +3515,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nu-std"
+version = "0.116.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3957dfe8a889daab2434883a000162a0fc8a516bae7c38b9ea325cea8eb5e650"
+dependencies = [
+ "log",
+ "miette 7.6.0",
+ "nu-engine",
+ "nu-parser",
+ "nu-protocol",
+]
+
+[[package]]
 name = "nu-system"
 version = "0.116.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3780,6 +3793,7 @@ dependencies = [
  "nu-plugin",
  "nu-plugin-test-support",
  "nu-protocol",
+ "nu-std",
  "nusage-model",
  "nusage-spec",
  "serde_json",

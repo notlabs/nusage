@@ -24,8 +24,8 @@ nu-command.workspace = true
 nusage-spec.workspace = true
 nusage-model.workspace = true
 serde_json.workspace = true
+nu-std.workspace = true
 nu-plugin-test-support = { workspace = true, optional = true }
 
 [lints]
 workspace = true
-

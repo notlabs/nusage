@@ -313,6 +313,12 @@ pub fn engine(natives: Vec<Box<dyn Command>>) -> Result<EngineState, ShellError>
         working_set.render()
     };
     state.merge_delta(delta)?;
+    // The standard library, for a script's `use std/...`, as `nu` loads it.
+    nu_std::load_standard_library(&mut state).map_err(|err| {
+        ShellError::from(LabeledError::new(format!(
+            "the standard library does not load: {err}"
+        )))
+    })?;
     // `$nu`, as a script expects it: its `current-exe` is this process, which answers as
     // Nushell when started with Nushell's flags.
     state.generate_nu_constant();

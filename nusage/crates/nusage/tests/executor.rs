@@ -62,3 +62,22 @@ fn a_script_calling_scripts_runs_inside_the_engine() {
     let refused = call(&commands, &[&script, "nus", &script]).unwrap_err();
     assert!(refused.contains("who"), "{refused}");
 }
+
+#[test]
+fn the_engine_has_the_standard_library() {
+    // A script's `use std/...` finds the library `nu` loads, in this engine as in `nu`.
+    let dir = std::env::temp_dir().join(format!("nusage-std-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let script = dir.join("checked.nu");
+    std::fs::write(
+        &script,
+        "#!/usr/bin/env nus\n#USAGE about \"Held to std\"\nuse std/assert\nassert equal 1 1\n\
+         \"held\"\n",
+    )
+    .unwrap();
+    let script = script.to_string_lossy();
+    let commands = Commands::new(Arc::new(Executor::new())).unwrap();
+    let value = call(&commands, &[&script, "nus", &script]).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(value, Value::test_string("held"));
+}
