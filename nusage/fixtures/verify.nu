@@ -26,7 +26,8 @@
 #   mise run //nusage:verify-fixtures fixtures/minimal      # one
 #   mise run //nusage:verify-fixtures --update-signatures   # rewrite expected/signatures.nuon
 #
-# `NUS_BIN` names the nus to check; the build `//nusage:build` links into `.bin` by default.
+# `NUS_BIN` names the nus to check, and `NUS_PLUGIN` its plugin; the build `//nusage:build`
+# copies both into `.bin` by default.
 
 # One row per check: shim, interpreter, run and (when present) completion per case, then
 # signatures.
@@ -52,6 +53,7 @@ def verify-fixture [dir: path, update: bool] {
             [
                 (row $name shim $id (check-shim $import $bin $case))
                 (row $name interpreter $id (check-interpreter $dir $bin $case))
+                (row $name executor $id (check-executor $dir $bin $case))
                 (row $name run $id (check-run $dir $bin $case))
                 (row $name prelude $id (check-prelude $dir $bin $case))
             ] | append (
@@ -168,6 +170,20 @@ def check-interpreter [dir: path, bin: string, case: record] {
     run-nu $code {
         NUS_ARGS: ($case.usage | to nuon)
     } | after-printed $case | compare (expected-output $case)
+}
+
+# The plugin's `nus call`: the script run in an engine inside the plugin's process, by the
+# built plugin under this Nushell, which must return the interpreter's value after what the
+# script printed.
+def check-executor [dir: path, bin: string, case: record] {
+    if not ($env.NUS_PLUGIN | path exists) {
+        return (skipped $"($env.NUS_PLUGIN) is not built")
+    }
+    # The root script, with the case's argv: the executor routes to the subcommand's, as
+    # the interpreter does.
+    let script = script-for $dir $bin []
+    let code = $"nus call ($script | to nuon) nus ($script | to nuon) ...($case.argv | to nuon) | to nuon"
+    run-nu $code {} --plugins [$env.NUS_PLUGIN] | after-printed $case | compare (expected-output $case)
 }
 
 # A binary call against the fixture's fake binary: the argv it recorded must be the case's
@@ -343,8 +359,15 @@ def check-prelude [dir: path, bin: string, case: record] {
     } | compare $case.usage
 }
 
-def run-nu [code: string, env_vars: record] {
-    let out = with-env $env_vars { ^$nu.current-exe -n -c $code } | complete
+def run-nu [code: string, env_vars: record, --plugins: list<path> = []] {
+    let plugins = if ($plugins | is-empty) {
+        []
+    } else {
+        [
+            "--plugins" ($plugins | to nuon)
+        ]
+    }
+    let out = with-env $env_vars { ^$nu.current-exe -n ...$plugins -c $code } | complete
     if $out.exit_code != 0 {
         {
             ok: false
@@ -446,6 +469,12 @@ $env.NUS_BIN = $env.NUS_BIN? | default (
     | path dirname
     | path dirname
     | path join .bin nus
+)
+$env.NUS_PLUGIN = $env.NUS_PLUGIN? | default (
+    $root
+    | path dirname
+    | path dirname
+    | path join .bin nu_plugin_nus
 )
 let fixtures = if ($usage.args.fixtures | is-empty) {
     ls $root | where type == dir | get name

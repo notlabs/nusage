@@ -39,6 +39,7 @@ pub enum Commands {
     Prelude(Prelude),
     Inspect(Inspect),
     Validate(Validate),
+    Call(Call),
 }
 
 /// Write the module for a script, a tree of scripts, or a usage spec of a binary
@@ -256,6 +257,58 @@ impl Run for Validate {
             eprintln!("{finding}");
         }
         std::process::exit(1)
+    }
+}
+
+/// Run a script as a call of it, and print its value as NUON
+///
+/// What the shadow of a called script does: `nus call <script> nus <script> [args]...` runs
+/// the script in an engine of this process with its `$usage` from the arguments, and
+/// `nus call <script> mise -C <dir> run <task>` runs the task through mise, which writes
+/// the script's value to the file `NUS_OUTPUT_FILE` names. The value is printed as NUON;
+/// what the script prints passes through. Put the program's arguments after `--` when they
+/// carry flags. Inside Nushell the same command is the plugin's, returning the value itself.
+#[derive(Args)]
+pub struct Call {
+    /// The script that is called
+    script: PathBuf,
+    /// The program that runs it, `nus` or `mise`
+    program: String,
+    /// The program's arguments
+    args: Vec<String>,
+}
+
+impl Run for Call {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        use nusage_plugin::nu_protocol::{PipelineData, Span, Value};
+        let executor = std::sync::Arc::new(crate::executor::Executor::new());
+        let commands = crate::commands::Commands::new(executor)?;
+        let mut words = vec![self.script.to_string_lossy().into_owned(), self.program];
+        words.extend(self.args);
+        let args = nusage_plugin::Args::new(
+            Span::unknown(),
+            words
+                .into_iter()
+                .map(|w| Value::string(w, Span::unknown()))
+                .collect(),
+            Vec::new(),
+        );
+        let out = nusage_plugin::Run::run(
+            &commands.call,
+            &crate::executor::ProcessContext,
+            &args,
+            PipelineData::empty(),
+        )
+        .map_err(|err| crate::executor::describe(&err))?;
+        let value = out
+            .into_value(Span::unknown())
+            .map_err(|err| err.to_string())?;
+        if !matches!(value, Value::Nothing { .. }) {
+            println!("{}", nusage_nu::nuon(&value));
+        }
+        Ok(())
     }
 }
 

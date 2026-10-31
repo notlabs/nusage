@@ -38,11 +38,11 @@ pub enum Parsed {
 /// as usage routes them, by name, alias or `default_subcommand`: the record is then that
 /// command's, and [`interpret`] runs its script.
 pub fn parse(script: &Path, args: &[String]) -> Result<Parsed, Diagnostic> {
-    Ok(parse_routed(script, args)?.0)
+    Ok(route(script, args)?.0)
 }
 
-/// [`parse`], with the script of the command the arguments selected.
-fn parse_routed(script: &Path, args: &[String]) -> Result<(Parsed, PathBuf), Diagnostic> {
+/// [`parse`], with the script of the command the arguments selected: the one to run.
+pub fn route(script: &Path, args: &[String]) -> Result<(Parsed, PathBuf), Diagnostic> {
     let (root, path) = crate::calls::place_in_tree(script)?;
     let assembled = nusage_spec::assemble(&root)?;
     let tree = nusage_model::model(&assembled)?;
@@ -93,7 +93,7 @@ fn parse_routed(script: &Path, args: &[String]) -> Result<(Parsed, PathBuf), Dia
 /// Run the script with the arguments; the exit code is the script's, or 0 after printing
 /// help, or 2 when usage rejects the arguments.
 pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
-    let (parsed, run) = parse_routed(script, args)?;
+    let (parsed, run) = route(script, args)?;
     let record = match parsed {
         Parsed::Record(record) => record,
         Parsed::Help(page) => {
