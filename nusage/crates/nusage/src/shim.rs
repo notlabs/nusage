@@ -12,12 +12,15 @@ use nusage_nu::{
 
 use nusage_spec::Texts;
 
+use crate::Carrier;
 use crate::binary::HELPERS;
 use crate::calls::{self, CALL_HELPER, Runner, shadow_def};
 use crate::common::{Target, attr_usage_alias, doc_of, nu_params, relative, usage_attrs};
 
-/// The module for a command tree, with `run` paths relative to `base`.
-pub fn module(tree: &CommandTree, base: &Path) -> Result<Module, SyntaxError> {
+/// The module for a command tree, with `run` paths relative to `base`. With the plugin as
+/// the helpers' carrier, `nus call`, which the plugin serves, is called and not defined: the
+/// shadows then run their scripts in the plugin's process.
+pub fn module(tree: &CommandTree, base: &Path, carrier: Carrier) -> Result<Module, SyntaxError> {
     let defs = tree
         .commands
         .iter()
@@ -29,10 +32,11 @@ pub fn module(tree: &CommandTree, base: &Path) -> Result<Module, SyntaxError> {
         .iter()
         .any(|def| def.body.iter().any(|stmt| matches!(stmt, Stmt::Def(_))));
     let helpers = if calls {
-        vec![
-            Item::Verbatim(HELPERS.to_string()),
-            Item::Verbatim(CALL_HELPER.to_string()),
-        ]
+        let mut helpers = vec![Item::Verbatim(HELPERS.to_string())];
+        if carrier == Carrier::Inline {
+            helpers.push(Item::Verbatim(CALL_HELPER.to_string()));
+        }
+        helpers
     } else {
         Vec::new()
     };

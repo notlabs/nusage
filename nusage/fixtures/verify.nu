@@ -52,6 +52,7 @@ def verify-fixture [dir: path, update: bool] {
         } else {
             [
                 (row $name shim $id (check-shim $import $bin $case))
+                (row $name shim-plugin $id (check-shim-plugin $dir $bin $case))
                 (row $name interpreter $id (check-interpreter $dir $bin $case))
                 (row $name executor $id (check-executor $dir $bin $case))
                 (row $name run $id (check-run $dir $bin $case))
@@ -156,6 +157,42 @@ def check-shim [import: string, bin: string, case: record] {
             ($env.NUS_BIN | path dirname)
         ])
     } | after-printed $case | compare (expected-output $case)
+}
+
+# The module written for a session with the plugin registered, `nus generate --plugin`: the
+# helpers the plugin serves are called and not defined, so its shadows run their scripts in
+# the plugin's process. Written afresh into a directory of its own, run under this Nushell
+# with the built plugin, and held to the same cases as the module that stands on its own.
+def check-shim-plugin [dir: path, bin: string, case: record] {
+    if not ($env.NUS_BIN | path exists) {
+        return (skipped $"($env.NUS_BIN) is not built")
+    }
+    if not ($env.NUS_PLUGIN | path exists) {
+        return (skipped $"($env.NUS_PLUGIN) is not built")
+    }
+    let single = $dir | path join script.nu
+    let source = if ($single | path exists) {
+        $single
+    } else {
+        $dir | path join $bin
+    }
+    let out = mktemp --directory
+    let module = $out | path join $"($bin).nu"
+    let generated = ^$env.NUS_BIN generate --plugin $source --out $module | complete
+    if $generated.exit_code != 0 {
+        rm --recursive $out
+        return {
+            ok: false
+            detail: ($generated.stderr | str trim)
+        }
+    }
+    let outcome = run-nu $"use ($module | to nuon); ($bin) (words-of $case) | to nuon" {
+        PATH: (search-path [
+            ($env.NUS_BIN | path dirname)
+        ])
+    } --plugins [$env.NUS_PLUGIN] | after-printed $case | compare (expected-output $case)
+    rm --recursive $out
+    $outcome
 }
 
 def check-interpreter [dir: path, bin: string, case: record] {

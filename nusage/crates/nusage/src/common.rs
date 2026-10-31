@@ -185,11 +185,34 @@ pub fn relative(base: &Path, target: &Path) -> String {
     }
 }
 
+/// The path absolute and as the filesystem has it, symlinks resolved: Nushell resolves a
+/// module's directory before it follows a relative `run` or `path self` from it, so a chain
+/// of `..` counted on a path with a symlink in it, `/var` for `/private/var` on macOS or a
+/// temporary directory elsewhere, would land one level off. What does not exist yet, the
+/// module about to be written, is resolved as far as it exists and kept as named below that.
 fn absolute(path: &Path) -> PathBuf {
-    if path.is_absolute() {
+    let path = if path.is_absolute() {
         path.to_path_buf()
     } else {
         std::env::current_dir().unwrap_or_default().join(path)
+    };
+    let mut rest = Vec::new();
+    let mut existing = path.as_path();
+    loop {
+        if let Ok(real) = std::fs::canonicalize(existing) {
+            let mut out = real;
+            for component in rest.iter().rev() {
+                out.push(component);
+            }
+            return out;
+        }
+        match (existing.parent(), existing.file_name()) {
+            (Some(parent), Some(name)) => {
+                rest.push(name.to_os_string());
+                existing = parent;
+            }
+            _ => return path,
+        }
     }
 }
 
@@ -212,6 +235,34 @@ mod tests {
     use super::{doc_of, relative};
     use nusage_model::{Command, CommandPath, Execution};
     use std::path::Path;
+
+    /// A module written under a symlink runs its scripts by the real directory's depth, as
+    /// Nushell resolves the directory before it follows the path.
+    #[cfg(unix)]
+    #[test]
+    fn relative_paths_count_from_the_real_directory() {
+        let dir = std::env::temp_dir().join(format!("nusage-relative-{}", std::process::id()));
+        let real = dir.join("real/x/y/z");
+        std::fs::create_dir_all(&real).unwrap();
+        let target = dir.join("scripts/callee.nu");
+        std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+        std::fs::write(&target, "").unwrap();
+        let shallow = dir.join("shallow");
+        std::os::unix::fs::symlink(&real, &shallow).unwrap();
+        // Through the symlink, the base is one directory deep; really it is four.
+        assert_eq!(
+            relative(&shallow, &target),
+            relative(&real, &target),
+            "the symlink and the directory it names are one base"
+        );
+        assert!(relative(&shallow, &target).starts_with("../../../../scripts/"));
+        // A base that does not exist yet is resolved as far as it does.
+        assert_eq!(
+            relative(&shallow.join("new"), &target),
+            relative(&real.join("new"), &target)
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     fn command(about: &str, long: &str) -> Command {
         Command {
