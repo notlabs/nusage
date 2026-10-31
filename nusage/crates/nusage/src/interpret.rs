@@ -1,4 +1,4 @@
-//! The interpreter entrypoint: `nusage <script> [args...]`, what a `#!/usr/bin/env nusage`
+//! The interpreter entrypoint: `nus <script> [args...]`, what a `#!/usr/bin/env nus`
 //! line runs when anything outside Nushell executes the script.
 //!
 //! usage's own parser reads the arguments against the script's header, so help, errors,
@@ -9,9 +9,9 @@
 //! its ancestors' globals; a script on its own is its own root.
 //!
 //! Before the script, Nushell defines the shadows of the scripts it calls, which run them
-//! through this same interpreter ([`crate::calls`]). Run by one, with `NUSAGE_OUTPUT_FILE`
+//! through this same interpreter ([`crate::calls`]). Run by one, with `NUS_OUTPUT_FILE`
 //! naming a file, the interpreter writes the script's value there as NUON for the shadow to
-//! read, when `NUSAGE_OUTPUT_SCRIPT` names this script or nothing: mise runs a task's
+//! read, when `NUS_OUTPUT_SCRIPT` names this script or nothing: mise runs a task's
 //! dependencies with the same variables. The script's own calls see neither.
 
 use std::io::IsTerminal;
@@ -126,21 +126,21 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
     let code = if cfg!(unix) {
         if stdin_is_stream() {
             format!(
-                "let usage = ($env.NUSAGE_USAGE | from nuon); open --raw /dev/stdin | run {script_word}{to_nuon}"
+                "let usage = ($env.NUS_USAGE | from nuon); open --raw /dev/stdin | run {script_word}{to_nuon}"
             )
         } else {
-            format!("let usage = ($env.NUSAGE_USAGE | from nuon); run {script_word}{to_nuon}")
+            format!("let usage = ($env.NUS_USAGE | from nuon); run {script_word}{to_nuon}")
         }
     } else {
         if !std::io::stdin().is_terminal() {
             nu.arg("--stdin");
         }
-        format!("let usage = ($env.NUSAGE_USAGE | from nuon); $in | run {script_word}{to_nuon}")
+        format!("let usage = ($env.NUS_USAGE | from nuon); $in | run {script_word}{to_nuon}")
     };
     let code = format!("{prelude}{code}");
     let status = nu
         .args(["-c", &code])
-        .env("NUSAGE_USAGE", nusage_nu::nuon(&record))
+        .env("NUS_USAGE", nusage_nu::nuon(&record))
         .env_remove(crate::calls::OUTPUT_VAR)
         .env_remove(crate::calls::OUTPUT_SCRIPT_VAR)
         .stdin(Stdio::inherit())

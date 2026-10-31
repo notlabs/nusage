@@ -1,5 +1,5 @@
 //! Scripts that call scripts. A script calls another the way it calls a binary, by its path:
-//! `./x.nu ...`, `nusage x.nu ...` or `nu x.nu ...`, and Nushell types none of them: an
+//! `./x.nu ...`, `nus x.nu ...` or `nu x.nu ...`, and Nushell types none of them: an
 //! external call returns text, whatever the script returned. So a call of a script whose
 //! shebang names nusage is shadowed by a command named as the call writes it, which is that
 //! script's typed wrapper: its signature is the script's header, and it runs the script
@@ -37,12 +37,12 @@ use crate::common::{Target, relative};
 
 /// The variable a shadow sets for the script it runs: the file the interpreter writes the
 /// script's value to, as NUON. The interpreter does not pass it on.
-pub const OUTPUT_VAR: &str = "NUSAGE_OUTPUT_FILE";
+pub const OUTPUT_VAR: &str = "NUS_OUTPUT_FILE";
 
 /// The variable naming the script whose value the file is for: a program that runs it, as
 /// mise does a task, may run other scripts before or after it. The interpreter does not pass
 /// it on either.
-pub const OUTPUT_SCRIPT_VAR: &str = "NUSAGE_OUTPUT_SCRIPT";
+pub const OUTPUT_SCRIPT_VAR: &str = "NUS_OUTPUT_SCRIPT";
 
 /// The helper a shadow runs its script with, which names that file and reads it back.
 pub const CALL_HELPER: &str = include_str!("script-call.nu");
@@ -180,13 +180,13 @@ pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
 }
 
 /// The call's name and the word naming its script, for the forms that call a script:
-/// a path to one, or `nusage` or `nu` with one.
+/// a path to one, or `nus` or `nu` with one.
 fn named_script<'a>(head: &'a Word, args: &'a [Word]) -> Option<(String, &'a Word)> {
     if head.text.ends_with(".nu") && is_path(&head.text) {
         return Some((head.text.clone(), head));
     }
     let script = args.first().filter(|arg| arg.text.ends_with(".nu"))?;
-    matches!(head.text.as_str(), "nusage" | "nu")
+    matches!(head.text.as_str(), "nus" | "nu")
         .then(|| (format!("{} {}", head.text, script.text), script))
 }
 
@@ -259,7 +259,7 @@ pub fn names_nusage(source: &str) -> bool {
     source.lines().next().is_some_and(|line| {
         line.strip_prefix("#!").is_some_and(|line| {
             line.split_whitespace()
-                .any(|word| word == "nusage" || word.ends_with("/nusage"))
+                .any(|word| word == "nus" || word.ends_with("/nus"))
         })
     })
 }
@@ -324,15 +324,15 @@ pub fn place_in_tree(script: &Path) -> Result<(PathBuf, CommandPath), Diagnostic
 #[derive(Debug, Clone, Copy)]
 pub enum Runner<'a> {
     /// From a module in this directory: the script relative to the module's file, and the
-    /// `nusage` and mise on `PATH`.
+    /// `nus` and mise on `PATH`.
     Module(&'a Path),
-    /// The script by its absolute path, run by this `nusage`, a path or a name on `PATH`: for
+    /// The script by its absolute path, run by this `nus`, a path or a name on `PATH`: for
     /// the interpreter, and for the line that stands in for a script's first.
     Absolute(&'a Path),
 }
 
 /// The shadow as a definition: the called command's parameters, as a wrapper of a binary
-/// has them, and a body that hands its input and argv to [`CALL_HELPER`]'s `nusage call`.
+/// has them, and a body that hands its input and argv to [`CALL_HELPER`]'s `nus call`.
 pub fn shadow_def(shadow: &Shadow, runner: Runner) -> Result<Def, SyntaxError> {
     let (params, argv) = params_and_argv(&shadow.command, Target::Call)?;
     let mut body = Vec::new();
@@ -352,14 +352,14 @@ pub fn shadow_def(shadow: &Shadow, runner: Runner) -> Result<Def, SyntaxError> {
     match &shadow.through {
         Through::Nusage => args.extend([
             Expr::Str(match runner {
-                Runner::Module(_) => "nusage".into(),
+                Runner::Module(_) => "nus".into(),
                 Runner::Absolute(nusage) => nusage.to_string_lossy().into_owned(),
             }),
             script,
         ]),
         Through::Mise { dir, task } => args.extend([
             Expr::Str("mise".into()),
-            // Quoted: bare, it would be a flag of `nusage call`'s own.
+            // Quoted: bare, it would be a flag of `nus call`'s own.
             Expr::Raw(r#""-C""#.into()),
             from_module("dir", dir)?,
             Expr::Str("run".into()),
@@ -371,7 +371,7 @@ pub fn shadow_def(shadow: &Shadow, runner: Runner) -> Result<Def, SyntaxError> {
     body.push(Stmt::Pipeline(vec![
         Expr::Var(Ident::new("in")?),
         Expr::Call {
-            name: CommandName::new("nusage call")?,
+            name: CommandName::new("nus call")?,
             args,
         },
     ]));
@@ -426,8 +426,8 @@ mod tests {
             Some(("nu x.nu".into(), "x.nu".into()))
         );
         assert_eq!(
-            named("nusage", &["../y.nu"]),
-            Some(("nusage ../y.nu".into(), "../y.nu".into()))
+            named("nus", &["../y.nu"]),
+            Some(("nus ../y.nu".into(), "../y.nu".into()))
         );
         // A bare name is looked up on PATH, and `nu` with something else is not a script.
         assert_eq!(named("x.nu", &[]), None);
@@ -481,16 +481,16 @@ mod tests {
         );
         assert!(
             module.contains(
-                r#"const script = path self "../callee.nu"; const dir = path self ".."; $in | nusage call $script mise "-C" $dir run greet ...(nusage argv"#
+                r#"const script = path self "../callee.nu"; const dir = path self ".."; $in | nus call $script mise "-C" $dir run greet ...(nus argv"#
             ),
             "{module}"
         );
         let absolute = nusage_nu::print_line(
-            &shadow_def(&shadow, Runner::Absolute(Path::new("/bin/nusage"))).unwrap(),
+            &shadow_def(&shadow, Runner::Absolute(Path::new("/bin/nus"))).unwrap(),
         );
         assert!(
             absolute.contains(&format!(
-                "nusage call {} mise \"-C\" {} run greet ...(",
+                "nus call {} mise \"-C\" {} run greet ...(",
                 word(&callee.to_string_lossy()),
                 word(&fixture.to_string_lossy())
             )),

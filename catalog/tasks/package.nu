@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Package the catalog for a release: the lib directory and autoload lines as a tarball, and the tasks as the directory an OCI task catalog is pushed from"
 #USAGE flag "--out <dir>" default="dist" help="Where the package goes, relative to the catalog"
 # The tarball is what the `nusage-catalog` tool installs: `nusage-catalog/lib/<tool>/` for

@@ -31,7 +31,7 @@ spec = { openapi = "openapi.yaml" }
 [vars]
 catalog_version = "0.1.0"
 
-# The tasks run through the nusage built here. The generated files are committed, so `spec`
+# The tasks run through the nus built here. The generated files are committed, so `spec`
 # and `generate` are the two steps that change them, and `check` holds what is committed to
 # its inputs and to the tool on PATH: in CI that tool is pinned, and a Renovate bump of it
 # fails `check` until the spec and module are regenerated and reviewed with it.

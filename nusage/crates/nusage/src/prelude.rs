@@ -41,7 +41,7 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
     }
     let mut texts = texts.clone();
     texts.insert(script.to_path_buf(), source.to_string());
-    let value = "($env.NUSAGE_USAGE? | default \"{}\" | from nuon)";
+    let value = "($env.NUS_USAGE? | default \"{}\" | from nuon)";
     let (mut line, header) = match command_of(script, &texts) {
         Ok(command) => (
             format!("let usage: {} = {value}", usage_type(&command)),
@@ -53,7 +53,7 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
     let mut shadows = Vec::new();
     // Made for each check, never kept, so it can name the script where it is.
     for shadow in &calls.shadows {
-        let def = calls::shadow_def(shadow, Runner::Absolute(Path::new("nusage")))
+        let def = calls::shadow_def(shadow, Runner::Absolute(Path::new("nus")))
             .map_err(|err| syntax(script, err))?;
         line.push_str("; ");
         let start = line.len();
@@ -80,7 +80,7 @@ pub fn line(script: &Path) -> Result<(String, Calls), Diagnostic> {
 }
 
 /// The Nushell the interpreter runs before the script: the helpers and the shadows, which
-/// run the scripts they stand for with this `nusage`. Empty when the script calls none.
+/// run the scripts they stand for with this `nus`. Empty when the script calls none.
 pub fn runtime(script: &Path, nusage: &Path) -> Result<String, Diagnostic> {
     let source = read(script)?;
     let calls = calls::scan(script, &source, &Texts::new());

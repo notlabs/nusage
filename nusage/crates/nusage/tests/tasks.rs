@@ -39,7 +39,7 @@ fn project(test: &str, caller: &str) -> Option<PathBuf> {
     );
     let around = |word: &str| {
         format!(
-            "#!/usr/bin/env nusage\n#USAGE output (\"string\")\"nuon\" default=#true\n\"{word}\"\n"
+            "#!/usr/bin/env nus\n#USAGE output (\"string\")\"nuon\" default=#true\n\"{word}\"\n"
         )
     };
     for (name, text) in [
@@ -87,7 +87,7 @@ fn parse_errors(script: &Path) -> Vec<String> {
 
 #[test]
 fn a_task_is_called_as_its_script_with_the_value_its_own() {
-    let caller = r#"#!/usr/bin/env nusage
+    let caller = r#"#!/usr/bin/env nus
 #USAGE arg "<who>"
 #USAGE output ("record<times: int, at: string, loud: string>")"nuon" default=#true
 {
@@ -106,10 +106,10 @@ fn a_task_is_called_as_its_script_with_the_value_its_own() {
         );
         return;
     }
-    // The tasks' shebangs find the nusage built here, and the interpreter the `nu` on PATH,
+    // The tasks' shebangs find the nus built here, and the interpreter the `nu` on PATH,
     // from a directory of the project's own: mise takes its installs off PATH for a project
     // that pins no `nu`. mise reads no configuration of the user's.
-    let nusage = PathBuf::from(env!("CARGO_BIN_EXE_nusage"));
+    let nusage = PathBuf::from(env!("CARGO_BIN_EXE_nus"));
     let path = std::env::var_os("PATH").unwrap_or_default();
     let nu = std::env::split_paths(&path)
         .map(|dir| dir.join(format!("nu{}", std::env::consts::EXE_SUFFIX)))
@@ -133,7 +133,7 @@ fn a_task_is_called_as_its_script_with_the_value_its_own() {
         .current_dir(std::env::temp_dir())
         .env("PATH", std::env::join_paths(dirs).unwrap())
         .env("MISE_CONFIG_DIR", dir.join("no-config"))
-        .env("NUSAGE_OUTPUT_FILE", &value)
+        .env("NUS_OUTPUT_FILE", &value)
         .output()
         .unwrap();
     let written = std::fs::read_to_string(&value);
@@ -147,7 +147,7 @@ fn a_task_is_called_as_its_script_with_the_value_its_own() {
 
 #[test]
 fn a_call_of_a_task_is_held_to_its_scripts_header() {
-    let caller = "#!/usr/bin/env nusage\nmise run greet --times two --bogus\nmise run plain 1 2\n";
+    let caller = "#!/usr/bin/env nus\nmise run greet --times two --bogus\nmise run plain 1 2\n";
     let Some(dir) = project("checked", caller) else {
         return;
     };
@@ -190,7 +190,7 @@ fn a_call_of_a_task_is_held_to_its_scripts_header() {
 
 #[test]
 fn a_task_mise_does_not_know_is_said() {
-    let caller = "#!/usr/bin/env nusage\nmise run nope\n^mise run nope\nmise run --quiet nope\n";
+    let caller = "#!/usr/bin/env nus\nmise run nope\n^mise run nope\nmise run --quiet nope\n";
     let Some(dir) = project("unknown", caller) else {
         return;
     };

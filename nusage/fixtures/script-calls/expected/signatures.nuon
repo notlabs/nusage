@@ -1,15 +1,15 @@
 [
-  [name,   signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               attributes];
+  [name,   signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   attributes];
   [caller, {
       nothing: [
-        [parameter_name, parameter_type, syntax_shape,                                                                                            is_optional, short_flag, description, completion, parameter_default];
-        [null,           input,          nothing,                                                                                                 false,       null,       null,        null,       null],
-        [who,            positional,     string,                                                                                                  false,       null,       "",          null,       null],
-        [null,           output,         "record<path: record<greeting: string, times: int, at: datetime>, nusage: string, nu: int, at: string>", false,       null,       null,        null,       null]
+        [parameter_name, parameter_type, syntax_shape,                                                                                         is_optional, short_flag, description, completion, parameter_default];
+        [null,           input,          nothing,                                                                                              false,       null,       null,        null,       null],
+        [who,            positional,     string,                                                                                               false,       null,       "",          null,       null],
+        [null,           output,         "record<path: record<greeting: string, times: int, at: datetime>, nus: string, nu: int, at: string>", false,       null,       null,        null,       null]
       ]
     }, [
       [name,  value];
       [usage, "arg \"<who>\""],
-      [usage, "output (\"record<path: record<greeting: string, times: int, at: datetime>, nusage: string, nu: int, at: string>\")\"nuon\" default=#true"]
+      [usage, "output (\"record<path: record<greeting: string, times: int, at: datetime>, nus: string, nu: int, at: string>\")\"nuon\" default=#true"]
     ]]
 ]

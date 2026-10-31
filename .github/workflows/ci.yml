@@ -81,14 +81,14 @@ jobs:
             if [ "$RUNNER_OS" = Linux ]; then
               mise run //:check
             fi
-            mise run --affected --affected-base "$AFFECTED_BASE" --affected-head HEAD --affected-committed "$NUSAGE_CHECK_TASK"
+            mise run --affected --affected-base "$AFFECTED_BASE" --affected-head HEAD --affected-committed "$NUS_CHECK_TASK"
           else
             # Main is the full validation boundary used by release assembly.
-            mise run "$NUSAGE_CHECK_TASK"
+            mise run "$NUS_CHECK_TASK"
           fi
         env:
           GH_TOKEN: ${{ github.token }}
           AFFECTED_BASE: ${{ steps.mergiraf-changes.outputs.base }}
-          NUSAGE_CHECK_TASK: ${{ runner.os == 'Linux' && '//...:check' || '//...:check:platform' }}
+          NUS_CHECK_TASK: ${{ runner.os == 'Linux' && '//...:check' || '//...:check:platform' }}
       - if: steps.mergiraf-changes.outputs.run == 'true'
         run: mise run //mergiraf:test

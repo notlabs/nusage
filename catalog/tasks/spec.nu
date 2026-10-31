@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Obtain each entry's spec into its package: as its tool prints it, or from the clap command its crate builds, left untouched when unchanged"
 #USAGE arg "[tool]" help="One entry; every entry when absent"
 #USAGE flag "--force" help="Write a clap entry's spec though it describes the binary's version, after a change to the extractor or to usage"
@@ -22,7 +22,7 @@ for entry in (entries $usage.args.tool) {
         clap => {
             let dir = (extractor $entry).dir
             let force = if $usage.flags.force { ["--force"] } else { [] }
-            ^nusage $clap $dir --out $files.spec ...$force
+            ^nus $clap $dir --out $files.spec ...$force
         }
         openapi => {
             # The committed set is made the written set: a file the document no longer gives

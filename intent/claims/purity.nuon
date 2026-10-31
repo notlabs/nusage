@@ -45,7 +45,7 @@ $total
     status: open
     traits: [reads]
     given: {
-      source: "#!/usr/bin/env nusage
+      source: "#!/usr/bin/env nus
 #USAGE arg \"<file>\"
 open $usage.args.file | lines | length
 "
@@ -95,10 +95,10 @@ open $usage.args.file | lines | length
     given: {
       script: caller.nu
       files: {
-        "caller.nu": "#!/usr/bin/env nusage
+        "caller.nu": "#!/usr/bin/env nus
 (./sum.nu 1 2) * 2
 "
-        "sum.nu": "#!/usr/bin/env nusage
+        "sum.nu": "#!/usr/bin/env nus
 #USAGE arg \"<a>\"
 #USAGE arg \"<b>\"
 #USAGE output (\"int\")\"nuon\" default=#true

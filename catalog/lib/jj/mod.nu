@@ -1,7 +1,7 @@
 alias "attr usage" = echo
 
 # A value as an argv word: a datetime in ISO 8601, anything else as Nushell writes it.
-def "nusage word" []: any -> string {
+def "nus word" []: any -> string {
     if ($in | describe --detailed | get type) == datetime {
         $in | format date "%+"
     } else {
@@ -13,32 +13,32 @@ def "nusage word" []: any -> string {
 # preceded by the clause-scoped flags, then the other flags. A flag goes by its value: a
 # switch once when on, a count that many times, a list once per item with its value, any
 # other value once with its value; null and false add nothing.
-def "nusage argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
-    let scoped = $scoped | nusage flag-words
-    let words = $positionals | compact | each { nusage word }
+def "nus argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
+    let scoped = $scoped | nus flag-words
+    let words = $positionals | compact | each { nus word }
     let instances = if ($words | is-empty) {
         $scoped
     } else {
         $words | each {|word| $scoped ++ [$word] } | flatten
     }
-    $instances ++ ($flags | nusage flag-words)
+    $instances ++ ($flags | nus flag-words)
 }
 
-def "nusage flag-words" []: record -> list<string> {
+def "nus flag-words" []: record -> list<string> {
     $in | transpose name value | each {|flag|
         match ($flag.value | describe --detailed | get type) {
             bool => (if $flag.value { [$flag.name] } else { [] })
             int => (0..<$flag.value | each { $flag.name })
-            list => ($flag.value | each {|value| [$flag.name ($value | nusage word)] } | flatten)
+            list => ($flag.value | each {|value| [$flag.name ($value | nus word)] } | flatten)
             nothing => []
-            _ => [$flag.name ($flag.value | nusage word)]
+            _ => [$flag.name ($flag.value | nus word)]
         }
     } | flatten
 }
 
 # Completions from usage's own completer, against the spec this module was generated
 # from, with the words typed so far. Nothing when the `usage` CLI is not installed.
-def "nusage complete" [place: record] {
+def "nus complete" [place: record] {
     const spec = (path self | path dirname | path join "jj.usage.kdl")
     if (which usage | is-empty) {
         return []
@@ -52,13 +52,13 @@ def "nusage complete" [place: record] {
 }
 
 # A binary's output decoded as the module's closure decodes it. When that fails and the
-# `nusage` this module was generated with is on PATH, the output is held to the schema the
+# `nus` this module was generated with is on PATH, the output is held to the schema the
 # spec declares, line by line with `--lines`, so the error names what does not match it
 # rather than what failed to convert; what failed to convert follows, as the inner error.
-# The error is the decoding's own when the output matches or there is no `nusage` to ask,
+# The error is the decoding's own when the output matches or there is no `nus` to ask,
 # and the inner one under why the output could not be held to its schema when the check
 # did not run.
-def "nusage decoded" [
+def "nus decoded" [
     text: string
     schema: string
     decode: closure
@@ -67,13 +67,13 @@ def "nusage decoded" [
     try {
         $text | do $decode
     } catch {|err|
-        if (which nusage | is-empty) {
+        if (which nus | is-empty) {
             error make $err
         }
         let file = mktemp --tmpdir nusage-XXXXXX.schema.json
         $schema | save --force $file
         let flags = if $lines { [--lines] } else { [] }
-        let checked = $text | ^nusage validate $file - ...$flags | complete
+        let checked = $text | ^nus validate $file - ...$flags | complete
         rm $file
         match $checked.exit_code {
             0 => { error make $err }
@@ -84,7 +84,7 @@ def "nusage decoded" [
             }
             _ => {
                 $err | error make --unspanned {
-                    msg: $"the output could not be held to its schema: nusage validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
+                    msg: $"the output could not be held to its schema: nus validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
                 }
             }
         }
@@ -183,19 +183,19 @@ The name should be specified as TOML dotted keys. The value should be specified 
 @usage 'complete repository type=dir'
 @usage 'complete path type=path'
 export def main [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj ...(nusage argv [] {
+    ^jj ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -235,22 +235,22 @@ Bookmarks will be moved to the parent revisions instead.
 @usage 'flag --restore-descendants help="Do not modify the content of the children of the abandoned commits"'
 @usage 'arg "[REVSETS]…" help="The revision(s) to abandon (default: @) [aliases: -r]" required=#false var=#true var_min=1'
 export def "jj abandon" [
-    ...revsets: string,                           # The revision(s) to abandon (default: @) [aliases: -r]
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --retain-bookmarks,                           # Do not delete bookmarks pointing to the revisions to abandon
-    --restore-descendants,                        # Do not modify the content of the children of the abandoned commits
+    ...revsets: string,                         # The revision(s) to abandon (default: @) [aliases: -r]
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --retain-bookmarks,                         # Do not delete bookmarks pointing to the revisions to abandon
+    --restore-descendants,                      # Do not modify the content of the children of the abandoned commits
 ]: nothing -> string {
-    ^jj abandon ...(nusage argv [...$revsets] {
+    ^jj abandon ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -305,24 +305,24 @@ Only ancestors of the source revision will be considered.
 @usage 'arg "[FILESETS]…" help="Move only changes to these paths (instead of all paths)" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj absorb" [
-    ...filesets: path@"nusage complete",          # Move only changes to these paths (instead of all paths)
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --from (-f): string,                          # Source revision to absorb from
-    --into (-t): list<string>,                    # Destination revisions to absorb into
-    --interactive (-i),                           # Interactively choose which parts to absorb
-    --tool: string,                               # Specify diff editor to be used (implies --interactive)
+    ...filesets: path@"nus complete",           # Move only changes to these paths (instead of all paths)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --from (-f): string,                        # Source revision to absorb from
+    --into (-t): list<string>,                  # Destination revisions to absorb into
+    --interactive (-i),                         # Interactively choose which parts to absorb
+    --tool: string,                             # Specify diff editor to be used (implies --interactive)
 ]: nothing -> string {
-    ^jj absorb ...(nusage argv [...$filesets] {
+    ^jj absorb ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -351,20 +351,20 @@ The revisions to arrange [aliases: -r]
 If no revisions are specified, this defaults to the `revsets.arrange` setting.
 """# required=#false var=#true var_min=1'
 export def "jj arrange" [
-    ...revsets: string,                           # The revisions to arrange [aliases: -r]
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    ...revsets: string,                         # The revisions to arrange [aliases: -r]
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj arrange ...(nusage argv [...$revsets] {
+    ^jj arrange ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -381,19 +381,19 @@ export def "jj arrange" [
 
 # Find a bad revision by bisection
 export def "jj bisect" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj bisect ...(nusage argv [] {
+    ^jj bisect ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -498,24 +498,24 @@ Arguments to pass to the command
 Hint: Use a `--` separator to allow passing arguments starting with `-`. For example: `jj bisect run --range=... -- test -f some-file`.
 """# required=#false var=#true var_min=1'
 export def "jj bisect run" [
-    command?: string,                             # Command to run to determine the status of a revision
-    ...args: string,                              # Arguments to pass to the command
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --range (-r): list<string>,                   # Range of revisions to bisect (can be repeated)
-    --find-good,                                  # Find the first good revision instead
-    --trust-endpoints,                            # Skip the pre-bisection checks
+    command?: string,                           # Command to run to determine the status of a revision
+    ...args: string,                            # Arguments to pass to the command
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --range (-r): list<string>,                 # Range of revisions to bisect (can be repeated)
+    --find-good,                                # Find the first good revision instead
+    --trust-endpoints,                          # Skip the pre-bisection checks
 ]: nothing -> string {
-    ^jj bisect run ...(nusage argv [$command ...$args] {
+    ^jj bisect run ...(nus argv [$command ...$args] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -546,19 +546,19 @@ See [`jj help -k bookmarks`][bookmarks] for more information.
 [bookmarks]: https://docs.jj-vcs.dev/latest/bookmarks
 """#'
 export def "jj bookmark" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj bookmark ...(nusage argv [] {
+    ^jj bookmark ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -618,21 +618,21 @@ By default, the specified pattern matches bookmark names with glob syntax. You c
 [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 """# required=#false var=#true var_min=1'
 export def "jj bookmark advance" [
-    ...names: string,                             # Move bookmarks matching the given name patterns
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --to (-t): string,                            # Move bookmarks to this revision
+    ...names: string,                           # Move bookmarks matching the given name patterns
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --to (-t): string,                          # Move bookmarks to this revision
 ]: nothing -> string {
-    ^jj bookmark advance ...(nusage argv [...$names] {
+    ^jj bookmark advance ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -655,21 +655,21 @@ export def "jj bookmark advance" [
         }'#
 @usage 'arg <NAMES>… help="The bookmarks to create" var=#true var_min=1'
 export def "jj bookmark create" [
-    ...names: string,                             # The bookmarks to create
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # The bookmark's target revision
+    ...names: string,                           # The bookmarks to create
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # The bookmark's target revision
 ]: nothing -> string {
-    ^jj bookmark create ...(nusage argv [...$names] {
+    ^jj bookmark create ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -706,20 +706,20 @@ By default, the specified pattern matches bookmark names with glob syntax. You c
 [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 """# var=#true var_min=1'
 export def "jj bookmark delete" [
-    ...names: string,                             # The bookmarks to delete
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    ...names: string,                           # The bookmarks to delete
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj bookmark delete ...(nusage argv [...$names] {
+    ^jj bookmark delete ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -758,21 +758,21 @@ By default, the specified pattern matches bookmark names with glob syntax. You c
 [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 """# var=#true var_min=1'
 export def "jj bookmark forget" [
-    ...names: string,                             # The bookmarks to forget
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --include-remotes,                            # When forgetting a local bookmark, also forget any corresponding remote bookmarks
+    ...names: string,                           # The bookmarks to forget
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --include-remotes,                          # When forgetting a local bookmark, also forget any corresponding remote bookmarks
 ]: nothing -> string {
-    ^jj bookmark forget ...(nusage argv [...$names] {
+    ^jj bookmark forget ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -873,7 +873,7 @@ By default, the specified pattern matches bookmark names with glob syntax. You c
 @usage 'output "json" framing="jsonl" { schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"A bookmark or a tag, one line of `jj bookmark list` or `jj tag list`\",\n  \"type\": \"object\",\n  \"required\": [\n    \"name\",\n    \"target\"\n  ],\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"name\": {\n      \"type\": \"string\"\n    },\n    \"remote\": {\n      \"type\": \"string\"\n    },\n    \"target\": {\n      \"$ref\": \"#/$defs/target\"\n    },\n    \"tracking_target\": {\n      \"$ref\": \"#/$defs/target\"\n    }\n  },\n  \"$defs\": {\n    \"target\": {\n      \"type\": \"array\",\n      \"minItems\": 1,\n      \"items\": {\n        \"anyOf\": [\n          {\n            \"type\": \"string\",\n            \"pattern\": \"^[0-9a-f]+$\"\n          },\n          {\n            \"type\": \"null\"\n          }\n        ]\n      }\n    }\n  }\n}\n" }'
 export def "jj bookmark list" [
     ...names: string,                                                                                                                                                                                               # Show bookmarks whose local name matches
-    --repository (-R): path@"nusage complete",                                                                                                                                                                      # Path to repository to operate on
+    --repository (-R): path@"nus complete",                                                                                                                                                                         # Path to repository to operate on
     --ignore-working-copy,                                                                                                                                                                                          # Don't snapshot the working copy, and don't update it
     --no-integrate-operation,                                                                                                                                                                                       # Run the command as usual but don't integrate any operations
     --ignore-immutable,                                                                                                                                                                                             # Allow rewriting immutable commits
@@ -883,7 +883,7 @@ export def "jj bookmark list" [
     --quiet,                                                                                                                                                                                                        # Silence non-primary command output
     --no-pager,                                                                                                                                                                                                     # Disable the pager
     --config: list<string>,                                                                                                                                                                                         # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",                                                                                                                                                                    # Additional configuration files (can be repeated)
+    --config-file: list<path>@"nus complete",                                                                                                                                                                       # Additional configuration files (can be repeated)
     --all-remotes (-a),                                                                                                                                                                                             # Show all tracked and untracked remote bookmarks including the ones whose targets are synchronized with the local bookmarks
     --remote: list<string>,                                                                                                                                                                                         # Show all tracked and untracked remote bookmarks belonging to this remote
     --tracked (-t),                                                                                                                                                                                                 # Show tracked remote bookmarks only
@@ -891,7 +891,7 @@ export def "jj bookmark list" [
     --revision (-r): list<string>,                                                                                                                                                                                  # Show bookmarks whose local targets are in the given revisions
     --sort: list<string>@[name name- author-name author-name- author-email author-email- author-date author-date- committer-name committer-name- committer-email committer-email- committer-date committer-date-],  # Sort bookmarks based on the given key (or multiple keys)
 ]: nothing -> table<name: string, remote: oneof<string, nothing>, target: list<oneof<string, nothing>>, tracking_target: oneof<list<oneof<string, nothing>>, nothing>> {
-    let text = ^jj bookmark list --template "json(self) ++ \"\\n\"" ...(nusage argv [...$names] {
+    let text = ^jj bookmark list --template "json(self) ++ \"\\n\"" ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -910,7 +910,7 @@ export def "jj bookmark list" [
         --revision: $revision
         --sort: $sort
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A bookmark or a tag, one line of `jj bookmark list` or `jj tag list`\",\"type\":\"object\",\"required\":[\"name\",\"target\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"remote\":{\"type\":\"string\"},\"target\":{\"$ref\":\"#/$defs/target\"},\"tracking_target\":{\"$ref\":\"#/$defs/target\"}},\"$defs\":{\"target\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"anyOf\":[{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},{\"type\":\"null\"}]}}}}" { from json --objects | default null remote | default null tracking_target } --lines
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A bookmark or a tag, one line of `jj bookmark list` or `jj tag list`\",\"type\":\"object\",\"required\":[\"name\",\"target\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"remote\":{\"type\":\"string\"},\"target\":{\"$ref\":\"#/$defs/target\"},\"tracking_target\":{\"$ref\":\"#/$defs/target\"}},\"$defs\":{\"target\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"anyOf\":[{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},{\"type\":\"null\"}]}}}}" { from json --objects | default null remote | default null tracking_target } --lines
 }
 
 # Move existing bookmarks to target revision
@@ -945,23 +945,23 @@ By default, the specified pattern matches bookmark names with glob syntax. You c
 [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 """# required=#false var=#true var_min=1'
 export def "jj bookmark move" [
-    ...names: string,                             # Move bookmarks matching the given name patterns
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --from (-f): list<string>,                    # Move bookmarks from the given revisions
-    --to (-t): string,                            # Move bookmarks to this revision
-    --allow-backwards (-B),                       # Allow moving bookmarks backwards or sideways
+    ...names: string,                           # Move bookmarks matching the given name patterns
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --from (-f): list<string>,                  # Move bookmarks from the given revisions
+    --to (-t): string,                          # Move bookmarks to this revision
+    --allow-backwards (-B),                     # Allow moving bookmarks backwards or sideways
 ]: nothing -> string {
-    ^jj bookmark move ...(nusage argv [...$names] {
+    ^jj bookmark move ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -992,22 +992,22 @@ The new bookmark name points at the same commit as the old bookmark name.
 @usage 'arg <OLD> help="The old name of the bookmark"'
 @usage 'arg <NEW> help="The new name of the bookmark"'
 export def "jj bookmark rename" [
-    old: string,                                  # The old name of the bookmark
-    new: string,                                  # The new name of the bookmark
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --overwrite-existing,                         # Allow renaming even if the new bookmark name already exists
+    old: string,                                # The old name of the bookmark
+    new: string,                                # The new name of the bookmark
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --overwrite-existing,                       # Allow renaming even if the new bookmark name already exists
 ]: nothing -> string {
-    ^jj bookmark rename ...(nusage argv [$old $new] {
+    ^jj bookmark rename ...(nus argv [$old $new] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1038,22 +1038,22 @@ If you want to move bookmarks based on their current location rather than by nam
 @usage 'flag "-B --allow-backwards" help="Allow moving the bookmark backwards or sideways"'
 @usage 'arg <NAMES>… help="The bookmarks to update" var=#true var_min=1'
 export def "jj bookmark set" [
-    ...names: string,                             # The bookmarks to update
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # The bookmark's target revision
-    --allow-backwards (-B),                       # Allow moving the bookmark backwards or sideways
+    ...names: string,                           # The bookmarks to update
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # The bookmark's target revision
+    --allow-backwards (-B),                     # Allow moving the bookmark backwards or sideways
 ]: nothing -> string {
-    ^jj bookmark set ...(nusage argv [...$names] {
+    ^jj bookmark set ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1101,21 +1101,21 @@ Bookmark name patterns or remote bookmark symbols to track
 [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 """# var=#true var_min=1'
 export def "jj bookmark track" [
-    ...bookmark_remote: string,                   # Bookmark name patterns or remote bookmark symbols to track
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --remote: list<string>,                       # Remote names to track
+    ...bookmark_remote: string,                 # Bookmark name patterns or remote bookmark symbols to track
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --remote: list<string>,                     # Remote names to track
 ]: nothing -> string {
-    ^jj bookmark track ...(nusage argv [...$bookmark_remote] {
+    ^jj bookmark track ...(nus argv [...$bookmark_remote] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1165,21 +1165,21 @@ Bookmark name patterns or remote bookmark symbols to untrack
 [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 """# var=#true var_min=1'
 export def "jj bookmark untrack" [
-    ...bookmark_remote: string,                   # Bookmark name patterns or remote bookmark symbols to untrack
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --remote: list<string>,                       # Remote names to untrack
+    ...bookmark_remote: string,                 # Bookmark name patterns or remote bookmark symbols to untrack
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --remote: list<string>,                     # Remote names to untrack
 ]: nothing -> string {
-    ^jj bookmark untrack ...(nusage argv [...$bookmark_remote] {
+    ^jj bookmark untrack ...(nus argv [...$bookmark_remote] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1240,24 +1240,24 @@ Forces an editor to open when using `--message` to allow the message to be edite
 @usage 'arg "[FILESETS]…" help="Put these paths in the current commit" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj commit" [
-    ...filesets: path@"nusage complete",          # Put these paths in the current commit
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --interactive (-i),                           # Interactively choose which changes to include in the current commit
-    --tool: string,                               # Specify diff editor to be used (implies --interactive)
-    --message (-m): list<string>,                 # The change description to use (don't open editor)
-    --editor,                                     # Open an editor to edit the change description
+    ...filesets: path@"nus complete",           # Put these paths in the current commit
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --interactive (-i),                         # Interactively choose which changes to include in the current commit
+    --tool: string,                             # Specify diff editor to be used (implies --interactive)
+    --message (-m): list<string>,               # The change description to use (don't open editor)
+    --editor,                                   # Open an editor to edit the change description
 ]: nothing -> string {
-    ^jj commit ...(nusage argv [...$filesets] {
+    ^jj commit ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1293,19 +1293,19 @@ See [`jj help -k config`][config] to know more about file locations, supported c
 [config]: https://docs.jj-vcs.dev/latest/config/
 """#'
 export def "jj config" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj config ...(nusage argv [] {
+    ^jj config ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1347,23 +1347,23 @@ If the file does not exist, commands like `set` and `edit` will create it and an
 @usage 'group config_target "--user" "--repo" "--workspace" "--file" required=#true'
 @usage 'complete path type=path'
 export def "jj config edit" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --user,                                       # Target the user-level config
-    --repo,                                       # Target the repo-level config
-    --workspace,                                  # Target the workspace-level config
-    --file: path@"nusage complete",               # Target the config file specified by the given path
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --user,                                     # Target the user-level config
+    --repo,                                     # Target the repo-level config
+    --workspace,                                # Target the workspace-level config
+    --file: path@"nus complete",                # Target the config file specified by the given path
 ]: nothing -> string {
-    ^jj config edit ...(nusage argv [] {
+    ^jj config edit ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1384,19 +1384,19 @@ export def "jj config edit" [
 
 # Find and optionally delete repo-level config directories whose repo path no longer exists
 export def "jj config gc" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj config gc ...(nusage argv [] {
+    ^jj config gc ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1435,19 +1435,19 @@ Martin von Zweigbergk
 @usage 'arg <NAME>'
 export def "jj config get" [
     name: string,
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj config get ...(nusage argv [$name] {
+    ^jj config get ...(nus argv [$name] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1499,25 +1499,25 @@ See [`jj help -k templates`][templates] for more information.
 @usage 'group config_level "--user" "--repo" "--workspace"'
 @usage 'output "json" framing="jsonl" { schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"A configuration value, one line of `jj config list`\",\n  \"type\": \"object\",\n  \"required\": [\n    \"name\",\n    \"value\",\n    \"source\",\n    \"path\",\n    \"is_overridden\"\n  ],\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"name\": {\n      \"type\": \"string\"\n    },\n    \"value\": {\n      \"description\": \"Any TOML value; a TOML datetime is {\\\"$__toml_private_datetime\\\": \\\"...\\\"}\"\n    },\n    \"source\": {\n      \"enum\": [\n        \"default\",\n        \"system\",\n        \"env\",\n        \"user\",\n        \"repo\",\n        \"workspace\",\n        \"cli\"\n      ]\n    },\n    \"path\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"is_overridden\": {\n      \"type\": \"boolean\"\n    }\n  }\n}\n" }'
 export def "jj config list" [
-    name?: string,                                # An optional name of a specific config option to look up
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --include-defaults,                           # Whether to explicitly include built-in default values in the list
-    --include-overridden,                         # Allow printing overridden values
-    --user,                                       # Target the user-level config
-    --repo,                                       # Target the repo-level config
-    --workspace,                                  # Target the workspace-level config
+    name?: string,                              # An optional name of a specific config option to look up
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --include-defaults,                         # Whether to explicitly include built-in default values in the list
+    --include-overridden,                       # Allow printing overridden values
+    --user,                                     # Target the user-level config
+    --repo,                                     # Target the repo-level config
+    --workspace,                                # Target the workspace-level config
 ]: nothing -> table<name: string, value: any, source: string, path: oneof<string, nothing>, is_overridden: bool> {
-    let text = ^jj config list --template "json(self) ++ \"\\n\"" ...(nusage argv [$name] {
+    let text = ^jj config list --template "json(self) ++ \"\\n\"" ...(nus argv [$name] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1535,7 +1535,7 @@ export def "jj config list" [
         --repo: $repo
         --workspace: $workspace
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A configuration value, one line of `jj config list`\",\"type\":\"object\",\"required\":[\"name\",\"value\",\"source\",\"path\",\"is_overridden\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"value\":{\"description\":\"Any TOML value; a TOML datetime is {\\\"$__toml_private_datetime\\\": \\\"...\\\"}\"},\"source\":{\"enum\":[\"default\",\"system\",\"env\",\"user\",\"repo\",\"workspace\",\"cli\"]},\"path\":{\"type\":[\"string\",\"null\"]},\"is_overridden\":{\"type\":\"boolean\"}}}" { from json --objects } --lines
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A configuration value, one line of `jj config list`\",\"type\":\"object\",\"required\":[\"name\",\"value\",\"source\",\"path\",\"is_overridden\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"value\":{\"description\":\"Any TOML value; a TOML datetime is {\\\"$__toml_private_datetime\\\": \\\"...\\\"}\"},\"source\":{\"enum\":[\"default\",\"system\",\"env\",\"user\",\"repo\",\"workspace\",\"cli\"]},\"path\":{\"type\":[\"string\",\"null\"]},\"is_overridden\":{\"type\":\"boolean\"}}}" { from json --objects } --lines
 }
 
 # Print the paths to the config files
@@ -1560,22 +1560,22 @@ See `jj config edit` if you'd like to immediately edit a file.
 @usage 'flag --workspace help="Target the workspace-level config"'
 @usage 'group config_level "--user" "--repo" "--workspace" required=#true'
 export def "jj config path" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --user,                                       # Target the user-level config
-    --repo,                                       # Target the repo-level config
-    --workspace,                                  # Target the workspace-level config
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --user,                                     # Target the user-level config
+    --repo,                                     # Target the repo-level config
+    --workspace,                                # Target the workspace-level config
 ]: nothing -> string {
-    ^jj config path ...(nusage argv [] {
+    ^jj config path ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1622,24 +1622,24 @@ Alternative, e.g. to avoid dealing with shell quoting, use `jj config edit` to e
 @usage 'complete path type=path'
 export def "jj config set" [
     name: string,
-    value: string,                                # New value to set
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --user,                                       # Target the user-level config
-    --repo,                                       # Target the repo-level config
-    --workspace,                                  # Target the workspace-level config
-    --file: path@"nusage complete",               # Target the config file specified by the given path
+    value: string,                              # New value to set
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --user,                                     # Target the user-level config
+    --repo,                                     # Target the repo-level config
+    --workspace,                                # Target the workspace-level config
+    --file: path@"nus complete",                # Target the config file specified by the given path
 ]: nothing -> string {
-    ^jj config set ...(nusage argv [$name $value] {
+    ^jj config set ...(nus argv [$name $value] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1680,23 +1680,23 @@ If the file does not exist, commands like `set` and `edit` will create it and an
 @usage 'complete path type=path'
 export def "jj config unset" [
     name: string,
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --user,                                       # Target the user-level config
-    --repo,                                       # Target the repo-level config
-    --workspace,                                  # Target the workspace-level config
-    --file: path@"nusage complete",               # Target the config file specified by the given path
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --user,                                     # Target the user-level config
+    --repo,                                     # Target the repo-level config
+    --workspace,                                # Target the workspace-level config
+    --file: path@"nus complete",                # Target the config file specified by the given path
 ]: nothing -> string {
-    ^jj config unset ...(nusage argv [$name] {
+    ^jj config unset ...(nus argv [$name] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1761,21 +1761,21 @@ If the command cannot solve divergence automatically it will print a warning and
     }'
 @usage 'flag "-i --interactive" help="No-op flag to pair with --no-interactive" hide=#true'
 export def "jj converge" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): list<string>,                # The search space to look for divergent revisions
-    --no-interactive,                             # Do not prompt the user for help resolving divergence
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): list<string>,              # The search space to look for divergent revisions
+    --no-interactive,                           # Do not prompt the user for help resolving divergence
 ]: nothing -> string {
-    ^jj converge ...(nusage argv [] {
+    ^jj converge ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1831,23 +1831,23 @@ Forces an editor to open when using `--stdin` or `--message` to allow the messag
     }'
 @usage 'arg "[REVSETS]…" help="The revision(s) whose description to edit (default: @) [aliases: -r]" required=#false var=#true var_min=1'
 export def "jj describe" [
-    ...revsets: string,                           # The revision(s) whose description to edit (default: @) [aliases: -r]
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --message (-m): list<string>,                 # The change description to use (don't open editor)
-    --stdin,                                      # Read the change description from stdin
-    --editor,                                     # Open an editor to edit the change description
+    ...revsets: string,                         # The revision(s) whose description to edit (default: @) [aliases: -r]
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --message (-m): list<string>,               # The change description to use (don't open editor)
+    --stdin,                                    # Read the change description from stdin
+    --editor,                                   # Open an editor to edit the change description
 ]: nothing -> string {
-    ^jj describe ...(nusage argv [...$revsets] {
+    ^jj describe ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1959,34 +1959,34 @@ A builtin format can also be specified as `:<name>`. For example, `--tool=:git` 
 @usage 'group long-format "--git" "--color-words"'
 @usage 'complete filesets type=path'
 export def "jj diff" [
-    ...filesets: path@"nusage complete",          # Restrict the diff to these paths
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revisions (-r): list<string>,               # Show changes in these revisions
-    --from (-f): string,                          # Show changes from this revision
-    --to (-t): string,                            # Show changes to this revision
-    --template (-T): string,                      # Render each file diff entry using the given template
-    --summary (-s),                               # For each path, show only whether it was modified, added, or deleted
-    --stat,                                       # Show a histogram of the changes
-    --types,                                      # For each path, show only its type before and after
-    --name-only,                                  # For each path, show only its path
-    --git,                                        # Show a Git-format diff
-    --color-words,                                # Show a word-level diff with changes indicated only by color
-    --tool: string,                               # Generate diff by external command
-    --context: string,                            # Number of lines of context to show
-    --ignore-all-space (-w),                      # Ignore whitespace when comparing lines
-    --ignore-space-change (-b),                   # Ignore changes in amount of whitespace when comparing lines
+    ...filesets: path@"nus complete",           # Restrict the diff to these paths
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revisions (-r): list<string>,             # Show changes in these revisions
+    --from (-f): string,                        # Show changes from this revision
+    --to (-t): string,                          # Show changes to this revision
+    --template (-T): string,                    # Render each file diff entry using the given template
+    --summary (-s),                             # For each path, show only whether it was modified, added, or deleted
+    --stat,                                     # Show a histogram of the changes
+    --types,                                    # For each path, show only its type before and after
+    --name-only,                                # For each path, show only its path
+    --git,                                      # Show a Git-format diff
+    --color-words,                              # Show a word-level diff with changes indicated only by color
+    --tool: string,                             # Generate diff by external command
+    --context: string,                          # Number of lines of context to show
+    --ignore-all-space (-w),                    # Ignore whitespace when comparing lines
+    --ignore-space-change (-b),                 # Ignore changes in amount of whitespace when comparing lines
 ]: nothing -> string {
-    ^jj diff ...(nusage argv [...$filesets] {
+    ^jj diff ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2076,25 +2076,25 @@ When rebasing a descendant on top of the rewritten revision, its diff compared t
 @usage 'arg "[FILESETS]…" help="Edit only these paths (unmatched paths will remain unchanged)" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj diffedit" [
-    ...filesets: path@"nusage complete",          # Edit only these paths (unmatched paths will remain unchanged)
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # The revision to touch up
-    --from (-f): string,                          # Show changes from this revision
-    --to (-t): string,                            # Edit changes in this revision
-    --tool: string,                               # Specify diff editor to be used
-    --restore-descendants,                        # Preserve the content (not the diff) when rebasing descendants
+    ...filesets: path@"nus complete",           # Edit only these paths (unmatched paths will remain unchanged)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # The revision to touch up
+    --from (-f): string,                        # Show changes from this revision
+    --to (-t): string,                          # Edit changes in this revision
+    --tool: string,                             # Specify diff editor to be used
+    --restore-descendants,                      # Preserve the content (not the diff) when rebasing descendants
 ]: nothing -> string {
-    ^jj diffedit ...(nusage argv [...$filesets] {
+    ^jj diffedit ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2144,23 +2144,23 @@ By default, the duplicated commits retain the descriptions of the originals. Thi
     }'
 @usage 'arg "[REVSETS]…" help="The revision(s) to duplicate (default: @) [aliases: -r]" required=#false var=#true var_min=1'
 export def "jj duplicate" [
-    ...revsets: string,                           # The revision(s) to duplicate (default: @) [aliases: -r]
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --onto (-o): list<string>,                    # The revision(s) to duplicate onto (can be repeated to create a merge commit)
-    --insert-after (-A): list<string>,            # The revision(s) to insert after (can be repeated to create a merge commit)
-    --insert-before (-B): list<string>,           # The revision(s) to insert before (can be repeated to create a merge commit)
+    ...revsets: string,                         # The revision(s) to duplicate (default: @) [aliases: -r]
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --onto (-o): list<string>,                  # The revision(s) to duplicate onto (can be repeated to create a merge commit)
+    --insert-after (-A): list<string>,          # The revision(s) to insert after (can be repeated to create a merge commit)
+    --insert-before (-B): list<string>,         # The revision(s) to insert before (can be repeated to create a merge commit)
 ]: nothing -> string {
-    ^jj duplicate ...(nusage argv [...$revsets] {
+    ^jj duplicate ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2195,20 +2195,20 @@ Note: it is [generally recommended] to instead use `jj new` and `jj squash`.
     }'
 @usage 'arg "[REVSET]" help="The commit to edit [aliases: -r]" required=#false'
 export def "jj edit" [
-    revset?: string,                              # The commit to edit [aliases: -r]
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    revset?: string,                            # The commit to edit [aliases: -r]
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj edit ...(nusage argv [$revset] {
+    ^jj edit ...(nus argv [$revset] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2303,22 +2303,22 @@ A builtin format can also be specified as `:<name>`. For example, `--tool=:git` 
 @usage 'group long-format "--git" "--color-words"'
 @usage 'output "json" framing="jsonl" { schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"An entry of `jj evolog`: the commit, and the operation that wrote it, if recorded\",\n  \"type\": \"object\",\n  \"required\": [\n    \"commit\",\n    \"operation\"\n  ],\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"commit\": {\n      \"$ref\": \"#/$defs/commit\"\n    },\n    \"operation\": {\n      \"anyOf\": [\n        {\n          \"$ref\": \"#/$defs/operation\"\n        },\n        {\n          \"type\": \"null\"\n        }\n      ]\n    }\n  },\n  \"$defs\": {\n    \"commit_id\": {\n      \"type\": \"string\",\n      \"pattern\": \"^[0-9a-f]+$\"\n    },\n    \"signature\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"name\",\n        \"email\",\n        \"timestamp\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"name\": {\n          \"type\": \"string\"\n        },\n        \"email\": {\n          \"type\": \"string\"\n        },\n        \"timestamp\": {\n          \"type\": \"string\",\n          \"format\": \"date-time\"\n        }\n      }\n    },\n    \"commit\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"commit_id\",\n        \"parents\",\n        \"change_id\",\n        \"description\",\n        \"author\",\n        \"committer\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"commit_id\": {\n          \"$ref\": \"#/$defs/commit_id\"\n        },\n        \"parents\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"$ref\": \"#/$defs/commit_id\"\n          }\n        },\n        \"change_id\": {\n          \"type\": \"string\",\n          \"pattern\": \"^[k-z]+$\"\n        },\n        \"description\": {\n          \"type\": \"string\"\n        },\n        \"author\": {\n          \"$ref\": \"#/$defs/signature\"\n        },\n        \"committer\": {\n          \"$ref\": \"#/$defs/signature\"\n        }\n      }\n    },\n    \"operation\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"id\",\n        \"parents\",\n        \"time\",\n        \"description\",\n        \"hostname\",\n        \"username\",\n        \"is_snapshot\",\n        \"workspace_name\",\n        \"attributes\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"id\": {\n          \"type\": \"string\",\n          \"pattern\": \"^[0-9a-f]+$\"\n        },\n        \"parents\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\",\n            \"pattern\": \"^[0-9a-f]+$\"\n          }\n        },\n        \"time\": {\n          \"type\": \"object\",\n          \"required\": [\n            \"start\",\n            \"end\"\n          ],\n          \"additionalProperties\": false,\n          \"properties\": {\n            \"start\": {\n              \"type\": \"string\",\n              \"format\": \"date-time\"\n            },\n            \"end\": {\n              \"type\": \"string\",\n              \"format\": \"date-time\"\n            }\n          }\n        },\n        \"description\": {\n          \"type\": \"string\"\n        },\n        \"hostname\": {\n          \"type\": \"string\"\n        },\n        \"username\": {\n          \"type\": \"string\"\n        },\n        \"is_snapshot\": {\n          \"type\": \"boolean\"\n        },\n        \"workspace_name\": {\n          \"type\": [\n            \"string\",\n            \"null\"\n          ]\n        },\n        \"attributes\": {\n          \"type\": \"object\",\n          \"additionalProperties\": {\n            \"type\": \"string\"\n          }\n        }\n      }\n    }\n  }\n}\n" }'
 export def "jj evolog" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revisions (-r): list<string>,               # Follow changes from these revisions
-    --limit (-n): string,                         # Limit number of revisions to show
-    --reversed,                                   # Show revisions in the opposite order (older revisions first)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revisions (-r): list<string>,             # Follow changes from these revisions
+    --limit (-n): string,                       # Limit number of revisions to show
+    --reversed,                                 # Show revisions in the opposite order (older revisions first)
 ]: nothing -> table<commit: record<commit_id: string, parents: list<string>, change_id: string, description: string, author: record<name: string, email: string, timestamp: datetime>, committer: record<name: string, email: string, timestamp: datetime>>, operation: oneof<record<id: string, parents: list<string>, time: record<start: datetime, end: datetime>, description: string, hostname: string, username: string, is_snapshot: bool, workspace_name: oneof<string, nothing>, attributes: record>, nothing>> {
-    let text = ^jj evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [] {
+    let text = ^jj evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2334,24 +2334,24 @@ export def "jj evolog" [
         --limit: $limit
         --reversed: $reversed
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"An entry of `jj evolog`: the commit, and the operation that wrote it, if recorded\",\"type\":\"object\",\"required\":[\"commit\",\"operation\"],\"additionalProperties\":false,\"properties\":{\"commit\":{\"$ref\":\"#/$defs/commit\"},\"operation\":{\"anyOf\":[{\"$ref\":\"#/$defs/operation\"},{\"type\":\"null\"}]}},\"$defs\":{\"commit_id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"signature\":{\"type\":\"object\",\"required\":[\"name\",\"email\",\"timestamp\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"commit\":{\"type\":\"object\",\"required\":[\"commit_id\",\"parents\",\"change_id\",\"description\",\"author\",\"committer\"],\"additionalProperties\":false,\"properties\":{\"commit_id\":{\"$ref\":\"#/$defs/commit_id\"},\"parents\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/commit_id\"}},\"change_id\":{\"type\":\"string\",\"pattern\":\"^[k-z]+$\"},\"description\":{\"type\":\"string\"},\"author\":{\"$ref\":\"#/$defs/signature\"},\"committer\":{\"$ref\":\"#/$defs/signature\"}}},\"operation\":{\"type\":\"object\",\"required\":[\"id\",\"parents\",\"time\",\"description\",\"hostname\",\"username\",\"is_snapshot\",\"workspace_name\",\"attributes\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"parents\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"}},\"time\":{\"type\":\"object\",\"required\":[\"start\",\"end\"],\"additionalProperties\":false,\"properties\":{\"start\":{\"type\":\"string\",\"format\":\"date-time\"},\"end\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"description\":{\"type\":\"string\"},\"hostname\":{\"type\":\"string\"},\"username\":{\"type\":\"string\"},\"is_snapshot\":{\"type\":\"boolean\"},\"workspace_name\":{\"type\":[\"string\",\"null\"]},\"attributes\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}}}}}" { from json --objects | into datetime commit.author.timestamp | into datetime commit.committer.timestamp | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.start } } | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.end } } } --lines
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"An entry of `jj evolog`: the commit, and the operation that wrote it, if recorded\",\"type\":\"object\",\"required\":[\"commit\",\"operation\"],\"additionalProperties\":false,\"properties\":{\"commit\":{\"$ref\":\"#/$defs/commit\"},\"operation\":{\"anyOf\":[{\"$ref\":\"#/$defs/operation\"},{\"type\":\"null\"}]}},\"$defs\":{\"commit_id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"signature\":{\"type\":\"object\",\"required\":[\"name\",\"email\",\"timestamp\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"commit\":{\"type\":\"object\",\"required\":[\"commit_id\",\"parents\",\"change_id\",\"description\",\"author\",\"committer\"],\"additionalProperties\":false,\"properties\":{\"commit_id\":{\"$ref\":\"#/$defs/commit_id\"},\"parents\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/commit_id\"}},\"change_id\":{\"type\":\"string\",\"pattern\":\"^[k-z]+$\"},\"description\":{\"type\":\"string\"},\"author\":{\"$ref\":\"#/$defs/signature\"},\"committer\":{\"$ref\":\"#/$defs/signature\"}}},\"operation\":{\"type\":\"object\",\"required\":[\"id\",\"parents\",\"time\",\"description\",\"hostname\",\"username\",\"is_snapshot\",\"workspace_name\",\"attributes\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"parents\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"}},\"time\":{\"type\":\"object\",\"required\":[\"start\",\"end\"],\"additionalProperties\":false,\"properties\":{\"start\":{\"type\":\"string\",\"format\":\"date-time\"},\"end\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"description\":{\"type\":\"string\"},\"hostname\":{\"type\":\"string\"},\"username\":{\"type\":\"string\"},\"is_snapshot\":{\"type\":\"boolean\"},\"workspace_name\":{\"type\":[\"string\",\"null\"]},\"attributes\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}}}}}" { from json --objects | into datetime commit.author.timestamp | into datetime commit.committer.timestamp | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.start } } | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.end } } } --lines
 }
 
 # File operations
 export def "jj file" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj file ...(nusage argv [] {
+    ^jj file ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2394,22 +2394,22 @@ If not specified, this defaults to the `templates.file_annotate` setting.
 @usage 'arg <PATH> help="the file to annotate"'
 @usage 'complete path type=path'
 export def "jj file annotate" [
-    path: path@"nusage complete",                 # the file to annotate
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # an optional revision to start at
-    --template (-T): string,                      # Render each line using the given template
+    path: path@"nus complete",                  # the file to annotate
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # an optional revision to start at
+    --template (-T): string,                    # Render each line using the given template
 ]: nothing -> string {
-    ^jj file annotate ...(nusage argv [$path] {
+    ^jj file annotate ...(nus argv [$path] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2451,21 +2451,21 @@ Unlike the POSIX `chmod`, `jj file chmod` also works on Windows, on conflicted f
 @usage 'complete filesets type=path'
 export def "jj file chmod" [
     mode: string@[n x],
-    ...filesets: path@"nusage complete",          # Paths to change the executable bit for
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # The revision to update
+    ...filesets: path@"nus complete",           # Paths to change the executable bit for
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # The revision to update
 ]: nothing -> string {
-    ^jj file chmod ...(nusage argv [$mode ...$filesets] {
+    ^jj file chmod ...(nus argv [$mode ...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2496,22 +2496,22 @@ Removes all files matched by the given filesets from the specified revision. Des
 @usage 'arg <FILESETS>… help="Files or directories to delete (filesets are accepted)" var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj file delete" [
-    ...filesets: path@"nusage complete",          # Files or directories to delete (filesets are accepted)
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # The revision to delete the files in
-    --restore-descendants,                        # Preserve the content (not the diff) when rebasing descendants
+    ...filesets: path@"nus complete",           # Files or directories to delete (filesets are accepted)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # The revision to delete the files in
+    --restore-descendants,                      # Preserve the content (not the diff) when rebasing descendants
 ]: nothing -> string {
-    ^jj file delete ...(nusage argv [...$filesets] {
+    ^jj file delete ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2551,22 +2551,22 @@ If the file is conflicted, the conflict markers are materialized in the editor. 
 @usage 'arg <FILE> help="The file to edit"'
 @usage 'complete file type=path'
 export def "jj file edit" [
-    file: path@"nusage complete",                 # The file to edit
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # The revision to edit the file in
-    --restore-descendants,                        # Preserve the content (not the diff) when rebasing descendants
+    file: path@"nus complete",                  # The file to edit
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # The revision to edit the file in
+    --restore-descendants,                      # Preserve the content (not the diff) when rebasing descendants
 ]: nothing -> string {
-    ^jj file edit ...(nusage argv [$file] {
+    ^jj file edit ...(nus argv [$file] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2604,22 +2604,22 @@ The default template can be set by the `templates.file_list` setting.
 @usage 'arg "[FILESETS]…" help="Only list files matching these prefixes (instead of all files)" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj file list" [
-    ...filesets: path@"nusage complete",          # Only list files matching these prefixes (instead of all files)
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # The revision to list files in
-    --template (-T): string,                      # Render each file entry using the given template
+    ...filesets: path@"nus complete",           # Only list files matching these prefixes (instead of all files)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # The revision to list files in
+    --template (-T): string,                    # Render each file entry using the given template
 ]: nothing -> string {
-    ^jj file list ...(nusage argv [...$filesets] {
+    ^jj file list ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2668,24 +2668,24 @@ If it is a glob pattern, the whole line must match the pattern, so you may want 
 @usage 'arg "[FILESETS]…" help="Only search files matching these prefixes (instead of all files)" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj file search" [
-    ...filesets: path@"nusage complete",          # Only search files matching these prefixes (instead of all files)
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # The revision to search files in
-    --pattern (-p): string,                       # The pattern to search for in a single line
-    --name-only,                                  # Print only the paths of files that contain a match, not the matched lines
-    --line-number (-n),                           # Prefix each matched line with its 1-based line number within the file
+    ...filesets: path@"nus complete",           # Only search files matching these prefixes (instead of all files)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # The revision to search files in
+    --pattern (-p): string,                     # The pattern to search for in a single line
+    --name-only,                                # Print only the paths of files that contain a match, not the matched lines
+    --line-number (-n),                         # Prefix each matched line with its 1-based line number within the file
 ]: nothing -> string {
-    ^jj file search ...(nusage argv [...$filesets] {
+    ^jj file search ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2732,22 +2732,22 @@ If not specified, this defaults to the `templates.file_show` setting.
 @usage 'arg <FILESETS>… help="Paths to print" var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj file show" [
-    ...filesets: path@"nusage complete",          # Paths to print
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # The revision to get the file contents from
-    --template (-T): string,                      # Render each file metadata using the given template
+    ...filesets: path@"nus complete",           # Paths to print
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # The revision to get the file contents from
+    --template (-T): string,                    # Render each file metadata using the given template
 ]: nothing -> string {
-    ^jj file show ...(nusage argv [...$filesets] {
+    ^jj file show ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2786,21 +2786,21 @@ By default, `jj file track` will not track files that are ignored by .gitignore 
 @usage 'arg <FILESETS>… help="Paths to track" var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj file track" [
-    ...filesets: path@"nusage complete",          # Paths to track
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --include-ignored,                            # Track paths even if they're ignored or too large
+    ...filesets: path@"nus complete",           # Paths to track
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --include-ignored,                          # Track paths even if they're ignored or too large
 ]: nothing -> string {
-    ^jj file track ...(nusage argv [...$filesets] {
+    ^jj file track ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2824,20 +2824,20 @@ The paths could be ignored via a .gitignore or .git/info/exclude (in colocated w
 """# var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj file untrack" [
-    ...filesets: path@"nusage complete",          # Paths to untrack. They must already be ignored
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    ...filesets: path@"nus complete",           # Paths to untrack. They must already be ignored
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj file untrack ...(nusage argv [...$filesets] {
+    ^jj file untrack ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3074,23 +3074,23 @@ If the formatter doesn't support formatting only modified lines, then this optio
 @usage 'arg "[FILESETS]…" help="Fix only these paths" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj fix" [
-    ...filesets: path@"nusage complete",          # Fix only these paths
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --source (-s): list<string>,                  # Fix files in the specified revision(s) and their descendants. If no revisions are specified, this defaults to the `revsets.fix` setting, or `reachable(@, mutable())` if it is not set
-    --include-unchanged-files,                    # Fix unchanged files in addition to changed ones. If no paths are specified, all files in the repo will be fixed
-    --all-lines (-a),                             # Format all lines instead of only modified lines
+    ...filesets: path@"nus complete",           # Fix only these paths
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --source (-s): list<string>,                # Fix files in the specified revision(s) and their descendants. If no revisions are specified, this defaults to the `revsets.fix` setting, or `reachable(@, mutable())` if it is not set
+    --include-unchanged-files,                  # Fix unchanged files in addition to changed ones. If no paths are specified, all files in the repo will be fixed
+    --all-lines (-a),                           # Format all lines instead of only modified lines
 ]: nothing -> string {
-    ^jj fix ...(nusage argv [...$filesets] {
+    ^jj fix ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3110,19 +3110,19 @@ export def "jj fix" [
 
 # Interact with Gerrit Code Review
 export def "jj gerrit" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj gerrit ...(nusage argv [] {
+    ^jj gerrit ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3345,7 +3345,7 @@ See https://gerrit-review.googlesource.com/Documentation/user-upload.html#trace
             arg <TRACE>
         }'
 export def "jj gerrit upload" [
-    --repository (-R): path@"nusage complete",          # Path to repository to operate on
+    --repository (-R): path@"nus complete",             # Path to repository to operate on
     --ignore-working-copy,                              # Don't snapshot the working copy, and don't update it
     --no-integrate-operation,                           # Run the command as usual but don't integrate any operations
     --ignore-immutable,                                 # Allow rewriting immutable commits
@@ -3355,7 +3355,7 @@ export def "jj gerrit upload" [
     --quiet,                                            # Silence non-primary command output
     --no-pager,                                         # Disable the pager
     --config: list<string>,                             # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",        # Additional configuration files (can be repeated)
+    --config-file: list<path>@"nus complete",           # Additional configuration files (can be repeated)
     --revision (-r): list<string>,                      # The revisions to upload to Gerrit
     --remote-branch (-b): string,                       # The location where your changes are intended to land
     --remote: string,                                   # The Gerrit remote to push to
@@ -3383,7 +3383,7 @@ export def "jj gerrit upload" [
     --option (-o): list<string>,                        # Send a `git push -o` option (can be repeated)
     --trace: string,                                    # For debugging Gerrit
 ]: nothing -> string {
-    ^jj gerrit upload ...(nusage argv [] {
+    ^jj gerrit upload ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3441,19 +3441,19 @@ See this [comparison], including a [table of commands].
 [table of commands]: https://docs.jj-vcs.dev/latest/git-command-table
 """#'
 export def "jj git" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git ...(nusage argv [] {
+    ^jj git ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3547,28 +3547,28 @@ Local path will be resolved to absolute form.
 @usage 'complete source type=url'
 @usage 'complete destination type=dir'
 export def "jj git clone" [
-    source: string@"nusage complete",             # URL or path of the Git repo to clone
-    destination?: path@"nusage complete",         # Specifies the target directory for the Jujutsu repository clone. If not provided, defaults to a directory named after the last component of the source URL. The full directory path will be created if it doesn't exist
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --remote: string,                             # Name of the newly created remote
-    --colocate,                                   # Colocate the Jujutsu repo with the git repo
-    --no-colocate,                                # Disable colocation of the Jujutsu repo with the git repo
-    --depth: string,                              # Create a shallow clone of the given depth
-    --branch (-b): list<string>,                  # Name of the branch to fetch and use as the parent of the working-copy change (can be repeated)
-    --tag (-t): list<string>,                     # Fetch only some of the tags (can be repeated)
-    --object-hash: string@["sha1" "sha256"],      # Object hash algorithm for the local Git repository
+    source: string@"nus complete",              # URL or path of the Git repo to clone
+    destination?: path@"nus complete",          # Specifies the target directory for the Jujutsu repository clone. If not provided, defaults to a directory named after the last component of the source URL. The full directory path will be created if it doesn't exist
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --remote: string,                           # Name of the newly created remote
+    --colocate,                                 # Colocate the Jujutsu repo with the git repo
+    --no-colocate,                              # Disable colocation of the Jujutsu repo with the git repo
+    --depth: string,                            # Create a shallow clone of the given depth
+    --branch (-b): list<string>,                # Name of the branch to fetch and use as the parent of the working-copy change (can be repeated)
+    --tag (-t): list<string>,                   # Fetch only some of the tags (can be repeated)
+    --object-hash: string@["sha1" "sha256"],    # Object hash algorithm for the local Git repository
 ]: nothing -> string {
-    ^jj git clone ...(nusage argv [$source $destination] {
+    ^jj git clone ...(nus argv [$source $destination] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3592,19 +3592,19 @@ export def "jj git clone" [
 
 # Manage Jujutsu repository colocation with Git
 export def "jj git colocation" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git colocation ...(nusage argv [] {
+    ^jj git colocation ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3628,19 +3628,19 @@ Convert into a non-colocated Jujutsu/Git repository
 This moves the Git repository that is at the root of the Jujutsu workspace into the .jj directory. Once this is done you will no longer be able to use Git commands directly in the Jujutsu workspace.
 """#'
 export def "jj git colocation disable" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git colocation disable ...(nusage argv [] {
+    ^jj git colocation disable ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3664,19 +3664,19 @@ Convert into a colocated Jujutsu/Git repository
 This moves the underlying Git repository that is found inside the .jj directory to the root of the Jujutsu workspace. This allows you to use Git commands directly in the Jujutsu workspace.
 """#'
 export def "jj git colocation enable" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git colocation enable ...(nusage argv [] {
+    ^jj git colocation enable ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3693,19 +3693,19 @@ export def "jj git colocation enable" [
 
 # Show the current colocation status
 export def "jj git colocation status" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git colocation status ...(nusage argv [] {
+    ^jj git colocation status ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3729,19 +3729,19 @@ Update the underlying Git repo with changes made in the repo
 By default, this command does nothing in colocated workspaces because the export happens automatically. Use `--ignore-working-copy` to forcibly export changes.
 """#'
 export def "jj git export" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git export ...(nusage argv [] {
+    ^jj git export ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3818,24 +3818,24 @@ By default, the specified pattern matches remote names with glob syntax, e.g. `-
         }'#
 @usage 'flag --all-remotes help="Fetch from all remotes" conflicts=--remote'
 export def "jj git fetch" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --branch (-b): list<string>,                  # Name of the branch to fetch (can be repeated)
-    --tag (-t): list<string>,                     # Fetch only some of the tags (can be repeated)
-    --tracked,                                    # Fetch only tracked bookmarks and tags
-    --remote: list<string>,                       # The remote to fetch from (only named remotes are supported, can be repeated)
-    --all-remotes,                                # Fetch from all remotes
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --branch (-b): list<string>,                # Name of the branch to fetch (can be repeated)
+    --tag (-t): list<string>,                   # Fetch only some of the tags (can be repeated)
+    --tracked,                                  # Fetch only tracked bookmarks and tags
+    --remote: list<string>,                     # The remote to fetch from (only named remotes are supported, can be repeated)
+    --all-remotes,                              # Fetch from all remotes
 ]: nothing -> string {
-    ^jj git fetch ...(nusage argv [] {
+    ^jj git fetch ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3872,19 +3872,19 @@ If a working-copy commit gets abandoned, it will be given a new, empty commit. T
 By default, this command does nothing in colocated workspaces because the import happens automatically. Use `--ignore-working-copy` to forcibly import changes.
 """#'
 export def "jj git import" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git import ...(nusage argv [] {
+    ^jj git import ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3970,24 +3970,24 @@ If the specified `--git-repo` path is outside of the given `DESTINATION`, then t
 @usage 'complete destination type=dir'
 @usage 'complete git_repo type=dir'
 export def "jj git init" [
-    destination?: path@"nusage complete",         # The destination directory where the `jj` repo will be created. If the directory does not exist, it will be created. If no directory is given, the current directory is used
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --colocate,                                   # Colocate the workspace of the Jujutsu repo with the Git repo
-    --no-colocate,                                # Disable colocation for the workspace of the Jujutsu repo with the Git repo
-    --object-hash: string@["sha1" "sha256"],      # Object hash algorithm for the newly created Git repository
-    --git-repo: path@"nusage complete",           # Specifies a path to an **existing** git repository to be used as the backing git repo for the newly created `jj` repo
+    destination?: path@"nus complete",          # The destination directory where the `jj` repo will be created. If the directory does not exist, it will be created. If no directory is given, the current directory is used
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --colocate,                                 # Colocate the workspace of the Jujutsu repo with the Git repo
+    --no-colocate,                              # Disable colocation for the workspace of the Jujutsu repo with the Git repo
+    --object-hash: string@["sha1" "sha256"],    # Object hash algorithm for the newly created Git repository
+    --git-repo: path@"nus complete",            # Specifies a path to an **existing** git repository to be used as the backing git repo for the newly created `jj` repo
 ]: nothing -> string {
-    ^jj git init ...(nusage argv [$destination] {
+    ^jj git init ...(nus argv [$destination] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4126,33 +4126,33 @@ Automatically tracks the bookmark if it is new.
             arg <OPTION>… var=#true
         }'
 export def "jj git push" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --remote: list<string>,                       # The remote(s) to push to (can be repeated)
-    --bookmark (-b): list<string>,                # Push only this bookmark, or bookmarks matching a pattern (can be repeated)
-    --tag (-t): list<string>,                     # Push only this tag, or tags matching a pattern (can be repeated)
-    --all,                                        # Push all bookmarks and tags (including new ones)
-    --tracked,                                    # Push all tracked bookmarks and tags
-    --deleted,                                    # Push all deleted bookmarks and tags
-    --allow-empty-description,                    # Allow pushing commits with empty descriptions
-    --allow-private,                              # Allow pushing commits that are private
-    --allow-conflicts,                            # Allow pushing commits that contain conflicts
-    --revision (-r): list<string>,                # Push bookmarks and tags pointing to these commits (can be repeated)
-    --change (-c): list<string>,                  # Push this commit by creating a bookmark (can be repeated)
-    --named: list<string>,                        # Specify a new bookmark name and a revision to push under that name, e.g. '--named myfeature=@'
-    --dry-run,                                    # Only display what will change on the remote
-    --option (-o): list<string>,                  # Git push options
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --remote: list<string>,                     # The remote(s) to push to (can be repeated)
+    --bookmark (-b): list<string>,              # Push only this bookmark, or bookmarks matching a pattern (can be repeated)
+    --tag (-t): list<string>,                   # Push only this tag, or tags matching a pattern (can be repeated)
+    --all,                                      # Push all bookmarks and tags (including new ones)
+    --tracked,                                  # Push all tracked bookmarks and tags
+    --deleted,                                  # Push all deleted bookmarks and tags
+    --allow-empty-description,                  # Allow pushing commits with empty descriptions
+    --allow-private,                            # Allow pushing commits that are private
+    --allow-conflicts,                          # Allow pushing commits that contain conflicts
+    --revision (-r): list<string>,              # Push bookmarks and tags pointing to these commits (can be repeated)
+    --change (-c): list<string>,                # Push this commit by creating a bookmark (can be repeated)
+    --named: list<string>,                      # Specify a new bookmark name and a revision to push under that name, e.g. '--named myfeature=@'
+    --dry-run,                                  # Only display what will change on the remote
+    --option (-o): list<string>,                # Git push options
 ]: nothing -> string {
-    ^jj git push ...(nusage argv [] {
+    ^jj git push ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4190,19 +4190,19 @@ Manage Git remotes
 The Git repo will be a bare git repo stored inside the `.jj/` directory.
 """#'
 export def "jj git remote" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git remote ...(nusage argv [] {
+    ^jj git remote ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4235,22 +4235,22 @@ Local path will be resolved to absolute form.
 @usage 'complete url type=url'
 @usage 'complete push_url type=url'
 export def "jj git remote add" [
-    remote: string,                               # The remote's name
-    url: string@"nusage complete",                # The remote's URL or path
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --push-url: string@"nusage complete",         # The URL used for push
+    remote: string,                             # The remote's name
+    url: string@"nus complete",                 # The remote's URL or path
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --push-url: string@"nus complete",          # The URL used for push
 ]: nothing -> string {
-    ^jj git remote add ...(nusage argv [$remote $url] {
+    ^jj git remote add ...(nus argv [$remote $url] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4268,19 +4268,19 @@ export def "jj git remote add" [
 
 # List Git remotes
 export def "jj git remote list" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git remote list ...(nusage argv [] {
+    ^jj git remote list ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4298,20 +4298,20 @@ export def "jj git remote list" [
 # Remove a Git remote and forget its bookmarks
 @usage r#'arg <REMOTE> help="The remote's name"'#
 export def "jj git remote remove" [
-    remote: string,                               # The remote's name
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    remote: string,                             # The remote's name
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git remote remove ...(nusage argv [$remote] {
+    ^jj git remote remove ...(nus argv [$remote] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4330,21 +4330,21 @@ export def "jj git remote remove" [
 @usage 'arg <OLD> help="The name of an existing remote"'
 @usage 'arg <NEW> help="The desired name for `old`"'
 export def "jj git remote rename" [
-    old: string,                                  # The name of an existing remote
-    new: string,                                  # The desired name for `old`
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    old: string,                                # The name of an existing remote
+    new: string,                                # The desired name for `old`
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git remote rename ...(nusage argv [$old $new] {
+    ^jj git remote rename ...(nus argv [$old $new] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4388,23 +4388,23 @@ Local path will be resolved to absolute form.
 @usage 'complete push type=url'
 @usage 'complete fetch type=url'
 export def "jj git remote set-url" [
-    remote: string,                               # The remote's name
-    url?: string@"nusage complete",               # The URL or path to fetch from
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --push: string@"nusage complete",             # The URL or path to push to
-    --fetch: string@"nusage complete",            # The URL or path to fetch from
+    remote: string,                             # The remote's name
+    url?: string@"nus complete",                # The URL or path to fetch from
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --push: string@"nus complete",              # The URL or path to push to
+    --fetch: string@"nus complete",             # The URL or path to fetch from
 ]: nothing -> string {
-    ^jj git remote set-url ...(nusage argv [$remote $url] {
+    ^jj git remote set-url ...(nus argv [$remote $url] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4423,19 +4423,19 @@ export def "jj git remote set-url" [
 
 # Show the underlying Git directory of a repository using the Git backend
 export def "jj git root" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git root ...(nusage argv [] {
+    ^jj git root ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4467,7 +4467,7 @@ export def "jj git root" [
 @usage 'arg "[COMMAND]…" help="Print help for the subcommand(s)" required=#false var=#true var_min=1'
 export def "jj help" [
     ...command: string,                                                                      # Print help for the subcommand(s)
-    --repository (-R): path@"nusage complete",                                               # Path to repository to operate on
+    --repository (-R): path@"nus complete",                                                  # Path to repository to operate on
     --ignore-working-copy,                                                                   # Don't snapshot the working copy, and don't update it
     --no-integrate-operation,                                                                # Run the command as usual but don't integrate any operations
     --ignore-immutable,                                                                      # Allow rewriting immutable commits
@@ -4477,10 +4477,10 @@ export def "jj help" [
     --quiet,                                                                                 # Silence non-primary command output
     --no-pager,                                                                              # Disable the pager
     --config: list<string>,                                                                  # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",                                             # Additional configuration files (can be repeated)
+    --config-file: list<path>@"nus complete",                                                # Additional configuration files (can be repeated)
     --keyword (-k): string@[bookmarks config filesets glossary revsets templates tutorial],  # Show help for keywords instead of commands
 ]: nothing -> string {
-    ^jj help ...(nusage argv [...$command] {
+    ^jj help ...(nus argv [...$command] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4571,32 +4571,32 @@ A builtin format can also be specified as `:<name>`. For example, `--tool=:git` 
 @usage 'group to_diff "--from" "--to" required=#true multiple=#true'
 @usage 'complete filesets type=path'
 export def "jj interdiff" [
-    ...filesets: path@"nusage complete",          # Restrict the diff to these paths
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --from (-f): string,                          # The first revision to compare (default: @)
-    --to (-t): string,                            # The second revision to compare (default: @)
-    --summary (-s),                               # For each path, show only whether it was modified, added, or deleted
-    --stat,                                       # Show a histogram of the changes
-    --types,                                      # For each path, show only its type before and after
-    --name-only,                                  # For each path, show only its path
-    --git,                                        # Show a Git-format diff
-    --color-words,                                # Show a word-level diff with changes indicated only by color
-    --tool: string,                               # Generate diff by external command
-    --context: string,                            # Number of lines of context to show
-    --ignore-all-space (-w),                      # Ignore whitespace when comparing lines
-    --ignore-space-change (-b),                   # Ignore changes in amount of whitespace when comparing lines
+    ...filesets: path@"nus complete",           # Restrict the diff to these paths
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --from (-f): string,                        # The first revision to compare (default: @)
+    --to (-t): string,                          # The second revision to compare (default: @)
+    --summary (-s),                             # For each path, show only whether it was modified, added, or deleted
+    --stat,                                     # Show a histogram of the changes
+    --types,                                    # For each path, show only its type before and after
+    --name-only,                                # For each path, show only its path
+    --git,                                      # Show a Git-format diff
+    --color-words,                              # Show a word-level diff with changes indicated only by color
+    --tool: string,                             # Generate diff by external command
+    --context: string,                          # Number of lines of context to show
+    --ignore-all-space (-w),                    # Ignore whitespace when comparing lines
+    --ignore-space-change (-b),                 # Ignore changes in amount of whitespace when comparing lines
 ]: nothing -> string {
-    ^jj interdiff ...(nusage argv [...$filesets] {
+    ^jj interdiff ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4727,23 +4727,23 @@ A builtin format can also be specified as `:<name>`. For example, `--tool=:git` 
 @usage 'complete filesets type=path'
 @usage 'output "json" framing="jsonl" { schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"A commit, one line of `jj log`\",\n  \"$ref\": \"#/$defs/commit\",\n  \"$defs\": {\n    \"commit_id\": {\n      \"type\": \"string\",\n      \"pattern\": \"^[0-9a-f]+$\"\n    },\n    \"signature\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"name\",\n        \"email\",\n        \"timestamp\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"name\": {\n          \"type\": \"string\"\n        },\n        \"email\": {\n          \"type\": \"string\"\n        },\n        \"timestamp\": {\n          \"type\": \"string\",\n          \"format\": \"date-time\"\n        }\n      }\n    },\n    \"commit\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"commit_id\",\n        \"parents\",\n        \"change_id\",\n        \"description\",\n        \"author\",\n        \"committer\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"commit_id\": {\n          \"$ref\": \"#/$defs/commit_id\"\n        },\n        \"parents\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"$ref\": \"#/$defs/commit_id\"\n          }\n        },\n        \"change_id\": {\n          \"type\": \"string\",\n          \"pattern\": \"^[k-z]+$\"\n        },\n        \"description\": {\n          \"type\": \"string\"\n        },\n        \"author\": {\n          \"$ref\": \"#/$defs/signature\"\n        },\n        \"committer\": {\n          \"$ref\": \"#/$defs/signature\"\n        }\n      }\n    }\n  }\n}\n" }'
 export def "jj log" [
-    ...filesets: path@"nusage complete",          # Show revisions modifying the given paths
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): list<string>,                # Which revisions to show
-    --limit (-n): string,                         # Limit number of revisions to show
-    --reversed,                                   # Show revisions in the opposite order (older revisions first)
+    ...filesets: path@"nus complete",           # Show revisions modifying the given paths
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): list<string>,              # Which revisions to show
+    --limit (-n): string,                       # Limit number of revisions to show
+    --reversed,                                 # Show revisions in the opposite order (older revisions first)
 ]: nothing -> table<commit_id: string, parents: list<string>, change_id: string, description: string, author: record<name: string, email: string, timestamp: datetime>, committer: record<name: string, email: string, timestamp: datetime>> {
-    let text = ^jj log --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [...$filesets] {
+    let text = ^jj log --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4759,7 +4759,7 @@ export def "jj log" [
         --limit: $limit
         --reversed: $reversed
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A commit, one line of `jj log`\",\"$ref\":\"#/$defs/commit\",\"$defs\":{\"commit_id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"signature\":{\"type\":\"object\",\"required\":[\"name\",\"email\",\"timestamp\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"commit\":{\"type\":\"object\",\"required\":[\"commit_id\",\"parents\",\"change_id\",\"description\",\"author\",\"committer\"],\"additionalProperties\":false,\"properties\":{\"commit_id\":{\"$ref\":\"#/$defs/commit_id\"},\"parents\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/commit_id\"}},\"change_id\":{\"type\":\"string\",\"pattern\":\"^[k-z]+$\"},\"description\":{\"type\":\"string\"},\"author\":{\"$ref\":\"#/$defs/signature\"},\"committer\":{\"$ref\":\"#/$defs/signature\"}}}}}" { from json --objects | into datetime author.timestamp | into datetime committer.timestamp } --lines
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A commit, one line of `jj log`\",\"$ref\":\"#/$defs/commit\",\"$defs\":{\"commit_id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"signature\":{\"type\":\"object\",\"required\":[\"name\",\"email\",\"timestamp\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"commit\":{\"type\":\"object\",\"required\":[\"commit_id\",\"parents\",\"change_id\",\"description\",\"author\",\"committer\"],\"additionalProperties\":false,\"properties\":{\"commit_id\":{\"$ref\":\"#/$defs/commit_id\"},\"parents\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/commit_id\"}},\"change_id\":{\"type\":\"string\",\"pattern\":\"^[k-z]+$\"},\"description\":{\"type\":\"string\"},\"author\":{\"$ref\":\"#/$defs/signature\"},\"committer\":{\"$ref\":\"#/$defs/signature\"}}}}}" { from json --objects | into datetime author.timestamp | into datetime committer.timestamp } --lines
 }
 
 # Modify the metadata of a revision without changing its content
@@ -4845,27 +4845,27 @@ $ JJ_USER='Foo Bar' JJ_EMAIL=foo@bar.com jj metaedit --force-rewrite
     }'#
 @usage 'arg "[REVSETS]…" help="The revision(s) to modify (default: @) [aliases: -r]" required=#false var=#true var_min=1'
 export def "jj metaedit" [
-    ...revsets: string,                           # The revision(s) to modify (default: @) [aliases: -r]
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --update-change-id,                           # Generate a new change-id
-    --message (-m): list<string>,                 # Update the change description
-    --update-author-timestamp,                    # Update the author timestamp
-    --update-author,                              # Update the author to the configured user
-    --author: string,                             # Set author to the provided string
-    --author-timestamp: string,                   # Set the author date to the given date
-    --force-rewrite,                              # Rewrite the commit, even if no other metadata changed
+    ...revsets: string,                         # The revision(s) to modify (default: @) [aliases: -r]
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --update-change-id,                         # Generate a new change-id
+    --message (-m): list<string>,               # Update the change description
+    --update-author-timestamp,                  # Update the author timestamp
+    --update-author,                            # Update the author to the configured user
+    --author: string,                           # Set author to the provided string
+    --author-timestamp: string,                 # Set the author date to the given date
+    --force-rewrite,                            # Rewrite the commit, even if no other metadata changed
 ]: nothing -> string {
-    ^jj metaedit ...(nusage argv [...$revsets] {
+    ^jj metaedit ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4980,24 +4980,24 @@ times.
     }'
 @usage 'arg "[REVSETS]…" help="Parent(s) of the new change [default: @] [aliases: -o, -r]" required=#false var=#true var_min=1'
 export def "jj new" [
-    ...revsets: string,                           # Parent(s) of the new change [default: @] [aliases: -o, -r]
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --message (-m): list<string>,                 # The change description to use
-    --no-edit,                                    # Do not edit the newly created change
-    --insert-after (-A): list<string>,            # Insert the new change after the given commit(s)
-    --insert-before (-B): list<string>,           # Insert the new change before the given commit(s)
+    ...revsets: string,                         # Parent(s) of the new change [default: @] [aliases: -o, -r]
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --message (-m): list<string>,               # The change description to use
+    --no-edit,                                  # Do not edit the newly created change
+    --insert-after (-A): list<string>,          # Insert the new change after the given commit(s)
+    --insert-before (-B): list<string>,         # Insert the new change before the given commit(s)
 ]: nothing -> string {
-    ^jj new ...(nusage argv [...$revsets] {
+    ^jj new ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5091,23 +5091,23 @@ Takes precedence over config in `ui.movement.edit`; i.e. will negate `ui.movemen
 @usage 'flag --conflict help="Jump to the next conflicted descendant" conflicts=OFFSET'
 @usage 'arg "[OFFSET]" help="How many revisions to move forward. Advances to the next child by default" required=#false default="1"'
 export def "jj next" [
-    offset?: string,                              # How many revisions to move forward. Advances to the next child by default
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --edit (-e),                                  # Instead of creating a new working-copy commit on top of the target commit (like `jj new`), edit the target commit directly (like `jj edit`)
-    --no-edit (-n),                               # The inverse of `--edit`
-    --conflict,                                   # Jump to the next conflicted descendant
+    offset?: string,                            # How many revisions to move forward. Advances to the next child by default
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --edit (-e),                                # Instead of creating a new working-copy commit on top of the target commit (like `jj new`), edit the target commit directly (like `jj edit`)
+    --no-edit (-n),                             # The inverse of `--edit`
+    --conflict,                                 # Jump to the next conflicted descendant
 ]: nothing -> string {
-    ^jj next ...(nusage argv [$offset] {
+    ^jj next ...(nus argv [$offset] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5139,19 +5139,19 @@ See the [operation log documentation] for more information.
 [operation log documentation]: https://docs.jj-vcs.dev/latest/operation-log/
 """#'
 export def "jj operation" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj operation ...(nusage argv [] {
+    ^jj operation ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5184,20 +5184,20 @@ Previous versions of a change (or predecessors) are also discarded if they becom
 """#'
 @usage 'arg <OPERATION> help="The operation or operation range to abandon"'
 export def "jj operation abandon" [
-    operation: string,                            # The operation or operation range to abandon
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    operation: string,                          # The operation or operation range to abandon
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj operation abandon ...(nusage argv [$operation] {
+    ^jj operation abandon ...(nus argv [$operation] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5272,35 +5272,35 @@ If no revisions are specified, this defaults to the `revsets.op-diff-changes-in`
 @usage 'group short-format "--summary" "--stat" "--types" "--name-only"'
 @usage 'group long-format "--git" "--color-words"'
 export def "jj operation diff" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --operation: string,                          # Show repository changes in this operation, compared to its parent
-    --from (-f): string,                          # Show repository changes from this operation
-    --to (-t): string,                            # Show repository changes to this operation
-    --no-graph (-G),                              # Show a flat list of modified changes instead of a graph
-    --patch (-p),                                 # Show patch of modifications to changes
-    --summary (-s),                               # For each path, show only whether it was modified, added, or deleted
-    --stat,                                       # Show a histogram of the changes
-    --types,                                      # For each path, show only its type before and after
-    --name-only,                                  # For each path, show only its path
-    --git,                                        # Show a Git-format diff
-    --color-words,                                # Show a word-level diff with changes indicated only by color
-    --tool: string,                               # Generate diff by external command
-    --context: string,                            # Number of lines of context to show
-    --ignore-all-space,                           # Ignore whitespace when comparing lines
-    --ignore-space-change,                        # Ignore changes in amount of whitespace when comparing lines
-    --show-changes-in: string,                    # Show only changed revisions matching the given revset expression
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --operation: string,                        # Show repository changes in this operation, compared to its parent
+    --from (-f): string,                        # Show repository changes from this operation
+    --to (-t): string,                          # Show repository changes to this operation
+    --no-graph (-G),                            # Show a flat list of modified changes instead of a graph
+    --patch (-p),                               # Show patch of modifications to changes
+    --summary (-s),                             # For each path, show only whether it was modified, added, or deleted
+    --stat,                                     # Show a histogram of the changes
+    --types,                                    # For each path, show only its type before and after
+    --name-only,                                # For each path, show only its path
+    --git,                                      # Show a Git-format diff
+    --color-words,                              # Show a word-level diff with changes indicated only by color
+    --tool: string,                             # Generate diff by external command
+    --context: string,                          # Number of lines of context to show
+    --ignore-all-space,                         # Ignore whitespace when comparing lines
+    --ignore-space-change,                      # Ignore changes in amount of whitespace when comparing lines
+    --show-changes-in: string,                  # Show only changed revisions matching the given revset expression
 ]: nothing -> string {
-    ^jj operation diff ...(nusage argv [] {
+    ^jj operation diff ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5345,20 +5345,20 @@ Running this command on an operation that is already in the operation log (`jj o
 """#'
 @usage 'arg <OPERATION> help="The operation to integrate"'
 export def "jj operation integrate" [
-    operation: string,                            # The operation to integrate
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    operation: string,                          # The operation to integrate
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj operation integrate ...(nusage argv [$operation] {
+    ^jj operation integrate ...(nus argv [$operation] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5456,21 +5456,21 @@ If no revisions are specified, this defaults to the `revsets.op-diff-changes-in`
 @usage 'group long-format "--git" "--color-words"'
 @usage 'output "json" framing="jsonl" { schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"An operation, one line of `jj operation log`\",\n  \"type\": \"object\",\n  \"required\": [\n    \"id\",\n    \"parents\",\n    \"time\",\n    \"description\",\n    \"hostname\",\n    \"username\",\n    \"is_snapshot\",\n    \"workspace_name\",\n    \"attributes\"\n  ],\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"id\": {\n      \"type\": \"string\",\n      \"pattern\": \"^[0-9a-f]+$\"\n    },\n    \"parents\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\",\n        \"pattern\": \"^[0-9a-f]+$\"\n      }\n    },\n    \"time\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"start\",\n        \"end\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"start\": {\n          \"type\": \"string\",\n          \"format\": \"date-time\"\n        },\n        \"end\": {\n          \"type\": \"string\",\n          \"format\": \"date-time\"\n        }\n      }\n    },\n    \"description\": {\n      \"type\": \"string\"\n    },\n    \"hostname\": {\n      \"type\": \"string\"\n    },\n    \"username\": {\n      \"type\": \"string\"\n    },\n    \"is_snapshot\": {\n      \"type\": \"boolean\"\n    },\n    \"workspace_name\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"attributes\": {\n      \"type\": \"object\",\n      \"additionalProperties\": {\n        \"type\": \"string\"\n      }\n    }\n  }\n}\n" }'
 export def "jj operation log" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --limit (-n): string,                         # Limit number of operations to show
-    --reversed,                                   # Show operations in the opposite order (older operations first)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --limit (-n): string,                       # Limit number of operations to show
+    --reversed,                                 # Show operations in the opposite order (older operations first)
 ]: nothing -> table<id: string, parents: list<string>, time: record<start: datetime, end: datetime>, description: string, hostname: string, username: string, is_snapshot: bool, workspace_name: oneof<string, nothing>, attributes: record> {
-    let text = ^jj operation log --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [] {
+    let text = ^jj operation log --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5485,7 +5485,7 @@ export def "jj operation log" [
         --limit: $limit
         --reversed: $reversed
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"An operation, one line of `jj operation log`\",\"type\":\"object\",\"required\":[\"id\",\"parents\",\"time\",\"description\",\"hostname\",\"username\",\"is_snapshot\",\"workspace_name\",\"attributes\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"parents\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"}},\"time\":{\"type\":\"object\",\"required\":[\"start\",\"end\"],\"additionalProperties\":false,\"properties\":{\"start\":{\"type\":\"string\",\"format\":\"date-time\"},\"end\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"description\":{\"type\":\"string\"},\"hostname\":{\"type\":\"string\"},\"username\":{\"type\":\"string\"},\"is_snapshot\":{\"type\":\"boolean\"},\"workspace_name\":{\"type\":[\"string\",\"null\"]},\"attributes\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}}}" { from json --objects | into datetime time.start | into datetime time.end } --lines
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"An operation, one line of `jj operation log`\",\"type\":\"object\",\"required\":[\"id\",\"parents\",\"time\",\"description\",\"hostname\",\"username\",\"is_snapshot\",\"workspace_name\",\"attributes\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"parents\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"}},\"time\":{\"type\":\"object\",\"required\":[\"start\",\"end\"],\"additionalProperties\":false,\"properties\":{\"start\":{\"type\":\"string\",\"format\":\"date-time\"},\"end\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"description\":{\"type\":\"string\"},\"hostname\":{\"type\":\"string\"},\"username\":{\"type\":\"string\"},\"is_snapshot\":{\"type\":\"boolean\"},\"workspace_name\":{\"type\":[\"string\",\"null\"]},\"attributes\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}}}}" { from json --objects | into datetime time.start | into datetime time.end } --lines
 }
 
 # Create a new operation that restores the repo to an earlier state
@@ -5520,7 +5520,7 @@ Use `jj op log` to find an operation to restore to. Use e.g. `jj --at-op=<operat
 """#'
 export def "jj operation restore" [
     operation: string,                            # The operation to restore to
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
+    --repository (-R): path@"nus complete",       # Path to repository to operate on
     --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
     --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
     --ignore-immutable,                           # Allow rewriting immutable commits
@@ -5530,10 +5530,10 @@ export def "jj operation restore" [
     --quiet,                                      # Silence non-primary command output
     --no-pager,                                   # Disable the pager
     --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --config-file: list<path>@"nus complete",     # Additional configuration files (can be repeated)
     --what: list<string>@[repo remote-tracking],  # What portions of the local state to restore (can be repeated)
 ]: nothing -> string {
-    ^jj operation restore ...(nusage argv [$operation] {
+    ^jj operation restore ...(nus argv [$operation] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5581,7 +5581,7 @@ Use `jj op log` to find an operation to revert.
 """# required=#false default=@'
 export def "jj operation revert" [
     operation?: string,                           # The operation to revert
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
+    --repository (-R): path@"nus complete",       # Path to repository to operate on
     --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
     --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
     --ignore-immutable,                           # Allow rewriting immutable commits
@@ -5591,10 +5591,10 @@ export def "jj operation revert" [
     --quiet,                                      # Silence non-primary command output
     --no-pager,                                   # Disable the pager
     --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --config-file: list<path>@"nus complete",     # Additional configuration files (can be repeated)
     --what: list<string>@[repo remote-tracking],  # What portions of the local state to restore (can be repeated)
 ]: nothing -> string {
-    ^jj operation revert ...(nusage argv [$operation] {
+    ^jj operation revert ...(nus argv [$operation] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5679,35 +5679,35 @@ If no revisions are specified, this defaults to the `revsets.op-diff-changes-in`
 @usage 'group short-format "--summary" "--stat" "--types" "--name-only"'
 @usage 'group long-format "--git" "--color-words"'
 export def "jj operation show" [
-    operation?: string,                           # Show repository changes in this operation, compared to its parent(s)
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --no-graph (-G),                              # Show a flat list of modified changes instead of a graph
-    --template (-T): string,                      # Render the operation using the given template
-    --patch (-p),                                 # Show patch of modifications to changes
-    --no-op-diff,                                 # Do not show operation diff
-    --summary (-s),                               # For each path, show only whether it was modified, added, or deleted
-    --stat,                                       # Show a histogram of the changes
-    --types,                                      # For each path, show only its type before and after
-    --name-only,                                  # For each path, show only its path
-    --git,                                        # Show a Git-format diff
-    --color-words,                                # Show a word-level diff with changes indicated only by color
-    --tool: string,                               # Generate diff by external command
-    --context: string,                            # Number of lines of context to show
-    --ignore-all-space,                           # Ignore whitespace when comparing lines
-    --ignore-space-change,                        # Ignore changes in amount of whitespace when comparing lines
-    --show-changes-in: string,                    # Show only changed revisions matching the given revset expression
+    operation?: string,                         # Show repository changes in this operation, compared to its parent(s)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --no-graph (-G),                            # Show a flat list of modified changes instead of a graph
+    --template (-T): string,                    # Render the operation using the given template
+    --patch (-p),                               # Show patch of modifications to changes
+    --no-op-diff,                               # Do not show operation diff
+    --summary (-s),                             # For each path, show only whether it was modified, added, or deleted
+    --stat,                                     # Show a histogram of the changes
+    --types,                                    # For each path, show only its type before and after
+    --name-only,                                # For each path, show only its path
+    --git,                                      # Show a Git-format diff
+    --color-words,                              # Show a word-level diff with changes indicated only by color
+    --tool: string,                             # Generate diff by external command
+    --context: string,                          # Number of lines of context to show
+    --ignore-all-space,                         # Ignore whitespace when comparing lines
+    --ignore-space-change,                      # Ignore changes in amount of whitespace when comparing lines
+    --show-changes-in: string,                  # Show only changed revisions matching the given revset expression
 ]: nothing -> string {
-    ^jj operation show ...(nusage argv [$operation] {
+    ^jj operation show ...(nus argv [$operation] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5794,20 +5794,20 @@ descendant, and it was an ancestor of 3 before, so it remains an ancestor.
     }'
 @usage 'arg "[REVSETS]…" help="The revisions to parallelize [aliases: -r]" required=#false var=#true var_min=1'
 export def "jj parallelize" [
-    ...revsets: string,                           # The revisions to parallelize [aliases: -r]
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    ...revsets: string,                         # The revisions to parallelize [aliases: -r]
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj parallelize ...(nusage argv [...$revsets] {
+    ^jj parallelize ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5897,23 +5897,23 @@ Takes precedence over config in `ui.movement.edit`; i.e. will negate `ui.movemen
 @usage 'flag --conflict help="Jump to the previous conflicted ancestor" conflicts=OFFSET'
 @usage 'arg "[OFFSET]" help="How many revisions to move backward. Moves to the parent by default" required=#false default="1"'
 export def "jj prev" [
-    offset?: string,                              # How many revisions to move backward. Moves to the parent by default
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --edit (-e),                                  # Edit the parent directly, instead of moving the working-copy commit
-    --no-edit (-n),                               # The inverse of `--edit`
-    --conflict,                                   # Jump to the previous conflicted ancestor
+    offset?: string,                            # How many revisions to move backward. Moves to the parent by default
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --edit (-e),                                # Edit the parent directly, instead of moving the working-copy commit
+    --no-edit (-n),                             # The inverse of `--edit`
+    --conflict,                                 # Jump to the previous conflicted ancestor
 ]: nothing -> string {
-    ^jj prev ...(nusage argv [$offset] {
+    ^jj prev ...(nus argv [$offset] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6419,28 +6419,28 @@ Without this flag, divergent commits are abandoned while rebasing if another com
 @usage 'group RebaseDestinationArgs "--onto" "--insert-after" "--insert-before" required=#true multiple=#true'
 @usage 'group to_rebase "--branch" "--source" "--revision"'
 export def "jj rebase" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --branch (-b): list<string>,                  # Rebase the whole branch relative to destination's ancestors (can be repeated)
-    --source (-s): list<string>,                  # Rebase specified revision(s) together with their trees of descendants (can be repeated)
-    --revision (-r): list<string>,                # Rebase the given revisions, rebasing descendants onto this revision's parent(s)
-    --onto (-o): list<string>,                    # The revision(s) to rebase onto (can be repeated to create a merge commit)
-    --insert-after (-A): list<string>,            # The revision(s) to insert after (can be repeated to create a merge commit)
-    --insert-before (-B): list<string>,           # The revision(s) to insert before (can be repeated to create a merge commit)
-    --skip-emptied,                               # If true, when rebasing would produce an empty commit, the commit is abandoned. It will not be abandoned if it was already empty before the rebase. Will never skip merge commits with multiple non-empty parents
-    --keep-divergent,                             # Keep divergent commits while rebasing
-    --simplify-parents,                           # Simplify parents of rebased commits, like `jj simplify-parents`, while rebasing them. Any parents that are ancestors of other parents will be removed
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --branch (-b): list<string>,                # Rebase the whole branch relative to destination's ancestors (can be repeated)
+    --source (-s): list<string>,                # Rebase specified revision(s) together with their trees of descendants (can be repeated)
+    --revision (-r): list<string>,              # Rebase the given revisions, rebasing descendants onto this revision's parent(s)
+    --onto (-o): list<string>,                  # The revision(s) to rebase onto (can be repeated to create a merge commit)
+    --insert-after (-A): list<string>,          # The revision(s) to insert after (can be repeated to create a merge commit)
+    --insert-before (-B): list<string>,         # The revision(s) to insert before (can be repeated to create a merge commit)
+    --skip-emptied,                             # If true, when rebasing would produce an empty commit, the commit is abandoned. It will not be abandoned if it was already empty before the rebase. Will never skip merge commits with multiple non-empty parents
+    --keep-divergent,                           # Keep divergent commits while rebasing
+    --simplify-parents,                         # Simplify parents of rebased commits, like `jj simplify-parents`, while rebasing them. Any parents that are ancestors of other parents will be removed
 ]: nothing -> string {
-    ^jj rebase ...(nusage argv [] {
+    ^jj rebase ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6482,20 +6482,20 @@ By default, `jj redo` refuses to redo an undo-operation that was performed in an
 """#'
 @usage 'flag --allow-cross-workspace help="Allow redoing an undo-operation that was performed in another workspace"'
 export def "jj redo" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --allow-cross-workspace,                      # Allow redoing an undo-operation that was performed in another workspace
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --allow-cross-workspace,                    # Allow redoing an undo-operation that was performed in another workspace
 ]: nothing -> string {
-    ^jj redo ...(nusage argv [] {
+    ^jj redo ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6538,23 +6538,23 @@ The built-in merge tools `:ours` and `:theirs` can be used to choose side #1 and
 @usage 'arg "[FILESETS]…" help="Only resolve conflicts in these paths. You can use the `--list` argument to find paths to use here" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj resolve" [
-    ...filesets: path@"nusage complete",          # Only resolve conflicts in these paths. You can use the `--list` argument to find paths to use here
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    ...filesets: path@"nus complete",           # Only resolve conflicts in these paths. You can use the `--list` argument to find paths to use here
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --revision (-r): string,
-    --list (-l),                                  # Instead of resolving conflicts, list all the conflicts
-    --tool: string,                               # Specify 3-way merge tool to be used
+    --list (-l),                                # Instead of resolving conflicts, list all the conflicts
+    --tool: string,                             # Specify 3-way merge tool to be used
 ]: nothing -> string {
-    ^jj resolve ...(nusage argv [...$filesets] {
+    ^jj resolve ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6625,26 +6625,26 @@ If we followed the pattern of `jj diff` and `jj diffedit`, we would use `--revis
 @usage 'arg "[FILESETS]…" help="Restore only these paths (instead of all paths)" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj restore" [
-    ...filesets: path@"nusage complete",          # Restore only these paths (instead of all paths)
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --from (-f): string,                          # Revision to restore from (source)
-    --into (-t): string,                          # Revision to restore into (destination)
-    --changes-in (-c): string,                    # Undo the changes in a revision as compared to the merge of its parents
-    --interactive (-i),                           # Interactively choose which parts to restore
-    --tool: string,                               # Specify diff editor to be used (implies --interactive)
-    --restore-descendants,                        # Preserve the content (not the diff) when rebasing descendants
+    ...filesets: path@"nus complete",           # Restore only these paths (instead of all paths)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --from (-f): string,                        # Revision to restore from (source)
+    --into (-t): string,                        # Revision to restore into (destination)
+    --changes-in (-c): string,                  # Undo the changes in a revision as compared to the merge of its parents
+    --interactive (-i),                         # Interactively choose which parts to restore
+    --tool: string,                             # Specify diff editor to be used (implies --interactive)
+    --restore-descendants,                      # Preserve the content (not the diff) when rebasing descendants
 ]: nothing -> string {
-    ^jj restore ...(nusage argv [...$filesets] {
+    ^jj restore ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6692,23 +6692,23 @@ The description of the new revisions can be customized with the `templates.rever
     }'
 @usage 'group location "--onto" "--insert-after" "--insert-before" required=#true multiple=#true'
 export def "jj revert" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): list<string>,                # The revision(s) to apply the reverse of
-    --onto (-o): list<string>,                    # The revision(s) to apply the reverse changes on top of
-    --insert-after (-A): list<string>,            # The revision(s) to insert the reverse changes after (can be repeated to create a merge commit)
-    --insert-before (-B): list<string>,           # The revision(s) to insert the reverse changes before (can be repeated to create a merge commit)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): list<string>,              # The revision(s) to apply the reverse of
+    --onto (-o): list<string>,                  # The revision(s) to apply the reverse changes on top of
+    --insert-after (-A): list<string>,          # The revision(s) to insert the reverse changes after (can be repeated to create a merge commit)
+    --insert-before (-B): list<string>,         # The revision(s) to insert the reverse changes before (can be repeated to create a merge commit)
 ]: nothing -> string {
-    ^jj revert ...(nusage argv [] {
+    ^jj revert ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6729,19 +6729,19 @@ export def "jj revert" [
 
 # Show the current workspace root directory (shortcut for `jj workspace root`)
 export def "jj root" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj root ...(nusage argv [] {
+    ^jj root ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6868,7 +6868,7 @@ Hint: Use a `--` separator to allow passing arguments starting with `-`. For exa
 export def "jj run" [
     command: string,                              # Command to run across all selected revisions
     ...args: string,                              # Arguments to pass to the command
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
+    --repository (-R): path@"nus complete",       # Path to repository to operate on
     --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
     --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
     --ignore-immutable,                           # Allow rewriting immutable commits
@@ -6878,7 +6878,7 @@ export def "jj run" [
     --quiet,                                      # Silence non-primary command output
     --no-pager,                                   # Disable the pager
     --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --config-file: list<path>@"nus complete",     # Additional configuration files (can be repeated)
     --revision (-r): list<string>,                # The revisions to change
     --jobs (-j): string,                          # How many processes should run in parallel
     --root,                                       # Run the command from the working-copy root in each commit instead of from the subdirectory `jj run` was invoked from
@@ -6889,7 +6889,7 @@ export def "jj run" [
     --ignore-errors,                              # Continue with remaining revisions when a command's exit code indicates failure
     --sparse-patterns: string@[copy full empty],  # How to handle sparse patterns when running the command. This is controlled per `jj run` invocation
 ]: nothing -> string {
-    ^jj run ...(nusage argv [$command ...$args] {
+    ^jj run ...(nus argv [$command ...$args] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6970,33 +6970,33 @@ A builtin format can also be specified as `:<name>`. For example, `--tool=:git` 
 @usage 'group short-format "--summary" "--stat" "--types" "--name-only"'
 @usage 'group long-format "--git" "--color-words"'
 export def "jj show" [
-    ...revsets: string,                           # Show changes in these revisions, compared to their parent(s) [default: @] [aliases: -r]
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --reversed,                                   # Show revisions in the opposite order (older revisions first)
-    --template (-T): string,                      # Render each revision using the given template
-    --summary (-s),                               # For each path, show only whether it was modified, added, or deleted
-    --stat,                                       # Show a histogram of the changes
-    --types,                                      # For each path, show only its type before and after
-    --name-only,                                  # For each path, show only its path
-    --git,                                        # Show a Git-format diff
-    --color-words,                                # Show a word-level diff with changes indicated only by color
-    --tool: string,                               # Generate diff by external command
-    --context: string,                            # Number of lines of context to show
-    --no-patch,                                   # Do not show the patch
-    --ignore-all-space (-w),                      # Ignore whitespace when comparing lines
-    --ignore-space-change (-b),                   # Ignore changes in amount of whitespace when comparing lines
+    ...revsets: string,                         # Show changes in these revisions, compared to their parent(s) [default: @] [aliases: -r]
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --reversed,                                 # Show revisions in the opposite order (older revisions first)
+    --template (-T): string,                    # Render each revision using the given template
+    --summary (-s),                             # For each path, show only whether it was modified, added, or deleted
+    --stat,                                     # Show a histogram of the changes
+    --types,                                    # For each path, show only its type before and after
+    --name-only,                                # For each path, show only its path
+    --git,                                      # Show a Git-format diff
+    --color-words,                              # Show a word-level diff with changes indicated only by color
+    --tool: string,                             # Generate diff by external command
+    --context: string,                          # Number of lines of context to show
+    --no-patch,                                 # Do not show the patch
+    --ignore-all-space (-w),                    # Ignore whitespace when comparing lines
+    --ignore-space-change (-b),                 # Ignore changes in amount of whitespace when comparing lines
 ]: nothing -> string {
-    ^jj show ...(nusage argv [...$revsets] {
+    ^jj show ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7055,21 +7055,21 @@ While that leads to discomfort for users, which sign with hardware devices, as o
         arg <KEY>
     }'
 export def "jj sign" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): list<string>,                # What revision(s) to sign
-    --key: string,                                # The key used for signing
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): list<string>,              # What revision(s) to sign
+    --key: string,                              # The key used for signing
 ]: nothing -> string {
-    ^jj sign ...(nusage argv [] {
+    ^jj sign ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7111,21 +7111,21 @@ If both `--source` and `--revisions` are not provided, this defaults to the `rev
         arg <REVSETS>… var=#true
     }'
 export def "jj simplify-parents" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --source (-s): list<string>,                  # Simplify specified revision(s) together with their trees of descendants (can be repeated)
-    --revision (-r): list<string>,                # Simplify specified revision(s) (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --source (-s): list<string>,                # Simplify specified revision(s) together with their trees of descendants (can be repeated)
+    --revision (-r): list<string>,              # Simplify specified revision(s) (can be repeated)
 ]: nothing -> string {
-    ^jj simplify-parents ...(nusage argv [] {
+    ^jj simplify-parents ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7144,19 +7144,19 @@ export def "jj simplify-parents" [
 
 # Manage which paths from the working-copy commit are present in the working copy
 export def "jj sparse" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj sparse ...(nusage argv [] {
+    ^jj sparse ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7173,19 +7173,19 @@ export def "jj sparse" [
 
 # Start an editor to update the patterns that are present in the working copy
 export def "jj sparse edit" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj sparse edit ...(nusage argv [] {
+    ^jj sparse edit ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7209,19 +7209,19 @@ List the patterns that are currently present in the working copy
 By default, a newly cloned or initialized repo will have have a pattern matching all files from the repo root. That pattern is rendered as `.` (a single period).
 """#'
 export def "jj sparse list" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj sparse list ...(nusage argv [] {
+    ^jj sparse list ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7238,19 +7238,19 @@ export def "jj sparse list" [
 
 # Reset the patterns to include all files in the working copy
 export def "jj sparse reset" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj sparse reset ...(nusage argv [] {
+    ^jj sparse reset ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7283,22 +7283,22 @@ For example, if all you need is the `README.md` and the `lib/` directory, use `j
 @usage 'complete add type=path'
 @usage 'complete remove type=path'
 export def "jj sparse set" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --add: list<path>@"nusage complete",          # Patterns to add to the working copy
-    --remove: list<path>@"nusage complete",       # Patterns to remove from the working copy
-    --clear,                                      # Include no files in the working copy (combine with --add)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --add: list<path>@"nus complete",           # Patterns to add to the working copy
+    --remove: list<path>@"nus complete",        # Patterns to remove from the working copy
+    --clear,                                    # Include no files in the working copy (combine with --add)
 ]: nothing -> string {
-    ^jj sparse set ...(nusage argv [] {
+    ^jj sparse set ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7482,29 +7482,29 @@ Forces an editor to open when using `--message` to allow the message to be edite
 @usage 'arg "[FILESETS]…" help="Files matching any of these filesets are put in the selected changes" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj split" [
-    ...filesets: path@"nusage complete",          # Files matching any of these filesets are put in the selected changes
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --interactive (-i),                           # Interactively choose which parts to split
-    --tool: string,                               # Specify diff editor to be used (implies --interactive)
-    --revision (-r): string,                      # The revision to split
-    --onto (-o): list<string>,                    # The revision(s) to rebase the selected changes onto (can be repeated to create a merge commit)
-    --insert-after (-A): list<string>,            # The revision(s) to insert after (can be repeated to create a merge commit)
-    --insert-before (-B): list<string>,           # The revision(s) to insert before (can be repeated to create a merge commit)
-    --message (-m): list<string>,                 # The change description to use for the selected changes (don't open editor)
-    --editor,                                     # Open an editor to edit the change description(s)
-    --parallel (-p),                              # Split the revision into two parallel revisions instead of a parent and child
+    ...filesets: path@"nus complete",           # Files matching any of these filesets are put in the selected changes
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --interactive (-i),                         # Interactively choose which parts to split
+    --tool: string,                             # Specify diff editor to be used (implies --interactive)
+    --revision (-r): string,                    # The revision to split
+    --onto (-o): list<string>,                  # The revision(s) to rebase the selected changes onto (can be repeated to create a merge commit)
+    --insert-after (-A): list<string>,          # The revision(s) to insert after (can be repeated to create a merge commit)
+    --insert-before (-B): list<string>,         # The revision(s) to insert before (can be repeated to create a merge commit)
+    --message (-m): list<string>,               # The change description to use for the selected changes (don't open editor)
+    --editor,                                   # Open an editor to edit the change description(s)
+    --parallel (-p),                            # Split the revision into two parallel revisions instead of a parent and child
 ]: nothing -> string {
-    ^jj split ...(nusage argv [...$filesets] {
+    ^jj split ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7608,32 +7608,32 @@ Forces an editor to open when using `--message` to allow the message to be edite
 @usage 'arg "[FILESETS]…" help="Move only changes to these paths (instead of all paths)" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj squash" [
-    ...filesets: path@"nusage complete",          # Move only changes to these paths (instead of all paths)
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # Revision to squash into its parent (default: @). Incompatible with the experimental `-o`/`-A`/`-B` options
-    --from (-f): list<string>,                    # Revision(s) to squash from (default: @)
-    --into (-t): string,                          # Revision to squash into (default: @)
-    --onto (-o): list<string>,                    # (Experimental) The revision(s) to use as parent for the new commit (can be repeated to create a merge commit)
-    --insert-after (-A): list<string>,            # (Experimental) The revision(s) to insert the new commit after (can be repeated to create a merge commit)
-    --insert-before (-B): list<string>,           # (Experimental) The revision(s) to insert the new commit before (can be repeated to create a merge commit)
-    --message (-m): list<string>,                 # The description to use for squashed revision (don't open editor)
-    --use-destination-message (-u),               # Use the description of the destination revision and discard the description(s) of the source revision(s)
-    --editor,                                     # Open an editor to edit the change description
-    --interactive (-i),                           # Interactively choose which parts to squash
-    --tool: string,                               # Specify diff editor to be used (implies --interactive)
-    --keep-emptied (-k),                          # The source revision will not be abandoned
+    ...filesets: path@"nus complete",           # Move only changes to these paths (instead of all paths)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # Revision to squash into its parent (default: @). Incompatible with the experimental `-o`/`-A`/`-B` options
+    --from (-f): list<string>,                  # Revision(s) to squash from (default: @)
+    --into (-t): string,                        # Revision to squash into (default: @)
+    --onto (-o): list<string>,                  # (Experimental) The revision(s) to use as parent for the new commit (can be repeated to create a merge commit)
+    --insert-after (-A): list<string>,          # (Experimental) The revision(s) to insert the new commit after (can be repeated to create a merge commit)
+    --insert-before (-B): list<string>,         # (Experimental) The revision(s) to insert the new commit before (can be repeated to create a merge commit)
+    --message (-m): list<string>,               # The description to use for squashed revision (don't open editor)
+    --use-destination-message (-u),             # Use the description of the destination revision and discard the description(s) of the source revision(s)
+    --editor,                                   # Open an editor to edit the change description
+    --interactive (-i),                         # Interactively choose which parts to squash
+    --tool: string,                             # Specify diff editor to be used (implies --interactive)
+    --keep-emptied (-k),                        # The source revision will not be abandoned
 ]: nothing -> string {
-    ^jj squash ...(nusage argv [...$filesets] {
+    ^jj squash ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7691,20 +7691,20 @@ Note: You can use `jj diff --summary -r <rev>` to see the changed files for a sp
 @usage 'arg "[FILESETS]…" help="Restrict the status display to these paths" required=#false var=#true var_min=1'
 @usage 'complete filesets type=path'
 export def "jj status" [
-    ...filesets: path@"nusage complete",          # Restrict the status display to these paths
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    ...filesets: path@"nus complete",           # Restrict the status display to these paths
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj status ...(nusage argv [...$filesets] {
+    ^jj status ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7721,19 +7721,19 @@ export def "jj status" [
 
 # Manage tags
 export def "jj tag" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj tag ...(nusage argv [] {
+    ^jj tag ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7765,20 +7765,20 @@ By default, the specified pattern matches tag names with glob syntax. You can al
 [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 """# var=#true var_min=1'
 export def "jj tag delete" [
-    ...names: string,                             # Tag names to delete
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    ...names: string,                           # Tag names to delete
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj tag delete ...(nusage argv [...$names] {
+    ^jj tag delete ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7882,7 +7882,7 @@ By default, the specified pattern matches tag names with glob syntax. You can al
 @usage 'output "json" framing="jsonl" { schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"A bookmark or a tag, one line of `jj bookmark list` or `jj tag list`\",\n  \"type\": \"object\",\n  \"required\": [\n    \"name\",\n    \"target\"\n  ],\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"name\": {\n      \"type\": \"string\"\n    },\n    \"remote\": {\n      \"type\": \"string\"\n    },\n    \"target\": {\n      \"$ref\": \"#/$defs/target\"\n    },\n    \"tracking_target\": {\n      \"$ref\": \"#/$defs/target\"\n    }\n  },\n  \"$defs\": {\n    \"target\": {\n      \"type\": \"array\",\n      \"minItems\": 1,\n      \"items\": {\n        \"anyOf\": [\n          {\n            \"type\": \"string\",\n            \"pattern\": \"^[0-9a-f]+$\"\n          },\n          {\n            \"type\": \"null\"\n          }\n        ]\n      }\n    }\n  }\n}\n" }'
 export def "jj tag list" [
     ...names: string,                                                                                                                                                                                               # Show tags whose local name matches
-    --repository (-R): path@"nusage complete",                                                                                                                                                                      # Path to repository to operate on
+    --repository (-R): path@"nus complete",                                                                                                                                                                         # Path to repository to operate on
     --ignore-working-copy,                                                                                                                                                                                          # Don't snapshot the working copy, and don't update it
     --no-integrate-operation,                                                                                                                                                                                       # Run the command as usual but don't integrate any operations
     --ignore-immutable,                                                                                                                                                                                             # Allow rewriting immutable commits
@@ -7892,7 +7892,7 @@ export def "jj tag list" [
     --quiet,                                                                                                                                                                                                        # Silence non-primary command output
     --no-pager,                                                                                                                                                                                                     # Disable the pager
     --config: list<string>,                                                                                                                                                                                         # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",                                                                                                                                                                    # Additional configuration files (can be repeated)
+    --config-file: list<path>@"nus complete",                                                                                                                                                                       # Additional configuration files (can be repeated)
     --all-remotes (-a),                                                                                                                                                                                             # Show all tracked and untracked remote tags including the ones whose targets are synchronized with the local tags
     --remote: list<string>,                                                                                                                                                                                         # Show all tracked and untracked remote tags belonging to this remote
     --tracked (-t),                                                                                                                                                                                                 # Show tracked remote tags only
@@ -7900,7 +7900,7 @@ export def "jj tag list" [
     --revision (-r): list<string>,                                                                                                                                                                                  # Show tags whose local targets are in the given revisions
     --sort: list<string>@[name name- author-name author-name- author-email author-email- author-date author-date- committer-name committer-name- committer-email committer-email- committer-date committer-date-],  # Sort tags based on the given key (or multiple keys)
 ]: nothing -> table<name: string, remote: oneof<string, nothing>, target: list<oneof<string, nothing>>, tracking_target: oneof<list<oneof<string, nothing>>, nothing>> {
-    let text = ^jj tag list --template "json(self) ++ \"\\n\"" ...(nusage argv [...$names] {
+    let text = ^jj tag list --template "json(self) ++ \"\\n\"" ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7919,7 +7919,7 @@ export def "jj tag list" [
         --revision: $revision
         --sort: $sort
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A bookmark or a tag, one line of `jj bookmark list` or `jj tag list`\",\"type\":\"object\",\"required\":[\"name\",\"target\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"remote\":{\"type\":\"string\"},\"target\":{\"$ref\":\"#/$defs/target\"},\"tracking_target\":{\"$ref\":\"#/$defs/target\"}},\"$defs\":{\"target\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"anyOf\":[{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},{\"type\":\"null\"}]}}}}" { from json --objects | default null remote | default null tracking_target } --lines
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A bookmark or a tag, one line of `jj bookmark list` or `jj tag list`\",\"type\":\"object\",\"required\":[\"name\",\"target\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"remote\":{\"type\":\"string\"},\"target\":{\"$ref\":\"#/$defs/target\"},\"tracking_target\":{\"$ref\":\"#/$defs/target\"}},\"$defs\":{\"target\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"anyOf\":[{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},{\"type\":\"null\"}]}}}}" { from json --objects | default null remote | default null tracking_target } --lines
 }
 
 # Create or update tags
@@ -7930,22 +7930,22 @@ export def "jj tag list" [
 @usage 'flag --allow-move help="Allow moving existing tags"'
 @usage 'arg <NAMES>… help="Tag names to create or update" var=#true var_min=1'
 export def "jj tag set" [
-    ...names: string,                             # Tag names to create or update
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): string,                      # Target revision to point to
-    --allow-move,                                 # Allow moving existing tags
+    ...names: string,                           # Tag names to create or update
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): string,                    # Target revision to point to
+    --allow-move,                               # Allow moving existing tags
 ]: nothing -> string {
-    ^jj tag set ...(nusage argv [...$names] {
+    ^jj tag set ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7992,21 +7992,21 @@ Tag name patterns or remote tag symbols to track
 [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 """# var=#true var_min=1'
 export def "jj tag track" [
-    ...tag_remote: string,                        # Tag name patterns or remote tag symbols to track
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --remote: list<string>,                       # Remote names to track
+    ...tag_remote: string,                      # Tag name patterns or remote tag symbols to track
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --remote: list<string>,                     # Remote names to track
 ]: nothing -> string {
-    ^jj tag track ...(nusage argv [...$tag_remote] {
+    ^jj tag track ...(nus argv [...$tag_remote] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8052,21 +8052,21 @@ Tag name patterns or remote tag symbols to untrack
 [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 """# var=#true var_min=1'
 export def "jj tag untrack" [
-    ...tag_remote: string,                        # Tag name patterns or remote tag symbols to untrack
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --remote: list<string>,                       # Remote names to untrack
+    ...tag_remote: string,                      # Tag name patterns or remote tag symbols to untrack
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --remote: list<string>,                     # Remote names to untrack
 ]: nothing -> string {
-    ^jj tag untrack ...(nusage argv [...$tag_remote] {
+    ^jj tag untrack ...(nus argv [...$tag_remote] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8104,20 +8104,20 @@ By default, `jj undo` refuses to undo an operation that was performed in another
 """#'
 @usage 'flag --allow-cross-workspace help="Allow undoing an operation that was performed in another workspace"'
 export def "jj undo" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --allow-cross-workspace,                      # Allow undoing an operation that was performed in another workspace
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --allow-cross-workspace,                    # Allow undoing an operation that was performed in another workspace
 ]: nothing -> string {
-    ^jj undo ...(nusage argv [] {
+    ^jj undo ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8150,20 +8150,20 @@ See also [commit signing] docs.
         arg <REVSETS>… var=#true
     }'
 export def "jj unsign" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --revision (-r): list<string>,                # What revision(s) to unsign
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --revision (-r): list<string>,              # What revision(s) to unsign
 ]: nothing -> string {
-    ^jj unsign ...(nusage argv [] {
+    ^jj unsign ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8181,19 +8181,19 @@ export def "jj unsign" [
 
 # Infrequently used commands such as for generating shell completions
 export def "jj util" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util ...(nusage argv [] {
+    ^jj util ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8210,19 +8210,19 @@ export def "jj util" [
 
 # Commands relating to the backend used in the current repo
 export def "jj util backend" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util backend ...(nusage argv [] {
+    ^jj util backend ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8239,19 +8239,19 @@ export def "jj util backend" [
 
 # Print the name of the backend used in the current repo
 export def "jj util backend name" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util backend name ...(nusage argv [] {
+    ^jj util backend name ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8317,7 +8317,7 @@ See the docs on [command-line completion] for more details.
         }'
 export def "jj util completion" [
     shell: string@[bash elvish fish nushell power-shell zsh],
-    --repository (-R): path@"nusage complete",                 # Path to repository to operate on
+    --repository (-R): path@"nus complete",                    # Path to repository to operate on
     --ignore-working-copy,                                     # Don't snapshot the working copy, and don't update it
     --no-integrate-operation,                                  # Run the command as usual but don't integrate any operations
     --ignore-immutable,                                        # Allow rewriting immutable commits
@@ -8327,9 +8327,9 @@ export def "jj util completion" [
     --quiet,                                                   # Silence non-primary command output
     --no-pager,                                                # Disable the pager
     --config: list<string>,                                    # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",               # Additional configuration files (can be repeated)
+    --config-file: list<path>@"nus complete",                  # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util completion ...(nusage argv [$shell] {
+    ^jj util completion ...(nus argv [$shell] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8346,19 +8346,19 @@ export def "jj util completion" [
 
 # Print the JSON schema for the jj TOML config format
 export def "jj util config-schema" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util config-schema ...(nusage argv [] {
+    ^jj util config-schema ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8412,27 +8412,27 @@ Typically useful for shell commands like: `jj diff -r @- --name-only | xargs per
 @usage 'complete path1 type=path'
 @usage 'complete path2 type=path'
 export def "jj util diff" [
-    path1: path@"nusage complete",                # First path to compare
-    path2: path@"nusage complete",                # Second path to compare
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --git,                                        # Show a Git-format diff
-    --color-words,                                # Show a word-level diff with changes indicated only by color
-    --tool: string,                               # Generate diff by external command
-    --context: string,                            # Number of lines of context to show
-    --ignore-all-space (-w),                      # Ignore whitespace when comparing lines
-    --ignore-space-change (-b),                   # Ignore changes in amount of whitespace when comparing lines
+    path1: path@"nus complete",                 # First path to compare
+    path2: path@"nus complete",                 # Second path to compare
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --git,                                      # Show a Git-format diff
+    --color-words,                              # Show a word-level diff with changes indicated only by color
+    --tool: string,                             # Generate diff by external command
+    --context: string,                          # Number of lines of context to show
+    --ignore-all-space (-w),                    # Ignore whitespace when comparing lines
+    --ignore-space-change (-b),                 # Ignore changes in amount of whitespace when comparing lines
 ]: nothing -> string {
-    ^jj util diff ...(nusage argv [$path1 $path2] {
+    ^jj util diff ...(nus argv [$path1 $path2] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8549,21 +8549,21 @@ echo "args: $@"
 @usage 'arg "[ARGS]…" help="Arguments to pass to the external command" required=#false var=#true var_min=1'
 @usage 'complete args type=path'
 export def "jj util exec" [
-    command: string,                              # External command to execute
-    ...args: path@"nusage complete",              # Arguments to pass to the external command
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    command: string,                            # External command to execute
+    ...args: path@"nus complete",               # Arguments to pass to the external command
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util exec ...(nusage argv [$command ...$args] {
+    ^jj util exec ...(nus argv [$command ...$args] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8597,20 +8597,20 @@ Only the string "now" can be passed to this parameter. Support for arbitrary abs
             arg <EXPIRE>
         }'
 export def "jj util gc" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --expire: string,                             # Time threshold
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --expire: string,                           # Time threshold
 ]: nothing -> string {
-    ^jj util gc ...(nusage argv [] {
+    ^jj util gc ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8630,20 +8630,20 @@ export def "jj util gc" [
 @usage 'arg <PATH> help="The path where manpages will installed. An example path might be `/usr/share/man`. The provided path will be appended with `man1`, etc., as appropriate"'
 @usage 'complete path type=path'
 export def "jj util install-man-pages" [
-    path: path@"nusage complete",                 # The path where manpages will installed. An example path might be `/usr/share/man`. The provided path will be appended with `man1`, etc., as appropriate
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    path: path@"nus complete",                  # The path where manpages will installed. An example path might be `/usr/share/man`. The provided path will be appended with `man1`, etc., as appropriate
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util install-man-pages ...(nusage argv [$path] {
+    ^jj util install-man-pages ...(nus argv [$path] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8660,19 +8660,19 @@ export def "jj util install-man-pages" [
 
 # Print the CLI help for all subcommands in Markdown
 export def "jj util markdown-help" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util markdown-help ...(nusage argv [] {
+    ^jj util markdown-help ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8810,19 +8810,19 @@ Note that `jj util snapshot` does not output an operation ID, so it is not
 suitable for checks such as these.
 """#'#
 export def "jj util snapshot" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util snapshot ...(nusage argv [] {
+    ^jj util snapshot ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8839,19 +8839,19 @@ export def "jj util snapshot" [
 
 # Display version information
 export def "jj version" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj version ...(nusage argv [] {
+    ^jj version ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8883,19 +8883,19 @@ Each workspace has its own working-copy commit. When you have more than one work
 Each workspace also has own sparse patterns.
 """#'#
 export def "jj workspace" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj workspace ...(nusage argv [] {
+    ^jj workspace ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8962,8 +8962,8 @@ By default, a Git worktree is created when the current workspace is colocated an
 @usage 'arg <DESTINATION> help="Where to create the new workspace"'
 @usage 'complete destination type=dir'
 export def "jj workspace add" [
-    destination: path@"nusage complete",          # Where to create the new workspace
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
+    destination: path@"nus complete",             # Where to create the new workspace
+    --repository (-R): path@"nus complete",       # Path to repository to operate on
     --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
     --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
     --ignore-immutable,                           # Allow rewriting immutable commits
@@ -8973,7 +8973,7 @@ export def "jj workspace add" [
     --quiet,                                      # Silence non-primary command output
     --no-pager,                                   # Disable the pager
     --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --config-file: list<path>@"nus complete",     # Additional configuration files (can be repeated)
     --name: string,                               # A name for the workspace
     --revision (-r): list<string>,                # A list of parent revisions for the working-copy commit of the newly created workspace. You may specify nothing, or any number of parents
     --message (-m): list<string>,                 # The change description to use
@@ -8981,7 +8981,7 @@ export def "jj workspace add" [
     --no-colocate,                                # Do not create a Git worktree for this workspace
     --sparse-patterns: string@[copy full empty],  # How to handle sparse patterns when creating a new workspace
 ]: nothing -> string {
-    ^jj workspace add ...(nusage argv [$destination] {
+    ^jj workspace add ...(nus argv [$destination] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9012,20 +9012,20 @@ The workspace will not be touched on disk. It can be deleted from disk before or
 """#'#
 @usage 'arg "[WORKSPACES]…" help="Names of the workspaces to forget. By default, forgets only the current workspace" required=#false var=#true var_min=1'
 export def "jj workspace forget" [
-    ...workspaces: string,                        # Names of the workspaces to forget. By default, forgets only the current workspace
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    ...workspaces: string,                      # Names of the workspaces to forget. By default, forgets only the current workspace
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj workspace forget ...(nusage argv [...$workspaces] {
+    ^jj workspace forget ...(nus argv [...$workspaces] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9057,19 +9057,19 @@ The default template can be set by the `templates.workspace_list` setting.
         }'
 @usage 'output "json" framing="jsonl" { schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"A workspace and its working-copy commit, one line of `jj workspace list`\",\n  \"type\": \"object\",\n  \"required\": [\n    \"name\",\n    \"target\"\n  ],\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"name\": {\n      \"type\": \"string\"\n    },\n    \"target\": {\n      \"$ref\": \"#/$defs/commit\"\n    }\n  },\n  \"$defs\": {\n    \"commit_id\": {\n      \"type\": \"string\",\n      \"pattern\": \"^[0-9a-f]+$\"\n    },\n    \"signature\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"name\",\n        \"email\",\n        \"timestamp\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"name\": {\n          \"type\": \"string\"\n        },\n        \"email\": {\n          \"type\": \"string\"\n        },\n        \"timestamp\": {\n          \"type\": \"string\",\n          \"format\": \"date-time\"\n        }\n      }\n    },\n    \"commit\": {\n      \"type\": \"object\",\n      \"required\": [\n        \"commit_id\",\n        \"parents\",\n        \"change_id\",\n        \"description\",\n        \"author\",\n        \"committer\"\n      ],\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"commit_id\": {\n          \"$ref\": \"#/$defs/commit_id\"\n        },\n        \"parents\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"$ref\": \"#/$defs/commit_id\"\n          }\n        },\n        \"change_id\": {\n          \"type\": \"string\",\n          \"pattern\": \"^[k-z]+$\"\n        },\n        \"description\": {\n          \"type\": \"string\"\n        },\n        \"author\": {\n          \"$ref\": \"#/$defs/signature\"\n        },\n        \"committer\": {\n          \"$ref\": \"#/$defs/signature\"\n        }\n      }\n    }\n  }\n}\n" }'
 export def "jj workspace list" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> table<name: string, target: record<commit_id: string, parents: list<string>, change_id: string, description: string, author: record<name: string, email: string, timestamp: datetime>, committer: record<name: string, email: string, timestamp: datetime>>> {
-    let text = ^jj workspace list --template "json(self) ++ \"\\n\"" ...(nusage argv [] {
+    let text = ^jj workspace list --template "json(self) ++ \"\\n\"" ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9082,7 +9082,7 @@ export def "jj workspace list" [
         --config: $config
         --config-file: $config_file
     })
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A workspace and its working-copy commit, one line of `jj workspace list`\",\"type\":\"object\",\"required\":[\"name\",\"target\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"target\":{\"$ref\":\"#/$defs/commit\"}},\"$defs\":{\"commit_id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"signature\":{\"type\":\"object\",\"required\":[\"name\",\"email\",\"timestamp\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"commit\":{\"type\":\"object\",\"required\":[\"commit_id\",\"parents\",\"change_id\",\"description\",\"author\",\"committer\"],\"additionalProperties\":false,\"properties\":{\"commit_id\":{\"$ref\":\"#/$defs/commit_id\"},\"parents\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/commit_id\"}},\"change_id\":{\"type\":\"string\",\"pattern\":\"^[k-z]+$\"},\"description\":{\"type\":\"string\"},\"author\":{\"$ref\":\"#/$defs/signature\"},\"committer\":{\"$ref\":\"#/$defs/signature\"}}}}}" { from json --objects | into datetime target.author.timestamp | into datetime target.committer.timestamp } --lines
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A workspace and its working-copy commit, one line of `jj workspace list`\",\"type\":\"object\",\"required\":[\"name\",\"target\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"target\":{\"$ref\":\"#/$defs/commit\"}},\"$defs\":{\"commit_id\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]+$\"},\"signature\":{\"type\":\"object\",\"required\":[\"name\",\"email\",\"timestamp\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"email\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}},\"commit\":{\"type\":\"object\",\"required\":[\"commit_id\",\"parents\",\"change_id\",\"description\",\"author\",\"committer\"],\"additionalProperties\":false,\"properties\":{\"commit_id\":{\"$ref\":\"#/$defs/commit_id\"},\"parents\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/commit_id\"}},\"change_id\":{\"type\":\"string\",\"pattern\":\"^[k-z]+$\"},\"description\":{\"type\":\"string\"},\"author\":{\"$ref\":\"#/$defs/signature\"},\"committer\":{\"$ref\":\"#/$defs/signature\"}}}}}" { from json --objects | into datetime target.author.timestamp | into datetime target.committer.timestamp } --lines
 }
 
 # Remove a workspace and its working-copy files from disk
@@ -9095,20 +9095,20 @@ The workspace directory and its contents are removed from disk. The working-copy
 """#'
 @usage 'arg <WORKSPACES>… help="Names of the workspaces to remove" var=#true var_min=1'
 export def "jj workspace remove" [
-    ...workspaces: string,                        # Names of the workspaces to remove
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    ...workspaces: string,                      # Names of the workspaces to remove
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj workspace remove ...(nusage argv [...$workspaces] {
+    ^jj workspace remove ...(nus argv [...$workspaces] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9126,20 +9126,20 @@ export def "jj workspace remove" [
 # Renames the current workspace
 @usage 'arg <NEW_WORKSPACE_NAME> help="The name of the workspace to update to"'
 export def "jj workspace rename" [
-    new_workspace_name: string,                   # The name of the workspace to update to
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    new_workspace_name: string,                 # The name of the workspace to update to
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj workspace rename ...(nusage argv [$new_workspace_name] {
+    ^jj workspace rename ...(nus argv [$new_workspace_name] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9159,20 +9159,20 @@ export def "jj workspace rename" [
             arg <NAME>
         }'
 export def "jj workspace root" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
-    --name: string,                               # Name of the workspace (defaults to current)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
+    --name: string,                             # Name of the workspace (defaults to current)
 ]: nothing -> string {
-    ^jj workspace root ...(nusage argv [] {
+    ^jj workspace root ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9201,19 +9201,19 @@ See the [stale working copy documentation] for more information.
 [stale working copy documentation]: https://docs.jj-vcs.dev/latest/working-copy/#stale-working-copy
 """#'
 export def "jj workspace update-stale" [
-    --repository (-R): path@"nusage complete",    # Path to repository to operate on
-    --ignore-working-copy,                        # Don't snapshot the working copy, and don't update it
-    --no-integrate-operation,                     # Run the command as usual but don't integrate any operations
-    --ignore-immutable,                           # Allow rewriting immutable commits
-    --at-operation: string,                       # Operation to load the repo at
-    --debug,                                      # Enable debug logging
-    --color: string@[always never debug auto],    # When to colorize output
-    --quiet,                                      # Silence non-primary command output
-    --no-pager,                                   # Disable the pager
-    --config: list<string>,                       # Additional configuration options (can be repeated)
-    --config-file: list<path>@"nusage complete",  # Additional configuration files (can be repeated)
+    --repository (-R): path@"nus complete",     # Path to repository to operate on
+    --ignore-working-copy,                      # Don't snapshot the working copy, and don't update it
+    --no-integrate-operation,                   # Run the command as usual but don't integrate any operations
+    --ignore-immutable,                         # Allow rewriting immutable commits
+    --at-operation: string,                     # Operation to load the repo at
+    --debug,                                    # Enable debug logging
+    --color: string@[always never debug auto],  # When to colorize output
+    --quiet,                                    # Silence non-primary command output
+    --no-pager,                                 # Disable the pager
+    --config: list<string>,                     # Additional configuration options (can be repeated)
+    --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj workspace update-stale ...(nusage argv [] {
+    ^jj workspace update-stale ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation

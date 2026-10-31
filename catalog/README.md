@@ -47,21 +47,21 @@ lines for a vendor autoload directory.
 
 An editor starts `nu --lsp` itself, before any shell. A mise command wrapper gives it the
 project's environment: it keeps the name `nu`, so the editor's configuration does not change,
-and delegates to `nusage nu`, which serves nusage's language server for `--lsp` and runs the
+and delegates to `nus nu`, which serves nusage's language server for `--lsp` and runs the
 real `nu` for anything else, so a project wrapper and the global one nusage's conf.d fragment
 offers behave alike. `mise reshim` after adding it, and put mise's `command-wrappers/bin`
 directory, which `mise activate` adds to `PATH`, on the editor's `PATH`:
 
 ```toml
 [wrappers.nu]
-command = "nusage"
+command = "nus"
 args = ["nu"]
 env = { NU_LIB_DIRS = "{{ [config_root, '.nusage', 'lib'] | join_path }}" }
 ```
 
 A wrapper's values see `config_root`, `vars` and the environment, not the installed tools,
 so point it at a directory the project owns. The wrapper needs a nusage release that has
-`nusage nu`; an older one rejects the subcommand, and with it every `nu` the wrapper starts.
+`nus nu`; an older one rejects the subcommand, and with it every `nu` the wrapper starts.
 
 ### The tasks elsewhere
 
@@ -75,7 +75,7 @@ includes = ["oci::ghcr.io/notlabs/nusage-tasks:0.1.0"]
 ```
 
 They run as `catalog:spec`, `catalog:generate`, `catalog:check` and `catalog:install`, and
-need `nusage`, `nu` and `usage` on `PATH`, as the conf.d fragment installs them. They carry
+need `nus`, `nu` and `usage` on `PATH`, as the conf.d fragment installs them. They carry
 their shared helpers; the entries and their inputs stay in the consuming project's
 `lib/<tool>/`. A `clap` entry also needs Cargo and rustfmt, with its extractor and its
 dependencies supplied by the project; an `openapi` entry needs `openapi-usage`. Pin a digest,

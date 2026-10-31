@@ -107,7 +107,7 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         None => None,
     };
 
-    // `^demo status --format json ...(nusage argv [$a ...$rest] {--flag: $flag})`: the
+    // `^demo status --format json ...(nus argv [$a ...$rest] {--flag: $flag})`: the
     // selector words come first, so a `--` the caller passes still comes after them.
     let mut args: Vec<Expr> = command
         .path
@@ -128,7 +128,7 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
     };
 
     // Then `| from json | into datetime at` for a structured output. An output with a
-    // schema is decoded by `nusage decoded`, which holds the output to the schema when
+    // schema is decoded by `nus decoded`, which holds the output to the schema when
     // decoding fails, line by line for JSON lines.
     let body = match &command.structured {
         Some(structured) if structured.schema.is_some() => {
@@ -149,7 +149,7 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
                     name: text,
                     value: run,
                 },
-                Stmt::Pipeline(vec![call("nusage decoded", args)?]),
+                Stmt::Pipeline(vec![call("nus decoded", args)?]),
             ]
         }
         Some(structured) => {
@@ -170,7 +170,7 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
     })
 }
 
-/// A wrapper's parameters, and the argv they make: `nusage argv [$a ...$rest] {--flag:
+/// A wrapper's parameters, and the argv they make: `nus argv [$a ...$rest] {--flag:
 /// $flag}`. A `def` has one rest parameter; a command declaring several variadic
 /// positionals, as usage allows (`[ARGS]...` and `[-- MORE]...`), gets the first, which takes
 /// every remaining word anyway, since the command parses them.
@@ -227,10 +227,10 @@ pub(crate) fn params_and_argv(
     if !scoped.is_empty() {
         argv_args.push(Expr::Record(scoped));
     }
-    Ok((params, call("nusage argv", argv_args)?))
+    Ok((params, call("nus argv", argv_args)?))
 }
 
-/// A flag's value as `nusage argv` takes it. The helper spells a flag by its value's type,
+/// A flag's value as `nus argv` takes it. The helper spells a flag by its value's type,
 /// an `int` as a count and a `bool` as a switch, so a valued flag of a type other than text
 /// goes as the list of its value, empty when absent, which it spells `--flag value`.
 fn flag_value(param: &Param) -> Result<Expr, SyntaxError> {

@@ -86,7 +86,7 @@ fn extract(path: &Path, source: &str) -> Result<Vec<(usize, String)>, Diagnostic
     if !source.starts_with("#!") {
         return Err(Diagnostic::new(
             path,
-            "a script's usage header is only read after a shebang line; add `#!/usr/bin/env nusage`",
+            "a script's usage header is only read after a shebang line; add `#!/usr/bin/env nus`",
         )
         .at_line(1));
     }
@@ -303,7 +303,7 @@ mod tests {
     #[test]
     fn keeps_node_text_and_annotations() {
         let script = header_of(
-            "#!/usr/bin/env nusage\n\
+            "#!/usr/bin/env nus\n\
              #USAGE name \"t\"\n\
              #USAGE bin \"t\"\n\
              #USAGE about \"Test\"\n\

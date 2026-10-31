@@ -1,4 +1,4 @@
-//! The line `nusage prelude` writes stands in for a script's first where Nushell checks it,
+//! The line `nus prelude` writes stands in for a script's first where Nushell checks it,
 //! as an editor would have it: with it, Nushell's own parser knows `$usage` and checks each
 //! call of another script against that script's header.
 
@@ -84,11 +84,11 @@ fn only_a_script_nusage_runs_has_one() {
 fn a_run_of_a_script_nusage_runs_says_what_to_write() {
     let dir = std::env::temp_dir().join(format!("nusage-prelude-run-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("chatty.nu"), "#!/usr/bin/env nusage\nprint hi\n").unwrap();
+    std::fs::write(dir.join("chatty.nu"), "#!/usr/bin/env nus\nprint hi\n").unwrap();
     let caller = dir.join("caller.nu");
     std::fs::write(
         &caller,
-        "#!/usr/bin/env nusage\nrun ./chatty.nu\nrun chatty.nu\n",
+        "#!/usr/bin/env nus\nrun ./chatty.nu\nrun chatty.nu\n",
     )
     .unwrap();
     let found = nusage::prelude(&caller);

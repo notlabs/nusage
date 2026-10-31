@@ -1,8 +1,8 @@
-//! usage's argv corpus through `nusage parse`: each vector's spec becomes a script's
+//! usage's argv corpus through `nus parse`: each vector's spec becomes a script's
 //! `#USAGE` header, the script is parsed with the vector's argv and environment, and the
 //! `$usage` record has to hold everything `expect.ok` binds, or the arguments have to be
 //! rejected when the vector expects an error. The corpus is usage's own, at
-//! `$NUSAGE_CORPUS` (the `corpus/` directory of its source, which `mise.toml` installs);
+//! `$NUS_CORPUS` (the `corpus/` directory of its source, which `mise.toml` installs);
 //! without it the test is skipped. The format is usage's:
 //! https://github.com/jdx/usage/blob/main/corpus/README.md
 //!
@@ -23,14 +23,14 @@ use usage::kdl::{KdlDocument, KdlNode};
 
 #[test]
 fn usage_corpus_binds_the_same() {
-    let Ok(corpus) = std::env::var("NUSAGE_CORPUS") else {
+    let Ok(corpus) = std::env::var("NUS_CORPUS") else {
         // The mise task sets it; a bare `cargo test` without the corpus says so, and in CI
         // that is a failure, since a check that did not run proves nothing.
         assert!(
             std::env::var_os("CI").is_none(),
-            "NUSAGE_CORPUS is not set; `mise run //nusage:test` sets it to usage's corpus"
+            "NUS_CORPUS is not set; `mise run //nusage:test` sets it to usage's corpus"
         );
-        eprintln!("NUSAGE_CORPUS is not set; usage's corpus is not posed");
+        eprintln!("NUS_CORPUS is not set; usage's corpus is not posed");
         return;
     };
     let corpus = Path::new(&corpus);
@@ -91,7 +91,7 @@ fn pose(dir: &Path, vector: &Json) -> Option<String> {
         .iter()
         .map(|word| word.as_str().unwrap())
         .collect();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_nusage"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_nus"));
     command.arg("parse").arg(&script).arg("--").args(&argv);
     if let Some(env) = vector.get("env").and_then(Json::as_object) {
         for (name, value) in env {
@@ -148,7 +148,7 @@ fn has_command_properties(spec: &str) -> bool {
 fn write_command(dir: &Path, nodes: &[KdlNode], root: bool) -> PathBuf {
     let (commands, own): (Vec<&KdlNode>, Vec<&KdlNode>) =
         nodes.iter().partition(|node| node.name().value() == "cmd");
-    let mut source = String::from("#!/usr/bin/env nusage\n");
+    let mut source = String::from("#!/usr/bin/env nus\n");
     for node in own {
         for line in node.to_string().lines() {
             source.push_str("#USAGE ");

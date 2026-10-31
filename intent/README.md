@@ -12,8 +12,8 @@ changed or deleted as freely as code, and a disputed one is reworded where it st
   `open`; the ways it could be met, none chosen, under `alternatives`.
 - `*.schema.json`: the shape of those files, and the graph's words the examples use.
 - `check.nu`, `mise run //intent:check`, which CI runs: holds the files to the schemas and
-  their names to each other, and the checked claims to today's `nusage prelude`, with
-  `nusage inspect` confirming no findings and any declared call flags.
+  their names to each other, and the checked claims to today's `nus prelude`, with
+  `nus inspect` confirming no findings and any declared call flags.
 - `claims.nu`, `mise run //intent:claims [topic] [--status open|checked]`: the claims as a
   table.
 

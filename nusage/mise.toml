@@ -4,12 +4,12 @@
 
 # The released nusage for this user, pinned in a fragment of the global mise config that
 # `mise dot apply` links into place, and in a folder beside it, what its environments add:
-# `MISE_ENV=nusage-lsp` makes every `nu` mise starts `nusage nu`, so `nu --lsp` is nusage's
-# language server, and `nusage-kakehashi` installs kakehashi to highlight with it.
+# `MISE_ENV=nus-lsp` makes every `nu` mise starts `nus nu`, so `nu --lsp` is nusage's
+# language server, and `nus-kakehashi` installs kakehashi to highlight with it.
 [dotfiles]
 "~/.config/mise/conf.d/nusage.toml" = { source = "conf.d/nusage.toml", mode = "symlink" }
-"~/.config/mise/conf.d/nusage/mise.nusage-lsp.toml" = { source = "conf.d/nusage/mise.nusage-lsp.toml", mode = "symlink" }
-"~/.config/mise/conf.d/nusage/mise.nusage-kakehashi.toml" = { source = "conf.d/nusage/mise.nusage-kakehashi.toml", mode = "symlink" }
+"~/.config/mise/conf.d/nusage/mise.nus-lsp.toml" = { source = "conf.d/nusage/mise.nus-lsp.toml", mode = "symlink" }
+"~/.config/mise/conf.d/nusage/mise.nus-kakehashi.toml" = { source = "conf.d/nusage/mise.nus-kakehashi.toml", mode = "symlink" }
 
 [task_config]
 shell = "nu -c"
@@ -21,14 +21,14 @@ shell = "nu -c"
 [tasks.build]
 description = "Build the workspace and copy nusage and its plugin into the repository's bin directory"
 sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
-outputs = ["../.bin/nusage", "../.bin/nu_plugin_nusage"]
+outputs = ["../.bin/nusage", "../.bin/nu_plugin_nus"]
 run = '''
 let built = ^cargo build --workspace --locked --message-format json-render-diagnostics
   | lines
   | where ($it | str starts-with "{")
   | each { from json }
   | where reason == compiler-artifact and executable != null
-  | where $it.target.name == nusage or ($it.target.name | str starts-with nu_plugin_)
+  | where $it.target.name == nus or ($it.target.name | str starts-with nu_plugin_)
   | get executable
 let bin = "{{ config_root }}/../.bin" | path expand
 mkdir $bin
@@ -44,8 +44,8 @@ for exe in $built {
 '''
 
 # Registration is the user's: `plugin add` writes the plugin registry of the Nushell that
-# runs this, and a session then takes the plugin with `plugin use nusage`. The plugin's
-# commands are the CLI's by its spec, so `nusage validate` in a module is the plugin where
+# runs this, and a session then takes the plugin with `plugin use nus`. The plugin's
+# commands are the CLI's by its spec, so `nus validate` in a module is the plugin where
 # it is registered and the binary where it is not.
 [tasks.plugins]
 description = "Register the plugin built here with the Nushell on PATH, for `plugin use` in a session"
@@ -57,11 +57,11 @@ for plugin in (glob ("{{ config_root }}/../.bin/nu_plugin_*" | path expand)) {
 }
 '''
 
-# After the build: both write the target directory's `nusage`, and the corpus test runs it.
+# After the build: both write the target directory's `nus`, and the corpus test runs it.
 [tasks.test]
 description = "Rust tests: every fixture generating its expected module byte for byte, and usage's corpus through the parser"
 depends = [":build"]
-env = { NUSAGE_CORPUS = "{{ tools['usage-source'].path }}/corpus" }
+env = { NUS_CORPUS = "{{ tools['usage-source'].path }}/corpus" }
 run = "cargo test --workspace --locked"
 
 [tasks.fmt]

@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Run the packaged catalog tasks from an unrelated project"
 use std/assert
 
@@ -19,7 +19,7 @@ let config = $consumer | path join mise.toml
     env: {
         _: {
             path: (
-                [nusage nu usage]
+                [nus nu usage]
                 | each {|tool| which $tool | where type == external | first | get path | path dirname }
                 | uniq
             )
@@ -79,7 +79,7 @@ let checked = try {
         CI: "true"
     } {
         cd $consumer
-        let packed = ^nusage ($tasks | path join package.nu) --out $package | complete
+        let packed = ^nus ($tasks | path join package.nu) --out $package | complete
         assert equal $packed.exit_code 0 $packed.stderr
         let listed = ^mise tasks ls --json | complete
         assert equal $listed.exit_code 0 $listed.stderr
@@ -90,7 +90,7 @@ let checked = try {
             assert equal $result.exit_code 0 $"($task): ($result.stdout)($result.stderr)"
         }
         # The clap runner has no internal dependencies beyond the executable tools.
-        let clap = ^nusage ($package | path join oci catalog .support clap spec.nu) --help | complete
+        let clap = ^nus ($package | path join oci catalog .support clap spec.nu) --help | complete
         assert equal $clap.exit_code 0 $clap.stderr
     }
     null

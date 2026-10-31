@@ -49,7 +49,7 @@ export def schema-overlay [suite: record] {
 }
 
 def validate-file [schema: path, instance: path] {
-    let result = ^nusage validate $schema $instance | complete
+    let result = ^nus validate $schema $instance | complete
     if $result.exit_code == 0 { [] } else {
         [
             ([$result.stdout $result.stderr] | str join (char nl) | str trim)
@@ -114,7 +114,7 @@ export def validate-result [suite: record, case: record, result: record] {
 # shape the schema must refuse. A document is written on one line, as a JSON lines record is.
 export def check-examples [suite: record, examples: list<record>] {
     for file in ($suite.outputs | get schema | uniq) {
-        let checked = ^nusage validate ($suite.directory | path join $file) | complete
+        let checked = ^nus validate ($suite.directory | path join $file) | complete
         if $checked.exit_code != 0 {
             error make --unspanned {
                 msg: ($checked.stderr | str trim)

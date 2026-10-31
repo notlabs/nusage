@@ -1,7 +1,7 @@
 //! nusage's commands as a Nushell plugin: the same commands as the CLI, with the same
 //! parameters, by the CLI's own usage spec, which `usage-rs` derives from the CLI and the
-//! plugin reads at startup. A module whose wrappers call `nusage validate` calls this plugin
-//! when it is registered and the `nusage` binary when it is not, the words being the same;
+//! plugin reads at startup. A module whose wrappers call `nus validate` calls this plugin
+//! when it is registered and the `nus` binary when it is not, the words being the same;
 //! the plugin's process lives across calls, so a module that checks every output pays no
 //! process per check. Where the CLI prints and exits, a plugin command returns the data:
 //! the findings, as a table, not a line each on standard error and an exit code.
@@ -25,7 +25,7 @@ pub struct NusagePlugin {
 impl NusagePlugin {
     /// The plugin, from the CLI's own spec.
     pub fn new() -> Result<Self, Diagnostic> {
-        let tree = nusage_plugin::commands("nusage", &nusage::cli::Nusage::to_kdl())?;
+        let tree = nusage_plugin::commands("nus", &nusage::cli::Nusage::to_kdl())?;
         Ok(NusagePlugin { tree })
     }
 }

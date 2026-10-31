@@ -6,7 +6,7 @@
 //! shape, which header nodes ride along as attributes, what a completion provider may look
 //! like, and how a binary's outputs are selected and decoded. The result is plain data a
 //! target turns into a module; it names no Nushell syntax and performs no I/O. It
-//! serializes, so a tool can show what a target is handed: `nusage model` prints it.
+//! serializes, so a tool can show what a target is handed: `nus model` prints it.
 
 mod build;
 

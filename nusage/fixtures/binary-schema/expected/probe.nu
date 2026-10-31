@@ -1,7 +1,7 @@
 alias "attr usage" = echo
 
 # A value as an argv word: a datetime in ISO 8601, anything else as Nushell writes it.
-def "nusage word" []: any -> string {
+def "nus word" []: any -> string {
     if ($in | describe --detailed | get type) == datetime {
         $in | format date "%+"
     } else {
@@ -13,37 +13,37 @@ def "nusage word" []: any -> string {
 # preceded by the clause-scoped flags, then the other flags. A flag goes by its value: a
 # switch once when on, a count that many times, a list once per item with its value, any
 # other value once with its value; null and false add nothing.
-def "nusage argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
-    let scoped = $scoped | nusage flag-words
-    let words = $positionals | compact | each { nusage word }
+def "nus argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
+    let scoped = $scoped | nus flag-words
+    let words = $positionals | compact | each { nus word }
     let instances = if ($words | is-empty) {
         $scoped
     } else {
         $words | each {|word| $scoped ++ [$word] } | flatten
     }
-    $instances ++ ($flags | nusage flag-words)
+    $instances ++ ($flags | nus flag-words)
 }
 
-def "nusage flag-words" []: record -> list<string> {
+def "nus flag-words" []: record -> list<string> {
     $in | transpose name value | each {|flag|
         match ($flag.value | describe --detailed | get type) {
             bool => (if $flag.value { [$flag.name] } else { [] })
             int => (0..<$flag.value | each { $flag.name })
-            list => ($flag.value | each {|value| [$flag.name ($value | nusage word)] } | flatten)
+            list => ($flag.value | each {|value| [$flag.name ($value | nus word)] } | flatten)
             nothing => []
-            _ => [$flag.name ($flag.value | nusage word)]
+            _ => [$flag.name ($flag.value | nus word)]
         }
     } | flatten
 }
 
 # A binary's output decoded as the module's closure decodes it. When that fails and the
-# `nusage` this module was generated with is on PATH, the output is held to the schema the
+# `nus` this module was generated with is on PATH, the output is held to the schema the
 # spec declares, line by line with `--lines`, so the error names what does not match it
 # rather than what failed to convert; what failed to convert follows, as the inner error.
-# The error is the decoding's own when the output matches or there is no `nusage` to ask,
+# The error is the decoding's own when the output matches or there is no `nus` to ask,
 # and the inner one under why the output could not be held to its schema when the check
 # did not run.
-def "nusage decoded" [
+def "nus decoded" [
     text: string
     schema: string
     decode: closure
@@ -52,13 +52,13 @@ def "nusage decoded" [
     try {
         $text | do $decode
     } catch {|err|
-        if (which nusage | is-empty) {
+        if (which nus | is-empty) {
             error make $err
         }
         let file = mktemp --tmpdir nusage-XXXXXX.schema.json
         $schema | save --force $file
         let flags = if $lines { [--lines] } else { [] }
-        let checked = $text | ^nusage validate $file - ...$flags | complete
+        let checked = $text | ^nus validate $file - ...$flags | complete
         rm $file
         match $checked.exit_code {
             0 => { error make $err }
@@ -69,7 +69,7 @@ def "nusage decoded" [
             }
             _ => {
                 $err | error make --unspanned {
-                    msg: $"the output could not be held to its schema: nusage validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
+                    msg: $"the output could not be held to its schema: nus validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
                 }
             }
         }
@@ -78,7 +78,7 @@ def "nusage decoded" [
 
 # A CLI whose outputs declare JSON Schemas
 export def main []: nothing -> string {
-    ^probe ...(nusage argv [] {})
+    ^probe ...(nus argv [] {})
 }
 
 # Show status
@@ -101,8 +101,8 @@ export def main []: nothing -> string {
 """#
     }'
 export def "probe status" []: nothing -> record<ok: bool, took: duration, at: datetime, size: filesize, note: oneof<string, nothing>, seen: oneof<datetime, nothing>> {
-    let text = ^probe status --json ...(nusage argv [] {})
-    nusage decoded $text "{\"type\":\"object\",\"required\":[\"ok\",\"took\",\"at\",\"size\"],\"properties\":{\"ok\":{\"type\":\"boolean\"},\"took\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"duration\",\"unit\":\"ms\"}},\"at\":{\"type\":\"string\",\"format\":\"date-time\"},\"size\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"filesize\",\"unit\":\"kB\"}},\"note\":{\"type\":\"string\"},\"seen\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"datetime\",\"unit\":\"sec\"}}}}" { from json | default null note | default null seen | update took {|row| $row.took | into duration --unit ms } | into datetime at | update size {|row| $row.size * 1kB } | update seen {|row| if $row.seen == null { null } else { (1970-01-01T00:00:00Z) + ($row.seen | into duration --unit sec) } } }
+    let text = ^probe status --json ...(nus argv [] {})
+    nus decoded $text "{\"type\":\"object\",\"required\":[\"ok\",\"took\",\"at\",\"size\"],\"properties\":{\"ok\":{\"type\":\"boolean\"},\"took\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"duration\",\"unit\":\"ms\"}},\"at\":{\"type\":\"string\",\"format\":\"date-time\"},\"size\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"filesize\",\"unit\":\"kB\"}},\"note\":{\"type\":\"string\"},\"seen\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"datetime\",\"unit\":\"sec\"}}}}" { from json | default null note | default null seen | update took {|row| $row.took | into duration --unit ms } | into datetime at | update size {|row| $row.size * 1kB } | update seen {|row| if $row.seen == null { null } else { (1970-01-01T00:00:00Z) + ($row.seen | into duration --unit sec) } } }
 }
 
 # Stream events
@@ -112,8 +112,8 @@ export def "probe status" []: nothing -> record<ok: bool, took: duration, at: da
         schema file="events.schema.json"
     }'
 export def "probe events" []: nothing -> table<at: datetime, kind: string, detail: oneof<string, nothing>> {
-    let text = ^probe events --json ...(nusage argv [] {})
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"required\":[\"at\",\"kind\"],\"properties\":{\"at\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"datetime\",\"unit\":\"sec\"}},\"kind\":{\"enum\":[\"start\",\"stop\"]},\"detail\":{\"type\":[\"string\",\"null\"]}}}" { from json --objects | default null detail | update at {|row| (1970-01-01T00:00:00Z) + ($row.at | into duration --unit sec) } } --lines
+    let text = ^probe events --json ...(nus argv [] {})
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"required\":[\"at\",\"kind\"],\"properties\":{\"at\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"datetime\",\"unit\":\"sec\"}},\"kind\":{\"enum\":[\"start\",\"stop\"]},\"detail\":{\"type\":[\"string\",\"null\"]}}}" { from json --objects | default null detail | update at {|row| (1970-01-01T00:00:00Z) + ($row.at | into duration --unit sec) } } --lines
 }
 
 # Describe the project
@@ -121,8 +121,8 @@ export def "probe events" []: nothing -> table<at: datetime, kind: string, detai
         schema file="report.schema.json"
     }'
 export def "probe report" []: nothing -> record<name: string, dependencies: table<name: string, version: string, optional: oneof<bool, nothing>, since: oneof<datetime, nothing>>, meta: record<built: datetime, took: oneof<duration, nothing>>, tags: list<string>, icon: binary, score: oneof<float, nothing>> {
-    let text = ^probe report ...(nusage argv [] {})
-    nusage decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$defs\":{\"dependency\":{\"type\":\"object\",\"required\":[\"name\",\"version\"],\"properties\":{\"name\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"optional\":{\"type\":\"boolean\"},\"since\":{\"type\":\"string\",\"format\":\"date-time\"}}}},\"type\":\"object\",\"required\":[\"name\",\"dependencies\",\"meta\",\"tags\",\"icon\"],\"properties\":{\"name\":{\"type\":\"string\"},\"dependencies\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"meta\":{\"type\":\"object\",\"required\":[\"built\"],\"properties\":{\"built\":{\"type\":\"string\",\"format\":\"date-time\"},\"took\":{\"type\":\"number\",\"x-nu\":{\"type\":\"duration\",\"unit\":\"sec\"}}}},\"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"icon\":{\"type\":\"string\",\"contentEncoding\":\"base64\"},\"score\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}}}" { from json | update dependencies { default null optional } | update dependencies { default null since } | update meta { default null took } | default null score | update dependencies {|row| $row.dependencies | update since {|row| if $row.since == null { null } else { $row.since | into datetime } } } | into datetime meta.built | update meta.took {|row| if $row.meta.took == null { null } else { $row.meta.took | into duration --unit sec } } | update icon {|row| $row.icon | decode base64 } }
+    let text = ^probe report ...(nus argv [] {})
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$defs\":{\"dependency\":{\"type\":\"object\",\"required\":[\"name\",\"version\"],\"properties\":{\"name\":{\"type\":\"string\"},\"version\":{\"type\":\"string\"},\"optional\":{\"type\":\"boolean\"},\"since\":{\"type\":\"string\",\"format\":\"date-time\"}}}},\"type\":\"object\",\"required\":[\"name\",\"dependencies\",\"meta\",\"tags\",\"icon\"],\"properties\":{\"name\":{\"type\":\"string\"},\"dependencies\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"meta\":{\"type\":\"object\",\"required\":[\"built\"],\"properties\":{\"built\":{\"type\":\"string\",\"format\":\"date-time\"},\"took\":{\"type\":\"number\",\"x-nu\":{\"type\":\"duration\",\"unit\":\"sec\"}}}},\"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"icon\":{\"type\":\"string\",\"contentEncoding\":\"base64\"},\"score\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}]}}}" { from json | update dependencies { default null optional } | update dependencies { default null since } | update meta { default null took } | default null score | update dependencies {|row| $row.dependencies | update since {|row| if $row.since == null { null } else { $row.since | into datetime } } } | into datetime meta.built | update meta.took {|row| if $row.meta.took == null { null } else { $row.meta.took | into duration --unit sec } } | update icon {|row| $row.icon | decode base64 } }
 }
 
 # Show the peer, when there is one
@@ -151,6 +151,6 @@ export def "probe report" []: nothing -> record<name: string, dependencies: tabl
 """#
     }'
 export def "probe peer" []: nothing -> oneof<nothing, record<host: string, port: oneof<int, nothing>, since: oneof<datetime, nothing>, link: oneof<nothing, record<up: bool, latency: oneof<duration, nothing>>>>> {
-    let text = ^probe peer ...(nusage argv [] {})
-    nusage decoded $text "{\"oneOf\":[{\"type\":\"null\"},{\"type\":\"object\",\"required\":[\"host\"],\"properties\":{\"host\":{\"type\":\"string\"},\"port\":{\"type\":\"integer\"},\"since\":{\"type\":\"string\",\"format\":\"date-time\"},\"link\":{\"oneOf\":[{\"type\":\"null\"},{\"type\":\"object\",\"required\":[\"up\"],\"properties\":{\"up\":{\"type\":\"boolean\"},\"latency\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"duration\",\"unit\":\"ms\"}}}}]}}}]}" { from json | if $in == null { null } else { $in | default null port | default null since | default null link | update link {|row| if $row.link == null { null } else { $row.link | default null latency } } | update since {|row| if $row.since == null { null } else { $row.since | into datetime } } | update link {|row| if $row.link == null { null } else { $row.link | update latency {|row| if $row.latency == null { null } else { $row.latency | into duration --unit ms } } } } } }
+    let text = ^probe peer ...(nus argv [] {})
+    nus decoded $text "{\"oneOf\":[{\"type\":\"null\"},{\"type\":\"object\",\"required\":[\"host\"],\"properties\":{\"host\":{\"type\":\"string\"},\"port\":{\"type\":\"integer\"},\"since\":{\"type\":\"string\",\"format\":\"date-time\"},\"link\":{\"oneOf\":[{\"type\":\"null\"},{\"type\":\"object\",\"required\":[\"up\"],\"properties\":{\"up\":{\"type\":\"boolean\"},\"latency\":{\"type\":\"integer\",\"x-nu\":{\"type\":\"duration\",\"unit\":\"ms\"}}}}]}}}]}" { from json | if $in == null { null } else { $in | default null port | default null since | default null link | update link {|row| if $row.link == null { null } else { $row.link | default null latency } } | update since {|row| if $row.since == null { null } else { $row.since | into datetime } } | update link {|row| if $row.link == null { null } else { $row.link | update latency {|row| if $row.latency == null { null } else { $row.latency | into duration --unit ms } } } } } }
 }

@@ -230,12 +230,12 @@
     ]
     cases: [
         {id: version, output: version, argv: [version --json], exit_codes: [0], expect: {properties: {version: {pattern: '^[0-9]{4}[.][0-9]+[.][0-9]+'}}}}
-        {id: env-populated, output: env, argv: [env --json], exit_codes: [0], expect: {required: [NUSAGE_SCHEMA_FIXTURE], properties: {NUSAGE_SCHEMA_FIXTURE: {const: "present"}}}}
+        {id: env-populated, output: env, argv: [env --json], exit_codes: [0], expect: {required: [NUS_SCHEMA_FIXTURE], properties: {NUS_SCHEMA_FIXTURE: {const: "present"}}}}
         {id: config-populated, output: config-ls, argv: [config ls --json], exit_codes: [0], expect: {minItems: 1, contains: {properties: {tools: {contains: {const: "node"}}}, required: [tools]}}}
         {id: ls-map, output: ls, argv: [ls --json --offline], exit_codes: [0], expect: {type: object, minProperties: 1, additionalProperties: {minItems: 2}}}
         {id: ls-filtered, output: ls, argv: [ls node --json --offline], exit_codes: [0], expect: {type: array, minItems: 2, allOf: [{contains: {required: [source requested_version], properties: {installed: {const: false}}}} {contains: {properties: {installed: {const: true}}}}]}}
         {id:bin-paths-populated,output:bin-paths,argv:[bin-paths,node,--json],exit_codes:[0],expect:{minItems:1,contains:{required:[name],properties:{name:{const:node},symlink:{const:false}}}}}
-        {id:env-extended-source,output:env-extended,argv:[env,--json-extended],exit_codes:[0],expect:{required:[NUSAGE_SCHEMA_FIXTURE],properties:{NUSAGE_SCHEMA_FIXTURE:{required:[source],properties:{value:{const:present},source:{pattern:"mise[.]toml$"}}}}}}
+        {id:env-extended-source,output:env-extended,argv:[env,--json-extended],exit_codes:[0],expect:{required:[NUS_SCHEMA_FIXTURE],properties:{NUS_SCHEMA_FIXTURE:{required:[source],properties:{value:{const:present},source:{pattern:"mise[.]toml$"}}}}}}
         {id:config-shortcut,output:config,argv:[config,--json],exit_codes:[0],expect:{minItems:1}}
         {id:config-explain-populated,output:config-explain,argv:[config,explain,--json],exit_codes:[0],expect:{minItems:1,contains:{properties:{key:{const:"tools.node"},known:{const:true}}}}}
         {id:tasks-populated,output:tasks-ls,argv:[tasks,ls,--json],exit_codes:[0],expect:{minItems:4,contains:{properties:{name:{const:fixture},aliases:{contains:{const:f}},outputs:{const:{auto:true}},silent:{const:stderr},run:{minItems:2},depends:{minItems:2}}}}}

@@ -1,5 +1,5 @@
 [
-  [name,           signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    attributes];
+  [name,           signatures,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         attributes];
   [demo,           {
       nothing: [
         [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description, completion, parameter_default];
@@ -7,7 +7,7 @@
         [verbose,        named,          int,          true,        v,          "Say more",  null,       null],
         [null,           output,         string,       false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       [
       [name,  value];
       [usage, "flag \"-v --verbose\" help=\"Say more\" global=#true count=#true"],
       [usage, "complete \"plugin\" run=\"echo \\\"plugin-1\\nplugin-2\\nplugin-3\\\"\""]
@@ -19,7 +19,7 @@
         [verbose,        named,          int,                                 true,        v,          "Say more",  null,       null],
         [null,           output,         "table<at: datetime, kind: string>", false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           [
       [name,  value];
       [usage, "flag \"--json\" help=\"One JSON object per line\""],
       [usage, "output \"text\" default=#true"],
@@ -27,15 +27,15 @@
     ]],
   ["demo install", {
       nothing: [
-        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,                   completion,        parameter_default];
-        [null,           input,          nothing,      false,       null,       null,                          null,              null],
-        [plugin,         positional,     string,       false,       null,       "Plugin to install",           "nusage complete", null],
-        [version,        positional,     string,       true,        null,       "Version to install",          null,              null],
-        [verbose,        named,          int,          true,        v,          "Say more",                    null,              null],
-        [global,         switch,         null,         true,        g,          "Install for every project",   null,              null],
-        [dir,            named,          path,         true,        d,          "Install into this directory", null,              null],
-        [env_,           named,          string,       true,        null,       "Environment to install into", null,              null],
-        [null,           output,         string,       false,       null,       null,                          null,              null]
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,                   completion,     parameter_default];
+        [null,           input,          nothing,      false,       null,       null,                          null,           null],
+        [plugin,         positional,     string,       false,       null,       "Plugin to install",           "nus complete", null],
+        [version,        positional,     string,       true,        null,       "Version to install",          null,           null],
+        [verbose,        named,          int,          true,        v,          "Say more",                    null,           null],
+        [global,         switch,         null,         true,        g,          "Install for every project",   null,           null],
+        [dir,            named,          path,         true,        d,          "Install into this directory", null,           null],
+        [env_,           named,          string,       true,        null,       "Environment to install into", null,           null],
+        [null,           output,         string,       false,       null,       null,                          null,           null]
       ]
     }, [
       [name,  value];
@@ -47,15 +47,15 @@
     ]],
   ["demo run",     {
       nothing: [
-        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,                   completion,        parameter_default];
-        [null,           input,          nothing,      false,       null,       null,                          null,              null],
-        [task,           positional,     string,       false,       null,       "Task to run",                 "nusage complete", null],
-        [args,           rest,           string,       true,        null,       "Arguments for the task",      null,              null],
-        [verbose,        named,          int,          true,        v,          "Say more",                    null,              null],
-        [set,            named,          list<string>, true,        e,          "Variable to set, repeatable", null,              null],
-        [null,           output,         string,       false,       null,       null,                          null,              null]
+        [parameter_name, parameter_type, syntax_shape, is_optional, short_flag, description,                   completion,     parameter_default];
+        [null,           input,          nothing,      false,       null,       null,                          null,           null],
+        [task,           positional,     string,       false,       null,       "Task to run",                 "nus complete", null],
+        [args,           rest,           string,       true,        null,       "Arguments for the task",      null,           null],
+        [verbose,        named,          int,          true,        v,          "Say more",                    null,           null],
+        [set,            named,          list<string>, true,        e,          "Variable to set, repeatable", null,           null],
+        [null,           output,         string,       false,       null,       null,                          null,           null]
       ]
-    },                                                                                                                                                                                                                                                                                   [
+    },                                                                                                                                                                                                                                                                             [
       [name,  value];
       [usage, "arg \"<task>\" help=\"Task to run\""],
       [usage, "arg \"[args]...\" help=\"Arguments for the task\""],
@@ -69,7 +69,7 @@
         [verbose,        named,          int,                                     true,        v,          "Say more",  null,       null],
         [null,           output,         "record<ok: bool, tasks: list<string>>", false,       null,       null,        null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           [
       [name,  value];
       [usage, "flag \"--format <format>\" help=\"Output format\""],
       [usage, "output \"human\" default=#true help=\"A readable report\""],
@@ -85,7 +85,7 @@
         [label,          named,          string,       true,        l,          "Label for the item that follows", null,       null],
         [null,           output,         string,       false,       null,       null,                              null,       null]
       ]
-    },                                                                                                                                                                                                                                                                                                                                                                                                                                              [
+    },                                                                                                                                                                                                                                                                                                                                                                                                                   [
       [name,  value];
       [usage, "clause \"items\" {
         flag \"-l --label <label>\" help=\"Label for the item that follows\"

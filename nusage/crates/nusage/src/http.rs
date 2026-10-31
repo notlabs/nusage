@@ -1,7 +1,7 @@
 //! The HTTP target: one `export def` per command of a service described by a spec with an
 //! HTTP mapping beside it. The commands are named as a binary's are, `<name> <command>`
 //! with `main` for the root, so `use <name>.nu *` names them as the spec does. A wrapper's
-//! body hands `nusage request` what the mapping says the call sends, the path parameters,
+//! body hands `nus request` what the mapping says the call sends, the path parameters,
 //! query and headers from its typed parameters and the body from its input, and decodes the
 //! response as a binary wrapper decodes an output, with the same helper and the same hold to
 //! the schema when decoding fails. The root says where the service is.
@@ -72,7 +72,7 @@ fn wrapper(tree: &CommandTree, service: &Service, command: &Command) -> Result<D
                 params: Params::new(params)?,
                 io: Some((Type::new("nothing")?, Type::new("string")?)),
                 body: vec![Stmt::Pipeline(vec![call(
-                    "nusage base",
+                    "nus base",
                     vec![Expr::Str(tree.bin.clone()), base],
                 )?])],
             });
@@ -130,19 +130,19 @@ fn wrapper(tree: &CommandTree, service: &Service, command: &Command) -> Result<D
                 Ident::new("in")?
             };
             let run = call(
-                "nusage request",
+                "nus request",
                 vec![request_record(tree, service, base, request, carried)?],
             )?;
             body.push(Stmt::Let {
                 name: text,
                 value: run,
             });
-            body.push(Stmt::Pipeline(vec![call("nusage decoded", args)?]));
+            body.push(Stmt::Pipeline(vec![call("nus decoded", args)?]));
             body
         }
         Some(structured) => {
             let run = call(
-                "nusage request",
+                "nus request",
                 vec![request_record(
                     tree,
                     service,
@@ -156,7 +156,7 @@ fn wrapper(tree: &CommandTree, service: &Service, command: &Command) -> Result<D
             vec![Stmt::Pipeline(stages)]
         }
         None => vec![Stmt::Pipeline(vec![call(
-            "nusage request",
+            "nus request",
             vec![request_record(
                 tree,
                 service,
@@ -177,7 +177,7 @@ fn wrapper(tree: &CommandTree, service: &Service, command: &Command) -> Result<D
     })
 }
 
-/// What `nusage request` is handed: the service and where it is, how it authenticates, the
+/// What `nus request` is handed: the service and where it is, how it authenticates, the
 /// method and path, and the parameters by where they go, each as the variable that carries
 /// it; the body as `carried`, the input or the variable bound to it, with its media type,
 /// when the call sends one.

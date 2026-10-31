@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
 #MISE description="The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
 #MISE depends=["//nusage:build"]

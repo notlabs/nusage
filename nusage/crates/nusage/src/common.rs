@@ -9,7 +9,7 @@ use nusage_nu::{
 };
 
 /// The binary module's completer, which runs usage's against the spec.
-pub const SPEC_COMPLETER: &str = "nusage complete";
+pub const SPEC_COMPLETER: &str = "nus complete";
 
 /// Which module a parameter is written for. In both, a counted flag is an `int` and a
 /// repeatable one a `list`, since a `def`'s flags cannot repeat.

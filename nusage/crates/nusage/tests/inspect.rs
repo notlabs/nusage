@@ -5,7 +5,7 @@ use std::process::Command;
 use serde_json::Value;
 
 fn inspected(script: &Path) -> Value {
-    let output = Command::new(env!("CARGO_BIN_EXE_nusage"))
+    let output = Command::new(env!("CARGO_BIN_EXE_nus"))
         .arg("inspect")
         .arg(script)
         .output()
@@ -35,10 +35,10 @@ fn resolved_calls_and_findings_are_data_without_executing() {
     let caller = dir.join("caller.nu");
     std::fs::write(
         dir.join("callee.nu"),
-        "#!/usr/bin/env nusage\n#USAGE arg \"<name>\"\nerror make {msg: 'must not run'}\n",
+        "#!/usr/bin/env nus\n#USAGE arg \"<name>\"\nerror make {msg: 'must not run'}\n",
     )
     .unwrap();
-    let source = "#!/usr/bin/env nusage\n./callee.nu world\nrun callee.nu\n./missing.nu\n";
+    let source = "#!/usr/bin/env nus\n./callee.nu world\nrun callee.nu\n./missing.nu\n";
     std::fs::write(&caller, source).unwrap();
     let report = inspected(&caller);
     assert_eq!(report["script"], caller.to_str().unwrap());
@@ -47,7 +47,7 @@ fn resolved_calls_and_findings_are_data_without_executing() {
     let call = &report["calls"][0];
     assert_eq!(call["name"], "./callee.nu");
     assert_eq!(call["target"], dir.join("callee.nu").to_str().unwrap());
-    assert_eq!(call["through"]["kind"], "nusage");
+    assert_eq!(call["through"]["kind"], "nus");
     assert_eq!(call["command"]["positionals"][0]["usage_name"], "name");
     let findings = report["findings"].as_array().unwrap();
     assert_eq!(findings.len(), 2);
@@ -58,7 +58,7 @@ fn resolved_calls_and_findings_are_data_without_executing() {
     }
     std::fs::write(
         &caller,
-        "#!/usr/bin/env nusage\n#USAGE not-valid-kdl {\n./callee.nu world\n",
+        "#!/usr/bin/env nus\n#USAGE not-valid-kdl {\n./callee.nu world\n",
     )
     .unwrap();
     let report = inspected(&caller);

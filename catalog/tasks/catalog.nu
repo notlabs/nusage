@@ -233,15 +233,15 @@ export def generate [entry: record, --into: string]: nothing -> record {
     let switch = $entry.switch?
     if $switch != null {
         let select = $out | path join ($files.select | path basename)
-        ^nusage overlay $spec $"--switch=($switch.flag)" --framing $switch.framing | save --force $select
+        ^nus overlay $spec $"--switch=($switch.flag)" --framing $switch.framing | save --force $select
         $generated = $generated | append $select
     }
     if ($files.schemas | path exists) {
         let schemas = $out | path join ($files.schemas_overlay | path basename)
-        ^nusage $schema_overlay $files.schemas | save --force $schemas
+        ^nus $schema_overlay $files.schemas | save --force $schemas
         $generated = $generated | append $schemas
     }
     let overlays = $generated ++ $files.overlays
-    ^nusage generate $spec ...($overlays | each {|overlay| ["--overlay" $overlay] } | flatten) ...$http --out $module
+    ^nus generate $spec ...($overlays | each {|overlay| ["--overlay" $overlay] } | flatten) ...$http --out $module
     {generated: $generated, module: $module, overlays: $overlays}
 }

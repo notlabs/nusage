@@ -1,4 +1,4 @@
-//! `nusage validate`, as the CLI has it: a schema, documents, `--lines`. The documents are
+//! `nus validate`, as the CLI has it: a schema, documents, `--lines`. The documents are
 //! the files named and the input, with `-` consuming the input at that position. Text is
 //! one JSON document, or one per line with `--lines`; a value is the document it is,
 //! including null; a stream is one document per item. No input is no document. The result

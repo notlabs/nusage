@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE name "mycli"
 #USAGE bin "mycli"
 #USAGE about "Manage a project"

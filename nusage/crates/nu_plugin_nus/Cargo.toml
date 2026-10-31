@@ -1,5 +1,5 @@
 [package]
-name = "nu_plugin_nusage"
+name = "nu_plugin_nus"
 description = "nusage's commands inside Nushell: the CLI's interface, served by one process across calls"
 version.workspace = true
 edition.workspace = true
@@ -10,7 +10,7 @@ repository.workspace = true
 publish = false
 
 [[bin]]
-name = "nu_plugin_nusage"
+name = "nu_plugin_nus"
 bench = false
 
 [lib]

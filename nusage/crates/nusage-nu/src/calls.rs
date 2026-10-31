@@ -124,7 +124,7 @@ mod tests {
     fn external_heads_and_their_bare_words() {
         let source = "let a = ./x.nu --count 1 | length\n\
                       nu ../y.nu sub $a\n\
-                      def main [] { [1] | each { nusage z.nu \"quoted\" } }\n\
+                      def main [] { [1] | each { nus z.nu \"quoted\" } }\n\
                       ^./skip.nu\n\
                       run w.nu --flag\n";
         let calls = calls(source);
@@ -134,7 +134,7 @@ mod tests {
             [
                 vec!["./x.nu", "--count", "1"],
                 vec!["nu", "../y.nu", "sub"],
-                vec!["nusage", "z.nu"],
+                vec!["nus", "z.nu"],
                 vec!["run", "w.nu"],
             ]
         );

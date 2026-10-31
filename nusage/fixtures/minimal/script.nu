@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE name "greet"
 #USAGE bin "greet"
 #USAGE about "Greet someone"

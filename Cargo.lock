@@ -3588,7 +3588,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nu_plugin_nusage"
+name = "nu_plugin_nus"
 version = "0.1.1"
 dependencies = [
  "nusage",

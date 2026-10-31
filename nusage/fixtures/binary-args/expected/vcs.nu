@@ -1,7 +1,7 @@
 alias "attr usage" = echo
 
 # A value as an argv word: a datetime in ISO 8601, anything else as Nushell writes it.
-def "nusage word" []: any -> string {
+def "nus word" []: any -> string {
     if ($in | describe --detailed | get type) == datetime {
         $in | format date "%+"
     } else {
@@ -13,37 +13,37 @@ def "nusage word" []: any -> string {
 # preceded by the clause-scoped flags, then the other flags. A flag goes by its value: a
 # switch once when on, a count that many times, a list once per item with its value, any
 # other value once with its value; null and false add nothing.
-def "nusage argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
-    let scoped = $scoped | nusage flag-words
-    let words = $positionals | compact | each { nusage word }
+def "nus argv" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> {
+    let scoped = $scoped | nus flag-words
+    let words = $positionals | compact | each { nus word }
     let instances = if ($words | is-empty) {
         $scoped
     } else {
         $words | each {|word| $scoped ++ [$word] } | flatten
     }
-    $instances ++ ($flags | nusage flag-words)
+    $instances ++ ($flags | nus flag-words)
 }
 
-def "nusage flag-words" []: record -> list<string> {
+def "nus flag-words" []: record -> list<string> {
     $in | transpose name value | each {|flag|
         match ($flag.value | describe --detailed | get type) {
             bool => (if $flag.value { [$flag.name] } else { [] })
             int => (0..<$flag.value | each { $flag.name })
-            list => ($flag.value | each {|value| [$flag.name ($value | nusage word)] } | flatten)
+            list => ($flag.value | each {|value| [$flag.name ($value | nus word)] } | flatten)
             nothing => []
-            _ => [$flag.name ($flag.value | nusage word)]
+            _ => [$flag.name ($flag.value | nus word)]
         }
     } | flatten
 }
 
 # A binary's output decoded as the module's closure decodes it. When that fails and the
-# `nusage` this module was generated with is on PATH, the output is held to the schema the
+# `nus` this module was generated with is on PATH, the output is held to the schema the
 # spec declares, line by line with `--lines`, so the error names what does not match it
 # rather than what failed to convert; what failed to convert follows, as the inner error.
-# The error is the decoding's own when the output matches or there is no `nusage` to ask,
+# The error is the decoding's own when the output matches or there is no `nus` to ask,
 # and the inner one under why the output could not be held to its schema when the check
 # did not run.
-def "nusage decoded" [
+def "nus decoded" [
     text: string
     schema: string
     decode: closure
@@ -52,13 +52,13 @@ def "nusage decoded" [
     try {
         $text | do $decode
     } catch {|err|
-        if (which nusage | is-empty) {
+        if (which nus | is-empty) {
             error make $err
         }
         let file = mktemp --tmpdir nusage-XXXXXX.schema.json
         $schema | save --force $file
         let flags = if $lines { [--lines] } else { [] }
-        let checked = $text | ^nusage validate $file - ...$flags | complete
+        let checked = $text | ^nus validate $file - ...$flags | complete
         rm $file
         match $checked.exit_code {
             0 => { error make $err }
@@ -69,7 +69,7 @@ def "nusage decoded" [
             }
             _ => {
                 $err | error make --unspanned {
-                    msg: $"the output could not be held to its schema: nusage validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
+                    msg: $"the output could not be held to its schema: nus validate exited ($checked.exit_code)\n($checked.stderr | str trim)"
                 }
             }
         }
@@ -81,7 +81,7 @@ def "nusage decoded" [
 export def main [
     --repository (-R): string,  # Where to work
 ]: nothing -> string {
-    ^vcs ...(nusage argv [] {--repository: $repository})
+    ^vcs ...(nus argv [] {--repository: $repository})
 }
 
 # Show revisions
@@ -100,8 +100,8 @@ export def "vcs log" [
     --revision (-r): list<string>,  # Which revisions to show
     --limit (-n): int,              # At most this many revisions
 ]: nothing -> table<commit_id: string, author: record<name: string, timestamp: datetime>> {
-    let text = ^vcs log --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [...$filesets] {--repository: $repository, --revision: $revision, --limit: ([$limit] | compact)})
-    nusage decoded $text "{\"type\":\"object\",\"required\":[\"commit_id\",\"author\"],\"properties\":{\"commit_id\":{\"type\":\"string\"},\"author\":{\"type\":\"object\",\"required\":[\"name\",\"timestamp\"],\"properties\":{\"name\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}}}}" { from json --objects | into datetime author.timestamp } --lines
+    let text = ^vcs log --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [...$filesets] {--repository: $repository, --revision: $revision, --limit: ([$limit] | compact)})
+    nus decoded $text "{\"type\":\"object\",\"required\":[\"commit_id\",\"author\"],\"properties\":{\"commit_id\":{\"type\":\"string\"},\"author\":{\"type\":\"object\",\"required\":[\"name\",\"timestamp\"],\"properties\":{\"name\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}}}}" { from json --objects | into datetime author.timestamp } --lines
 }
 
 # Show how a change evolved
@@ -113,6 +113,6 @@ export def "vcs log" [
 export def "vcs evolog" [
     --repository (-R): string,  # Where to work
 ]: nothing -> table<commit_id: string, operation: oneof<record<time: record<start: datetime>>, nothing>> {
-    let text = ^vcs evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nusage argv [] {--repository: $repository})
-    nusage decoded $text "{\"type\":\"object\",\"required\":[\"commit_id\",\"operation\"],\"properties\":{\"commit_id\":{\"type\":\"string\"},\"operation\":{\"anyOf\":[{\"type\":\"object\",\"required\":[\"time\"],\"properties\":{\"time\":{\"type\":\"object\",\"required\":[\"start\"],\"properties\":{\"start\":{\"type\":\"string\",\"format\":\"date-time\"}}}}},{\"type\":\"null\"}]}}}" { from json --objects | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.start } } } --lines
+    let text = ^vcs evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [] {--repository: $repository})
+    nus decoded $text "{\"type\":\"object\",\"required\":[\"commit_id\",\"operation\"],\"properties\":{\"commit_id\":{\"type\":\"string\"},\"operation\":{\"anyOf\":[{\"type\":\"object\",\"required\":[\"time\"],\"properties\":{\"time\":{\"type\":\"object\",\"required\":[\"start\"],\"properties\":{\"start\":{\"type\":\"string\",\"format\":\"date-time\"}}}}},{\"type\":\"null\"}]}}}" { from json --objects | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.start } } } --lines
 }

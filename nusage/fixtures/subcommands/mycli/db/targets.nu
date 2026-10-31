@@ -1,4 +1,4 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "List migration targets"
 #USAGE output ("list<string>")"nuon" default=#true
 

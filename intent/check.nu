@@ -1,15 +1,15 @@
-#!/usr/bin/env nusage
+#!/usr/bin/env nus
 #USAGE about "Holds the intent to its schemas and its checked claims to nusage as it is"
 # Disposable: the claims, the traits and the schemas are what last. This holds each file to
 # its schema, the names the claims use to the traits and the graph's words, and runs each
-# checked claim against today's `nusage prelude`, backed by `nusage inspect`; an open claim
+# checked claim against today's `nus prelude`, backed by `nus inspect`; an open claim
 # it only holds to its shape.
 
 const here = path self | path dirname
 
 # Where a value breaks its schema, a line each; none when it holds.
 def findings [schema: string, name: string]: any -> list<string> {
-    let result = $in | to json | ^nusage validate ($here | path join $schema) - | complete
+    let result = $in | to json | ^nus validate ($here | path join $schema) - | complete
     if $result.exit_code == 0 {
         return []
     }
@@ -33,24 +33,24 @@ def write-files [dir: string, files: record] {
 def analysis [dir: string, script: string]: nothing -> record {
     let result = do {
         cd $dir
-        ^nusage inspect ($dir | path join $script) | complete
+        ^nus inspect ($dir | path join $script) | complete
     }
     if $result.exit_code != 0 {
-        error make --unspanned {msg: $"nusage inspect ($script): ($result.stderr)"}
+        error make --unspanned {msg: $"nus inspect ($script): ($result.stderr)"}
     }
     let inspected = $result.stdout | from json
     if ($inspected.findings | is-not-empty) {
         error make --unspanned {
-            msg: $"nusage inspect ($script) has findings: ($inspected.findings | to nuon)"
+            msg: $"nus inspect ($script) has findings: ($inspected.findings | to nuon)"
         }
     }
     # Prelude carries the caller's own $usage type, which inspect's resolved calls do not.
     let prelude = do {
         cd $dir
-        ^nusage prelude ($dir | path join $script) | complete
+        ^nus prelude ($dir | path join $script) | complete
     }
     if $prelude.exit_code != 0 or ($prelude.stderr | str trim | is-not-empty) {
-        error make --unspanned {msg: $"nusage prelude ($script): ($prelude.stderr)"}
+        error make --unspanned {msg: $"nus prelude ($script): ($prelude.stderr)"}
     }
     $inspected | insert prelude $prelude.stdout
 }
