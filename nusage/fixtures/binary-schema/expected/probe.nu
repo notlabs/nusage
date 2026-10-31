@@ -52,7 +52,7 @@ def "nus decoded" [
     try {
         $text | do $decode
     } catch {|err|
-        if (which nusage | is-empty) {
+        if (which nus | is-empty) {
             error make $err
         }
         let file = mktemp --tmpdir nusage-XXXXXX.schema.json
