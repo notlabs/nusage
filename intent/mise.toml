@@ -7,3 +7,7 @@ file = "check.nu"
 description = "List the intent's claims, by topic and status"
 depends = ["//nusage:build"]
 file = "claims.nu"
+
+[tasks."check:platform"]
+description = "Hold the checked claims to nusage on this platform"
+depends = [":check"]

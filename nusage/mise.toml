@@ -96,14 +96,22 @@ depends = [":build"]
 env = { NUSAGE_CORPUS = "{{ tools['usage-source'].path }}/corpus" }
 run = "cargo test --workspace --locked"
 
+[tasks.fmt]
+description = "Hold the workspace's Rust source to rustfmt"
+run = "cargo fmt --all --check"
+
+[tasks.clippy]
+description = "Clippy for every workspace target on this platform"
+run = "cargo clippy --quiet --workspace --all-targets --locked -- -D warnings"
+
+[tasks.docs]
+description = "Build the workspace's documentation without warnings"
+env = { RUSTDOCFLAGS = "-D warnings" }
+run = "cargo doc --quiet --workspace --no-deps --locked"
+
 [tasks.lint]
 description = "Formatting, clippy and rustdoc, as CI checks them"
-env = { RUSTDOCFLAGS = "-D warnings" }
-run = [
-  "cargo fmt --all --check",
-  "cargo clippy --quiet --workspace --all-targets --locked -- -D warnings",
-  "cargo doc --quiet --workspace --no-deps --locked",
-]
+depends = [":fmt", ":clippy", ":docs"]
 
 [tasks.verify-fixtures]
 description = "Run every fixture through its entrypoints, check completions and parsed signatures"
@@ -113,3 +121,8 @@ file = "fixtures/verify.nu"
 [tasks.check]
 description = "Everything: tests, the fixture harness against nu, formatting and clippy"
 depends = [":test", ":verify-fixtures", ":lint"]
+
+# CI runs formatting and documentation once, and these checks on each platform.
+[tasks."check:platform"]
+description = "Tests, the fixture harness and clippy on this platform"
+depends = [":test", ":verify-fixtures", ":clippy"]

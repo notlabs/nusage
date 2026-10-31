@@ -5,13 +5,22 @@
 description = "The crate's tests"
 run = "cargo test --locked"
 
+[tasks.fmt]
+description = "Hold the crate's Rust source to rustfmt"
+run = "cargo fmt --check"
+
+[tasks.clippy]
+description = "Clippy for every crate target on this platform"
+run = "cargo clippy --quiet --all-targets --locked -- -D warnings"
+
 [tasks.lint]
 description = "Formatting and clippy, as CI checks them"
-run = [
-  "cargo fmt --check",
-  "cargo clippy --quiet --all-targets --locked -- -D warnings",
-]
+depends = [":fmt", ":clippy"]
 
 [tasks.check]
 description = "The crate's tests, formatting and clippy"
 depends = [":test", ":lint"]
+
+[tasks."check:platform"]
+description = "The crate's tests and clippy on this platform"
+depends = [":test", ":clippy"]

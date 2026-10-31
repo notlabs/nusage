@@ -1,5 +1,9 @@
-min_version = "2026.9.2"
+min_version = "2026.10.21"
 monorepo_root = true
+
+[settings]
+# Native global task inputs are gated in the pinned mise version.
+experimental = true
 
 [monorepo]
 config_roots = [
@@ -11,6 +15,40 @@ config_roots = [
   "intent",
   "mergiraf",
 ]
+
+# Task config roots and inferred Cargo package roots are different. These projects own
+# the checks; dependencies carry changes to the consumers that exercise them.
+[monorepo.projects."custom:nusage"]
+root = "nusage"
+
+[monorepo.projects."custom:catalog"]
+root = "catalog"
+depends = ["custom:nusage", "custom:clap", "custom:cobra", "custom:schemas"]
+
+[monorepo.projects."custom:clap"]
+root = "catalog/clap"
+
+[monorepo.projects."custom:cobra"]
+root = "catalog/cobra"
+depends = ["custom:nusage"]
+
+[monorepo.projects."custom:schemas"]
+root = "catalog/schemas"
+depends = ["custom:nusage"]
+
+[monorepo.projects."custom:intent"]
+root = "intent"
+depends = ["custom:nusage"]
+
+[monorepo.projects."custom:mergiraf"]
+root = "mergiraf"
+
+[task_config]
+# Cargo crates have deeper inferred roots: keep all checks for core changes, including
+# future plugin crates. Shared configuration can change inherited tools and task behavior.
+# Other unowned paths (root files and .mise/) also affect every project. Root checks run
+# unconditionally in CI, so no catch-all root project hides that conservative fallback.
+global_inputs = ["nusage/crates/**", "**/mise*.toml", "**/mise.lock"]
 
 # The Cargo workspace is at the root, so its toolchain is: one pin for Cargo, the tasks and CI.
 [tools]
@@ -41,7 +79,7 @@ JJ_CONFIG = '{% if os() == "windows" %}{{ env.USERPROFILE }}\.jjconfig.toml;{{ e
 
 [tasks.check]
 description = "The root's own checks"
-depends = [":lint"]
+depends = [":lint", ":check-affected"]
 
 # The release is the commit this leaves to make: pushed to main, release.yml tags it.
 [tasks.release]

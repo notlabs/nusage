@@ -106,7 +106,14 @@ the tool on `PATH`.
 
 ## Release
 
-Bump `catalog_version` under `[vars]` in `mise.toml` and merge. The push to main that changes
-it is the release: `release.yml` runs `//catalog:package`, pushes the tasks to
-`ghcr.io/notlabs/nusage-tasks:<version>`, and creates the `catalog/v<version>` release with
-`nusage-catalog-<version>.tar.gz` attached.
+Bump `catalog_version` under `[vars]` in `mise.toml` and merge. After CI succeeds for that
+push to main, `release.yml` checks out the validated commit and runs `//catalog:assemble`,
+pushes the tasks to `ghcr.io/notlabs/nusage-tasks:<version>`, and creates the
+`catalog/v<version>` release at that commit with `nusage-catalog-<version>.tar.gz` attached.
+Automatic releases skip CI completions superseded by a newer main commit, keeping the
+checked source aligned with attestation provenance. An already released version installs
+no build tools.
+
+`//catalog:package` checks before assembling for local use. `//catalog:assemble` runs the
+same packaging script and builds the interpreter it needs, using the validation already
+completed for a release revision.

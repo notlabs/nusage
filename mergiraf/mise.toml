@@ -15,21 +15,14 @@
 [task_config]
 shell = "nu -c"
 
-# The source copied under the workspace's target directory and patched there, every time:
-# the copy is disposable, and Cargo keeps the build between runs in a target directory of
-# its own, so a changed patch rebuilds Mergiraf and not its grammars. The copy sits inside
-# this repository's Cargo workspace, so its manifest gets the empty `[workspace]` table that
-# keeps it out. Cargo is quiet, as in `//nusage:build`, and the path it reports is copied,
-# for the same reasons.
-[tasks.build]
-description = "Build Mergiraf with the patches applied and copy it into the repository's bin directory"
-sources = ["mise.toml", "patches/*.patch"]
-outputs = ["../.bin/mergiraf"]
+# Prepare the patched source once, even when release and test builds run together.
+# The empty workspace table keeps this disposable copy out of the root Cargo workspace.
+[tasks.prepare]
+hide = true
 output = "interleave"
 quiet = true
-env = { MERGIRAF_SOURCE = "{{ tools['mergiraf-source'].path }}", MERGIRAF_VERSION = "{{ tools['mergiraf-source'].version }}" }
+env = { MERGIRAF_SOURCE = "{{ tools['mergiraf-source'].path }}" }
 run = '''
-use "{{ config_root }}/../.mise/lib/actions.nu" *
 let target = "{{ config_root }}/../target" | path expand
 let work = $target | path join mergiraf-source
 rm -rf $work
@@ -39,7 +32,26 @@ for patch in (glob "{{ config_root }}/patches/*.patch" | sort) {
     ^patch -p1 -s -F0 -d $work -i $patch
 }
 "\n[workspace]\n" | save --append ($work | path join Cargo.toml)
-let build = ^cargo build --quiet --release --locked --manifest-path ($work | path join Cargo.toml) --target-dir ($target | path join mergiraf) --message-format json-render-diagnostics
+'''
+
+# Cargo and Mr Boxington validate source, toolchain and platform identity for reuse;
+# a task timestamp shortcut would bypass those checks. Both profiles share the same
+# source and build logic, but the dev binary never replaces the release used by jj.
+[tasks.compile]
+hide = true
+quiet = true
+depends = [":prepare"]
+usage = '''
+arg "<profile>" help="Cargo build profile"
+arg "<bin>" help="Output directory relative to the repository root"
+'''
+output = "interleave"
+env = { MERGIRAF_VERSION = "{{ tools['mergiraf-source'].version }}" }
+run = '''
+use "{{ config_root }}/../.mise/lib/actions.nu" *
+let target = "{{ config_root }}/../target" | path expand
+let work = $target | path join mergiraf-source
+let build = ^cargo build --quiet --profile $env.usage_profile --locked --manifest-path ($work | path join Cargo.toml) --target-dir ($target | path join mergiraf) --message-format json-render-diagnostics
   | complete
 print --stderr --no-newline $build.stderr
 if $build.exit_code != 0 {
@@ -52,10 +64,14 @@ let built = $build.stdout
   | each { from json }
   | where reason == compiler-artifact and executable != null and target.name == mergiraf
   | get 0.executable
-let bin = "{{ config_root }}/../.bin" | path expand
+let bin = "{{ config_root }}/.." | path join $env.usage_bin | path expand
 mkdir $bin
 cp $built ($bin | path join mergiraf)
 '''
+
+[tasks.build]
+description = "Build Mergiraf with the patches applied and copy it into the repository's bin directory"
+depends = [[":compile", "release", ".bin"]]
 
 # The cases the Nushell patch carries, in Mergiraf's own test layout, merged by the binary
 # built, with the flags jj passes it, and held to each case's expected result; a case whose
@@ -64,19 +80,20 @@ cp $built ($bin | path join mergiraf)
 # differs is an annotation on the patch, at the expected result it carries.
 [tasks.test]
 description = "Merge each case of the Nushell patch with the Mergiraf built and hold it to the expected result"
-depends = [":build"]
+depends = [[":compile", "dev", "target/mergiraf-test"]]
 output = "interleave"
 quiet = true
 run = '''
 use "{{ config_root }}/../.mise/lib/actions.nu" *
 let patch = "{{ config_root }}/patches/0001-Add-Nushell-support.patch"
+let binary = "{{ config_root }}/../target/mergiraf-test/mergiraf" | path expand
 let cases = "{{ config_root }}/../target/mergiraf-source/tests/data/nushell/working" | path expand
 let failed = glob ($cases | path join "*") | sort | each {|case|
     let name = $case | path basename
     let suffix = ls $case | get name | path basename | where ($it | str starts-with Base) | first | path parse | get extension
     let file = {|revision| $case | path join $"($revision).($suffix)" }
     let expected = open --raw (do $file Expected)
-    let merged = ^mergiraf merge --fast -s BASE -x LEFT -y RIGHT (do $file Base) (do $file Left) (do $file Right) | complete
+    let merged = ^$binary merge --fast -s BASE -x LEFT -y RIGHT (do $file Base) (do $file Left) (do $file Right) | complete
     let expected_exit = if ($expected | lines | any {|line| $line | str starts-with "<<<<<<<" }) { 1 } else { 0 }
     if $merged.stdout == $expected and $merged.exit_code == $expected_exit {
         print $"($name): as expected"
@@ -119,3 +136,8 @@ for patch in (glob "{{ config_root }}/patches/*.patch" | sort) {
 }
 rm -rf ($work | path dirname)
 '''
+
+# Patch application uses platform tools, so both CI platforms exercise it.
+[tasks."check:platform"]
+description = "Check that the Mergiraf patches apply on this platform"
+depends = [":check"]

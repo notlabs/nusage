@@ -54,3 +54,11 @@ interactive Nushell session load the catalog's modules. `mise dot apply` links t
 fragment that installs the released nusage for the user, with the `nu` it runs scripts in and
 the `usage` its completions run. The repository uses a single `main` bookmark with a colocated
 Git/Jujutsu checkout.
+
+`mise run '//...:check'` runs the full local checks. CI uses mise's native affected-project
+selection for pull requests, with root formatting and selection-regression checks always
+run on Linux. Core crates and shared configuration conservatively select all projects.
+Main receives the full checks before release assembly. Formatting, documentation and
+synthetic schema checks run once on Linux; `check:platform` keeps runtime tests and Clippy
+on both Linux and macOS. The check roots and their dependencies are declared in
+`mise.toml`; `mise run //:check-affected` verifies the selection, including new plugin crates.

@@ -25,9 +25,9 @@ spec = { run = "mise run //catalog/cobra:gh", probe = "version" }
 [_.nusage.catalog.typesafe]
 spec = { openapi = "openapi.yaml" }
 
-# The catalog's own version, released apart from nusage's: a push to main that changes it
-# is the release, which release.yml tags `catalog/v<version>`, with the tarball `package`
-# builds attached and the tasks pushed to GHCR as an OCI task catalog.
+# The catalog's own version, released apart from nusage's after CI validates current main.
+# release.yml tags `catalog/v<version>`, attaches the assembled tarball and pushes the
+# tasks to GHCR as an OCI task catalog.
 [vars]
 catalog_version = "0.1.0"
 
@@ -51,10 +51,21 @@ depends = ["//nusage:build", ":check-package"]
 file = "tasks/check.nu"
 tools = { docker-compose = "5.6.1", gh = "2.103.3" }
 
+[tasks."check:platform"]
+description = "Check the catalog's contracts and packaged tasks on this platform"
+depends = [":check"]
+
 [tasks.install]
 description = "Generate the modules and have every new interactive Nushell session load them"
 depends = [":generate"]
 file = "tasks/install.nu"
+
+# CI validates the revision before release assembly. Keep package's checks for local use;
+# both entrypoints run the same script.
+[tasks.assemble]
+description = "Assemble the catalog artifacts from an already checked revision"
+depends = ["//nusage:build"]
+file = "tasks/package.nu"
 
 [tasks.package]
 description = "Package the catalog for a release: the tarball the nusage-catalog tool installs, and the directory the OCI task catalog is pushed from"
