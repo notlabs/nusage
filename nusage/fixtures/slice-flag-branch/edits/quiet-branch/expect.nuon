@@ -1,0 +1,2 @@
+# An edit in the branch one shape folds away: that shape's slice is kept, the other's changes.
+{loud: kept, quiet: changed}

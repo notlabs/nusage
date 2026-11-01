@@ -1,0 +1,12 @@
+{
+    format: 1
+    name: {kind: script, path: script.nu}
+    shape: {flags: {loud: true}}
+    usage: {args: [who], flags: []}
+    input: null
+    output: {type: string, framing: nuon}
+    env: []
+    paths: []
+    calls: []
+    tools: []
+}

@@ -1,0 +1,12 @@
+{
+    format: 1
+    name: {kind: script, path: script.nu}
+    shape: {}
+    usage: {args: [], flags: []}
+    input: {type: any}
+    output: {type: "list<string>", framing: nuon}
+    env: [GREETING]
+    paths: [names.txt]
+    calls: []
+    tools: []
+}

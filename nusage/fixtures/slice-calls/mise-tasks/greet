@@ -1,0 +1,4 @@
+#!/usr/bin/env nus
+#USAGE arg "<name>" help="Who to greet"
+#USAGE output ("string")"nuon" default=#true
+$"hi ($usage.args.name)"

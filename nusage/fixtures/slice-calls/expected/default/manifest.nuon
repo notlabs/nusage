@@ -1,0 +1,15 @@
+{
+    format: 1
+    name: {kind: script, path: script.nu}
+    shape: {}
+    usage: {args: [who], flags: []}
+    input: null
+    output: {type: "record<script: string, task: string>", framing: nuon}
+    env: []
+    paths: []
+    calls: [
+        {name: {kind: script, path: "./callee.nu"}, shape: {flags: {loud: true}}}
+        {name: {kind: mise, dir: ".", task: greet}, shape: {}}
+    ]
+    tools: []
+}

@@ -1,0 +1,9 @@
+# No residual and no manifest: the slice is refused, and the findings say where and why.
+# Spans are zero-based, end-exclusive UTF-8 byte offsets in the script, as `nus inspect`
+# gives them.
+[
+    {
+        span: {start: 344, end: 371}
+        message: "reads the environment by a name known only at run time; a slice names each variable it reads"
+    }
+]

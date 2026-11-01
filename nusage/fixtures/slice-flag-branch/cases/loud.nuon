@@ -1,0 +1,5 @@
+{
+    argv: [world, --loud],
+    usage: {cmd: [], args: {who: world}, flags: {loud: true}},
+    output: "HELLO WORLD",
+}

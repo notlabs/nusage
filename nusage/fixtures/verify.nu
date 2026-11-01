@@ -32,6 +32,9 @@
 # One row per check: shim, interpreter, run and (when present) completion per case, then
 # signatures.
 def verify-fixture [dir: path, update: bool] {
+    if (($dir | path join shapes | path type) == dir) {
+        return (verify-slice $dir)
+    }
     let name = $dir | path basename
     let module = glob ($dir | path join expected '*.nu') | first
     let bin = $module | path parse | get stem
@@ -89,6 +92,150 @@ def verify-fixture [dir: path, update: bool] {
         ""
         (check-signatures $dir $import $bin $cmds $update)
     )) | append ((row $name conform "" (check-conform $dir $module $bin $is_binary)))
+}
+
+# A slice fixture, told by its `shapes/`: the slices of `script.nu` written by hand, for the
+# slicer to reproduce byte for byte. `shapes/<shape>.nuon` is a static projection of
+# `$usage`; `expected/<shape>/` holds the residual and the manifest it gives, or
+# `findings.nuon` where the slice is refused; `edits/<name>/` holds a changed source, with
+# `expect.nuon` saying per shape whether the slice is `kept`, byte for byte, or `changed`,
+# with an `expected/<shape>/` of its own. Each is held to its schema and to the layout; the
+# slicer's own rows are pending until `nus slice` exists. The script's cases run as a
+# script's, through the interpreter and the entrypoint: the script is a script before it is
+# a slice, and the residual must give what it gives.
+def verify-slice [dir: path] {
+    let name = $dir | path basename
+    const schemas = path self | path dirname | path dirname | path join schemas
+    let shapes = glob ($dir | path join shapes '*.nuon') | sort | each {|f| $f | path parse | get stem }
+    let per_shape = $shapes | each {|shape|
+        let expected = $dir | path join expected $shape
+        [
+            (row $name shape $shape (validate-nuon ($dir | path join shapes $"($shape).nuon") ($schemas | path join slice-shape.schema.json)))
+            (row $name expected $shape (check-slice-expected $expected $schemas))
+            (row $name slice $shape (check-slice ($dir | path join script.nu) ($dir | path join shapes $"($shape).nuon") $expected))
+        ]
+    } | flatten
+    let per_edit = glob ($dir | path join edits '*') | sort | each {|edit|
+        let id = $edit | path basename
+        let expect = open ($edit | path join expect.nuon)
+        $expect | columns | each {|shape|
+            let own = $edit | path join expected $shape
+            let outcome = if $shape not-in $shapes {
+                {ok: false, detail: $"no shape ($shape) under shapes/"}
+            } else if ($expect | get $shape) == kept {
+                if ($own | path exists) {
+                    {ok: false, detail: $"($shape) is kept, so ($own) must not exist"}
+                } else {
+                    check-slice ($edit | path join script.nu) ($dir | path join shapes $"($shape).nuon") ($dir | path join expected $shape)
+                }
+            } else if ($expect | get $shape) == changed {
+                let laid_out = check-slice-expected $own $schemas
+                if not $laid_out.ok {
+                    $laid_out
+                } else if (same-slice $own ($dir | path join expected $shape)) {
+                    {ok: false, detail: $"($shape) is changed, but ($own) is what the unedited source gives"}
+                } else {
+                    check-slice ($edit | path join script.nu) ($dir | path join shapes $"($shape).nuon") $own
+                }
+            } else {
+                {ok: false, detail: $"($id): ($shape) is kept or changed, not ($expect | get $shape | to nuon)"}
+            }
+            row $name edit $"($id)/($shape)" $outcome
+        }
+    } | flatten
+    # The cases run from a copy outside the repository: a task of mise's beside the script
+    # is found from its own directory there, not from this repository's root.
+    let scratch = mktemp --directory
+    for entry in (ls --all $dir) {
+        cp --recursive $entry.name $scratch
+    }
+    let per_case = glob ($dir | path join cases '*.nuon') | sort | each {|file|
+        let case = open $file
+        let id = $file | path parse | get stem
+        [
+            (row $name interpreter $id (check-interpreter $scratch script $case))
+            (row $name run $id (check-run $scratch script $case))
+        ]
+    } | flatten
+    rm --recursive $scratch
+    $per_shape | append $per_edit | append $per_case
+}
+
+# A NUON file held to a schema through `nus validate`.
+def validate-nuon [file: path, schema: path] {
+    if not ($env.NUS_BIN | path exists) {
+        return (skipped $"($env.NUS_BIN) is not built")
+    }
+    let out = open $file | to json | ^$env.NUS_BIN validate $schema - | complete
+    if $out.exit_code == 0 {
+        {ok: true, detail: ''}
+    } else {
+        let said = [$out.stdout $out.stderr] | str join (char nl) | str trim
+        {ok: false, detail: $"($file | path basename): ($said)"}
+    }
+}
+
+# An expected slice: a residual with its manifest, or findings and nothing else.
+def check-slice-expected [expected: path, schemas: path] {
+    let residual = $expected | path join residual.nu
+    let manifest = $expected | path join manifest.nuon
+    let findings = $expected | path join findings.nuon
+    if ($findings | path exists) {
+        if ($residual | path exists) or ($manifest | path exists) {
+            return {ok: false, detail: "a refused slice has findings and nothing else"}
+        }
+        let found = open $findings
+        let shaped = $found | all {|f|
+            ($f | columns | sort) == [message span] and ($f.span | columns | sort) == [end start] and $f.span.start <= $f.span.end
+        }
+        return (if ($found | is-not-empty) and $shaped {
+            {ok: true, detail: ''}
+        } else {
+            {ok: false, detail: "findings are records of a span, start and end, and a message, at least one"}
+        })
+    }
+    if not ($residual | path exists) or not ($manifest | path exists) {
+        return {ok: false, detail: $"($expected) holds residual.nu and manifest.nuon, or findings.nuon"}
+    }
+    let text = open --raw $residual
+    if ($text | str trim | is-empty) or not ($text | str ends-with "\n") {
+        return {ok: false, detail: "the residual is not empty and ends with one newline"}
+    }
+    validate-nuon $manifest ($schemas | path join slice.schema.json)
+}
+
+# Whether two expected slices are the same bytes.
+def same-slice [a: path, b: path] {
+    [residual.nu manifest.nuon findings.nuon] | all {|file|
+        let x = $a | path join $file
+        let y = $b | path join $file
+        ($x | path exists) == ($y | path exists) and (not ($x | path exists) or (open --raw $x) == (open --raw $y))
+    }
+}
+
+# The slicer's own row: `nus slice <script> --shape <shape> --out <dir>` must write the
+# expected files byte for byte. Pending, not skipped, until the subcommand exists: the
+# fixtures are the design, written ahead of it.
+def check-slice [script: path, shape: path, expected: path] {
+    if not ($env.NUS_BIN | path exists) {
+        return (skipped $"($env.NUS_BIN) is not built")
+    }
+    let probe = ^$env.NUS_BIN slice --help | complete
+    if $probe.exit_code != 0 {
+        return {ok: true, skipped: true, detail: "pending: nus slice is not implemented"}
+    }
+    let out = mktemp --directory
+    let sliced = ^$env.NUS_BIN slice $script --shape $shape --out $out | complete
+    let outcome = if $sliced.exit_code != 0 and not (($expected | path join findings.nuon) | path exists) {
+        {ok: false, detail: ($sliced.stderr | str trim)}
+    } else if (same-slice $out $expected) {
+        {ok: true, detail: ''}
+    } else {
+        let diff = ^diff --recursive --unified $expected $out | complete
+        {ok: false, detail: ($diff.stdout | str trim)}
+    }
+    rm --recursive $out
+    $outcome
 }
 
 # `nus check`: the module carries what the spec shows, as usage reads the spec, for

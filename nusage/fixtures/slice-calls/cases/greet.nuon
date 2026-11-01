@@ -1,0 +1,5 @@
+{
+    argv: [world],
+    usage: {cmd: [], args: {who: world}, flags: {}},
+    output: {script: "HELLO WORLD", task: "hi world"},
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "nus slice: a shape",
+  "description": "The static projection of `$usage` a slice is taken for: the switches and values that choose branches, by usage name in snake_case. What is not named is dynamic, read by the residual at run time. `{}` folds nothing.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "args": {"type": "object", "additionalProperties": {"$ref": "#/$defs/static"}},
+    "flags": {"type": "object", "additionalProperties": {"$ref": "#/$defs/static"}}
+  },
+  "$defs": {
+    "static": {
+      "oneOf": [
+        {"type": "boolean"},
+        {"type": "integer"},
+        {"type": "number"},
+        {"type": "string"},
+        {"type": "null"},
+        {"type": "array", "items": {"oneOf": [{"type": "boolean"}, {"type": "integer"}, {"type": "number"}, {"type": "string"}]}}
+      ]
+    }
+  }
+}

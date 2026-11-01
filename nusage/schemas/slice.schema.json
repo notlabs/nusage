@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "nus slice: the manifest",
+  "description": "What a slice of a script reads that its residual program does not carry: the free variables of the residual, each named and typed, and what was folded into it. The residual and this manifest together are the slice, and a slice's address is a function of the two and nothing else.",
+  "type": "object",
+  "required": ["format", "name", "shape", "usage", "input", "output", "env", "paths", "calls", "tools"],
+  "additionalProperties": false,
+  "properties": {
+    "format": {"const": 1},
+    "name": {
+      "description": "The canonical name of the script the slice is of: the path of a script as it is called, or the task of mise's that runs it.",
+      "$ref": "#/$defs/name"
+    },
+    "shape": {
+      "description": "The static projection of `$usage` folded into the residual: the switches and values that chose its branches. Exactly the shape the slice was asked for, after normalization.",
+      "$ref": "#/$defs/shape"
+    },
+    "usage": {
+      "description": "The parts of `$usage` the residual still reads at run time, by usage name in snake_case; a name in `shape` is never here.",
+      "type": "object",
+      "required": ["args", "flags"],
+      "additionalProperties": false,
+      "properties": {
+        "args": {"$ref": "#/$defs/names"},
+        "flags": {"$ref": "#/$defs/names"}
+      }
+    },
+    "input": {
+      "description": "The type of `$in` when the residual reads it, `null` when it does not.",
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {"type": {"type": "string", "minLength": 1}}
+        }
+      ]
+    },
+    "output": {
+      "description": "What the residual returns, as the header declares it: the Nushell type and the framing; `null` when the header declares no output.",
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["type", "framing"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"type": "string", "minLength": 1},
+            "framing": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    },
+    "env": {
+      "description": "The environment variables the residual reads, by name, sorted. A read whose name is not static is a finding, not an entry.",
+      "$ref": "#/$defs/names"
+    },
+    "paths": {
+      "description": "The paths the residual reads statically, relative to the script, sorted. A path known only at run time is a finding.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "calls": {
+      "description": "The scripts and tasks the residual calls, each by its canonical name and the static shape of that call, in the order of first call. A callee is named, never inlined: its own slice has its own address.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "shape"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"$ref": "#/$defs/name"},
+          "shape": {"$ref": "#/$defs/shape"}
+        }
+      }
+    },
+    "tools": {
+      "description": "The binaries the residual runs through a module of the catalog, each by its name, the version the lockfile pins and the static shape of the call, in the order of first call. An external run any other way is a finding.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "version", "command", "shape"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "version": {"type": "string", "minLength": 1},
+          "command": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "shape": {"$ref": "#/$defs/shape"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "name": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "path"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {"const": "script"},
+            "path": {"type": "string", "minLength": 1, "description": "The script's path as the caller writes it, `./x.nu` beside the caller; for the slice's own script, its file name."}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "dir", "task"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {"const": "mise"},
+            "dir": {"type": "string", "minLength": 1, "description": "The directory mise is asked from, relative to the script."},
+            "task": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    },
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "args": {
+          "type": "object",
+          "description": "Positionals with a static value, by usage name in snake_case.",
+          "additionalProperties": {"$ref": "#/$defs/static"}
+        },
+        "flags": {
+          "type": "object",
+          "description": "Flags with a static value, by usage name in snake_case: a switch as a boolean, a value as itself.",
+          "additionalProperties": {"$ref": "#/$defs/static"}
+        }
+      }
+    },
+    "static": {
+      "description": "A value the slice folded in: a scalar, or a list of scalars for a repeated flag or a variadic positional.",
+      "oneOf": [
+        {"type": "boolean"},
+        {"type": "integer"},
+        {"type": "number"},
+        {"type": "string"},
+        {"type": "null"},
+        {"type": "array", "items": {"oneOf": [{"type": "boolean"}, {"type": "integer"}, {"type": "number"}, {"type": "string"}]}}
+      ]
+    },
+    "names": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"}
+    }
+  }
+}

@@ -58,6 +58,23 @@ root says where the service is. `http-petstore` is the petstore through the conv
 cases name the commands for their signatures, and `tests/http.rs` sends their requests to a
 server of its own, since no fake stands in for a service.
 
+A slice fixture, `slice-*`, is told by its `shapes/`: the slices of its `script.nu`, written by
+hand ahead of the slicer, which must reproduce them byte for byte. A slice is a script's
+reachable statements for a shape, a static projection of `$usage` under
+`schemas/slice-shape.schema.json`, folded in and written in canonical form, the formatter's,
+with the header, the comments and the layout of the source gone: `expected/<shape>/residual.nu`.
+Beside it `manifest.nuon`, under `schemas/slice.schema.json`, names what the residual reads
+and does not carry: the parts of `$usage` still read, the type of `$in`, each environment
+variable, each path, each callee by its canonical name and the static shape of the call, each
+tool by its pinned version. A read the slicer cannot name, a variable or a path by a run-time
+value, refuses the slice: `expected/<shape>/findings.nuon` with a span and a message, and no
+residual. `edits/<name>/` is the source changed, with `expect.nuon` saying per shape whether
+the slice is `kept`, byte for byte, or `changed`, with an `expected/<shape>/` of its own: a
+comment, a reformat and an edit in a branch the shape excludes are kept, which is the cutoff
+the slice exists for. The script's cases run as a script's; the residual must give the same.
+The slicer's rows are pending until `nus slice` exists. `intent/claims/slicing.nuon` says what
+the slices are held to.
+
 A binary's wrapper decodes the one output it asks for. An output is decoded when its
 `media_type` names a format Nushell reads (`text/csv`, `application/yaml`, ...), when its
 framing is `json` or `jsonl`, or when its declaration carries a `nusage-decode` child whose argument

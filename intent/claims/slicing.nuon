@@ -1,0 +1,47 @@
+# A slice of a script: the residual program and the manifest a shape of `$usage` gives, which
+# together are what a run of the script is a function of, and what its address is taken from.
+# The fixtures under nusage/fixtures/slice-* are the slices written by hand, for the slicer
+# to reproduce byte for byte; these say what they are held to.
+[
+  {
+    id: residual-reachable
+    says: "The residual of a script for a shape is its reachable statements with the shape folded in, in canonical form: the header, the comments, the layout of the source and the branches the shape excludes do not reach it."
+    status: open
+    traits: [content-addressed]
+    open: ["Whether a `let` whose value no reachable statement reads is kept, as the source has it, or dropped, as the slice would allow."]
+  }
+  {
+    id: manifest-names-the-reads
+    says: "The manifest names everything the residual reads that it does not carry: the parts of `$usage` still read, the type of `$in`, each environment variable, each path, each callee and each tool, and nothing else."
+    status: open
+    traits: [reads]
+  }
+  {
+    id: slice-fails-closed
+    says: "A read the slicer cannot name statically, an environment variable or a path by a run-time value, or an external run outside a module of the catalog, refuses the slice with a finding at the read; nothing is guessed."
+    status: open
+    traits: [effect]
+  }
+  {
+    id: callee-by-name-and-shape
+    says: "A callee is named in the manifest by its canonical name and the static shape of the call, never inlined, so a change in the callee's body leaves the caller's slice as it was."
+    status: open
+    traits: [content-addressed]
+    open: ["Whether a change in the callee's header, which changes what the call means, changes the caller's shape of that call or only the callee's own slice."]
+  }
+  {
+    id: cutoff
+    says: "An edit that leaves the reachable statements and the manifest as they were, a comment, a reformat, a branch the shape excludes, leaves the slice byte for byte as it was."
+    status: open
+    traits: [content-addressed]
+  }
+  {
+    id: residual-faithful
+    says: "Running the residual with the manifest's reads bound gives what running the script with the same `$usage` gives."
+    status: open
+    alternatives: [
+      "The fixture harness runs each case through the script and through the residual, binding `$usage`, `$in` and the environment from the case."
+      "The executor runs the residual in place of the script where a slice exists, and the harness compares the two paths."
+    ]
+  }
+]

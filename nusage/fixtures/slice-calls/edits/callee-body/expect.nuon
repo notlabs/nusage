@@ -1,0 +1,3 @@
+# The callee's body changed, its header not: the caller's slice names the callee, so it is
+# kept. The callee's own slice changes, and a run of the caller reads the callee's result.
+{default: kept}

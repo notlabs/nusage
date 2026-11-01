@@ -1,0 +1,6 @@
+# With nothing on the input and the variable unset: the file's names, greeted by the default.
+{
+    argv: [],
+    usage: {cmd: [], args: {}, flags: {}},
+    output: ["hello ada", "hello grace"],
+}

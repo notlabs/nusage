@@ -1,0 +1,7 @@
+# The script itself still runs as a script: the residual must give the same.
+{
+    argv: [world],
+    usage: {cmd: [], args: {who: world}, flags: {}},
+    printed: "greeting",
+    output: "hello world",
+}
