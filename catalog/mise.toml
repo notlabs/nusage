@@ -9,8 +9,9 @@
 # An entry with a `version` is released on its own, as the packslip project
 # `github.com/<repository>/catalog/<tool>` tagged `catalog/<tool>/v<version>`: `pack` writes
 # its archive. `tool` is the mise tool that provides the wrapped binary; the package records
-# it with the version its spec was read from, so what installs the package can run that
-# version. An entry without `tool` wraps a binary nothing pins, as mise is.
+# it with the version its spec was read from, and nus refuses the package to a project that
+# has that tool at another version. An entry without `tool` wraps a binary nothing pins, as
+# mise is.
 [_.nusage.catalog.mise]
 spec = { run = "mise usage" }
 switch = { flag = "--json", framing = "json" }

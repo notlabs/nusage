@@ -22,7 +22,7 @@ mod prelude;
 mod shim;
 mod switch_overlay;
 mod validate;
-mod view;
+mod modules;
 
 use std::path::{Path, PathBuf};
 

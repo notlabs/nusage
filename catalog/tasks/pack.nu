@@ -6,8 +6,8 @@
 # archive's path relative to the catalog, for the release job.
 # An entry's archive, `nusage-<tool>-<version>.tar.gz`, holds:
 #   package.nuon  {name, version, module, tool?: {name, bin, version}}: the package, and the
-#                 mise tool and version of the binary its spec was read from, which what
-#                 installs the package pins so its wrappers run that binary
+#                 mise tool and version of the binary its spec was read from, which nus
+#                 holds the project's own version of that tool to
 #   bin/          empty, so that mise puts nothing of the package on PATH
 #   <tool>/       the module's directory, without what only its maintenance uses
 # The name gives no platform, so packslip records the archive as running anywhere.

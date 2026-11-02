@@ -574,57 +574,55 @@ fn a_nu_another_one_ran_runs() {
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "inner");
 }
 
-/// A view of its own for a test, holding the given files.
-fn view(name: &str, files: &[(&str, &str)]) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("nus-lsp-view-{name}-{}", std::process::id()));
+/// A package of its own for a test: the module `greet`, typed, and its record.
+fn package(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("nus-lsp-package-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    for (file, text) in files {
-        let path = dir.join(file);
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, text).unwrap();
-    }
+    std::fs::create_dir_all(dir.join("greet")).unwrap();
+    std::fs::write(
+        dir.join("greet/mod.nu"),
+        "export def \"greet twice\" [n: int]: nothing -> int { $n * 2 }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("package.nuon"),
+        "{name: greet, version: \"0.1.0\", module: greet, tool: {name: greeter, bin: greet, version: \"1.2.0\"}}\n",
+    )
+    .unwrap();
     dir
 }
 
-/// With `NUS_VIEW`, the editor resolves a script's imports from the view, as the interpreter
-/// does: the line standing in for the shebang names the view first. An entry of the view's
-/// that is also beside the script is said on that line, since the interpreter refuses it.
+/// The editor checks a script with the modules its calls get, as the interpreter runs it: a
+/// call that does not fit the module's signature is said, where without the module it is an
+/// external Nushell takes as it is. A tool of the wrong version is said on the first line.
 #[test]
-fn imports_resolve_from_the_view_and_a_shadowed_view_is_said() {
-    let greet = (
-        "pkg+test/greet/mod.nu",
-        "export def hello [who: string]: nothing -> string { $\"hello ($who)\" }\n",
-    );
-    let text = "#!/usr/bin/env nus\nuse pkg+test/greet\ngreet hello ana | str length\n";
-    let unviewed = view("unviewed", &[greet]);
+fn a_call_is_checked_against_the_module_its_word_names() {
+    let root = package("calls");
+    let text = "#!/usr/bin/env nus\ngreet twice abc\n";
     let Some((_, diagnostics)) = session(text, None, &[]) else {
         return;
     };
     let without = said(&diagnostics);
-    assert!(
-        without
-            .iter()
-            .any(|(line, message)| *line == 1 && message.contains("not found")),
-        "{without:?}"
+    assert!(without.iter().all(|(line, _)| *line != 1), "{without:?}");
+    let modules = (
+        "NUS_MODULES",
+        format!("{{greet: '{}'}}", root.join("greet").display()),
     );
-    let vars = [("NUS_VIEW", unviewed.to_string_lossy().into_owned())];
+    let vars = [modules.clone(), ("NUS_TOOLS", "{greeter: '1.2.0'}".to_string())];
     let (_, diagnostics) = session_with(&["lsp"], &vars, text, None, &[]).unwrap();
     let with = said(&diagnostics);
     assert!(
-        with.iter()
-            .all(|(_, message)| !message.contains("not found") && !message.contains("view")),
+        with.iter().any(|(line, message)| *line == 1 && message.contains("int")),
         "{with:?}"
     );
-    // `callee.nu` is beside the script the session opens.
-    let shadowed = view("shadowed", &[greet, ("callee.nu", "")]);
-    let vars = [("NUS_VIEW", shadowed.to_string_lossy().into_owned())];
+    let vars = [modules, ("NUS_TOOLS", "{greeter: '1.3.0'}".to_string())];
     let (_, diagnostics) = session_with(&["lsp"], &vars, text, None, &[]).unwrap();
-    let said = said(&diagnostics);
+    let other = said(&diagnostics);
     assert!(
-        said.iter()
-            .any(|(line, message)| *line == 0 && message.contains("`callee.nu`")),
-        "{said:?}"
+        other
+            .iter()
+            .any(|(line, message)| *line == 0 && message.contains("greeter 1.3.0")),
+        "{other:?}"
     );
-    std::fs::remove_dir_all(unviewed).unwrap();
-    std::fs::remove_dir_all(shadowed).unwrap();
+    std::fs::remove_dir_all(root).unwrap();
 }

@@ -121,18 +121,19 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
 }
 
 /// What the interpreter hands `nu` for the script at `script` with `record` as its
-/// `$usage`: the view, when `NUS_VIEW` names one ([`crate::view`]), the definitions of the
-/// scripts it calls, `source`d from a file named by its contents, then the record and the
-/// script `run` with the input. The definitions are written once for each of their contents,
-/// so a command line holds no more than the record and two paths.
+/// `$usage`: the modules its calls get ([`crate::modules`]), the definitions of the scripts
+/// it calls, `source`d from a file named by its contents, then the record and the script
+/// `run` with the input. The definitions are written once for each of their contents, so a
+/// command line holds no more than the record, the modules' paths and two paths.
 pub fn program(script: &Path, record: &Value) -> Result<String, Diagnostic> {
     let mut code = String::new();
-    if let Some(view) = crate::view::current().map_err(|why| Diagnostic::new(script, why))? {
-        let dir = script.parent().unwrap_or(Path::new("/"));
-        if let Some(why) = crate::view::refusal(&view, dir) {
-            return Err(Diagnostic::new(script, why));
-        }
-        code.push_str(&crate::view::prelude(&view).map_err(|why| Diagnostic::new(script, why))?);
+    let source = std::fs::read_to_string(script)
+        .map_err(|err| Diagnostic::new(script, format!("cannot read: {err}")))?;
+    let modules =
+        crate::modules::implicit(script, &source).map_err(|why| Diagnostic::new(script, why))?;
+    for line in crate::modules::uses(&modules) {
+        code.push_str(&line);
+        code.push('\n');
     }
     let definitions = crate::prelude::runtime(script)?;
     if !definitions.is_empty() {

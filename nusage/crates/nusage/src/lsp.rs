@@ -500,7 +500,7 @@ impl Document {
                 "message": header.message,
             }));
         }
-        if let Some(why) = &analysis.view {
+        if let Some(why) = &analysis.modules {
             let width = units(self.line(0), encoding);
             found.push(json!({
                 "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": width}},
