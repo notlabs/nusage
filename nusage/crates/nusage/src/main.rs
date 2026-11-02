@@ -5,19 +5,8 @@ use usage_rs::Run;
 
 fn main() -> ExitCode {
     let argv: Vec<String> = std::env::args().collect();
-    // `nus nu ...`: the arguments are Nushell's, flags and all, for no parser of ours. So is
-    // a call with Nushell's own flags first, `nus -c ...` or `nus -n --plugins ...`: a
-    // script running inside nus sees nus as `$nu.current-exe`, and what it starts that way
-    // is Nushell. nus's own `--help` and `--version` stay its own.
-    let as_nu = match argv.get(1).map(String::as_str) {
-        Some("nu") => Some(2),
-        Some(flag)
-            if flag.starts_with('-') && !matches!(flag, "-h" | "--help" | "-V" | "--version") =>
-        {
-            Some(1)
-        }
-        _ => None,
-    };
+    // `nus nu ...`: the arguments are Nushell's, flags and all, for no parser of ours.
+    let as_nu = (argv.get(1).map(String::as_str) == Some("nu")).then_some(2);
     if let Some(from) = as_nu {
         return match nusage::nu(&argv[from..]) {
             Ok(code) => ExitCode::from(code.clamp(0, 255) as u8),

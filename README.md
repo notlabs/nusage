@@ -10,11 +10,13 @@ Early development.
   --no-deps` for the crates. Two of them stand on their own: `nushell-schema`, the Nushell
   dialect of JSON Schema, and `openapi-usage`, an OpenAPI document as a usage spec with the
   HTTP mapping beside it, which `nus generate --http` turns into a module that calls the
-  service as another calls a binary. `nu_plugin_nus` is nusage inside Nushell: the
-  commands a module calls on its hot path, with the CLI's own signatures, served by one
-  process across calls; `nus call` runs a called script in an engine inside that process,
-  where a script calling a script never leaves it, and `nus validate` holds documents to a
-  schema. `mise run //nusage:plugins` registers it.
+  service as another calls a binary. `nus <script>` runs a script in the `nu` on PATH,
+  as Nushell runs any script, with the typed commands of the scripts it calls defined
+  before it: each binds the called script's `$usage` from its parameters and `run`s it, so
+  a script calling a script stays in the same Nushell and gets the value back typed.
+  `nu_plugin_nus` is nusage inside Nushell: the commands a module calls on its hot path,
+  with the CLI's own signatures, served by one process across calls; `nus validate` holds
+  documents to a schema. `mise run //nusage:plugins` registers it.
   A plugin is for what needs Rust in the interpreter, as a library only Rust reaches; a
   service or a binary is a module.
 - `catalog/`: the wrappers for other tools, a Nushell module package per tool under

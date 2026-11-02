@@ -29,24 +29,15 @@ declare a JSON Schema instead, inline or `schema file=`, which is read as a Nush
 
 A script that calls another by its path, `./x.nu`, or as `nus x.nu` or `nu x.nu`, calls the
 shadow nusage defines for that call: the other script's typed command, named as the call
-writes it, which runs it through the interpreter and returns its value, typed as its output
-declares, while what it prints passes through. The path is the calling script's: `./x.nu`,
-`nus x.nu` and `nu x.nu` all name the `x.nu` beside it, wherever it runs from, where the
-external call they replace would look in the working directory; `^./x.nu` is still that
-external. The interpreter and the module define the shadows before the script, and `nusage
-prelude` writes them as the line that stands in for the script's first where Nushell checks it.
-`script-calls` calls `callee.nu` the three ways. The harness runs each script case two more
-ways: through the plugin's `nus call`, which runs the script in an engine inside the
-plugin's process, and through the module `nus generate --plugin` writes for a session with
-the plugin registered, whose shadows call `nus call` without defining it; the value and
-what the script prints must be the interpreter's each way.
-
-A task of mise's whose file is a script nusage runs is called the same way, as `mise run
-<task>` or `mise r <task>`: the shadow runs the task through mise, which runs what the task
-depends on around it, and returns the task's own value. mise is asked what the name means
-from the calling script's directory, where the shadow runs it from too. A task mise finds up
-to date does not run, and the call returns nothing; `^mise run` is still the external, and
-so is a call with mise's own flags before the task.
+writes it, whose body binds that script's `$usage` from its parameters and `run`s it, so it
+runs in the caller's Nushell and returns its value, typed as its output declares, while what
+it prints passes through. The shadows of the scripts it calls in turn are defined inside that
+body. The path is the calling script's: `./x.nu`, `nus x.nu` and `nu x.nu` all name the
+`x.nu` beside it, wherever it runs from, where the external call they replace would look in
+the working directory; `^./x.nu` is still that external. The interpreter and the module
+define the shadows before the script, and `nus prelude` writes them as the line that stands
+in for the script's first where Nushell checks it. `script-calls` calls `callee.nu` the three
+ways.
 
 A spec may describe a service rather than a binary, with the HTTP mapping `openapi-usage`
 writes beside it, `<bin>.http.kdl`: then each command's wrapper sends the request the mapping

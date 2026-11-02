@@ -47,7 +47,10 @@ fn resolved_calls_and_findings_are_data_without_executing() {
     let call = &report["calls"][0];
     assert_eq!(call["name"], "./callee.nu");
     assert_eq!(call["target"], dir.join("callee.nu").to_str().unwrap());
-    assert_eq!(call["through"]["kind"], "nus");
+    assert!(
+        call.get("through").is_none(),
+        "calls are of one kind: {call}"
+    );
     assert_eq!(call["command"]["positionals"][0]["usage_name"], "name");
     let findings = report["findings"].as_array().unwrap();
     assert_eq!(findings.len(), 2);
