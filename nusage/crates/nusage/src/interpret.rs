@@ -121,13 +121,33 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
 }
 
 /// What the interpreter hands `nu` for the script at `script` with `record` as its
-/// `$usage`: the definitions of the scripts it calls, `source`d from a file named by its
-/// contents, then the record and the script `run` with the input. The definitions are
-/// written once for each of their contents, so a command line holds no more than the
-/// record and two paths.
+/// `$usage`: the view, when `NUS_VIEW` names one ([`crate::view`]), the definitions of the
+/// scripts it calls, `source`d from a file named by its contents, then the record and the
+/// script `run` with the input. The definitions are written once for each of their contents,
+/// so a command line holds no more than the record and two paths.
 pub fn program(script: &Path, record: &Value) -> Result<String, Diagnostic> {
-    let definitions = crate::prelude::runtime(script)?;
     let mut code = String::new();
+    if let Some(view) = crate::view::current().map_err(|why| Diagnostic::new(script, why))? {
+        let dir = script.parent().unwrap_or(Path::new("/"));
+        let shadowed = crate::view::shadowed(&view, dir);
+        if !shadowed.is_empty() {
+            return Err(Diagnostic::new(
+                script,
+                format!(
+                    "{} beside the script would take the place of the view's in {}: an \
+                     import names one module",
+                    shadowed
+                        .iter()
+                        .map(|name| format!("`{name}`"))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    view.display()
+                ),
+            ));
+        }
+        code.push_str(&crate::view::prelude(&view).map_err(|why| Diagnostic::new(script, why))?);
+    }
+    let definitions = crate::prelude::runtime(script)?;
     if !definitions.is_empty() {
         let file = written(&definitions).map_err(|err| {
             Diagnostic::new(script, format!("cannot keep its definitions: {err}"))

@@ -33,6 +33,17 @@ fn scripts(files: &[(&str, &str)]) -> PathBuf {
 /// `nus <script> <args>` in `dir`, with `input` on standard input when given, and the cache
 /// in `dir`; `None` when there is no `nu` to run it.
 fn nus(dir: &Path, script: &str, args: &[&str], input: Option<&str>) -> Option<Output> {
+    nus_viewing(dir, script, args, input, None)
+}
+
+/// [`nus`] with `NUS_VIEW` naming `view`, or unset.
+fn nus_viewing(
+    dir: &Path,
+    script: &str,
+    args: &[&str],
+    input: Option<&str>,
+    view: Option<&Path>,
+) -> Option<Output> {
     if Command::new("nu").arg("--version").output().is_err() {
         assert!(
             std::env::var("CI").as_deref() != Ok("true"),
@@ -49,8 +60,13 @@ fn nus(dir: &Path, script: &str, args: &[&str], input: Option<&str>) -> Option<O
         .current_dir(dir)
         .env("XDG_CACHE_HOME", &cache)
         .env("LOCALAPPDATA", &cache)
+        .env_remove("NUS_VIEW")
+        .env_remove("NUS_BINS")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    if let Some(view) = view {
+        command.env("NUS_VIEW", view);
+    }
     let output = match input {
         Some(text) => {
             command.stdin(Stdio::piped());
@@ -196,4 +212,48 @@ fn a_script_runs_the_commands_its_spec_mounts() {
         "{misspelt:?}"
     );
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// With `NUS_VIEW`, a script imports the view's modules by their path in it, and its
+/// wrappers run the binaries the view's `bins.nuon` names; an entry of the view's that is
+/// also beside the script is refused, since the import would reach that one instead.
+#[test]
+fn a_script_imports_from_the_view_it_is_given() {
+    let view = scripts(&[
+        (
+            "pkg+notlabs/catalog/greet/mod.nu",
+            "export def hello [who: string]: nothing -> string { $\"hello ($who)\" }\n\
+             export def bins []: nothing -> string { $env.NUS_BINS? | default none }\n",
+        ),
+        ("bins.nuon", "{greet: \"/opt/greet\"}\n"),
+    ]);
+    let dir = scripts(&[
+        (
+            "uses.nu",
+            "#!/usr/bin/env nus\nuse pkg+notlabs/catalog/greet\n[(greet hello ana) (greet bins)] | to nuon\n",
+        ),
+        ("shadowed/pkg+notlabs/catalog/greet/mod.nu", "export def hello [] { 'beside' }\n"),
+        (
+            "shadowed/uses.nu",
+            "#!/usr/bin/env nus\nuse pkg+notlabs/catalog/greet\ngreet hello\n",
+        ),
+    ]);
+    let Some(viewed) = nus_viewing(&dir, "uses.nu", &[], None, Some(&view)) else {
+        return;
+    };
+    assert!(viewed.status.success(), "{viewed:?}");
+    assert_eq!(
+        stdout(&viewed),
+        "[\"hello ana\", \"{greet: \\\"/opt/greet\\\"}\"]"
+    );
+    let unviewed = nus(&dir, "uses.nu", &[], None).unwrap();
+    assert!(!unviewed.status.success(), "{unviewed:?}");
+    let shadowed = nus_viewing(&dir, "shadowed/uses.nu", &[], None, Some(&view)).unwrap();
+    assert!(!shadowed.status.success(), "{shadowed:?}");
+    assert!(
+        String::from_utf8_lossy(&shadowed.stderr).contains("`pkg+notlabs`"),
+        "{shadowed:?}"
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+    std::fs::remove_dir_all(view).unwrap();
 }
