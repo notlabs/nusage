@@ -43,10 +43,16 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
     // holds as NUON, so a harness can hold a record to the type, as the fixtures' does.
     let value = "($env.NUS_USAGE? | default \"{}\" | from nuon)";
     let (mut line, header) = match command_of(script, &texts) {
-        Ok(command) => (
-            format!("let usage: {} = {value}", usage_type(&command)),
-            None,
-        ),
+        Ok((command, alone)) => {
+            // A script that runs commands its spec declares below its own reads a different
+            // `$usage` for each, which `cmd` says: no one command's arguments are its type.
+            let ty = if alone {
+                usage_type(&command)
+            } else {
+                "record<cmd: list<string>, args: record, flags: record>".to_string()
+            };
+            (format!("let usage: {ty} = {value}"), None)
+        }
         Err(err) => (format!("let usage = {value}"), Some(err)),
     };
     let mut calls = calls::scan(script, source, &texts);
@@ -98,20 +104,25 @@ fn read(script: &Path) -> Result<String, Diagnostic> {
         .map_err(|err| Diagnostic::new(script, format!("cannot read: {err}")))
 }
 
-/// The command the script is in its tree.
-fn command_of(script: &Path, texts: &Texts) -> Result<Command, Diagnostic> {
+/// The command the script is in its tree, and whether it is the only command the script
+/// runs, or its spec declares more below it.
+fn command_of(script: &Path, texts: &Texts) -> Result<(Command, bool), Diagnostic> {
     let (root, path) = calls::place_in_tree(script)?;
     let assembled = nusage_spec::assemble_in(&root, texts)?;
-    nusage_model::model(&assembled)?
-        .commands
-        .into_iter()
+    let commands = nusage_model::model(&assembled)?.commands;
+    let command = commands
+        .iter()
         .find(|command| command.path == path)
+        .cloned()
         .ok_or_else(|| {
             Diagnostic::new(
                 script,
                 format!("the tree at {} has no command `{path}`", root.display()),
             )
-        })
+        })?;
+    let runs = |other: &Command| other.execution == command.execution;
+    let alone = commands.iter().filter(|other| runs(other)).count() == 1;
+    Ok((command, alone))
 }
 
 /// The type of the `$usage` record the command's script sees: every declared name is

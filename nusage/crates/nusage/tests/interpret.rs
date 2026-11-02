@@ -158,3 +158,42 @@ fn definitions_are_kept_once_for_their_contents() {
     assert!(kept[0].ends_with(".nu"), "{kept:?}");
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+/// A script's spec may mount commands, which it then runs: usage reads the arguments by the
+/// mounted spec, `$usage.cmd` names the command, and a call of it is typed by it too.
+#[cfg(unix)]
+#[test]
+fn a_script_runs_the_commands_its_spec_mounts() {
+    let dir = scripts(&[
+        ("tasks.kdl", "cmd \"build\" {\n    flag \"--release\"\n}\n"),
+        (
+            "tool.nu",
+            "#!/usr/bin/env nus\n#USAGE cmd \"run\" { mount run=\"cat tasks.kdl\" }\n#USAGE output (\"record<cmd: list<string>, release: bool>\")\"nuon\" default=#true\n{cmd: $usage.cmd, release: ($usage.flags.release? | default false)}\n",
+        ),
+        (
+            "caller.nu",
+            "#!/usr/bin/env nus\n(./tool.nu run build --release) | to nuon\n",
+        ),
+        (
+            "misspelt.nu",
+            "#!/usr/bin/env nus\n./tool.nu run build --fast\n",
+        ),
+    ]);
+    let Some(direct) = nus(&dir, "tool.nu", &["run", "build", "--release"], None) else {
+        return;
+    };
+    assert!(direct.status.success(), "{direct:?}");
+    assert!(stdout(&direct).contains("release"), "{direct:?}");
+    let refused = nus(&dir, "tool.nu", &["run", "build", "--fast"], None).unwrap();
+    assert_eq!(refused.status.code(), Some(2), "{refused:?}");
+    let called = nus(&dir, "caller.nu", &[], None).unwrap();
+    assert!(called.status.success(), "{called:?}");
+    assert_eq!(stdout(&called), "{cmd: [run, build], release: true}");
+    let misspelt = nus(&dir, "misspelt.nu", &[], None).unwrap();
+    assert!(!misspelt.status.success(), "{misspelt:?}");
+    assert!(
+        String::from_utf8_lossy(&misspelt.stderr).contains("fast"),
+        "{misspelt:?}"
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
