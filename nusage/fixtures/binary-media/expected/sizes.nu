@@ -36,9 +36,17 @@ def "nus flag-words" []: record -> list<string> {
     } | flatten
 }
 
+# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
+# that names one, else the name, found on PATH.
+def "nus bin" []: nothing -> string {
+    let bins = $env.NUS_BINS? | default {}
+    let bins = if ($bins | describe) == string { $bins | from nuon } else { $bins }
+    $bins."sizes"? | default sizes
+}
+
 # A tool whose outputs name their media type: Nushell's reader for it decodes them
 export def main []: nothing -> string {
-    ^sizes ...(nus argv [] {})
+    ^(nus bin) ...(nus argv [] {})
 }
 
 # List things
@@ -46,7 +54,7 @@ export def main []: nothing -> string {
 @usage 'output "text" default=#true'
 @usage 'output ("table<name: string, size: filesize>")"csv" media_type="text/csv" select="--csv" help="One row per thing"'
 export def "sizes ls" []: nothing -> table<name: string, size: filesize> {
-    ^sizes ls --csv ...(nus argv [] {}) | from csv | into filesize size
+    ^(nus bin) ls --csv ...(nus argv [] {}) | from csv | into filesize size
 }
 
 # Describe one thing
@@ -57,5 +65,5 @@ export def "sizes ls" []: nothing -> table<name: string, size: filesize> {
 export def "sizes info" [
     name: string,  # The thing
 ]: nothing -> record<name: string, built: datetime> {
-    ^sizes info --yaml ...(nus argv [$name] {}) | from yaml | into datetime built
+    ^(nus bin) info --yaml ...(nus argv [$name] {}) | from yaml | into datetime built
 }

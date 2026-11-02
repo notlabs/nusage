@@ -36,6 +36,14 @@ def "nus flag-words" []: record -> list<string> {
     } | flatten
 }
 
+# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
+# that names one, else the name, found on PATH.
+def "nus bin" []: nothing -> string {
+    let bins = $env.NUS_BINS? | default {}
+    let bins = if ($bins | describe) == string { $bins | from nuon } else { $bins }
+    $bins."jj"? | default jj
+}
+
 # Completions from usage's own completer, against the spec this module was generated
 # from, with the words typed so far. Nothing when the `usage` CLI is not installed.
 def "nus complete" [place: record] {
@@ -195,7 +203,7 @@ export def main [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj ...(nus argv [] {
+    ^(nus bin) ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -250,7 +258,7 @@ export def "jj abandon" [
     --retain-bookmarks,                         # Do not delete bookmarks pointing to the revisions to abandon
     --restore-descendants,                      # Do not modify the content of the children of the abandoned commits
 ]: nothing -> string {
-    ^jj abandon ...(nus argv [...$revsets] {
+    ^(nus bin) abandon ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -322,7 +330,7 @@ export def "jj absorb" [
     --interactive (-i),                         # Interactively choose which parts to absorb
     --tool: string,                             # Specify diff editor to be used (implies --interactive)
 ]: nothing -> string {
-    ^jj absorb ...(nus argv [...$filesets] {
+    ^(nus bin) absorb ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -364,7 +372,7 @@ export def "jj arrange" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj arrange ...(nus argv [...$revsets] {
+    ^(nus bin) arrange ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -393,7 +401,7 @@ export def "jj bisect" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj bisect ...(nus argv [] {
+    ^(nus bin) bisect ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -515,7 +523,7 @@ export def "jj bisect run" [
     --find-good,                                # Find the first good revision instead
     --trust-endpoints,                          # Skip the pre-bisection checks
 ]: nothing -> string {
-    ^jj bisect run ...(nus argv [$command ...$args] {
+    ^(nus bin) bisect run ...(nus argv [$command ...$args] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -558,7 +566,7 @@ export def "jj bookmark" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj bookmark ...(nus argv [] {
+    ^(nus bin) bookmark ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -632,7 +640,7 @@ export def "jj bookmark advance" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --to (-t): string,                          # Move bookmarks to this revision
 ]: nothing -> string {
-    ^jj bookmark advance ...(nus argv [...$names] {
+    ^(nus bin) bookmark advance ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -669,7 +677,7 @@ export def "jj bookmark create" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --revision (-r): string,                    # The bookmark's target revision
 ]: nothing -> string {
-    ^jj bookmark create ...(nus argv [...$names] {
+    ^(nus bin) bookmark create ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -719,7 +727,7 @@ export def "jj bookmark delete" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj bookmark delete ...(nus argv [...$names] {
+    ^(nus bin) bookmark delete ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -772,7 +780,7 @@ export def "jj bookmark forget" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --include-remotes,                          # When forgetting a local bookmark, also forget any corresponding remote bookmarks
 ]: nothing -> string {
-    ^jj bookmark forget ...(nus argv [...$names] {
+    ^(nus bin) bookmark forget ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -891,7 +899,7 @@ export def "jj bookmark list" [
     --revision (-r): list<string>,                                                                                                                                                                                  # Show bookmarks whose local targets are in the given revisions
     --sort: list<string>@[name name- author-name author-name- author-email author-email- author-date author-date- committer-name committer-name- committer-email committer-email- committer-date committer-date-],  # Sort bookmarks based on the given key (or multiple keys)
 ]: nothing -> table<name: string, remote: oneof<string, nothing>, target: list<oneof<string, nothing>>, tracking_target: oneof<list<oneof<string, nothing>>, nothing>> {
-    let text = ^jj bookmark list --template "json(self) ++ \"\\n\"" ...(nus argv [...$names] {
+    let text = ^(nus bin) bookmark list --template "json(self) ++ \"\\n\"" ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -961,7 +969,7 @@ export def "jj bookmark move" [
     --to (-t): string,                          # Move bookmarks to this revision
     --allow-backwards (-B),                     # Allow moving bookmarks backwards or sideways
 ]: nothing -> string {
-    ^jj bookmark move ...(nus argv [...$names] {
+    ^(nus bin) bookmark move ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1007,7 +1015,7 @@ export def "jj bookmark rename" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --overwrite-existing,                       # Allow renaming even if the new bookmark name already exists
 ]: nothing -> string {
-    ^jj bookmark rename ...(nus argv [$old $new] {
+    ^(nus bin) bookmark rename ...(nus argv [$old $new] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1053,7 +1061,7 @@ export def "jj bookmark set" [
     --revision (-r): string,                    # The bookmark's target revision
     --allow-backwards (-B),                     # Allow moving the bookmark backwards or sideways
 ]: nothing -> string {
-    ^jj bookmark set ...(nus argv [...$names] {
+    ^(nus bin) bookmark set ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1115,7 +1123,7 @@ export def "jj bookmark track" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --remote: list<string>,                     # Remote names to track
 ]: nothing -> string {
-    ^jj bookmark track ...(nus argv [...$bookmark_remote] {
+    ^(nus bin) bookmark track ...(nus argv [...$bookmark_remote] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1179,7 +1187,7 @@ export def "jj bookmark untrack" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --remote: list<string>,                     # Remote names to untrack
 ]: nothing -> string {
-    ^jj bookmark untrack ...(nus argv [...$bookmark_remote] {
+    ^(nus bin) bookmark untrack ...(nus argv [...$bookmark_remote] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1257,7 +1265,7 @@ export def "jj commit" [
     --message (-m): list<string>,               # The change description to use (don't open editor)
     --editor,                                   # Open an editor to edit the change description
 ]: nothing -> string {
-    ^jj commit ...(nus argv [...$filesets] {
+    ^(nus bin) commit ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1305,7 +1313,7 @@ export def "jj config" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj config ...(nus argv [] {
+    ^(nus bin) config ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1363,7 +1371,7 @@ export def "jj config edit" [
     --workspace,                                # Target the workspace-level config
     --file: path@"nus complete",                # Target the config file specified by the given path
 ]: nothing -> string {
-    ^jj config edit ...(nus argv [] {
+    ^(nus bin) config edit ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1396,7 +1404,7 @@ export def "jj config gc" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj config gc ...(nus argv [] {
+    ^(nus bin) config gc ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1447,7 +1455,7 @@ export def "jj config get" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj config get ...(nus argv [$name] {
+    ^(nus bin) config get ...(nus argv [$name] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1517,7 +1525,7 @@ export def "jj config list" [
     --repo,                                     # Target the repo-level config
     --workspace,                                # Target the workspace-level config
 ]: nothing -> table<name: string, value: any, source: string, path: oneof<string, nothing>, is_overridden: bool> {
-    let text = ^jj config list --template "json(self) ++ \"\\n\"" ...(nus argv [$name] {
+    let text = ^(nus bin) config list --template "json(self) ++ \"\\n\"" ...(nus argv [$name] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1575,7 +1583,7 @@ export def "jj config path" [
     --repo,                                     # Target the repo-level config
     --workspace,                                # Target the workspace-level config
 ]: nothing -> string {
-    ^jj config path ...(nus argv [] {
+    ^(nus bin) config path ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1639,7 +1647,7 @@ export def "jj config set" [
     --workspace,                                # Target the workspace-level config
     --file: path@"nus complete",                # Target the config file specified by the given path
 ]: nothing -> string {
-    ^jj config set ...(nus argv [$name $value] {
+    ^(nus bin) config set ...(nus argv [$name $value] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1696,7 +1704,7 @@ export def "jj config unset" [
     --workspace,                                # Target the workspace-level config
     --file: path@"nus complete",                # Target the config file specified by the given path
 ]: nothing -> string {
-    ^jj config unset ...(nus argv [$name] {
+    ^(nus bin) config unset ...(nus argv [$name] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1775,7 +1783,7 @@ export def "jj converge" [
     --revision (-r): list<string>,              # The search space to look for divergent revisions
     --no-interactive,                           # Do not prompt the user for help resolving divergence
 ]: nothing -> string {
-    ^jj converge ...(nus argv [] {
+    ^(nus bin) converge ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1847,7 +1855,7 @@ export def "jj describe" [
     --stdin,                                    # Read the change description from stdin
     --editor,                                   # Open an editor to edit the change description
 ]: nothing -> string {
-    ^jj describe ...(nus argv [...$revsets] {
+    ^(nus bin) describe ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -1986,7 +1994,7 @@ export def "jj diff" [
     --ignore-all-space (-w),                    # Ignore whitespace when comparing lines
     --ignore-space-change (-b),                 # Ignore changes in amount of whitespace when comparing lines
 ]: nothing -> string {
-    ^jj diff ...(nus argv [...$filesets] {
+    ^(nus bin) diff ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2094,7 +2102,7 @@ export def "jj diffedit" [
     --tool: string,                             # Specify diff editor to be used
     --restore-descendants,                      # Preserve the content (not the diff) when rebasing descendants
 ]: nothing -> string {
-    ^jj diffedit ...(nus argv [...$filesets] {
+    ^(nus bin) diffedit ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2160,7 +2168,7 @@ export def "jj duplicate" [
     --insert-after (-A): list<string>,          # The revision(s) to insert after (can be repeated to create a merge commit)
     --insert-before (-B): list<string>,         # The revision(s) to insert before (can be repeated to create a merge commit)
 ]: nothing -> string {
-    ^jj duplicate ...(nus argv [...$revsets] {
+    ^(nus bin) duplicate ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2208,7 +2216,7 @@ export def "jj edit" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj edit ...(nus argv [$revset] {
+    ^(nus bin) edit ...(nus argv [$revset] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2318,7 +2326,7 @@ export def "jj evolog" [
     --limit (-n): string,                       # Limit number of revisions to show
     --reversed,                                 # Show revisions in the opposite order (older revisions first)
 ]: nothing -> table<commit: record<commit_id: string, parents: list<string>, change_id: string, description: string, author: record<name: string, email: string, timestamp: datetime>, committer: record<name: string, email: string, timestamp: datetime>>, operation: oneof<record<id: string, parents: list<string>, time: record<start: datetime, end: datetime>, description: string, hostname: string, username: string, is_snapshot: bool, workspace_name: oneof<string, nothing>, attributes: record>, nothing>> {
-    let text = ^jj evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [] {
+    let text = ^(nus bin) evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2351,7 +2359,7 @@ export def "jj file" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj file ...(nus argv [] {
+    ^(nus bin) file ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2409,7 +2417,7 @@ export def "jj file annotate" [
     --revision (-r): string,                    # an optional revision to start at
     --template (-T): string,                    # Render each line using the given template
 ]: nothing -> string {
-    ^jj file annotate ...(nus argv [$path] {
+    ^(nus bin) file annotate ...(nus argv [$path] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2465,7 +2473,7 @@ export def "jj file chmod" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --revision (-r): string,                    # The revision to update
 ]: nothing -> string {
-    ^jj file chmod ...(nus argv [$mode ...$filesets] {
+    ^(nus bin) file chmod ...(nus argv [$mode ...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2511,7 +2519,7 @@ export def "jj file delete" [
     --revision (-r): string,                    # The revision to delete the files in
     --restore-descendants,                      # Preserve the content (not the diff) when rebasing descendants
 ]: nothing -> string {
-    ^jj file delete ...(nus argv [...$filesets] {
+    ^(nus bin) file delete ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2566,7 +2574,7 @@ export def "jj file edit" [
     --revision (-r): string,                    # The revision to edit the file in
     --restore-descendants,                      # Preserve the content (not the diff) when rebasing descendants
 ]: nothing -> string {
-    ^jj file edit ...(nus argv [$file] {
+    ^(nus bin) file edit ...(nus argv [$file] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2619,7 +2627,7 @@ export def "jj file list" [
     --revision (-r): string,                    # The revision to list files in
     --template (-T): string,                    # Render each file entry using the given template
 ]: nothing -> string {
-    ^jj file list ...(nus argv [...$filesets] {
+    ^(nus bin) file list ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2685,7 +2693,7 @@ export def "jj file search" [
     --name-only,                                # Print only the paths of files that contain a match, not the matched lines
     --line-number (-n),                         # Prefix each matched line with its 1-based line number within the file
 ]: nothing -> string {
-    ^jj file search ...(nus argv [...$filesets] {
+    ^(nus bin) file search ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2747,7 +2755,7 @@ export def "jj file show" [
     --revision (-r): string,                    # The revision to get the file contents from
     --template (-T): string,                    # Render each file metadata using the given template
 ]: nothing -> string {
-    ^jj file show ...(nus argv [...$filesets] {
+    ^(nus bin) file show ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2800,7 +2808,7 @@ export def "jj file track" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --include-ignored,                          # Track paths even if they're ignored or too large
 ]: nothing -> string {
-    ^jj file track ...(nus argv [...$filesets] {
+    ^(nus bin) file track ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -2837,7 +2845,7 @@ export def "jj file untrack" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj file untrack ...(nus argv [...$filesets] {
+    ^(nus bin) file untrack ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3090,7 +3098,7 @@ export def "jj fix" [
     --include-unchanged-files,                  # Fix unchanged files in addition to changed ones. If no paths are specified, all files in the repo will be fixed
     --all-lines (-a),                           # Format all lines instead of only modified lines
 ]: nothing -> string {
-    ^jj fix ...(nus argv [...$filesets] {
+    ^(nus bin) fix ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3122,7 +3130,7 @@ export def "jj gerrit" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj gerrit ...(nus argv [] {
+    ^(nus bin) gerrit ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3383,7 +3391,7 @@ export def "jj gerrit upload" [
     --option (-o): list<string>,                        # Send a `git push -o` option (can be repeated)
     --trace: string,                                    # For debugging Gerrit
 ]: nothing -> string {
-    ^jj gerrit upload ...(nus argv [] {
+    ^(nus bin) gerrit upload ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3453,7 +3461,7 @@ export def "jj git" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git ...(nus argv [] {
+    ^(nus bin) git ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3568,7 +3576,7 @@ export def "jj git clone" [
     --tag (-t): list<string>,                   # Fetch only some of the tags (can be repeated)
     --object-hash: string@["sha1" "sha256"],    # Object hash algorithm for the local Git repository
 ]: nothing -> string {
-    ^jj git clone ...(nus argv [$source $destination] {
+    ^(nus bin) git clone ...(nus argv [$source $destination] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3604,7 +3612,7 @@ export def "jj git colocation" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git colocation ...(nus argv [] {
+    ^(nus bin) git colocation ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3640,7 +3648,7 @@ export def "jj git colocation disable" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git colocation disable ...(nus argv [] {
+    ^(nus bin) git colocation disable ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3676,7 +3684,7 @@ export def "jj git colocation enable" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git colocation enable ...(nus argv [] {
+    ^(nus bin) git colocation enable ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3705,7 +3713,7 @@ export def "jj git colocation status" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git colocation status ...(nus argv [] {
+    ^(nus bin) git colocation status ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3741,7 +3749,7 @@ export def "jj git export" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git export ...(nus argv [] {
+    ^(nus bin) git export ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3835,7 +3843,7 @@ export def "jj git fetch" [
     --remote: list<string>,                     # The remote to fetch from (only named remotes are supported, can be repeated)
     --all-remotes,                              # Fetch from all remotes
 ]: nothing -> string {
-    ^jj git fetch ...(nus argv [] {
+    ^(nus bin) git fetch ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3884,7 +3892,7 @@ export def "jj git import" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git import ...(nus argv [] {
+    ^(nus bin) git import ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -3987,7 +3995,7 @@ export def "jj git init" [
     --object-hash: string@["sha1" "sha256"],    # Object hash algorithm for the newly created Git repository
     --git-repo: path@"nus complete",            # Specifies a path to an **existing** git repository to be used as the backing git repo for the newly created `jj` repo
 ]: nothing -> string {
-    ^jj git init ...(nus argv [$destination] {
+    ^(nus bin) git init ...(nus argv [$destination] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4152,7 +4160,7 @@ export def "jj git push" [
     --dry-run,                                  # Only display what will change on the remote
     --option (-o): list<string>,                # Git push options
 ]: nothing -> string {
-    ^jj git push ...(nus argv [] {
+    ^(nus bin) git push ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4202,7 +4210,7 @@ export def "jj git remote" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git remote ...(nus argv [] {
+    ^(nus bin) git remote ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4250,7 +4258,7 @@ export def "jj git remote add" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --push-url: string@"nus complete",          # The URL used for push
 ]: nothing -> string {
-    ^jj git remote add ...(nus argv [$remote $url] {
+    ^(nus bin) git remote add ...(nus argv [$remote $url] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4280,7 +4288,7 @@ export def "jj git remote list" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git remote list ...(nus argv [] {
+    ^(nus bin) git remote list ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4311,7 +4319,7 @@ export def "jj git remote remove" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git remote remove ...(nus argv [$remote] {
+    ^(nus bin) git remote remove ...(nus argv [$remote] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4344,7 +4352,7 @@ export def "jj git remote rename" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git remote rename ...(nus argv [$old $new] {
+    ^(nus bin) git remote rename ...(nus argv [$old $new] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4404,7 +4412,7 @@ export def "jj git remote set-url" [
     --push: string@"nus complete",              # The URL or path to push to
     --fetch: string@"nus complete",             # The URL or path to fetch from
 ]: nothing -> string {
-    ^jj git remote set-url ...(nus argv [$remote $url] {
+    ^(nus bin) git remote set-url ...(nus argv [$remote $url] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4435,7 +4443,7 @@ export def "jj git root" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj git root ...(nus argv [] {
+    ^(nus bin) git root ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4480,7 +4488,7 @@ export def "jj help" [
     --config-file: list<path>@"nus complete",                                                # Additional configuration files (can be repeated)
     --keyword (-k): string@[bookmarks config filesets glossary revsets templates tutorial],  # Show help for keywords instead of commands
 ]: nothing -> string {
-    ^jj help ...(nus argv [...$command] {
+    ^(nus bin) help ...(nus argv [...$command] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4596,7 +4604,7 @@ export def "jj interdiff" [
     --ignore-all-space (-w),                    # Ignore whitespace when comparing lines
     --ignore-space-change (-b),                 # Ignore changes in amount of whitespace when comparing lines
 ]: nothing -> string {
-    ^jj interdiff ...(nus argv [...$filesets] {
+    ^(nus bin) interdiff ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4743,7 +4751,7 @@ export def "jj log" [
     --limit (-n): string,                       # Limit number of revisions to show
     --reversed,                                 # Show revisions in the opposite order (older revisions first)
 ]: nothing -> table<commit_id: string, parents: list<string>, change_id: string, description: string, author: record<name: string, email: string, timestamp: datetime>, committer: record<name: string, email: string, timestamp: datetime>> {
-    let text = ^jj log --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [...$filesets] {
+    let text = ^(nus bin) log --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4865,7 +4873,7 @@ export def "jj metaedit" [
     --author-timestamp: string,                 # Set the author date to the given date
     --force-rewrite,                            # Rewrite the commit, even if no other metadata changed
 ]: nothing -> string {
-    ^jj metaedit ...(nus argv [...$revsets] {
+    ^(nus bin) metaedit ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -4997,7 +5005,7 @@ export def "jj new" [
     --insert-after (-A): list<string>,          # Insert the new change after the given commit(s)
     --insert-before (-B): list<string>,         # Insert the new change before the given commit(s)
 ]: nothing -> string {
-    ^jj new ...(nus argv [...$revsets] {
+    ^(nus bin) new ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5107,7 +5115,7 @@ export def "jj next" [
     --no-edit (-n),                             # The inverse of `--edit`
     --conflict,                                 # Jump to the next conflicted descendant
 ]: nothing -> string {
-    ^jj next ...(nus argv [$offset] {
+    ^(nus bin) next ...(nus argv [$offset] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5151,7 +5159,7 @@ export def "jj operation" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj operation ...(nus argv [] {
+    ^(nus bin) operation ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5197,7 +5205,7 @@ export def "jj operation abandon" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj operation abandon ...(nus argv [$operation] {
+    ^(nus bin) operation abandon ...(nus argv [$operation] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5300,7 +5308,7 @@ export def "jj operation diff" [
     --ignore-space-change,                      # Ignore changes in amount of whitespace when comparing lines
     --show-changes-in: string,                  # Show only changed revisions matching the given revset expression
 ]: nothing -> string {
-    ^jj operation diff ...(nus argv [] {
+    ^(nus bin) operation diff ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5358,7 +5366,7 @@ export def "jj operation integrate" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj operation integrate ...(nus argv [$operation] {
+    ^(nus bin) operation integrate ...(nus argv [$operation] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5470,7 +5478,7 @@ export def "jj operation log" [
     --limit (-n): string,                       # Limit number of operations to show
     --reversed,                                 # Show operations in the opposite order (older operations first)
 ]: nothing -> table<id: string, parents: list<string>, time: record<start: datetime, end: datetime>, description: string, hostname: string, username: string, is_snapshot: bool, workspace_name: oneof<string, nothing>, attributes: record> {
-    let text = ^jj operation log --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [] {
+    let text = ^(nus bin) operation log --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5533,7 +5541,7 @@ export def "jj operation restore" [
     --config-file: list<path>@"nus complete",     # Additional configuration files (can be repeated)
     --what: list<string>@[repo remote-tracking],  # What portions of the local state to restore (can be repeated)
 ]: nothing -> string {
-    ^jj operation restore ...(nus argv [$operation] {
+    ^(nus bin) operation restore ...(nus argv [$operation] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5594,7 +5602,7 @@ export def "jj operation revert" [
     --config-file: list<path>@"nus complete",     # Additional configuration files (can be repeated)
     --what: list<string>@[repo remote-tracking],  # What portions of the local state to restore (can be repeated)
 ]: nothing -> string {
-    ^jj operation revert ...(nus argv [$operation] {
+    ^(nus bin) operation revert ...(nus argv [$operation] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5707,7 +5715,7 @@ export def "jj operation show" [
     --ignore-space-change,                      # Ignore changes in amount of whitespace when comparing lines
     --show-changes-in: string,                  # Show only changed revisions matching the given revset expression
 ]: nothing -> string {
-    ^jj operation show ...(nus argv [$operation] {
+    ^(nus bin) operation show ...(nus argv [$operation] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5807,7 +5815,7 @@ export def "jj parallelize" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj parallelize ...(nus argv [...$revsets] {
+    ^(nus bin) parallelize ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -5913,7 +5921,7 @@ export def "jj prev" [
     --no-edit (-n),                             # The inverse of `--edit`
     --conflict,                                 # Jump to the previous conflicted ancestor
 ]: nothing -> string {
-    ^jj prev ...(nus argv [$offset] {
+    ^(nus bin) prev ...(nus argv [$offset] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6440,7 +6448,7 @@ export def "jj rebase" [
     --keep-divergent,                           # Keep divergent commits while rebasing
     --simplify-parents,                         # Simplify parents of rebased commits, like `jj simplify-parents`, while rebasing them. Any parents that are ancestors of other parents will be removed
 ]: nothing -> string {
-    ^jj rebase ...(nus argv [] {
+    ^(nus bin) rebase ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6495,7 +6503,7 @@ export def "jj redo" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --allow-cross-workspace,                    # Allow redoing an undo-operation that was performed in another workspace
 ]: nothing -> string {
-    ^jj redo ...(nus argv [] {
+    ^(nus bin) redo ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6554,7 +6562,7 @@ export def "jj resolve" [
     --list (-l),                                # Instead of resolving conflicts, list all the conflicts
     --tool: string,                             # Specify 3-way merge tool to be used
 ]: nothing -> string {
-    ^jj resolve ...(nus argv [...$filesets] {
+    ^(nus bin) resolve ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6644,7 +6652,7 @@ export def "jj restore" [
     --tool: string,                             # Specify diff editor to be used (implies --interactive)
     --restore-descendants,                      # Preserve the content (not the diff) when rebasing descendants
 ]: nothing -> string {
-    ^jj restore ...(nus argv [...$filesets] {
+    ^(nus bin) restore ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6708,7 +6716,7 @@ export def "jj revert" [
     --insert-after (-A): list<string>,          # The revision(s) to insert the reverse changes after (can be repeated to create a merge commit)
     --insert-before (-B): list<string>,         # The revision(s) to insert the reverse changes before (can be repeated to create a merge commit)
 ]: nothing -> string {
-    ^jj revert ...(nus argv [] {
+    ^(nus bin) revert ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6741,7 +6749,7 @@ export def "jj root" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj root ...(nus argv [] {
+    ^(nus bin) root ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6889,7 +6897,7 @@ export def "jj run" [
     --ignore-errors,                              # Continue with remaining revisions when a command's exit code indicates failure
     --sparse-patterns: string@[copy full empty],  # How to handle sparse patterns when running the command. This is controlled per `jj run` invocation
 ]: nothing -> string {
-    ^jj run ...(nus argv [$command ...$args] {
+    ^(nus bin) run ...(nus argv [$command ...$args] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -6996,7 +7004,7 @@ export def "jj show" [
     --ignore-all-space (-w),                    # Ignore whitespace when comparing lines
     --ignore-space-change (-b),                 # Ignore changes in amount of whitespace when comparing lines
 ]: nothing -> string {
-    ^jj show ...(nus argv [...$revsets] {
+    ^(nus bin) show ...(nus argv [...$revsets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7069,7 +7077,7 @@ export def "jj sign" [
     --revision (-r): list<string>,              # What revision(s) to sign
     --key: string,                              # The key used for signing
 ]: nothing -> string {
-    ^jj sign ...(nus argv [] {
+    ^(nus bin) sign ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7125,7 +7133,7 @@ export def "jj simplify-parents" [
     --source (-s): list<string>,                # Simplify specified revision(s) together with their trees of descendants (can be repeated)
     --revision (-r): list<string>,              # Simplify specified revision(s) (can be repeated)
 ]: nothing -> string {
-    ^jj simplify-parents ...(nus argv [] {
+    ^(nus bin) simplify-parents ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7156,7 +7164,7 @@ export def "jj sparse" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj sparse ...(nus argv [] {
+    ^(nus bin) sparse ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7185,7 +7193,7 @@ export def "jj sparse edit" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj sparse edit ...(nus argv [] {
+    ^(nus bin) sparse edit ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7221,7 +7229,7 @@ export def "jj sparse list" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj sparse list ...(nus argv [] {
+    ^(nus bin) sparse list ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7250,7 +7258,7 @@ export def "jj sparse reset" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj sparse reset ...(nus argv [] {
+    ^(nus bin) sparse reset ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7298,7 +7306,7 @@ export def "jj sparse set" [
     --remove: list<path>@"nus complete",        # Patterns to remove from the working copy
     --clear,                                    # Include no files in the working copy (combine with --add)
 ]: nothing -> string {
-    ^jj sparse set ...(nus argv [] {
+    ^(nus bin) sparse set ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7504,7 +7512,7 @@ export def "jj split" [
     --editor,                                   # Open an editor to edit the change description(s)
     --parallel (-p),                            # Split the revision into two parallel revisions instead of a parent and child
 ]: nothing -> string {
-    ^jj split ...(nus argv [...$filesets] {
+    ^(nus bin) split ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7633,7 +7641,7 @@ export def "jj squash" [
     --tool: string,                             # Specify diff editor to be used (implies --interactive)
     --keep-emptied (-k),                        # The source revision will not be abandoned
 ]: nothing -> string {
-    ^jj squash ...(nus argv [...$filesets] {
+    ^(nus bin) squash ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7704,7 +7712,7 @@ export def "jj status" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj status ...(nus argv [...$filesets] {
+    ^(nus bin) status ...(nus argv [...$filesets] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7733,7 +7741,7 @@ export def "jj tag" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj tag ...(nus argv [] {
+    ^(nus bin) tag ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7778,7 +7786,7 @@ export def "jj tag delete" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj tag delete ...(nus argv [...$names] {
+    ^(nus bin) tag delete ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7900,7 +7908,7 @@ export def "jj tag list" [
     --revision (-r): list<string>,                                                                                                                                                                                  # Show tags whose local targets are in the given revisions
     --sort: list<string>@[name name- author-name author-name- author-email author-email- author-date author-date- committer-name committer-name- committer-email committer-email- committer-date committer-date-],  # Sort tags based on the given key (or multiple keys)
 ]: nothing -> table<name: string, remote: oneof<string, nothing>, target: list<oneof<string, nothing>>, tracking_target: oneof<list<oneof<string, nothing>>, nothing>> {
-    let text = ^jj tag list --template "json(self) ++ \"\\n\"" ...(nus argv [...$names] {
+    let text = ^(nus bin) tag list --template "json(self) ++ \"\\n\"" ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -7945,7 +7953,7 @@ export def "jj tag set" [
     --revision (-r): string,                    # Target revision to point to
     --allow-move,                               # Allow moving existing tags
 ]: nothing -> string {
-    ^jj tag set ...(nus argv [...$names] {
+    ^(nus bin) tag set ...(nus argv [...$names] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8006,7 +8014,7 @@ export def "jj tag track" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --remote: list<string>,                     # Remote names to track
 ]: nothing -> string {
-    ^jj tag track ...(nus argv [...$tag_remote] {
+    ^(nus bin) tag track ...(nus argv [...$tag_remote] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8066,7 +8074,7 @@ export def "jj tag untrack" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --remote: list<string>,                     # Remote names to untrack
 ]: nothing -> string {
-    ^jj tag untrack ...(nus argv [...$tag_remote] {
+    ^(nus bin) tag untrack ...(nus argv [...$tag_remote] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8117,7 +8125,7 @@ export def "jj undo" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --allow-cross-workspace,                    # Allow undoing an operation that was performed in another workspace
 ]: nothing -> string {
-    ^jj undo ...(nus argv [] {
+    ^(nus bin) undo ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8163,7 +8171,7 @@ export def "jj unsign" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --revision (-r): list<string>,              # What revision(s) to unsign
 ]: nothing -> string {
-    ^jj unsign ...(nus argv [] {
+    ^(nus bin) unsign ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8193,7 +8201,7 @@ export def "jj util" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util ...(nus argv [] {
+    ^(nus bin) util ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8222,7 +8230,7 @@ export def "jj util backend" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util backend ...(nus argv [] {
+    ^(nus bin) util backend ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8251,7 +8259,7 @@ export def "jj util backend name" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util backend name ...(nus argv [] {
+    ^(nus bin) util backend name ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8329,7 +8337,7 @@ export def "jj util completion" [
     --config: list<string>,                                    # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",                  # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util completion ...(nus argv [$shell] {
+    ^(nus bin) util completion ...(nus argv [$shell] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8358,7 +8366,7 @@ export def "jj util config-schema" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util config-schema ...(nus argv [] {
+    ^(nus bin) util config-schema ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8432,7 +8440,7 @@ export def "jj util diff" [
     --ignore-all-space (-w),                    # Ignore whitespace when comparing lines
     --ignore-space-change (-b),                 # Ignore changes in amount of whitespace when comparing lines
 ]: nothing -> string {
-    ^jj util diff ...(nus argv [$path1 $path2] {
+    ^(nus bin) util diff ...(nus argv [$path1 $path2] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8563,7 +8571,7 @@ export def "jj util exec" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util exec ...(nus argv [$command ...$args] {
+    ^(nus bin) util exec ...(nus argv [$command ...$args] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8610,7 +8618,7 @@ export def "jj util gc" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --expire: string,                           # Time threshold
 ]: nothing -> string {
-    ^jj util gc ...(nus argv [] {
+    ^(nus bin) util gc ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8643,7 +8651,7 @@ export def "jj util install-man-pages" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util install-man-pages ...(nus argv [$path] {
+    ^(nus bin) util install-man-pages ...(nus argv [$path] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8672,7 +8680,7 @@ export def "jj util markdown-help" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util markdown-help ...(nus argv [] {
+    ^(nus bin) util markdown-help ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8822,7 +8830,7 @@ export def "jj util snapshot" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj util snapshot ...(nus argv [] {
+    ^(nus bin) util snapshot ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8851,7 +8859,7 @@ export def "jj version" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj version ...(nus argv [] {
+    ^(nus bin) version ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8895,7 +8903,7 @@ export def "jj workspace" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj workspace ...(nus argv [] {
+    ^(nus bin) workspace ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -8981,7 +8989,7 @@ export def "jj workspace add" [
     --no-colocate,                                # Do not create a Git worktree for this workspace
     --sparse-patterns: string@[copy full empty],  # How to handle sparse patterns when creating a new workspace
 ]: nothing -> string {
-    ^jj workspace add ...(nus argv [$destination] {
+    ^(nus bin) workspace add ...(nus argv [$destination] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9025,7 +9033,7 @@ export def "jj workspace forget" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj workspace forget ...(nus argv [...$workspaces] {
+    ^(nus bin) workspace forget ...(nus argv [...$workspaces] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9069,7 +9077,7 @@ export def "jj workspace list" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> table<name: string, target: record<commit_id: string, parents: list<string>, change_id: string, description: string, author: record<name: string, email: string, timestamp: datetime>, committer: record<name: string, email: string, timestamp: datetime>>> {
-    let text = ^jj workspace list --template "json(self) ++ \"\\n\"" ...(nus argv [] {
+    let text = ^(nus bin) workspace list --template "json(self) ++ \"\\n\"" ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9108,7 +9116,7 @@ export def "jj workspace remove" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj workspace remove ...(nus argv [...$workspaces] {
+    ^(nus bin) workspace remove ...(nus argv [...$workspaces] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9139,7 +9147,7 @@ export def "jj workspace rename" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj workspace rename ...(nus argv [$new_workspace_name] {
+    ^(nus bin) workspace rename ...(nus argv [$new_workspace_name] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9172,7 +9180,7 @@ export def "jj workspace root" [
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
     --name: string,                             # Name of the workspace (defaults to current)
 ]: nothing -> string {
-    ^jj workspace root ...(nus argv [] {
+    ^(nus bin) workspace root ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation
@@ -9213,7 +9221,7 @@ export def "jj workspace update-stale" [
     --config: list<string>,                     # Additional configuration options (can be repeated)
     --config-file: list<path>@"nus complete",   # Additional configuration files (can be repeated)
 ]: nothing -> string {
-    ^jj workspace update-stale ...(nus argv [] {
+    ^(nus bin) workspace update-stale ...(nus argv [] {
         --repository: $repository
         --ignore-working-copy: $ignore_working_copy
         --no-integrate-operation: $no_integrate_operation

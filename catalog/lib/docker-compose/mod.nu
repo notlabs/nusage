@@ -36,6 +36,14 @@ def "nus flag-words" []: record -> list<string> {
     } | flatten
 }
 
+# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
+# that names one, else the name, found on PATH.
+def "nus bin" []: nothing -> string {
+    let bins = $env.NUS_BINS? | default {}
+    let bins = if ($bins | describe) == string { $bins | from nuon } else { $bins }
+    $bins."docker-compose"? | default docker-compose
+}
+
 # A binary's output decoded as the module's closure decodes it. When that fails and the
 # `nus` this module was generated with is on PATH, the output is held to the schema the
 # spec declares, line by line with `--lines`, so the error names what does not match it
@@ -128,7 +136,7 @@ export def main [
     --project-directory: string,  # Specify an alternate working directory (default: the path of the, first specified, Compose file)
     --project-name (-p): string,  # Project name
 ]: nothing -> string {
-    ^docker-compose ...(nus argv [] {
+    ^(nus bin) ...(nus argv [] {
         --dry-run: $dry_run
         --all-resources: $all_resources
         --ansi: $ansi
@@ -175,7 +183,7 @@ export def "docker-compose ls" [
     --all (-a),        # Show all stopped Compose projects
     --filter: string,  # Filter output based on conditions provided
 ]: nothing -> table<Name: string, Status: string, ConfigFiles: string> {
-    let text = ^docker-compose ls --format json ...(nus argv [] {--dry-run: $dry_run, --all: $all, --filter: $filter})
+    let text = ^(nus bin) ls --format json ...(nus argv [] {--dry-run: $dry_run, --all: $all, --filter: $filter})
     nus decoded $text "{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"Name\",\"Status\",\"ConfigFiles\"],\"properties\":{\"Name\":{\"type\":\"string\"},\"Status\":{\"type\":\"string\"},\"ConfigFiles\":{\"type\":\"string\"}}}}" { from json }
 }
 
@@ -198,6 +206,6 @@ export def "docker-compose ls" [
 export def "docker-compose version" [
     --dry-run,  # Execute command in dry run mode
 ]: nothing -> record<version: string> {
-    let text = ^docker-compose version --format json ...(nus argv [] {--dry-run: $dry_run})
+    let text = ^(nus bin) version --format json ...(nus argv [] {--dry-run: $dry_run})
     nus decoded $text "{\"type\":\"object\",\"required\":[\"version\"],\"properties\":{\"version\":{\"type\":\"string\"}}}" { from json }
 }

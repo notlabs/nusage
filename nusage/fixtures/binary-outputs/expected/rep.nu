@@ -36,6 +36,14 @@ def "nus flag-words" []: record -> list<string> {
     } | flatten
 }
 
+# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
+# that names one, else the name, found on PATH.
+def "nus bin" []: nothing -> string {
+    let bins = $env.NUS_BINS? | default {}
+    let bins = if ($bins | describe) == string { $bins | from nuon } else { $bins }
+    $bins."rep"? | default rep
+}
+
 # Reports, with CLI-wide outputs and a CLI-wide selector
 @usage 'flag "--format <format>" help="Output format" global=#true'
 @usage 'output "text" default=#true help="Readable"'
@@ -43,16 +51,16 @@ def "nus flag-words" []: record -> list<string> {
 @usage 'select "--format"'
 @usage 'include file="included.kdl"'
 export def main []: nothing -> record<ok: bool> {
-    ^rep --format json ...(nus argv [] {}) | from json
+    ^(nus bin) --format json ...(nus argv [] {}) | from json
 }
 
 # List reports
 export def "rep list" [] {
-    ^rep list --format json ...(nus argv [] {}) | from json
+    ^(nus bin) list --format json ...(nus argv [] {}) | from json
 }
 
 # Only text
 @usage 'output "json" hide=#true'
 export def "rep quiet" []: nothing -> string {
-    ^rep quiet ...(nus argv [] {})
+    ^(nus bin) quiet ...(nus argv [] {})
 }
