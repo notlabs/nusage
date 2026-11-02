@@ -85,10 +85,21 @@ the tool on `PATH`.
 
 ## Release
 
-A checked main commit releases two things. Each entry whose `version` has no
-`catalog/<tool>/v<version>` release yet is packed by `//catalog:pack`, released, and signed
-with the workflow's identity by a job that cannot change the release; the bundle is attached
-after it. And when `catalog_version` under `[vars]` has no `catalog/v<version>` release yet,
+A checked main commit releases two things. Each entry with a `version` is packed by
+`//catalog:pack` and published as `catalog/<tool>/v<version>`. A release is complete when its
+archive and `packslip.catalog-<tool>.sigstore.json` bundle are both uploaded. A job that
+cannot change the release signs the archive with the workflow's identity; a separate job
+attaches the bundle. Retries finish incomplete releases and reuse already uploaded archives.
+
+When a later main commit finds an unsigned archive, its signature records the original
+release tag's commit. That recovery creates no new build attestation: the newer workflow
+did not build those bytes. A missing or interrupted archive can be rebuilt only from its
+original revision and only before a signature has been attached; otherwise restore the
+original archive or recover from the original workflow revision. API errors stop release
+processing instead of being treated as absent releases. `//catalog:check-release` exercises
+partial publication, signing and bundle attachment retries without contacting GitHub.
+
+When `catalog_version` under `[vars]` has no `catalog/v<version>` release yet,
 `//catalog:assemble` writes the task catalog, which is pushed to
 `ghcr.io/notlabs/nusage-tasks:<version>`, and the release `catalog/v<version>` marks it.
 Automatic releases skip CI completions superseded by a newer main commit, keeping the checked
