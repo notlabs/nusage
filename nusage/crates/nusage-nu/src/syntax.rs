@@ -275,6 +275,8 @@ pub enum Expr {
     Call { name: CommandName, args: Vec<Expr> },
     /// `^name arg arg`: an external command.
     External { name: String, args: Vec<Expr> },
+    /// `^(head) arg arg`: an external command whose name `head` computes when it runs.
+    ExternalOf { head: Box<Expr>, args: Vec<Expr> },
     /// A string in argument position: bare when Nushell reads it back as itself, else quoted.
     Str(String),
     /// `(expr)`: a call or pipeline where a value is expected, such as a record field.

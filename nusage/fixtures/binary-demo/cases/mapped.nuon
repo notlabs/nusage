@@ -1,0 +1,8 @@
+# A wrapper runs the binary `$env.NUS_BINS` names for it, here with the fake off PATH: what
+# installs the module can hold it to the binary its spec was read from.
+{
+    cmd: [install],
+    invoke: "demo install p -g",
+    mapped: true,
+    argv: [install, p, --global],
+}

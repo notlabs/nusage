@@ -26,11 +26,17 @@ pub(crate) const HELPERS: &str = include_str!("binary-helpers.nu");
 /// decodes a JSON document that has one.
 pub(crate) const DECODED: &str = include_str!("binary-decoded.nu");
 
+/// The helper that names the binary a wrapper runs.
+const BIN: &str = "nus bin";
+
 /// The module for a binary: the helpers, the completer when a parameter wants one, then a
 /// wrapper per command. `spec` is the spec file's path relative to the module's directory,
 /// for the completer, which runs usage's against it.
 pub fn module(tree: &CommandTree, spec: &str) -> Result<Module, SyntaxError> {
-    let mut items = vec![Item::Verbatim(HELPERS.to_string())];
+    let mut items = vec![
+        Item::Verbatim(HELPERS.to_string()),
+        Item::Verbatim(bin_helper(&tree.bin)),
+    ];
     let wants_completer = tree.commands.iter().any(|command| {
         command
             .positionals
@@ -58,6 +64,26 @@ pub fn module(tree: &CommandTree, spec: &str) -> Result<Module, SyntaxError> {
         preamble: vec![attr_usage_alias()?],
         items,
     })
+}
+
+/// The binary a wrapper runs: the path `$env.NUS_BINS` gives for its name, else the name,
+/// which Nushell looks up on PATH. Whatever installs the module can so hold its wrappers to
+/// the binary its spec was read from, without putting that binary on PATH. The map is a
+/// record, or NUON text as a parent process hands it down: a record in the environment does
+/// not reach a process Nushell starts.
+fn bin_helper(bin: &str) -> String {
+    format!(
+        r#"# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
+# that names one, else the name, found on PATH.
+def "{BIN}" []: nothing -> string {{
+    let bins = $env.NUS_BINS? | default {{}}
+    let bins = if ($bins | describe) == string {{ $bins | from nuon }} else {{ $bins }}
+    $bins.{member}? | default {bin}
+}}
+"#,
+        member = serde_json::Value::String(bin.to_string()),
+        bin = word(bin),
+    )
 }
 
 /// usage's completer as a Nushell one: the words typed so far go to `usage complete-word`
@@ -107,7 +133,7 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         None => None,
     };
 
-    // `^demo status --format json ...(nus argv [$a ...$rest] {--flag: $flag})`: the
+    // `^(nus bin) status --format json ...(nus argv [$a ...$rest] {--flag: $flag})`: the
     // selector words come first, so a `--` the caller passes still comes after them.
     let mut args: Vec<Expr> = command
         .path
@@ -122,8 +148,11 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         .map(|w| Expr::Str(w.clone()))
         .collect();
     args.push(Expr::Spread(Box::new(argv)));
-    let run = Expr::External {
-        name: tree.bin.clone(),
+    let run = Expr::ExternalOf {
+        head: Box::new(Expr::Call {
+            name: CommandName::new(BIN)?,
+            args: vec![],
+        }),
         args,
     };
 
