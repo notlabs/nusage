@@ -38,7 +38,7 @@ project has at another version than the package was generated from is refused. `
 the binary. The fragment also makes `nu` the `nus nu` wrapper: an editor that starts `nu --lsp`
 through mise's shims in the project gets nusage's language server, which checks a script with
 the same imports. `mise reshim` after adding the include. An interactive Nushell has every
-package as the overlay `nus`, which follows the working directory, from `nus activate nu`.
+package as an overlay that follows the working directory, from `nus activate nu`.
 
 ### The tasks elsewhere
 

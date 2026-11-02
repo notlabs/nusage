@@ -143,7 +143,8 @@ fn the_overlays_follow_the_directory_and_leave_what_was_set_at_the_prompt() {
     std::fs::create_dir_all(dir.join("proj")).unwrap();
     let tools = dir.join("tools");
     // mise, as far as the activation asks it: `env --json` for the working directory, or the
-    // one `-C` names, and the variables `hook-env` would hide in a shell mise started.
+    // one `-C` names, with `LEVEL` from `MISE_ENV` there, and the variables `hook-env` would
+    // hide in a shell mise started.
     executable(
         &dir.join("bin/mise"),
         &format!(
@@ -153,7 +154,7 @@ if [ "$1" = "-C" ]; then dir=$2; shift 2; fi
 case "$1 $2" in
 "env --json")
   case "$dir" in
-  */proj) printf '{{"FOO": "proj", "NUS_MODULES": "{{greet: %s}}", "PATH": "%s:%s"}}\n' "'{module}'" "{tools}" "$PATH" ;;
+  */proj) printf '{{"FOO": "proj", "LEVEL": "%s", "NUS_MODULES": "{{greet: %s}}", "PATH": "%s:%s"}}\n' "${{MISE_ENV:-read}}" "'{module}'" "{tools}" "$PATH" ;;
   *) printf '{{"PATH": "%s"}}\n' "$PATH" ;;
   esac ;;
 "hook-env -s")
@@ -194,8 +195,8 @@ esac
         json!(["gone", "gone", true])
     );
 
-    // As the hook does before a prompt: the modules for the directory, and their reload when
-    // they changed.
+    // As the hook does before a prompt: what changes the overlays for the directory, and the
+    // change when the environment changed.
     let prompt = |nu: &mut Session| -> bool {
         let changed = nu.eval(&format!("nus-overlays {cache}"));
         if changed == json!(true) {
@@ -204,26 +205,68 @@ esac
         }
         changed == json!(true)
     };
+    // The overlays in use, each named by what it holds, the digest left out.
+    let state = r#"[($env.FOO? | default gone) ($env.LEVEL? | default none) ($env.PATH.0 == $env.__NUS_PATH.0)
+        ($env.MINE? | default lost) (scope commands | where name == "greet hello" | length)
+        (overlay list | where active | get name | each { str replace --regex '-[0-9a-f]{8}$' '' })]"#;
 
     nu.eval("cd proj");
     assert!(prompt(&mut nu));
+    assert_eq!(nu.eval("greet hello"), json!("typed hello"));
+    assert_eq!(nu.eval("$env.PATH.0"), json!(tools.to_string_lossy()));
     assert_eq!(
-        nu.eval("[$env.FOO $env.PATH.0 (greet hello)]"),
-        json!(["proj", tools.to_string_lossy(), "typed hello"])
+        nu.eval(state),
+        json!([
+            "proj",
+            "read",
+            false,
+            "lost",
+            1,
+            ["zero", "mise", "nus", "prompt"]
+        ])
     );
-    nu.eval(r#"$env.MINE = "kept""#);
-    // An environment that has not changed is not reloaded.
+    // What is set at the prompt stays; another `MISE_ENV` is another environment.
+    nu.eval(r#"$env.MINE = "kept"; $env.MISE_ENV = "write""#);
+    assert!(prompt(&mut nu));
+    assert_eq!(
+        nu.eval(state),
+        json!([
+            "proj",
+            "write",
+            false,
+            "kept",
+            1,
+            ["zero", "mise", "nus", "prompt"]
+        ])
+    );
+    // An environment that has not changed changes nothing.
     assert!(!prompt(&mut nu));
 
+    // Leaving takes away all the overlays set, variables and commands, and keeps the rest.
     nu.eval("cd ..");
     assert!(prompt(&mut nu));
     assert_eq!(
-        nu.eval(
-            r#"[($env.FOO? | default gone) ($env.PATH.0 == $env.__NUS_PATH.0) $env.MINE
-            (scope commands | where name == "greet hello" | is-empty)
-            (overlay list | where active | get name)]"#
-        ),
-        json!(["gone", true, "kept", true, ["zero", "mise", "nus"]])
+        nu.eval(state),
+        json!(["gone", "none", true, "kept", 0, ["zero", "mise", "prompt"]])
+    );
+    assert_eq!(
+        nu.eval("pwd"),
+        json!(dir.canonicalize().unwrap().to_string_lossy())
+    );
+
+    // An environment met again has its overlays back.
+    nu.eval("cd proj");
+    assert!(prompt(&mut nu));
+    assert_eq!(
+        nu.eval(state),
+        json!([
+            "proj",
+            "write",
+            false,
+            "kept",
+            1,
+            ["zero", "mise", "nus", "prompt"]
+        ])
     );
     std::fs::remove_dir_all(&dir).unwrap();
 }

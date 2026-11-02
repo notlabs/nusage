@@ -1,8 +1,9 @@
 //! `nus activate <shell>`: what activates nusage in a shell, as `mise activate` does for mise,
 //! in mise's place. For Nushell the environment mise resolves for the working directory and
-//! `MISE_ENV` is an overlay, `mise`, and the typed commands of the packages it names are
-//! another, `nus`, above it, reloaded by a hook before each prompt when the environment
-//! changed. The script, `activate.nu`, says how; this fills in the paths it is written with.
+//! `MISE_ENV` is an overlay, and the typed commands of the packages it names another, each
+//! named by what it holds, so that a hook before each prompt changes environments by hiding
+//! one's overlays and using another's. The script, `activate.nu`, says how; this fills in the
+//! paths it is written with.
 
 use std::path::Path;
 

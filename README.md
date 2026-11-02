@@ -63,17 +63,18 @@ saved where Nushell autoloads in place of `mise activate nu`:
 nus activate nu | save --force ($nu.user-autoload-dirs | first | path join nus.nu)
 ```
 
-The environment mise resolves for the working directory and `MISE_ENV` is then the overlay
-`mise`, and the typed commands of the packages it names, as `nus modules` writes them, are
-the overlay `nus` above it. Before each prompt a hook runs `mise env --json` and, when the
-result changed, reloads both, so the line after a `cd` has the directory's tools and
-commands, and leaving takes them away again; `$env.MISE_ENV = "…"` switches environments the
-same way. `overlay list` shows the two, and `overlay hide` takes one away until the
-environment next changes. What is set at the prompt lands in `nus`, the top overlay, and
-stays from one directory to the next; a `PATH` set there hides mise's for the rest of the
-session. A shell mise started with a project's environment, through its `nu` wrapper, has that
-environment reverted first. A script, and `nu --mcp`, keep the environment they started with.
-`mise shell` needs mise's own activation: `$env.MISE_<TOOL>_VERSION` does the same here.
+The environment mise resolves for the working directory and `MISE_ENV` is then an overlay,
+`mise-<digest>`, and the typed commands of the packages it names, as `nus modules` writes
+them, another, `nus-<digest>`, each named by what it holds. Before each prompt a hook runs
+`mise env --json` and, when the result changed, hides the overlays of the last environment
+and uses those of this one, so the line after a `cd` has the directory's tools and commands,
+and leaving takes away everything they set; an environment met again has its overlays back
+as they were. `$env.MISE_ENV = "…"` switches environments the same way. Above them is the
+overlay `prompt`, where what is set at the prompt lands, so it stays from one directory to
+the next; a `PATH` set there hides mise's for the rest of the session. `overlay list` shows
+them all. A shell mise started with a project's environment, through its `nu` wrapper, has
+that environment reverted first. A script, and `nu --mcp`, keep the environment they started
+with. `mise shell` needs mise's own activation: `$env.MISE_<TOOL>_VERSION` does the same here.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nus built here. `mise run //:link <project>` installs this
