@@ -37,8 +37,12 @@ for exe in $built {
     if ($copy | path type) == symlink {
         rm $copy
     }
+    # Beside it first, then in its place: a language server an editor started from the old
+    # copy keeps running it, where copying over it would fail as a busy file.
     if not ($copy | path exists) or (open --raw $exe | hash sha256) != (open --raw $copy | hash sha256) {
-        cp $exe $copy
+        let partial = $"($copy).partial"
+        cp $exe $partial
+        mv --force $partial $copy
     }
 }
 '''
