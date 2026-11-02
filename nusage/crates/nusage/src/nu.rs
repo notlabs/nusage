@@ -132,11 +132,10 @@ fn with_execute(args: &[String], code: &str) -> Vec<String> {
     if let Some(at) = out
         .iter()
         .position(|word| word == "-e" || word == "--execute")
+        && let Some(theirs) = out.get(at + 1).cloned()
     {
-        if let Some(theirs) = out.get(at + 1) {
-            out[at + 1] = format!("{code}\n{theirs}");
-            return out;
-        }
+        out[at + 1] = format!("{code}\n{theirs}");
+        return out;
     }
     if let Some(at) = out.iter().position(|word| word.starts_with("--execute=")) {
         let theirs = &out[at]["--execute=".len()..];
