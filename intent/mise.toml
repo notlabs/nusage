@@ -1,11 +1,20 @@
+# Every task here that declares what it reads, and that it writes nothing, keeps its result
+# in mise's task cache.
+[task_config]
+cache = { enabled = true }
+
 [tasks.check]
 description = "Hold the intent's files to their schemas and its checked claims to nusage as it is"
 depends = ["//nusage:build"]
+sources = ["**/*"]
+outputs = []
 file = "check.nu"
 
 [tasks.claims]
 description = "List the intent's claims, by topic and status"
 depends = ["//nusage:build"]
+sources = ["**/*"]
+outputs = []
 file = "claims.nu"
 
 [tasks."check:platform"]
