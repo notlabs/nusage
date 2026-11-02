@@ -262,6 +262,11 @@ esac
         nu.eval("pwd"),
         json!(dir.canonicalize().unwrap().to_string_lossy())
     );
+    // What the shell started with from mise is not passed to the programs it runs, either.
+    assert_eq!(
+        nu.eval(r#"^sh -c 'echo ${FOO-absent} ${NUS_MODULES-absent}' | str trim"#),
+        json!("absent absent")
+    );
 
     // An environment met again has its overlays back.
     nu.eval("cd proj");

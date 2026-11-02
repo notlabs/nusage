@@ -39,13 +39,18 @@ def --env nus-revert []: nothing -> nothing {
         let set = $here
         | items {|name, value| if $name != "PATH" and ($env | get -o $name) == $value { $name } }
         | compact
-        $env.__NUS_REVERTED = $set
+        nus-unset ...$set
     }
-    # What it hides `nus-overlays` hides again at each change: Nushell brings a variable hidden
-    # below an overlay back when that overlay is hidden, where one set stays as it was set.
-    $env.__NUS_REVERTED = $env.__NUS_REVERTED? | default [] | append [__MISE_DIFF __MISE_SESSION]
-    hide-env --ignore-errors ...$env.__NUS_REVERTED
+    nus-unset __MISE_DIFF __MISE_SESSION
     $env.__NUS_PATH = $env.PATH
+}
+
+# Take variables out of this shell's own environment, below the overlays, by setting them to
+# null: Nushell passes no null to the programs it runs, and reads it as no value. Hiding them
+# would not last, as Nushell brings back what is hidden below an overlay when the overlay is
+# hidden, and the overlays change with every environment.
+def --env nus-unset [...names: string]: nothing -> nothing {
+    load-env ($names | reduce --fold {} {|name, vars| $vars | insert $name null })
 }
 
 # Write what changes this shell's overlays into `dir`, and whether the environment changed:
@@ -108,13 +113,9 @@ def nus-overlays [dir: path]: nothing -> bool {
     let used = overlay list
     | where active and (($it.name starts-with "mise-") or ($it.name starts-with "nus-"))
     | get name
-    let reverted = $env.__NUS_REVERTED? | default []
     [
         "# How this shell's overlays change, as `nus-overlays` writes it."
         ...($used | each {|name| $"overlay hide ($name | to nuon)" })
-        ...(if ($reverted | is-empty) { [] } else {
-            [("hide-env --ignore-errors " + ($reverted | each { to nuon } | str join " "))]
-        })
         ...($modules | append $prompt | each {|file| $"overlay use ($file | to nuon)" })
     ]
     | str join "\n"
