@@ -509,7 +509,10 @@ fn resolve_mounts(spec: &mut usage::Spec, file: &Path) -> Result<(), Diagnostic>
         let output = run_mount(&run)
             .map_err(|why| Diagnostic::new(file, format!("mount `{run}`: {why}")))?;
         let mounted: usage::Spec = output.parse().map_err(|err| {
-            Diagnostic::new(file, format!("mount `{run}` gave no spec usage reads: {err}"))
+            Diagnostic::new(
+                file,
+                format!("mount `{run}` gave no spec usage reads: {err}"),
+            )
         })?;
         pending.extend(mounts_in(&mounted.cmd));
         outputs.insert(run, output);
@@ -692,7 +695,11 @@ mod tests {
         let build = CommandPath(vec!["run".into(), "build".into()]);
         let run = &assembled.spec.cmd.subcommands["run"].subcommands["build"];
         assert!(run.flags.iter().any(|flag| flag.name == "release"));
-        for path in [CommandPath::root(), CommandPath(vec!["count".into()]), build.clone()] {
+        for path in [
+            CommandPath::root(),
+            CommandPath(vec!["count".into()]),
+            build.clone(),
+        ] {
             assert_eq!(assembled.body(&path), Some(script.as_path()), "{path}");
         }
         let count = &assembled.headers[&CommandPath(vec!["count".into()])];

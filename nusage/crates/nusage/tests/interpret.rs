@@ -174,7 +174,10 @@ fn a_script_runs_the_commands_its_spec_mounts() {
             "caller.nu",
             "#!/usr/bin/env nus\n(./tool.nu run build --release) | to nuon\n",
         ),
-        ("misspelt.nu", "#!/usr/bin/env nus\n./tool.nu run build --fast\n"),
+        (
+            "misspelt.nu",
+            "#!/usr/bin/env nus\n./tool.nu run build --fast\n",
+        ),
     ]);
     let Some(direct) = nus(&dir, "tool.nu", &["run", "build", "--release"], None) else {
         return;
@@ -188,6 +191,9 @@ fn a_script_runs_the_commands_its_spec_mounts() {
     assert_eq!(stdout(&called), "{cmd: [run, build], release: true}");
     let misspelt = nus(&dir, "misspelt.nu", &[], None).unwrap();
     assert!(!misspelt.status.success(), "{misspelt:?}");
-    assert!(String::from_utf8_lossy(&misspelt.stderr).contains("fast"), "{misspelt:?}");
+    assert!(
+        String::from_utf8_lossy(&misspelt.stderr).contains("fast"),
+        "{misspelt:?}"
+    );
     std::fs::remove_dir_all(dir).unwrap();
 }

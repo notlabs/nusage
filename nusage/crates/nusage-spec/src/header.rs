@@ -286,7 +286,10 @@ fn read(path: &Path, subcommand: Option<&str>, texts: &Texts) -> Result<ScriptHe
         None => {
             let mut spec = usage::Spec::parse_str_with_path(&kdl, path).map_err(rejected)?;
             // A name usage takes from the file is the sidecar's; the script's is the default.
-            let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
+            let file_name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("");
             for field in [&mut spec.name, &mut spec.bin] {
                 if field == file_name {
                     field.clear();
@@ -353,18 +356,37 @@ mod tests {
     fn a_sidecar_stands_in_for_the_header_and_includes_are_relative() {
         let dir = dir_of("sidecar");
         let script = dir.join("greet.nu");
-        fs::write(&script, "#!/usr/bin/env nus\n#USAGE arg \"<ignored>\"\n$usage\n").unwrap();
+        fs::write(
+            &script,
+            "#!/usr/bin/env nus\n#USAGE arg \"<ignored>\"\n$usage\n",
+        )
+        .unwrap();
         fs::write(dir.join("common.kdl"), "flag \"--loud\"\n").unwrap();
         let sidecar = dir.join(".greet.nu.usage.kdl");
-        fs::write(&sidecar, "arg (int)\"<times>\"\ninclude file=\"common.kdl\"\n").unwrap();
+        fs::write(
+            &sidecar,
+            "arg (int)\"<times>\"\ninclude file=\"common.kdl\"\n",
+        )
+        .unwrap();
         let read = read_header(&script).unwrap();
         assert_eq!(read.header.path, sidecar);
-        assert_eq!(read.cmd.args.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["times"]);
+        assert_eq!(
+            read.cmd
+                .args
+                .iter()
+                .map(|a| a.name.as_str())
+                .collect::<Vec<_>>(),
+            ["times"]
+        );
         assert_eq!(read.header.nodes[0].value_type(), Some("int"));
         assert!(read.cmd.flags.iter().any(|f| f.name == "loud"));
         assert!(read.spec.name.is_empty(), "{}", read.spec.name);
         fs::remove_file(&sidecar).unwrap();
-        fs::write(&script, "#!/usr/bin/env nus\n#USAGE include file=\"common.kdl\"\n$usage\n").unwrap();
+        fs::write(
+            &script,
+            "#!/usr/bin/env nus\n#USAGE include file=\"common.kdl\"\n$usage\n",
+        )
+        .unwrap();
         let read = read_header(&script).unwrap();
         assert_eq!(read.header.path, script);
         assert!(read.cmd.flags.iter().any(|f| f.name == "loud"));
