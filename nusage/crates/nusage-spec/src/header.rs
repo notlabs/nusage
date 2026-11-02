@@ -64,6 +64,9 @@ pub struct ScriptHeader {
     /// The command this file declares: its args, flags, outputs, and for a subcommand its
     /// `alias` and `hide` too.
     pub cmd: usage::SpecCommand,
+    /// The declarations of the commands the spec's own `cmd` nodes declare below this one,
+    /// by their path under it.
+    pub nested: BTreeMap<crate::CommandPath, Header>,
 }
 
 /// Lines that open or continue a header. Only the `#` comment prefix: these are Nushell files.
@@ -217,13 +220,40 @@ pub(crate) fn read_subcommand_header_in(
     read(path, Some(name), texts)
 }
 
+/// usage's spec beside a script, `.<file name>.usage.kdl`, which usage reads in place of the
+/// script's header; with its text, as `texts` holds it or as it is on disk.
+pub fn sidecar(script: &Path, texts: &Texts) -> Option<(PathBuf, String)> {
+    let name = script.file_name()?.to_str()?;
+    let file = script.with_file_name(format!(".{name}.usage.kdl"));
+    if let Some(text) = texts.get(&file) {
+        return Some((file, text.clone()));
+    }
+    let text = fs::read_to_string(&file).ok()?;
+    Some((file, text))
+}
+
 fn read(path: &Path, subcommand: Option<&str>, texts: &Texts) -> Result<ScriptHeader, Diagnostic> {
     let source = match texts.get(path) {
         Some(text) => text.clone(),
         None => fs::read_to_string(path)
             .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?,
     };
-    let lines = extract(path, &source)?;
+    let header = extract(path, &source)?;
+    // As usage reads a script: the hidden spec beside it when there is one, in place of its
+    // header, else its header. Either is read with its own path, which a relative `include`
+    // is relative to.
+    let (spec_path, lines) = match sidecar(path, texts) {
+        Some((file, text)) => {
+            let lines = text
+                .lines()
+                .enumerate()
+                .map(|(index, line)| (index + 1, line.to_string()))
+                .collect();
+            (file, lines)
+        }
+        None => (path.to_path_buf(), header),
+    };
+    let path = spec_path.as_path();
     // Byte offset of each joined line's start, to map node spans back to script lines.
     let mut offsets = Vec::with_capacity(lines.len());
     let mut kdl = String::new();
@@ -254,7 +284,14 @@ fn read(path: &Path, subcommand: Option<&str>, texts: &Texts) -> Result<ScriptHe
     };
     let (spec, cmd, about, about_long) = match subcommand {
         None => {
-            let spec = kdl.parse::<usage::Spec>().map_err(rejected)?;
+            let mut spec = usage::Spec::parse_str_with_path(&kdl, path).map_err(rejected)?;
+            // A name usage takes from the file is the sidecar's; the script's is the default.
+            let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
+            for field in [&mut spec.name, &mut spec.bin] {
+                if field == file_name {
+                    field.clear();
+                }
+            }
             let cmd = spec.cmd.clone();
             let (about, about_long) = (spec.about.clone(), spec.about_long.clone());
             (spec, cmd, about, about_long)
@@ -268,7 +305,7 @@ fn read(path: &Path, subcommand: Option<&str>, texts: &Texts) -> Result<ScriptHe
                 }
             }
             let wrapped = format!("name \"_\"\nbin \"_\"\ncmd {name:?} {{\n{doc}}}\n");
-            let spec = wrapped.parse::<usage::Spec>().map_err(rejected)?;
+            let spec = usage::Spec::parse_str_with_path(&wrapped, path).map_err(rejected)?;
             let cmd = spec.cmd.subcommands.get(name).cloned().ok_or_else(|| {
                 Diagnostic::new(path, "usage did not read the header as a command")
             })?;
@@ -276,6 +313,16 @@ fn read(path: &Path, subcommand: Option<&str>, texts: &Texts) -> Result<ScriptHe
             (spec, cmd, about, about_long)
         }
     };
+    let mut nested = BTreeMap::new();
+    crate::tree::collect_cmd_headers(
+        doc.nodes(),
+        &crate::CommandPath::root(),
+        &cmd,
+        path,
+        &kdl,
+        &line_of,
+        &mut nested,
+    )?;
     Ok(ScriptHeader {
         header: Header {
             path: path.to_path_buf(),
@@ -286,12 +333,43 @@ fn read(path: &Path, subcommand: Option<&str>, texts: &Texts) -> Result<ScriptHe
         kdl,
         spec,
         cmd,
+        nested,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn dir_of(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("nusage-spec-{name}-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// As usage reads a script: the hidden spec beside it, in place of its header, which
+    /// declarations then name; and a relative `include` in either, from the file it is in.
+    #[test]
+    fn a_sidecar_stands_in_for_the_header_and_includes_are_relative() {
+        let dir = dir_of("sidecar");
+        let script = dir.join("greet.nu");
+        fs::write(&script, "#!/usr/bin/env nus\n#USAGE arg \"<ignored>\"\n$usage\n").unwrap();
+        fs::write(dir.join("common.kdl"), "flag \"--loud\"\n").unwrap();
+        let sidecar = dir.join(".greet.nu.usage.kdl");
+        fs::write(&sidecar, "arg (int)\"<times>\"\ninclude file=\"common.kdl\"\n").unwrap();
+        let read = read_header(&script).unwrap();
+        assert_eq!(read.header.path, sidecar);
+        assert_eq!(read.cmd.args.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["times"]);
+        assert_eq!(read.header.nodes[0].value_type(), Some("int"));
+        assert!(read.cmd.flags.iter().any(|f| f.name == "loud"));
+        assert!(read.spec.name.is_empty(), "{}", read.spec.name);
+        fs::remove_file(&sidecar).unwrap();
+        fs::write(&script, "#!/usr/bin/env nus\n#USAGE include file=\"common.kdl\"\n$usage\n").unwrap();
+        let read = read_header(&script).unwrap();
+        assert_eq!(read.header.path, script);
+        assert!(read.cmd.flags.iter().any(|f| f.name == "loud"));
+        fs::remove_dir_all(dir).unwrap();
+    }
 
     fn header_of(source: &str) -> ScriptHeader {
         let dir = std::env::temp_dir().join(format!("nusage-spec-{}", std::process::id()));

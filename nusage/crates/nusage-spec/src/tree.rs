@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -178,7 +178,6 @@ fn assemble_from(
     let mut headers = BTreeMap::new();
     let root = CommandPath::root();
     let root_header = group_header(source, texts)?;
-    reject_mounts(&root_header.header)?;
     let mut spec = root_header.spec.clone();
     if spec.name.is_empty() {
         let name = dir_name(source)?;
@@ -186,16 +185,16 @@ fn assemble_from(
         spec.bin = name;
     }
     spec.cmd.name = spec.bin.clone();
-    spec.cmd.subcommands = children(source, &root, &mut bodies, &mut headers, texts)?;
+    let discovered = children(source, &root, &mut bodies, &mut headers, texts)?;
+    spec.cmd.subcommands.extend(discovered);
     bodies.insert(root.clone(), source.join("mod.nu"));
-    headers.insert(root, root_header.header);
+    insert_nested(&root, &root_header.nested, &mut headers);
+    let file = root_header.header.path.clone();
+    headers.insert(root.clone(), root_header.header);
+    resolve_mounts(&mut spec, &file)?;
     spec.restamp();
-    fill_headers(
-        &spec.cmd,
-        &CommandPath::root(),
-        &source.join("mod.nu"),
-        &mut headers,
-    );
+    fill_headers(&spec.cmd, &root, &file, &mut headers);
+    inherit_bodies(&spec.cmd, &root, None, &mut bodies);
     let mut out = Assembled {
         spec,
         source: Source::Scripts { bodies },
@@ -210,7 +209,6 @@ fn assemble_from(
 
 fn assemble_single(path: &Path, texts: &Texts) -> Result<Assembled, Diagnostic> {
     let script = read_header_in(path, texts)?;
-    reject_mounts(&script.header)?;
     let mut spec = script.spec.clone();
     if spec.name.is_empty() {
         let stem = file_stem(path)?;
@@ -218,14 +216,19 @@ fn assemble_single(path: &Path, texts: &Texts) -> Result<Assembled, Diagnostic> 
         spec.bin = stem;
     }
     spec.cmd.name = spec.bin.clone();
+    let file = script.header.path.clone();
+    resolve_mounts(&mut spec, &file)?;
     spec.restamp();
     let root = CommandPath::root();
+    let mut headers = BTreeMap::from([(root.clone(), script.header)]);
+    insert_nested(&root, &script.nested, &mut headers);
+    fill_headers(&spec.cmd, &root, &file, &mut headers);
+    let mut bodies = BTreeMap::from([(root.clone(), path.to_path_buf())]);
+    inherit_bodies(&spec.cmd, &root, None, &mut bodies);
     let mut out = Assembled {
         spec,
-        source: Source::Scripts {
-            bodies: BTreeMap::from([(root.clone(), path.to_path_buf())]),
-        },
-        headers: BTreeMap::from([(root, script.header)]),
+        source: Source::Scripts { bodies },
+        headers,
         providers: Vec::new(),
         output_args: OutputArgs::new(),
         http: None,
@@ -359,7 +362,7 @@ fn fill_headers(
     }
 }
 
-fn collect_cmd_headers(
+pub(crate) fn collect_cmd_headers(
     nodes: &[KdlNode],
     parent: &CommandPath,
     parent_cmd: &SpecCommand,
@@ -447,27 +450,102 @@ fn children(
         } else {
             continue;
         };
-        reject_mounts(&script.header)?;
         let path = parent.child(&name);
         let mut cmd = script.cmd.clone();
         cmd.name = name.clone();
-        cmd.subcommands = nested;
+        cmd.subcommands.extend(nested);
         bodies.insert(path.clone(), body);
+        insert_nested(&path, &script.nested, headers);
         headers.insert(path, script.header);
         subcommands.insert(name, cmd);
     }
     Ok(subcommands)
 }
 
-fn reject_mounts(header: &Header) -> Result<(), Diagnostic> {
-    if let Some(node) = header.nodes.iter().find(|node| node.name == "mount") {
-        return Err(Diagnostic::new(
-            &header.path,
-            "`mount` is not supported in a script: a script tree's directory is the discovery",
-        )
-        .at_line(node.line));
+/// A script's own declarations of the commands its spec declares below it, under its path.
+fn insert_nested(
+    at: &CommandPath,
+    nested: &BTreeMap<CommandPath, Header>,
+    headers: &mut BTreeMap<CommandPath, Header>,
+) {
+    for (relative, header) in nested {
+        let path = relative
+            .words()
+            .iter()
+            .fold(at.clone(), |path, word| path.child(word));
+        headers.insert(path, header.clone());
     }
-    Ok(())
+}
+
+/// The commands a script's spec declares below its own, in its header, by `include` or by
+/// `mount`, are the script's: it runs them, as usage runs a script for each of its commands,
+/// and reads which in `$usage.cmd`. A command keeps the script it has; one with none takes
+/// its parent's.
+fn inherit_bodies(
+    cmd: &SpecCommand,
+    path: &CommandPath,
+    inherited: Option<&PathBuf>,
+    bodies: &mut BTreeMap<CommandPath, PathBuf>,
+) {
+    let own = bodies.get(path).cloned().or_else(|| inherited.cloned());
+    if let Some(body) = &own {
+        bodies.entry(path.clone()).or_insert_with(|| body.clone());
+    }
+    for (name, sub) in &cmd.subcommands {
+        inherit_bodies(sub, &path.child(name), own.as_ref(), bodies);
+    }
+}
+
+/// usage's `mount`: each one's `run`, run as usage runs it, by the shell in the current
+/// directory, prints a spec whose commands join the command the mount is on, by usage's own
+/// resolution; the mounted specs' own mounts run in turn, each command once.
+fn resolve_mounts(spec: &mut usage::Spec, file: &Path) -> Result<(), Diagnostic> {
+    let mut outputs = HashMap::new();
+    let mut pending = mounts_in(&spec.cmd);
+    while let Some(run) = pending.pop() {
+        if outputs.contains_key(&run) {
+            continue;
+        }
+        let output = run_mount(&run)
+            .map_err(|why| Diagnostic::new(file, format!("mount `{run}`: {why}")))?;
+        let mounted: usage::Spec = output.parse().map_err(|err| {
+            Diagnostic::new(file, format!("mount `{run}` gave no spec usage reads: {err}"))
+        })?;
+        pending.extend(mounts_in(&mounted.cmd));
+        outputs.insert(run, output);
+    }
+    if outputs.is_empty() {
+        return Ok(());
+    }
+    spec.resolve_mount_outputs(&outputs)
+        .map_err(|err| Diagnostic::new(file, format!("usage cannot join the mounts: {err}")))
+}
+
+/// The `run` of each mount on the command and on the commands below it.
+fn mounts_in(cmd: &SpecCommand) -> Vec<String> {
+    cmd.mounts
+        .iter()
+        .map(|mount| mount.run.clone())
+        .chain(cmd.subcommands.values().flat_map(mounts_in))
+        .collect()
+}
+
+/// A mount's command, by the shell; its standard output is the spec.
+fn run_mount(run: &str) -> Result<String, String> {
+    let output = if cfg!(windows) {
+        std::process::Command::new("cmd").args(["/C", run]).output()
+    } else {
+        std::process::Command::new("sh").args(["-c", run]).output()
+    }
+    .map_err(|err| err.to_string())?;
+    if !output.status.success() {
+        return Err(format!(
+            "exited with {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    String::from_utf8(output.stdout).map_err(|err| err.to_string())
 }
 
 /// Resolve every `choices run="<path>.nu"` to the command whose body that path is.
@@ -589,5 +667,40 @@ mod tests {
         let cmd = &assembled.spec.cmd.subcommands["du"];
         assert_eq!(cmd.outputs.len(), 1);
         assert_eq!(cmd.outputs[0].framing, usage::Framing::Text);
+    }
+
+    /// The commands a script's spec declares below its own, inline or by `mount`, are the
+    /// script's to run: the mount's command runs, its spec joins, and each command has the
+    /// script as its body; an inline command's declaration keeps its node types.
+    #[cfg(unix)]
+    #[test]
+    fn a_scripts_own_and_mounted_commands_are_its_to_run() {
+        let dir = std::env::temp_dir().join(format!("nusage-spec-mount-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let tasks = dir.join("tasks.kdl");
+        fs::write(&tasks, "cmd \"build\" {\n    flag \"--release\"\n}\n").unwrap();
+        let script = dir.join("tool.nu");
+        fs::write(
+            &script,
+            format!(
+                "#!/usr/bin/env nus\n#USAGE cmd \"count\" {{ arg (int)\"<n>\" }}\n#USAGE cmd \"run\" {{ mount run=\"cat '{}'\" }}\n$usage\n",
+                tasks.display()
+            ),
+        )
+        .unwrap();
+        let assembled = assemble(&script).unwrap();
+        let build = CommandPath(vec!["run".into(), "build".into()]);
+        let run = &assembled.spec.cmd.subcommands["run"].subcommands["build"];
+        assert!(run.flags.iter().any(|flag| flag.name == "release"));
+        for path in [CommandPath::root(), CommandPath(vec!["count".into()]), build.clone()] {
+            assert_eq!(assembled.body(&path), Some(script.as_path()), "{path}");
+        }
+        let count = &assembled.headers[&CommandPath(vec!["count".into()])];
+        assert_eq!(count.nodes[0].value_type(), Some("int"));
+        assert!(assembled.headers.contains_key(&build));
+        fs::write(&script, "#!/usr/bin/env nus\n#USAGE mount run=\"exit 3\"\n").unwrap();
+        let failed = assemble(&script).unwrap_err().to_string();
+        assert!(failed.contains("mount `exit 3`"), "{failed}");
+        fs::remove_dir_all(dir).unwrap();
     }
 }
