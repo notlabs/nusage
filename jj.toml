@@ -13,7 +13,7 @@ patterns = ["glob:'**/*.rs'"]
 [fix.tools.nufmt]
 command = ["nufmt", "--stdin"]
 patterns = [
-  "glob:'**/*.nu' ~ glob:'**/expected/*.nu' ~ glob:'catalog/lib/*/mod.nu'",
+  "glob:'**/*.nu' ~ glob:'**/expected/*.nu'",
 ]
 
 [fix.tools.taplo]
@@ -23,6 +23,6 @@ patterns = ["glob:'**/*.toml'"]
 # Conflicts: `jj resolve` runs Mergiraf, the structural merge tool, which
 # `mise run //mergiraf:build` builds with Nushell support into `.bin`. jj's own configuration
 # of the tool applies. What it cannot merge keeps its markers, for `jj resolve --tool :builtin`
-# or an editor; a generated module under catalog/lib is regenerated, not merged.
+# or an editor.
 [ui]
 merge-editor = "mergiraf"

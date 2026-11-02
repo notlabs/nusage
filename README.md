@@ -24,13 +24,6 @@ Early development.
   documents to a schema. `mise run //nusage:plugins` registers it.
   A plugin is for what needs Rust in the interpreter, as a library only Rust reaches; a
   service or a binary is a module.
-- `catalog/`: the wrappers for other tools, a Nushell module package per tool under
-  `catalog/lib/`, generated from each tool's spec, the schemas of its outputs and the
-  overlays beside it. With `catalog/lib` on `$NU_LIB_DIRS`, `use mise *` names mise's
-  commands as mise does, and `use jj *` jj's. `catalog/mise.toml` declares the entries and
-  `catalog/tasks/catalog.nu` the layout; `catalog/clap/` reads the spec of a binary whose
-  crate builds its clap command, as jj's is, and `catalog/schemas/` runs an output-schema
-  suite, as both packages keep one.
 - `intent/`: the direction, as claims that are checked where they can be; nothing there is
   settled.
 - `mergiraf/`: Mergiraf, the structural merge tool `jj resolve` runs here, built from its
@@ -58,8 +51,7 @@ for its environment, names nusage the same way, `command = "nus"` and `args = ["
 beside its `env`, and keeps nusage's server, which is Nushell for anything but `--lsp`.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
-tasks, which run through the nus built here. `mise run //catalog:install` has every new
-interactive Nushell session load the catalog's modules. `mise dot apply` links the global
+tasks, which run through the nus built here. `mise dot apply` links the global
 fragment that installs the released nusage for the user, with the `nu` it runs scripts in and
 the `usage` its completions run. The repository uses a single `main` bookmark with a colocated
 Git/Jujutsu checkout.

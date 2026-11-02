@@ -1,4 +1,0 @@
-[tasks.invalid]
-description = "A deliberately invalid dependency"
-depends = ["definitely-missing"]
-run = "exit 0"

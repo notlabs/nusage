@@ -1,2 +1,0 @@
-#!/bin/sh
-printf "%s\n" "3.0.0"

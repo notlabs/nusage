@@ -6,35 +6,12 @@ monorepo_root = true
 experimental = true
 
 [monorepo]
-config_roots = [
-  "nusage",
-  "catalog",
-  "catalog/clap",
-  "catalog/cobra",
-  "catalog/schemas",
-  "intent",
-  "mergiraf",
-]
+config_roots = ["nusage", "intent", "mergiraf"]
 
 # Task config roots and inferred Cargo package roots are different. These projects own
 # the checks; dependencies carry changes to the consumers that exercise them.
 [monorepo.projects."custom:nusage"]
 root = "nusage"
-
-[monorepo.projects."custom:catalog"]
-root = "catalog"
-depends = ["custom:nusage", "custom:clap", "custom:cobra", "custom:schemas"]
-
-[monorepo.projects."custom:clap"]
-root = "catalog/clap"
-
-[monorepo.projects."custom:cobra"]
-root = "catalog/cobra"
-depends = ["custom:nusage"]
-
-[monorepo.projects."custom:schemas"]
-root = "catalog/schemas"
-depends = ["custom:nusage"]
 
 [monorepo.projects."custom:intent"]
 root = "intent"

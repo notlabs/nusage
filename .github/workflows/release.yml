@@ -8,11 +8,6 @@ name: release
 #
 # The other targets are built on demand: run this workflow with the tag and the targets,
 # `all` or a comma-separated list, and they are attached to that release.
-#
-# The catalog releases apart, by the same rule: a checked main commit whose
-# `catalog_version` has no release yet is tagged `catalog/v<version>`, with the tarball
-# `//catalog:assemble` writes attached, and the tasks pushed to GHCR as the OCI task
-# catalog `ghcr.io/<repository>-tasks:<version>`.
 on:
   # Jobs accept only successful same-repository pushes whose checked SHA is still main's
   # event SHA, matching the attestation's OIDC source. Superseded completions are skipped.
@@ -191,77 +186,3 @@ jobs:
       TAG: ${{ needs.plan.outputs.tag }}
     steps:
       - run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
-
-  catalog:
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.head_sha == github.sha &&
-      github.event.workflow_run.head_repository.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: write
-      packages: write
-      id-token: write
-      attestations: write
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MBX_DISABLE: "1"
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          persist-credentials: false
-      # Read the version with mise alone; an already released catalog installs no tools.
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
-        with:
-          version: 2026.10.21
-          install: false
-          cache: false
-      # The version catalog/mise.toml declares, and whether it is released already.
-      - id: version
-        run: |
-          version=$(mise config get vars.catalog_version --file catalog/mise.toml)
-          tag="catalog/v$version"
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            released=true
-          else
-            released=false
-          fi
-          {
-            echo "version=$version"
-            echo "tag=$tag"
-            echo "released=$released"
-          } >> "$GITHUB_OUTPUT"
-      # This exact commit passed CI. Build its interpreter and assemble its committed
-      # catalog without repeating validation. Published builds still use no cache.
-      - if: steps.version.outputs.released == 'false'
-        run: mise install --monorepo --locked
-      - if: steps.version.outputs.released == 'false'
-        run: mise run //catalog:assemble
-      - if: steps.version.outputs.released == 'false'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          cd catalog/dist/oci
-          echo "$GH_TOKEN" | mise x aqua:oras-project/oras@1.3.4 -- oras login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          mise x aqua:oras-project/oras@1.3.4 -- oras push "ghcr.io/${GITHUB_REPOSITORY}-tasks:${VERSION}" catalog
-      # Attestations for a private repository need GitHub Enterprise Cloud.
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        if: ${{ steps.version.outputs.released == 'false' && !github.event.repository.private }}
-        with:
-          subject-path: catalog/dist/nusage-catalog-${{ steps.version.outputs.version }}.tar.gz
-      - if: steps.version.outputs.released == 'false'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          TAG: ${{ steps.version.outputs.tag }}
-          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          gh release create "$TAG" "catalog/dist/nusage-catalog-$VERSION.tar.gz" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$SOURCE_SHA" \
-            --title "catalog $VERSION" \
-            --notes "The catalog's module packages, for the \`nusage-catalog\` tool; the tasks are \`oci::ghcr.io/$GITHUB_REPOSITORY-tasks:$VERSION\`."
