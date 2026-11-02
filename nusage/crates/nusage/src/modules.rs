@@ -34,6 +34,34 @@ pub fn implicit(script: &Path, source: &str) -> Result<Vec<PathBuf>, String> {
     select(script, source, &modules, record(TOOLS)?.as_ref())
 }
 
+/// Every module `NUS_MODULES` names, for an interactive session, which has no calls to read
+/// beforehand; and why any is left out: a tool at another version than its package was
+/// generated from, or a variable that does not read.
+pub fn every() -> (Vec<PathBuf>, Vec<String>) {
+    let modules = match record(MODULES) {
+        Ok(Some(modules)) => modules,
+        Ok(None) => return (Vec::new(), Vec::new()),
+        Err(why) => return (Vec::new(), vec![why]),
+    };
+    let tools = match record(TOOLS) {
+        Ok(tools) => tools,
+        Err(why) => return (Vec::new(), vec![why]),
+    };
+    let mut found: Vec<PathBuf> = Vec::new();
+    let mut left = Vec::new();
+    for (word, dir) in &modules {
+        let dir = PathBuf::from(dir);
+        if found.contains(&dir) {
+            continue;
+        }
+        match check(word, &dir, tools.as_ref()) {
+            Ok(()) => found.push(dir),
+            Err(why) => left.push(why),
+        }
+    }
+    (found, left)
+}
+
 /// The lines that give a script its modules: `use <module> *`, by absolute path.
 pub fn uses(modules: &[PathBuf]) -> Vec<String> {
     modules
