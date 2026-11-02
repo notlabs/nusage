@@ -84,7 +84,7 @@ let checked = try {
         let listed = ^mise tasks ls --json | complete
         assert equal $listed.exit_code 0 $listed.stderr
         let names = $listed.stdout | from json | get name | sort
-        assert equal $names [catalog:check catalog:generate catalog:install catalog:spec]
+        assert equal $names [catalog:check catalog:generate catalog:spec]
         for task in [catalog:spec catalog:generate catalog:check] {
             let result = ^mise run $task | complete
             assert equal $result.exit_code 0 $"($task): ($result.stdout)($result.stderr)"
