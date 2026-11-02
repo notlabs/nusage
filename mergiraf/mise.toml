@@ -14,6 +14,11 @@
 # `run` script sees only the root's from `//`, so the source comes in as variables.
 [task_config]
 shell = "nu -c"
+# Every task here that declares what it reads, and what it writes or that it writes
+# nothing, keeps its result in mise's task cache. The key holds the patches, the pinned
+# source's and Rust's versions and the platform; Cargo and Mr Boxington then judge reuse
+# within a build that does run, as before.
+cache = { enabled = true }
 
 # Prepare the patched source once, even when release and test builds run together.
 # The empty workspace table keeps this disposable copy out of the root Cargo workspace.
@@ -21,6 +26,9 @@ shell = "nu -c"
 hide = true
 output = "interleave"
 quiet = true
+dir = "{{ config_root }}/.."
+sources = ["mergiraf/patches/*.patch"]
+outputs = ["target/mergiraf-source"]
 env = { MERGIRAF_SOURCE = "{{ tools['mergiraf-source'].path }}" }
 run = '''
 let target = "{{ config_root }}/../target" | path expand
@@ -34,13 +42,15 @@ for patch in (glob "{{ config_root }}/patches/*.patch" | sort) {
 "\n[workspace]\n" | save --append ($work | path join Cargo.toml)
 '''
 
-# Cargo and Mr Boxington validate source, toolchain and platform identity for reuse;
-# a task timestamp shortcut would bypass those checks. Both profiles share the same
-# source and build logic, but the dev binary never replaces the release used by jj.
+# Both profiles share the same source and build logic, but the dev binary never replaces
+# the release used by jj. The patched source is `prepare`'s, whose key is part of this one's.
 [tasks.compile]
 hide = true
 quiet = true
 depends = [":prepare"]
+dir = "{{ config_root }}/.."
+sources = ["mergiraf/patches/*.patch", ".mise/lib/actions.nu"]
+outputs = ["{{ usage.bin }}/mergiraf"]
 usage = '''
 arg "<profile>" help="Cargo build profile"
 arg "<bin>" help="Output directory relative to the repository root"
@@ -83,6 +93,8 @@ description = "Merge each case of the Nushell patch with the Mergiraf built and 
 depends = [[":compile", "dev", "target/mergiraf-test"]]
 output = "interleave"
 quiet = true
+sources = ["patches/*.patch", "../.mise/lib/actions.nu"]
+outputs = []
 run = '''
 use "{{ config_root }}/../.mise/lib/actions.nu" *
 let patch = "{{ config_root }}/patches/0001-Add-Nushell-support.patch"
@@ -120,6 +132,8 @@ if ($failed | is-not-empty) {
 description = "Hold the patches to the pinned Mergiraf source: each applies"
 output = "interleave"
 quiet = true
+sources = ["patches/*.patch", "../.mise/lib/actions.nu"]
+outputs = []
 env = { MERGIRAF_SOURCE = "{{ tools['mergiraf-source'].path }}", MERGIRAF_VERSION = "{{ tools['mergiraf-source'].version }}" }
 run = '''
 use "{{ config_root }}/../.mise/lib/actions.nu" *

@@ -13,15 +13,26 @@
 
 [task_config]
 shell = "nu -c"
+# Every task here that declares what it reads, and what it writes or that it writes
+# nothing, keeps its result in mise's task cache, keyed by those files' contents, the tools'
+# versions, the platform and the variables that change what Cargo builds.
+cache = { enabled = true, env = [
+  "CARGO_PROFILE_DEV_DEBUG",
+  "CARGO_INCREMENTAL",
+  "RUSTFLAGS",
+] }
 
 # The build, copied where the root's `[env] _.path` looks for it, from the paths Cargo
 # reports: a build cache may keep the target directory elsewhere, and Cargo rewrites a
 # binary there whenever another of its commands relinks it, under a task that is running it.
 # The plugin is copied beside nusage, for `plugins` to register.
+# It runs at the root, the Cargo workspace's, where its outputs are: the task cache stores
+# only what is under a task's directory.
 [tasks.build]
 description = "Build the workspace and copy nusage and its plugin into the repository's bin directory"
-sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
-outputs = ["../.bin/nus", "../.bin/nu_plugin_nus"]
+dir = "{{ config_root }}/.."
+sources = ["Cargo.toml", "Cargo.lock", "nusage/crates/**/*"]
+outputs = [".bin/nus", ".bin/nu_plugin_nus"]
 run = '''
 let built = ^cargo build --workspace --locked --message-format json-render-diagnostics
   | lines
@@ -62,19 +73,34 @@ for plugin in (glob ("{{ config_root }}/../.bin/nu_plugin_*" | path expand)) {
 description = "Rust tests: every fixture generating its expected module byte for byte, and usage's corpus through the parser"
 depends = [":build"]
 env = { NUS_CORPUS = "{{ tools['usage-source'].path }}/corpus" }
+sources = [
+  "../Cargo.toml",
+  "../Cargo.lock",
+  "crates/**/*",
+  "fixtures/**/*",
+  "schemas/**/*",
+]
+outputs = []
 run = "cargo test --workspace --locked"
 
 [tasks.fmt]
 description = "Hold the workspace's Rust source to rustfmt"
+sources = ["../Cargo.toml", "crates/**/*.rs", "crates/**/Cargo.toml"]
+outputs = []
 run = "cargo fmt --all --check"
 
 [tasks.clippy]
 description = "Clippy for every workspace target on this platform"
+# The tests are targets too, and one includes the inspection schema.
+sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*", "schemas/**/*"]
+outputs = []
 run = "cargo clippy --quiet --workspace --all-targets --locked -- -D warnings"
 
 [tasks.docs]
 description = "Build the workspace's documentation without warnings"
 env = { RUSTDOCFLAGS = "-D warnings" }
+sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
+outputs = []
 run = "cargo doc --quiet --workspace --no-deps --locked"
 
 [tasks.lint]
@@ -84,6 +110,8 @@ depends = [":fmt", ":clippy", ":docs"]
 [tasks.verify-fixtures]
 description = "Run every fixture through its entrypoints, check completions and parsed signatures"
 depends = [":build"]
+sources = ["fixtures/**/*"]
+outputs = []
 file = "fixtures/verify.nu"
 
 [tasks.check]

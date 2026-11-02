@@ -57,6 +57,11 @@ root = "mergiraf"
 # Other unowned paths (root files and .mise/) also affect every project. Root checks run
 # unconditionally in CI, so no catch-all root project hides that conservative fallback.
 global_inputs = ["nusage/crates/**", "**/mise*.toml", "**/mise.lock"]
+# The root's tasks that declare what they read and that they write nothing keep their
+# result in mise's task cache, as each project's do. `MISE_ENV=audit` has mise trace each
+# task it runs, on Linux, for the files it reads and writes and does not declare; the
+# `mise.audit.toml` beside each project's configuration turns that on.
+cache = { enabled = true }
 
 # The Cargo workspace is at the root, so its toolchain is: one pin for Cargo, the tasks and CI.
 [tools]
