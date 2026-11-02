@@ -296,21 +296,23 @@ fn fold(path: &Path) -> PathBuf {
     out
 }
 
-/// The user's cache directory, as each platform has one.
+/// The user's cache directory, as each platform has one: `XDG_CACHE_HOME` when it is set,
+/// on macOS too, as mise reads it, else `~/Library/Caches` there and `~/.cache` elsewhere;
+/// `LOCALAPPDATA` on Windows.
 pub fn cache_dir() -> PathBuf {
     let var = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
     if cfg!(windows) {
         if let Some(dir) = var("LOCALAPPDATA") {
             return PathBuf::from(dir);
         }
-    } else if cfg!(target_os = "macos") {
-        if let Some(home) = var("HOME") {
-            return PathBuf::from(home).join("Library/Caches");
-        }
     } else if let Some(dir) = var("XDG_CACHE_HOME") {
         return PathBuf::from(dir);
     } else if let Some(home) = var("HOME") {
-        return PathBuf::from(home).join(".cache");
+        return PathBuf::from(home).join(if cfg!(target_os = "macos") {
+            "Library/Caches"
+        } else {
+            ".cache"
+        });
     }
     std::env::temp_dir()
 }
