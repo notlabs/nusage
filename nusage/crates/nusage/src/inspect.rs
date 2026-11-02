@@ -22,16 +22,9 @@ pub fn inspect(script: &Path) -> Result<Value, Diagnostic> {
         .shadows
         .iter()
         .map(|shadow| {
-            let through = match &shadow.through {
-                crate::calls::Through::Nusage => json!({"kind": "nus"}),
-                crate::calls::Through::Mise { dir, task } => {
-                    json!({"kind": "mise", "dir": dir, "task": task})
-                }
-            };
             json!({
                 "name": shadow.name,
                 "target": shadow.target,
-                "through": through,
                 "command": shadow.command,
             })
         })

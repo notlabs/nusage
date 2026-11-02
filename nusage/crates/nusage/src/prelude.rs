@@ -1,19 +1,17 @@
 //! What a script has before its first line. Where it runs, the interpreter defines the
 //! shadows of the scripts it calls ([`crate::calls`]) and binds `$usage`; where Nushell
 //! checks it, as an editor does, one line stands in for the script's first, the shebang,
-//! saying the same: `$usage` with its type, and the shadows as the interpreter defines them,
-//! less the helpers they call. Replacing a line with a line keeps every other line where it
-//! was.
+//! saying the same: `$usage` with its type, and the shadows as the interpreter defines them.
+//! Replacing a line with a line keeps every other line where it was.
 
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use nusage_model::{Command, Param, ParamKind};
-use nusage_nu::{Item, Module, SyntaxError};
+use nusage_nu::{Item, Module};
 use nusage_spec::{Diagnostic, Texts};
 
-use crate::binary::HELPERS;
-use crate::calls::{self, CALL_HELPER, Calls, Runner};
+use crate::calls::{self, Calls, Paths};
 
 /// The line that stands in for a script's first, and what a checker reports with it.
 #[derive(Debug, Clone)]
@@ -41,6 +39,8 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
     }
     let mut texts = texts.clone();
     texts.insert(script.to_path_buf(), source.to_string());
+    // What a checker needs is the type. Run as it is, the line binds the record `NUS_USAGE`
+    // holds as NUON, so a harness can hold a record to the type, as the fixtures' does.
     let value = "($env.NUS_USAGE? | default \"{}\" | from nuon)";
     let (mut line, header) = match command_of(script, &texts) {
         Ok(command) => (
@@ -49,15 +49,14 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
         ),
         Err(err) => (format!("let usage = {value}"), Some(err)),
     };
-    let calls = calls::scan(script, source, &texts);
+    let mut calls = calls::scan(script, source, &texts);
+    let defs = calls::definitions(script, &mut calls, Paths::Absolute, &texts);
     let mut shadows = Vec::new();
     // Made for each check, never kept, so it can name the script where it is.
-    for shadow in &calls.shadows {
-        let def = calls::shadow_def(shadow, Runner::Absolute(Path::new("nus")))
-            .map_err(|err| syntax(script, err))?;
+    for (shadow, def) in calls.shadows.iter().zip(&defs) {
         line.push_str("; ");
         let start = line.len();
-        line.push_str(&nusage_nu::print_line(&def));
+        line.push_str(&nusage_nu::print_line(def));
         shadows.push((start..line.len(), shadow.target.clone()));
     }
     Ok(Analysis {
@@ -79,48 +78,24 @@ pub fn line(script: &Path) -> Result<(String, Calls), Diagnostic> {
     }
 }
 
-/// The Nushell the interpreter runs before the script: the helpers and the shadows, which
-/// run the scripts they stand for with this `nus`. Empty when the script calls none.
-pub fn runtime(script: &Path, nusage: &Path) -> Result<String, Diagnostic> {
-    runtime_with(script, nusage, true)
-}
-
-/// [`runtime`] for an engine that has `nus call` as a command of its own, the executor's:
-/// the shadows run their scripts through it, and the helper that would spawn a process for
-/// each is left out. The shadows name `nus` as the runner, which the command reads as
-/// itself.
-pub fn runtime_in_engine(script: &Path) -> Result<String, Diagnostic> {
-    runtime_with(script, Path::new("nus"), false)
-}
-
-fn runtime_with(script: &Path, nusage: &Path, call_helper: bool) -> Result<String, Diagnostic> {
+/// The Nushell the interpreter defines before the script: the shadows of the scripts it
+/// calls, each running its script by its absolute path. Empty when the script calls none.
+pub fn runtime(script: &Path) -> Result<String, Diagnostic> {
     let source = read(script)?;
-    let calls = calls::scan(script, &source, &Texts::new());
-    if calls.shadows.is_empty() {
+    let mut calls = calls::scan(script, &source, &Texts::new());
+    let defs = calls::definitions(script, &mut calls, Paths::Absolute, &Texts::new());
+    if defs.is_empty() {
         return Ok(String::new());
-    }
-    let mut items = vec![Item::Verbatim(HELPERS.to_string())];
-    if call_helper {
-        items.push(Item::Verbatim(CALL_HELPER.to_string()));
-    }
-    for shadow in &calls.shadows {
-        let def = calls::shadow_def(shadow, Runner::Absolute(nusage))
-            .map_err(|err| syntax(script, err))?;
-        items.push(Item::Def(def));
     }
     Ok(nusage_nu::print(&Module {
         preamble: Vec::new(),
-        items,
+        items: defs.into_iter().map(Item::Def).collect(),
     }))
 }
 
 fn read(script: &Path) -> Result<String, Diagnostic> {
     std::fs::read_to_string(script)
         .map_err(|err| Diagnostic::new(script, format!("cannot read: {err}")))
-}
-
-fn syntax(script: &Path, err: SyntaxError) -> Diagnostic {
-    Diagnostic::new(script, err.to_string())
 }
 
 /// The command the script is in its tree.

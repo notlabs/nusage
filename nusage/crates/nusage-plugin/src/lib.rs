@@ -12,17 +12,14 @@
 //! Rust reaches, as a library without a command line. A binary or a service is a module,
 //! and its hot path is nusage's plugin serving the helpers the module calls.
 //!
-//! A command is written once, as a [`Run`] over its evaluated [`Args`] and a [`Context`],
-//! and registered twice: [`Native`] in an engine, [`Adapter`] in the plugin, so a script
-//! running inside the plugin's own engine calls the same code the caller's shell does.
+//! A command is written as a [`Run`] over its evaluated [`Args`] and a [`Context`], and
+//! [`Adapter`] registers it in the plugin.
 //!
 //! The rest is the boundary: [`value`] carries values across it as JSON and back, [`env()`]
 //! reads the caller's environment, [`serve`] runs the plugin, and [`test`] runs it in
 //! process for its tests. The Nushell crates a plugin needs are re-exported, so a plugin
 //! depends on this crate and the version they are pinned to is pinned once.
 
-pub use nu_engine;
-pub use nu_parser;
 pub use nu_plugin;
 pub use nu_protocol;
 pub use nusage_model::{Command, CommandTree, Param, ParamKind};
@@ -34,7 +31,7 @@ use nu_protocol::{LabeledError, Signature, SyntaxShape};
 pub mod command;
 pub mod value;
 
-pub use command::{Adapter, Args, Context, EngineContext, Native, Run};
+pub use command::{Adapter, Args, Context, Run};
 
 /// The commands a usage spec declares, as the model every target of nusage's is handed.
 /// `name` stands for the spec's file, and names the spec when it names itself in no `name`
