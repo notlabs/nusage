@@ -142,9 +142,8 @@ fn the_overlays_follow_the_directory_and_leave_what_was_set_at_the_prompt() {
     .unwrap();
     std::fs::create_dir_all(dir.join("proj")).unwrap();
     let tools = dir.join("tools");
-    // mise, as far as the activation asks it: `env --json` for the working directory, or the
-    // one `-C` names, with `LEVEL` from `MISE_ENV` there, and the variables `hook-env` would
-    // hide in a shell mise started.
+    // mise, as far as the activation asks it: `env --json` for the working directory, with
+    // `LEVEL` from `MISE_ENV` in the project, and what it adds before the PATH it is given.
     executable(
         &dir.join("bin/mise"),
         &format!(
@@ -157,8 +156,6 @@ case "$1 $2" in
   */proj) printf '{{"FOO": "proj", "LEVEL": "%s", "NUS_MODULES": "{{greet: %s}}", "PATH": "%s:%s"}}\n' "${{MISE_ENV:-read}}" "'{module}'" "{tools}" "$PATH" ;;
   *) printf '{{"PATH": "%s"}}\n' "$PATH" ;;
   esac ;;
-"hook-env -s")
-  [ -n "$__MISE_DIFF" ] && printf 'hide,INHERITED,\nset,PATH,/elsewhere\n' ;;
 esac
 "#,
             module = module.display(),
@@ -183,16 +180,29 @@ esac
     let mut nu = Session::start(&nushell, &dir, &path);
     let word = |path: &Path| serde_json::to_string(&path.to_string_lossy()).unwrap();
     let cache = word(&dir.join("cache/test"));
+    // A session with no startup files is not activated as a shell at a prompt is, and the
+    // `--mcp` it serves is not activated at all; its PATH is still a string, as before
+    // Nushell's configuration converts it.
     nu.eval(&format!("source {}", word(&dir.join("activate.nu"))));
-
-    // A shell mise started has the project's variables: they go, and what is left is the
-    // shell's own environment, from which mise is asked.
     assert_eq!(
-        nu.eval(
-            r#"$env.__MISE_DIFF = "x"; $env.INHERITED = "from a project"; nus-revert
-            [($env.INHERITED? | default gone) ($env.__MISE_DIFF? | default gone) ($env.PATH == $env.__NUS_PATH)]"#
-        ),
-        json!(["gone", "gone", true])
+        nu.eval("[($env.__NUS_PATH? | default unset) ($env.config.hooks.pre_prompt | length)]"),
+        json!(["unset", 0])
+    );
+    nu.eval("$env.PATH = ($env.PATH | split row (char esep))");
+
+    // A shell that starts in the project with mise's environment already set, as a wrapper or
+    // an editor starts it, has it taken out: what is left is the shell's own environment.
+    let module_word = format!("{{greet: '{}'}}", module.display());
+    assert_eq!(
+        nu.eval(&format!(
+            r#"cd proj; $env.FOO = "proj"; $env.LEVEL = "read"; $env.NUS_MODULES = "{module_word}"
+            $env.PATH = ($env.PATH | prepend {tools}); $env.__MISE_DIFF = "x"; $env.OWN = "mine"
+            nus-revert
+            [($env.FOO? | default gone) ($env.NUS_MODULES? | default gone) ($env.__MISE_DIFF? | default gone)
+             ($env.PATH.0 == {tools}) ($env.PATH == $env.__NUS_PATH) $env.OWN]"#,
+            tools = word(&tools),
+        )),
+        json!(["gone", "gone", "gone", false, true, "mine"])
     );
 
     // As the hook does before a prompt: what changes the overlays for the directory, and the
@@ -210,7 +220,6 @@ esac
         ($env.MINE? | default lost) (scope commands | where name == "greet hello" | length)
         (overlay list | where active | get name | each { str replace --regex '-[0-9a-f]{8}$' '' })]"#;
 
-    nu.eval("cd proj");
     assert!(prompt(&mut nu));
     assert_eq!(nu.eval("greet hello"), json!("typed hello"));
     assert_eq!(nu.eval("$env.PATH.0"), json!(tools.to_string_lossy()));

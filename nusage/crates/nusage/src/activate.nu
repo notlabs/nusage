@@ -14,22 +14,37 @@
 # keeps the environment it started with.
 
 # Make this shell's own environment the one from before mise, and keep its PATH as the one
-# mise resolves from. A shell started through mise, by its `nu` wrapper or `mise exec`, has a
-# project's environment from the start: mise reverts it, so that what is below the overlays
-# is the same whichever directory the shell started in.
+# mise resolves from. A shell can start with mise's environment for its directory already
+# set, as mise's `nu` wrapper, `mise exec`, an editor or an activated parent shell starts
+# it: what mise sets there, from an empty PATH so that its PATH is only what mise adds, is
+# taken out, so that what is below the overlays is the same wherever the shell started.
 def --env nus-revert []: nothing -> nothing {
-    $env.__NUS_PATH = ^mise -C / env --json | from json | get PATH | split row (char esep)
-    if "__MISE_DIFF" in $env {
-        let added = ^mise -C / hook-env -s nu
-        | lines
-        | where $it starts-with "hide,"
-        | each { split row "," | get 1 }
-        if ($added | is-not-empty) {
-            hide-env --ignore-errors ...$added
+    let mise = which mise | get path.0?
+    if $mise != null {
+        let here = try {
+            do {
+                hide-env --ignore-errors __MISE_DIFF __MISE_SESSION
+                $env.PATH = []
+                ^$mise env --json
+            }
+            | from json
+        } catch {
+            {}
         }
-        hide-env --ignore-errors __MISE_DIFF __MISE_SESSION
+        let added = $here.PATH? | default "" | split row (char esep) | where $it != ""
+        # PATH is a list once Nushell's configuration has converted it, a string before.
+        $env.PATH = $env.PATH
+        | if ($in | describe) == "string" { split row (char esep) } else { $in }
+        | where $it not-in $added
+        let set = $here
+        | items {|name, value| if $name != "PATH" and ($env | get -o $name) == $value { $name } }
+        | compact
+        if ($set | is-not-empty) {
+            hide-env --ignore-errors ...$set
+        }
     }
-    $env.PATH = $env.__NUS_PATH
+    hide-env --ignore-errors __MISE_DIFF __MISE_SESSION
+    $env.__NUS_PATH = $env.PATH
 }
 
 # Write what changes this shell's overlays into `dir`, and whether the environment changed:
@@ -109,7 +124,9 @@ def nus-overlays-code [dir: path]: nothing -> string {
 }
 
 export-env {
-    if $nu.is-interactive {
+    # `nu --mcp` and `nu --lsp` count as interactive too, and have no prompt.
+    let served = ($nu.is-mcp? | default false) or ($nu.is-lsp? | default false)
+    if $nu.is-interactive and not $served {
         nus-revert
         let root = "@root@"
         # A shell's files are written again whenever its environment changes, so the
