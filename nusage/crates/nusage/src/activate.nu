@@ -39,11 +39,12 @@ def --env nus-revert []: nothing -> nothing {
         let set = $here
         | items {|name, value| if $name != "PATH" and ($env | get -o $name) == $value { $name } }
         | compact
-        if ($set | is-not-empty) {
-            hide-env --ignore-errors ...$set
-        }
+        $env.__NUS_REVERTED = $set
     }
-    hide-env --ignore-errors __MISE_DIFF __MISE_SESSION
+    # What it hides `nus-overlays` hides again at each change: Nushell brings a variable hidden
+    # below an overlay back when that overlay is hidden, where one set stays as it was set.
+    $env.__NUS_REVERTED = $env.__NUS_REVERTED? | default [] | append [__MISE_DIFF __MISE_SESSION]
+    hide-env --ignore-errors ...$env.__NUS_REVERTED
     $env.__NUS_PATH = $env.PATH
 }
 
@@ -107,9 +108,13 @@ def nus-overlays [dir: path]: nothing -> bool {
     let used = overlay list
     | where active and (($it.name starts-with "mise-") or ($it.name starts-with "nus-"))
     | get name
+    let reverted = $env.__NUS_REVERTED? | default []
     [
         "# How this shell's overlays change, as `nus-overlays` writes it."
         ...($used | each {|name| $"overlay hide ($name | to nuon)" })
+        ...(if ($reverted | is-empty) { [] } else {
+            [("hide-env --ignore-errors " + ($reverted | each { to nuon } | str join " "))]
+        })
         ...($modules | append $prompt | each {|file| $"overlay use ($file | to nuon)" })
     ]
     | str join "\n"
