@@ -2,23 +2,18 @@
 //! line runs when anything outside Nushell executes the script.
 //!
 //! usage's own parser reads the arguments against the script's header, so help, errors,
-//! defaults and `negate` are usage's. The record a shim would hand the script is built from
-//! the parse the same way, from the same model, and the script runs with it in an engine of
-//! this process, the executor's ([`crate::executor`]), exactly as the shim runs it: `let
-//! usage = ...; $in | run <script>`. A script inside a tree (a `mod.nu` beside it) is parsed
-//! as that tree's command, with its siblings as providers and its ancestors' globals; a
-//! script on its own is its own root.
-//!
-//! Before the script, the engine defines the shadows of the scripts it calls, which run them
-//! in the same engine ([`crate::calls`]). Run by a shadow of another process's, with
-//! `NUS_OUTPUT_FILE` naming a file, the interpreter writes the script's value there as NUON
-//! for the shadow to read, when `NUS_OUTPUT_SCRIPT` names this script or nothing: mise runs
-//! a task's dependencies with the same variables. The script's own calls see neither. The
-//! value is otherwise printed as Nushell shows it, and an error reported as Nushell reports
-//! it, with the exit code the script gave.
+//! defaults and `negate` are usage's. The `$usage` record is built from the parse, and the
+//! script runs in the `nu` on PATH, as Nushell runs any script: what nusage hands it is the
+//! definitions of the scripts it calls ([`crate::calls`]), from a file of their own, then
+//! `let usage = ...; $in | run <script>`. A script inside a tree (a `mod.nu` beside it) is
+//! parsed as that tree's command, with its siblings as providers and its ancestors'
+//! globals; a script on its own is its own root. The interpreter becomes that `nu`, so the
+//! script's value is shown as Nushell shows it, an error reported as Nushell reports it, and
+//! the exit code the script's.
 
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
+use std::process::Command as Process;
 
 use nu_protocol::{Record, Span, Value};
 use nusage_model::{Execution, Param, ParamKind, value_from_text};
@@ -95,94 +90,77 @@ pub fn route(script: &Path, args: &[String]) -> Result<(Parsed, PathBuf), Diagno
 /// Run the script with the arguments; the exit code is the script's, or 0 after printing
 /// help, or 2 when usage rejects the arguments.
 pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
-    use nusage_plugin::nu_protocol::{ByteStream, PipelineData, ShellError};
-
     let (parsed, run) = route(script, args)?;
-    if let Parsed::Help(page) = &parsed {
-        println!("{page}");
-        return Ok(0);
-    }
-    if let Parsed::Rejected(why) = &parsed {
-        eprintln!("{why}");
-        return Ok(2);
-    }
+    let record = match parsed {
+        Parsed::Help(page) => {
+            println!("{page}");
+            return Ok(0);
+        }
+        Parsed::Rejected(why) => {
+            eprintln!("{why}");
+            return Ok(2);
+        }
+        Parsed::Record(record) => record,
+    };
     let path = std::path::absolute(&run)
         .map_err(|err| Diagnostic::new(script, format!("cannot resolve: {err}")))?;
-    // The script runs in an engine of this process, as a called script does in the plugin's.
-    // What addresses this process, the value file the caller named, is kept from the
-    // script's own calls, which return their values inside the engine.
-    let executor = std::sync::Arc::new(crate::executor::Executor::new());
-    crate::commands::Commands::new(executor.clone()).map_err(|err| Diagnostic::new(script, err))?;
-    let asked = match std::env::var_os(crate::calls::OUTPUT_VAR) {
-        Some(file) if !file.is_empty() && value_is_asked_of(&path) => Some(PathBuf::from(file)),
-        _ => None,
-    };
-    let cx = crate::executor::ProcessContext::without(&[
-        crate::calls::OUTPUT_VAR,
-        crate::calls::OUTPUT_SCRIPT_VAR,
-    ]);
-    let span = Span::unknown();
+    let code = program(&path, &record)?;
+    let mut nu = Process::new(crate::nu::real_nu());
     // The script's `$in` is standard input when something is piped in, read only if the
     // script reads it. A terminal, a socket or a closed descriptor gives the script no input.
-    let input = if stdin_is_stream() || (!cfg!(unix) && !std::io::stdin().is_terminal()) {
-        match ByteStream::stdin(span) {
-            Ok(stream) => PipelineData::byte_stream(stream, None),
-            Err(_) => PipelineData::empty(),
-        }
-    } else {
-        PipelineData::empty()
-    };
-    let named = std::path::absolute(script)
-        .map_err(|err| Diagnostic::new(script, format!("cannot resolve: {err}")))?;
-    let outcome = match executor.run(&cx, &named, args, input, span) {
-        Ok(data) => deliver(&executor, data, asked.as_deref(), span),
-        Err(err) => Err(err),
-    };
-    match outcome {
-        Ok(()) => Ok(0),
-        Err(ShellError::Exit { code, .. }) => Ok(code),
-        Err(err) => {
-            let code = err.exit_code().unwrap_or(1);
-            executor.report(&err);
-            Ok(if code == 0 { 1 } else { code })
-        }
+    if stdin_is_stream() || (!cfg!(unix) && !std::io::stdin().is_terminal()) {
+        nu.arg("--stdin");
     }
+    nu.arg("-c").arg(code);
+    crate::nu::replace_with(&mut nu).map_err(|err| {
+        Diagnostic::new(
+            script,
+            format!("cannot run the `nu` on PATH, which nusage runs scripts in: {err}"),
+        )
+    })
 }
 
-/// The script's value where the caller wants it: as NUON in the file the caller named, or
-/// on standard output as Nushell shows it.
-#[allow(clippy::result_large_err)]
-fn deliver(
-    executor: &crate::executor::Executor,
-    data: nusage_plugin::nu_protocol::PipelineData,
-    asked: Option<&Path>,
-    span: Span,
-) -> Result<(), nusage_plugin::nu_protocol::ShellError> {
-    use nusage_plugin::nu_protocol::{LabeledError, ShellError};
-    match asked {
-        Some(file) => {
-            let value = data.into_value(span)?;
-            std::fs::write(file, nusage_nu::nuon(&value)).map_err(|err| {
-                ShellError::from(LabeledError::new(format!("{}: {err}", file.display())))
-            })
-        }
-        None => executor.print(data),
+/// What the interpreter hands `nu` for the script at `script` with `record` as its
+/// `$usage`: the definitions of the scripts it calls, `source`d from a file named by its
+/// contents, then the record and the script `run` with the input. The definitions are
+/// written once for each of their contents, so a command line holds no more than the
+/// record and two paths.
+pub fn program(script: &Path, record: &Value) -> Result<String, Diagnostic> {
+    let definitions = crate::prelude::runtime(script)?;
+    let mut code = String::new();
+    if !definitions.is_empty() {
+        let file = written(&definitions).map_err(|err| {
+            Diagnostic::new(script, format!("cannot keep its definitions: {err}"))
+        })?;
+        code.push_str(&format!(
+            "source {}\n",
+            nusage_nu::word(&file.to_string_lossy())
+        ));
     }
+    code.push_str(&format!("let usage = {}\n", nusage_nu::nuon(record)));
+    code.push_str(&format!(
+        "$in | run {}\n",
+        nusage_nu::word(&script.to_string_lossy())
+    ));
+    Ok(code)
 }
 
-/// Whether the caller asks this script for its value: the one it names, or any when it names
-/// none.
-fn value_is_asked_of(script: &Path) -> bool {
-    match std::env::var_os(crate::calls::OUTPUT_SCRIPT_VAR) {
-        Some(asked) if !asked.is_empty() => {
-            let asked = Path::new(&asked);
-            match (std::fs::canonicalize(asked), std::fs::canonicalize(script)) {
-                (Ok(asked), Ok(script)) => asked == script,
-                _ => asked == script,
-            }
-        }
-        _ => true,
+/// `text` in the user's cache, in a file named by what it holds: written when no file holds
+/// it yet, beside it first and then moved, so a run reading it never sees half of it.
+fn written(text: &str) -> std::io::Result<PathBuf> {
+    let dir = crate::common::cache_dir()
+        .join("nusage")
+        .join("definitions");
+    let name = crate::common::fnv1a(text.bytes());
+    let file = dir.join(format!("{name}.nu"));
+    if std::fs::read_to_string(&file).ok().as_deref() == Some(text) {
+        return Ok(file);
     }
+    std::fs::create_dir_all(&dir)?;
+    let partial = dir.join(format!(".{name}.{}", std::process::id()));
+    std::fs::write(&partial, text)?;
+    std::fs::rename(&partial, &file)?;
+    Ok(file)
 }
 
 /// Whether standard input is a pipe or a regular file: what `/dev/stdin` opens as a stream.

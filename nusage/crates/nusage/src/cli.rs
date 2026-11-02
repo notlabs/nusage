@@ -13,11 +13,12 @@ use usage_rs::{Args, Cli, Run, Subcommands};
 /// `#!/usr/bin/env nus`: the arguments are parsed against its `#USAGE` header and the
 /// script runs in Nushell with its `$usage` record, as the generated module would run it.
 ///
-/// Such a script calls another by its path, `./x.nu ...`, or as `nus x.nu ...` or `nu x.nu
-/// ...`: the call is that script's typed command, which runs it and returns its value typed,
-/// while what it prints passes through. The path is the calling script's, not the working
-/// directory's: `./x.nu` is the script beside it, wherever it runs from. `^./x.nu` is the plain
-/// external, which returns text.
+/// The script runs in the `nu` on PATH. Such a script calls another by its path, `./x.nu
+/// ...`, or as `nus x.nu ...` or `nu x.nu ...`: the call is that script's typed command,
+/// which runs it in the same Nushell and returns its value typed, while what it prints
+/// passes through. The path is the calling script's, not the working directory's: `./x.nu`
+/// is the script beside it, wherever it runs from. `^./x.nu` is the plain external, which
+/// returns text.
 #[derive(Cli)]
 #[usage(name = "nus", bin = "nus", version)]
 pub struct Nusage {
@@ -39,7 +40,6 @@ pub enum Commands {
     Prelude(Prelude),
     Inspect(Inspect),
     Validate(Validate),
-    Call(Call),
 }
 
 /// Write the module for a script, a tree of scripts, or a usage spec of a binary
@@ -72,29 +72,17 @@ pub struct Generate {
     /// and `$env.<NAME>_TOKEN`, as the module's helpers say
     #[usage(long)]
     http: Option<PathBuf>,
-    /// Write the module for a session with `nu_plugin_nus` registered: the helpers the
-    /// plugin serves, `nus call` first, are called by name and not defined, so a called
-    /// script runs in the plugin's process. Without it the module carries its helpers and
-    /// stands on its own in any Nushell
-    #[usage(long)]
-    plugin: bool,
 }
 
 impl Run for Generate {
     type Output = Result<(), String>;
 
     fn run(self) -> Self::Output {
-        let carrier = if self.plugin {
-            crate::Carrier::Plugin
-        } else {
-            crate::Carrier::Inline
-        };
-        let module = crate::generate_for(
+        let module = crate::generate_with(
             &self.source,
             self.out.as_deref(),
             &self.overlay,
             self.http.as_deref(),
-            carrier,
         )
         .map_err(|e| e.to_string())?;
         match &self.out {
@@ -272,58 +260,6 @@ impl Run for Validate {
     }
 }
 
-/// Run a script as a call of it, and print its value as NUON
-///
-/// What the shadow of a called script does: `nus call <script> nus <script> [args]...` runs
-/// the script in an engine of this process with its `$usage` from the arguments, and
-/// `nus call <script> mise -C <dir> run <task>` runs the task through mise, which writes
-/// the script's value to the file `NUS_OUTPUT_FILE` names. The value is printed as NUON;
-/// what the script prints passes through. Put the program's arguments after `--` when they
-/// carry flags. Inside Nushell the same command is the plugin's, returning the value itself.
-#[derive(Args)]
-pub struct Call {
-    /// The script that is called
-    script: PathBuf,
-    /// The program that runs it, `nus` or `mise`
-    program: String,
-    /// The program's arguments
-    args: Vec<String>,
-}
-
-impl Run for Call {
-    type Output = Result<(), String>;
-
-    fn run(self) -> Self::Output {
-        use nusage_plugin::nu_protocol::{PipelineData, Span, Value};
-        let executor = std::sync::Arc::new(crate::executor::Executor::new());
-        let commands = crate::commands::Commands::new(executor)?;
-        let mut words = vec![self.script.to_string_lossy().into_owned(), self.program];
-        words.extend(self.args);
-        let args = nusage_plugin::Args::new(
-            Span::unknown(),
-            words
-                .into_iter()
-                .map(|w| Value::string(w, Span::unknown()))
-                .collect(),
-            Vec::new(),
-        );
-        let out = nusage_plugin::Run::run(
-            &commands.call,
-            &crate::executor::ProcessContext::default(),
-            &args,
-            PipelineData::empty(),
-        )
-        .map_err(|err| crate::executor::describe(&err))?;
-        let value = out
-            .into_value(Span::unknown())
-            .map_err(|err| err.to_string())?;
-        if !matches!(value, Value::Nothing { .. }) {
-            println!("{}", nusage_nu::nuon(&value));
-        }
-        Ok(())
-    }
-}
-
 /// Print the `$usage` record a script would see for the arguments, as NUON
 ///
 /// What `nus <script> [args...]` hands the script, without running it: the arguments
@@ -394,8 +330,8 @@ impl Run for Inspect {
 pub struct Prelude {
     /// The script, whose shebang names nusage
     script: PathBuf,
-    /// Print what the interpreter runs before the script instead: the shadows with their
-    /// bodies, and the helpers they build an argv with
+    /// Print the definitions the interpreter `source`s before the script instead: the shadows,
+    /// each running its script by its absolute path
     #[usage(long)]
     run: bool,
 }
@@ -405,10 +341,9 @@ impl Run for Prelude {
 
     fn run(self) -> Self::Output {
         if self.run {
-            let nusage = std::env::current_exe().map_err(|err| err.to_string())?;
             print!(
                 "{}",
-                crate::prelude_run(&self.script, &nusage).map_err(|e| e.to_string())?
+                crate::prelude_run(&self.script).map_err(|e| e.to_string())?
             );
             return Ok(());
         }
@@ -444,13 +379,14 @@ impl Run for Lsp {
     }
 }
 
-/// Run as `nu`, as mise's command wrapper does
+/// Run as `nu`, in Nushell's place
 ///
-/// In the `nus-lsp` environment mise starts every `nu` as `nus nu`, so an editor that
-/// starts `nu --lsp` gets nusage's language server unasked: kakehashi with nusage's layer when
-/// kakehashi is on PATH, which highlights a script's header and bridges the script to `nusage
-/// lsp`, else `nus lsp` alone. Anything else is `nu` itself, as it was asked for. The
-/// arguments are Nushell's, flags included.
+/// For a command wrapper that starts every `nu` as `nus nu`, such as mise's `[wrappers.nu]`
+/// with `args = ["nu"]`, so an editor that starts `nu --lsp` gets nusage's language server
+/// unasked: kakehashi with nusage's layer when kakehashi is on PATH, which highlights a
+/// script's header and bridges the script to `nus lsp`, else `nus lsp` alone. Anything else
+/// is `nu` itself, as it was asked for. The arguments are Nushell's, flags included, read by
+/// Nushell's own command line.
 #[derive(Args)]
 pub struct Nu {
     /// Nushell's arguments

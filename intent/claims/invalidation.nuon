@@ -115,36 +115,6 @@ $usage.args.x
     expect: {analysis: kept}
   }
   {
-    id: task-script-header
-    says: "Changing the header of the script a called task runs changes the analysis, as a called script's does."
-    status: checked
-    given: {
-      script: caller.nu
-      files: {
-        "caller.nu": "#!/usr/bin/env nus
-mise run greet world
-"
-        "mise-tasks/greet": "#!/usr/bin/env nus
-#USAGE arg \"<name>\"
-$'hello ($usage.args.name)'
-"
-      }
-    }
-    change: {
-      files: {
-        "mise-tasks/greet": "#!/usr/bin/env nus
-#USAGE arg \"<name>\"
-#USAGE flag \"--loud\"
-$'hello ($usage.args.name)'
-"
-      }
-    }
-    expect: {
-      analysis: changed
-      calls: [{name: "mise run greet", before_flags: [], after_flags: [loud]}]
-    }
-  }
-  {
     id: one-read-per-change
     says: "Scripts that call one script read its header once for each change of it, not once each."
     status: open

@@ -1,11 +1,12 @@
-//! What both targets share: the attribute alias, doc comments, parameters, relative paths.
+//! What both targets share: the attribute alias, doc comments, parameters, the `$usage` a
+//! script's definition builds, relative paths.
 
 use std::path::{Component, Path, PathBuf};
 
 use nusage_model::{Command, Completer, Param, ParamKind};
 use nusage_nu::{
-    Attr, CommandName, Completer as NuCompleter, FlagName, Ident, Param as NuParam, Stmt,
-    SyntaxError, Type,
+    Attr, CommandName, Completer as NuCompleter, Expr, FlagName, Ident, Infix, Param as NuParam,
+    Stmt, SyntaxError, Type, Value,
 };
 
 /// The binary module's completer, which runs usage's against the spec.
@@ -20,9 +21,10 @@ pub enum Target {
     /// A `def` that runs a binary: no defaults, since the binary applies its own, and the
     /// wrapper passes only what the call gave.
     Binary,
-    /// A `def` that runs another script through the interpreter, named as a call writes it:
-    /// as for a binary, and only static choices complete, since that script's providers
-    /// and usage's completer are not where the call is.
+    /// A `def` that runs another script, named as a call writes it: it hands the script
+    /// `$usage` as a module's does, so declared defaults apply, and only static choices
+    /// complete, since that script's providers and usage's completer are not where the call
+    /// is.
     Call,
 }
 
@@ -91,8 +93,8 @@ pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxEr
         None => None,
     };
     let default = match target {
-        Target::Script => param.default.clone(),
-        Target::Binary | Target::Call => None,
+        Target::Script | Target::Call => param.default.clone(),
+        Target::Binary => None,
     };
     let doc = param.doc.clone();
     let main = match param.kind {
@@ -148,6 +150,70 @@ pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxEr
         });
     }
     Ok(params)
+}
+
+/// The `$usage` record a script's definition builds from its parameters, as usage would bind
+/// them: `{cmd, args, flags}`, every declared name present, keyed as the script reads it.
+pub fn usage_record(command: &Command) -> Result<Expr, SyntaxError> {
+    let cmd = Expr::Literal(Value::test_list(
+        command
+            .path
+            .words()
+            .iter()
+            .map(Value::test_string)
+            .collect(),
+    ));
+    let field = |param: &Param| -> Result<(String, Expr), SyntaxError> {
+        Ok((param.key.clone(), param_value(param)?))
+    };
+    let args = command
+        .positionals
+        .iter()
+        .map(field)
+        .collect::<Result<Vec<_>, _>>()?;
+    let flags = command
+        .flags
+        .iter()
+        .map(field)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Expr::Record(vec![
+        ("cmd".into(), cmd),
+        ("args".into(), Expr::Record(args)),
+        ("flags".into(), Expr::Record(flags)),
+    ]))
+}
+
+/// What a parameter contributes to `$usage`: its variable, except for a switch usage declares
+/// on by default, which stays on unless its `negate` flag is given, as usage's own parsers
+/// read it. A switch with a `negate` flag and no default is on when given and not negated.
+fn param_value(param: &Param) -> Result<Expr, SyntaxError> {
+    let var = Expr::Var(Ident::new(&param.var)?);
+    if param.kind != ParamKind::Switch {
+        return Ok(var);
+    }
+    let on_by_default = matches!(&param.default, Some(Value::Bool { val: true, .. }));
+    let negated = match &param.negate {
+        Some(negate) => Expr::Call {
+            name: CommandName::new("not")?,
+            args: vec![Expr::Var(Ident::new(negate.replace('-', "_"))?)],
+        },
+        None => {
+            return Ok(if on_by_default {
+                Expr::Literal(Value::test_bool(true))
+            } else {
+                var
+            });
+        }
+    };
+    Ok(Expr::Group(Box::new(if on_by_default {
+        negated
+    } else {
+        Expr::Infix {
+            lhs: Box::new(var),
+            op: Infix::And,
+            rhs: Box::new(negated),
+        }
+    })))
 }
 
 /// The flag as Nushell spells it; a flag with no long name is spelled by its usage name.
@@ -228,6 +294,35 @@ fn fold(path: &Path) -> PathBuf {
         }
     }
     out
+}
+
+/// The user's cache directory, as each platform has one.
+pub fn cache_dir() -> PathBuf {
+    let var = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
+    if cfg!(windows) {
+        if let Some(dir) = var("LOCALAPPDATA") {
+            return PathBuf::from(dir);
+        }
+    } else if cfg!(target_os = "macos") {
+        if let Some(home) = var("HOME") {
+            return PathBuf::from(home).join("Library/Caches");
+        }
+    } else if let Some(dir) = var("XDG_CACHE_HOME") {
+        return PathBuf::from(dir);
+    } else if let Some(home) = var("HOME") {
+        return PathBuf::from(home).join(".cache");
+    }
+    std::env::temp_dir()
+}
+
+/// FNV-1a over `bytes`, in hexadecimal: a name for contents that is the same from one build
+/// of nusage to the next.
+pub fn fnv1a(bytes: impl IntoIterator<Item = u8>) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in bytes {
+        hash = (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3);
+    }
+    format!("{hash:016x}")
 }
 
 #[cfg(test)]
