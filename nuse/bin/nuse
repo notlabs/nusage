@@ -1,0 +1,118 @@
+#!/usr/bin/env nu
+# nuse: nusage's mise layer. In a project whose mise config installs nusage packages (packslip
+# releases carrying a `package.nuon`, as the catalog's are), `nuse sync`:
+#
+# - writes `.config/mise/conf.d/nuse.toml`: a hidden task per package that wraps a binary,
+#   pinning the mise tool and version the package's spec was read from, so `mise lock` locks
+#   that version and `mise run nuse:<module> -- ...` runs it; and `NUS_VIEW`, naming the view;
+# - installs those versions, and resolves each binary's path with `mise which --tool`;
+# - builds the view, `.nuse/view` (ignored by version control): each package's module linked
+#   at `pkg+<owner>/<repo>/<path>`, its packslip project with `github.com/` written `pkg+`
+#   (another host keeps its name: `pkg+<host>/<path>`), and `bins.nuon`, the binaries' paths.
+#
+# `nus` puts the view on a script's `NU_LIB_DIRS`, so `use pkg+notlabs/nusage/catalog/jj`
+# imports the jj wrappers, which run the pinned jj through `bins.nuon`. Run it after the
+# packages or the pins change; a `postinstall` hook running `nuse sync` does that on every
+# `mise install`.
+
+const FRAGMENT = ".config/mise/conf.d/nuse.toml"
+const VIEW = ".nuse/view"
+
+# The view entry for a packslip project.
+def entry [project: string]: nothing -> string {
+    if ($project | str starts-with "github.com/") {
+        $"pkg+($project | str substring 11..)"
+    } else {
+        $"pkg+($project)"
+    }
+}
+
+# The nusage packages mise has active here: each tool whose install holds a `package.nuon`.
+def packages []: nothing -> table {
+    ^mise ls --current --installed --json
+    | from json
+    | transpose tool installs
+    | each {|row|
+        $row.installs
+        | where {|install| ($install.install_path | path join package.nuon | path exists) }
+        | each {|install|
+            {
+                tool: $row.tool
+                install: $install.install_path
+                package: (open ($install.install_path | path join package.nuon))
+            }
+        }
+    }
+    | flatten
+    | where {|row| $row.tool | str starts-with "packslip:" }
+}
+
+# The fragment that pins the wrapped binaries and names the view.
+def fragment [packages: table]: nothing -> string {
+    let tasks = $packages | where {|row| $row.package.tool? != null } | each {|row|
+        let tool = $row.package.tool
+        [
+            $"[tasks.\"nuse:($row.package.module)\"]"
+            $"description = \"($tool.bin) ($tool.version), which ($row.tool) wraps\""
+            "hide = true"
+            "quiet = true"
+            $"tools = { ($tool.name | to json) = ($tool.version | to json) }"
+            $"run = ($tool.bin | to json)"
+            ""
+        ] | str join "\n"
+    }
+    [
+        "# Written by `nuse sync`; edits are overwritten. Each hidden task pins the binary a nusage"
+        "# package's wrappers were read from, for `mise lock` and `nuse sync`; NUS_VIEW names the"
+        "# modules `nus` gives a script."
+        "[env]"
+        $"NUS_VIEW = \"{{ config_root }}/($VIEW)\""
+        ""
+        ...$tasks
+    ] | str join "\n"
+}
+
+# Bring the project's view up to the packages mise has installed here.
+def "main sync" [
+    --dir: path # The project; the current directory when absent
+] {
+    let root = $dir | default $env.PWD | path expand
+    cd $root
+    let packages = packages
+    let text = fragment $packages
+    let file = $root | path join $FRAGMENT
+    mkdir ($file | path dirname)
+    if not ($file | path exists) or (open --raw $file) != $text {
+        $text | save --force $file
+    }
+    let pinned = $packages | where {|row| $row.package.tool? != null }
+    let bins = $pinned | each {|row|
+        let tool = $row.package.tool
+        let spec = $"($tool.name)@($tool.version)"
+        ^mise install --quiet $spec
+        let path = ^mise which $tool.bin --tool $spec | str trim
+        {name: $tool.bin, path: $path}
+    } | reduce --fold {} {|row, acc| $acc | insert $row.name $row.path }
+    let view = $root | path join $VIEW
+    rm --recursive --force $view
+    mkdir $view
+    "*\n" | save --force ($root | path join .nuse .gitignore)
+    for row in $packages {
+        let link = $view | path join (entry ($row.tool | str substring 9..))
+        mkdir ($link | path dirname)
+        ^ln -s ($row.install | path join $row.package.module) $link
+    }
+    $bins | to nuon | save --force ($view | path join bins.nuon)
+    $packages | each {|row|
+        let tool = $row.package.tool? | default null
+        {
+            use: (entry ($row.tool | str substring 9..))
+            version: $row.package.version
+            runs: (if $tool == null { $"($row.package.module) on PATH" } else { $bins | get $tool.bin })
+        }
+    }
+}
+
+def main [] {
+    print "nuse sync: bring the project's view up to the nusage packages mise installs here"
+}
