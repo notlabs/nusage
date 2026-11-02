@@ -2,7 +2,7 @@
 //! directory, `proj`, and for anywhere else. Each step is its own evaluation in one session,
 //! as each line at a prompt is: `nu --mcp` evaluates them in turn without a terminal, and the
 //! hook's condition and code are run as the hook would run them. `nus modules` is the real
-//! one. Without `nu` on PATH the session is skipped, except in CI, where it fails.
+//! one. Without Nushell on PATH the session is skipped, except in CI, where it fails.
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -28,16 +28,23 @@ fn executable(file: &Path, text: &str) {
     }
 }
 
-fn nu_on_path() -> bool {
-    if Command::new("nu").arg("--version").output().is_ok() {
-        return true;
+/// The Nushell on PATH: the first `nu` that is a file named `nu` once its links are followed,
+/// as `nus nu` finds it, passing over a version manager's wrapper, a link to another program.
+fn nushell() -> Option<PathBuf> {
+    let found = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+        .map(|dir| dir.join("nu"))
+        .find(|file| {
+            std::fs::canonicalize(file)
+                .is_ok_and(|real| real.is_file() && real.file_name() == Some("nu".as_ref()))
+        });
+    if found.is_none() {
+        assert!(
+            std::env::var("CI").as_deref() != Ok("true"),
+            "CI runs Nushell, and nu is not on PATH"
+        );
+        eprintln!("skipped: nu is not on PATH");
     }
-    assert!(
-        std::env::var("CI").as_deref() != Ok("true"),
-        "CI runs Nushell, and nu is not on PATH"
-    );
-    eprintln!("skipped: nu is not on PATH");
-    false
+    found
 }
 
 /// A Nushell session that evaluates one step at a time.
@@ -49,8 +56,8 @@ struct Session {
 }
 
 impl Session {
-    fn start(dir: &Path, path: &str) -> Self {
-        let mut child = Command::new("nu")
+    fn start(nu: &Path, dir: &Path, path: &str) -> Self {
+        let mut child = Command::new(nu)
             .arg("--mcp")
             .current_dir(dir)
             .env("PATH", path)
@@ -121,9 +128,9 @@ impl Drop for Session {
 #[test]
 #[cfg(unix)]
 fn the_overlays_follow_the_directory_and_leave_what_was_set_at_the_prompt() {
-    if !nu_on_path() {
+    let Some(nushell) = nushell() else {
         return;
-    }
+    };
     let dir = scratch("overlays");
     let module = dir.join("greet");
     std::fs::create_dir_all(&module).unwrap();
@@ -171,7 +178,7 @@ esac
         dir.join("bin").display(),
         std::env::var("PATH").unwrap_or_default()
     );
-    let mut nu = Session::start(&dir, &path);
+    let mut nu = Session::start(&nushell, &dir, &path);
     let word = |path: &Path| serde_json::to_string(&path.to_string_lossy()).unwrap();
     let cache = word(&dir.join("cache/test"));
     nu.eval(&format!("source {}", word(&dir.join("activate.nu"))));
