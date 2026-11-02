@@ -16,15 +16,18 @@ use crate::common::{Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
 
 /// The module for a command tree, with `run` paths relative to `base`.
 pub fn module(tree: &CommandTree, base: &Path) -> Result<Module, SyntaxError> {
-    let items = tree
-        .commands
-        .iter()
-        .map(|command| def(command, base).map(Item::Def))
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(Module {
+    let mut module = Module {
         preamble: vec![attr_usage_alias()?],
-        items,
-    })
+        items: tree
+            .commands
+            .iter()
+            .map(|command| def(command, base).map(Item::Def))
+            .collect::<Result<Vec<_>, _>>()?,
+    };
+    // The scripts' calls of programs build their argv with the helpers binary modules carry.
+    let helpers = crate::binary::helpers_for(&nusage_nu::print(&module));
+    module.items.splice(0..0, helpers);
+    Ok(module)
 }
 
 fn def(command: &Command, base: &Path) -> Result<Def, SyntaxError> {

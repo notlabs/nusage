@@ -158,3 +158,92 @@ fn definitions_are_kept_once_for_their_contents() {
     assert!(kept[0].ends_with(".nu"), "{kept:?}");
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+/// A program that echoes the arguments it was given, and prints a spec of its tasks when
+/// asked for them, as a task runner's `--usage` does.
+const TOOL: &str = "#!/bin/sh\nif [ \"$1\" = --tasks ]; then printf 'cmd \"build\" {\\n    flag \"--release\"\\n}\\n'; exit; fi\necho \"$@\"\n";
+
+/// The program's spec beside it, its tasks mounted from what it prints.
+const TOOL_SPEC: &str = "name \"tool\"\nbin \"tool\"\ncmd \"greet\" {\n    flag \"--name <name>\"\n    flag \"--loud\"\n}\ncmd \"run\" {\n    mount run=\"./tool --tasks\"\n}\n";
+
+#[cfg(unix)]
+#[test]
+fn a_program_with_a_spec_beside_it_is_called_by_its_commands() {
+    let dir = scripts(&[
+        ("tool", TOOL),
+        (".tool.usage.kdl", TOOL_SPEC),
+        (
+            "caller.nu",
+            "#!/usr/bin/env nus\n./tool greet --name ana --loud\n./tool run build --release\n",
+        ),
+        (
+            "misspelt.nu",
+            "#!/usr/bin/env nus\n./tool greet --nme ana\n",
+        ),
+        (
+            "untasked.nu",
+            "#!/usr/bin/env nus\n./tool run build --fast\n",
+        ),
+    ]);
+    let Some(output) = nus(&dir, "caller.nu", &[], None) else {
+        return;
+    };
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        stdout(&output),
+        "greet --name ana --loud\nrun build --release"
+    );
+    // The spec's flags, and a mounted task's, are the only ones Nushell takes.
+    for (script, word) in [("misspelt.nu", "nme"), ("untasked.nu", "fast")] {
+        let refused = nus(&dir, script, &[], None).unwrap();
+        assert!(!refused.status.success(), "{refused:?}");
+        let stderr = String::from_utf8_lossy(&refused.stderr);
+        assert!(stderr.contains(word), "{stderr}");
+    }
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// A program found on PATH by its name, and a script nusage runs found there, are typed as
+/// a path to them is.
+#[cfg(unix)]
+#[test]
+fn a_command_on_path_is_typed_by_its_spec() {
+    let dir = scripts(&[
+        ("bin/tool", TOOL),
+        ("bin/.tool.usage.kdl", TOOL_SPEC),
+        ("bin/callee", CALLEE),
+        (
+            "caller.nu",
+            "#!/usr/bin/env nus\nlet got = callee ana\nprint $got.times\ntool greet --name ana\n",
+        ),
+    ]);
+    let path = std::env::join_paths(
+        std::iter::once(dir.join("bin")).chain(std::env::split_paths(
+            &std::env::var_os("PATH").unwrap_or_default(),
+        )),
+    )
+    .unwrap();
+    let Some(output) = nus_with(&dir, "caller.nu", &[("PATH", path.as_os_str())]) else {
+        return;
+    };
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(stdout(&output), "callee: ana\n2\ngreet --name ana");
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// [`nus`] with no input and these variables set.
+fn nus_with(dir: &Path, script: &str, env: &[(&str, &std::ffi::OsStr)]) -> Option<Output> {
+    Command::new("nu").arg("--version").output().ok()?;
+    let cache = dir.join(".cache");
+    let mut command = Command::new(env!("CARGO_BIN_EXE_nus"));
+    command
+        .arg(dir.join(script))
+        .current_dir(dir)
+        .env("XDG_CACHE_HOME", &cache)
+        .env("LOCALAPPDATA", &cache)
+        .stdin(Stdio::null());
+    for (name, value) in env {
+        command.env(name, value);
+    }
+    Some(command.output().unwrap())
+}

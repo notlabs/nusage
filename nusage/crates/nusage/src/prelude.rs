@@ -17,7 +17,8 @@ use crate::calls::{self, Calls, Paths};
 #[derive(Debug, Clone)]
 pub struct Analysis {
     pub line: String,
-    /// Where on the line each shadow is defined, by byte range, and the script it runs.
+    /// Where on the line each shadow is defined, by byte range, and the file that declares
+    /// its command: the script it runs, or the spec of the program it runs.
     pub shadows: Vec<(Range<usize>, PathBuf)>,
     /// What the script's calls of scripts get wrong.
     pub calls: Calls,
@@ -57,7 +58,20 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
         line.push_str("; ");
         let start = line.len();
         line.push_str(&nusage_nu::print_line(def));
-        shadows.push((start..line.len(), shadow.target.clone()));
+        // A program's command is declared in its spec, a script's in the script.
+        let declared = match &shadow.runs {
+            calls::Runs::Program { spec, .. } => spec.clone(),
+            calls::Runs::Script => shadow.target.clone(),
+        };
+        shadows.push((start..line.len(), declared));
+    }
+    // A program call's wrapper builds its argv with helpers that run where the script runs;
+    // on this one line each is its signature, which is what a check reads.
+    for (name, signature) in HELPER_SIGNATURES {
+        if line.contains(name) {
+            line.push_str("; ");
+            line.push_str(signature);
+        }
     }
     Ok(Analysis {
         line,
@@ -66,6 +80,19 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
         header,
     })
 }
+
+/// The helpers a program call's wrapper calls, by name, and each as one line that has its
+/// signature: `binary-helpers.nu`'s and `binary-decoded.nu`'s, which a test holds them to.
+const HELPER_SIGNATURES: &[(&str, &str)] = &[
+    (
+        "nus argv",
+        "def \"nus argv\" [positionals: list<any>, flags: record, scoped: record = {}]: nothing -> list<string> { [] }",
+    ),
+    (
+        "nus decoded",
+        "def \"nus decoded\" [text: string, schema: string, decode: closure, --lines]: nothing -> any { }",
+    ),
+];
 
 /// The line that stands in for the script's first as it is on disk, and what its calls of
 /// scripts get wrong; a header that cannot be read is the error.
@@ -87,10 +114,13 @@ pub fn runtime(script: &Path) -> Result<String, Diagnostic> {
     if defs.is_empty() {
         return Ok(String::new());
     }
-    Ok(nusage_nu::print(&Module {
+    let mut module = Module {
         preamble: Vec::new(),
         items: defs.into_iter().map(Item::Def).collect(),
-    }))
+    };
+    let helpers = crate::binary::helpers_for(&nusage_nu::print(&module));
+    module.items.splice(0..0, helpers);
+    Ok(nusage_nu::print(&module))
 }
 
 fn read(script: &Path) -> Result<String, Diagnostic> {
@@ -146,5 +176,33 @@ fn param_type(param: &Param) -> String {
         ParamKind::Rest | ParamKind::Repeated => format!("list<{ty}>"),
         ParamKind::Switch => "bool".to_string(),
         ParamKind::Count => "int".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Each helper's stand-in has the signature of the helper it stands in for.
+    #[test]
+    fn the_helpers_stand_ins_have_their_signatures() {
+        let helpers = [crate::binary::HELPERS, crate::binary::DECODED].concat();
+        let signature = |text: &str, name: &str| {
+            let start = text.find(&format!("def \"{name}\" [")).unwrap();
+            let text = &text[start..];
+            let params_end = text.find("]: ").unwrap();
+            let io_end = params_end + text[params_end..].find(" {").unwrap();
+            text[..io_end]
+                .chars()
+                .filter(|c| !c.is_whitespace() && *c != ',')
+                .collect::<String>()
+        };
+        for (name, stand_in) in HELPER_SIGNATURES {
+            assert_eq!(
+                signature(stand_in, name),
+                signature(&helpers, name),
+                "{name}"
+            );
+        }
     }
 }

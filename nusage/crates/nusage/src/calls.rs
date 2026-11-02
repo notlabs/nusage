@@ -11,6 +11,14 @@
 //! stand in its first line where Nushell checks it, so what is checked is what runs.
 //! `^./x.nu` is still the external, and its text.
 //!
+//! Any other external call is typed by the same rule when what it runs has a spec: its head
+//! is found as Nushell finds it, by a path from the caller's directory or by name on PATH,
+//! and a script nusage runs there is called as above, while a program with a usage spec
+//! beside it, `.<file name>.usage.kdl` where usage looks for a script's, is shadowed by a
+//! command per command of the spec, whose body builds the program's argv from its
+//! parameters as a binary module's wrapper does. The spec's `mount`s run first, so a
+//! command the program reports, a task runner's task, is one too. Nothing has to be `use`d.
+//!
 //! A path is the caller's: `./x.nu` names the script beside the caller, wherever it runs
 //! from. `run x.nu` hands a nusage script the caller's `$usage` rather than the arguments
 //! after it; it is reported, not shadowed.
@@ -31,17 +39,32 @@ use nusage_spec::{Diagnostic, Texts};
 
 use crate::common::{Target, nu_params, relative, usage_record};
 
-/// A command standing in for calls of one command of another script.
+/// A command standing in for calls of one command of another script, or of a program.
 #[derive(Debug, Clone)]
 pub struct Shadow {
-    /// The call's words, as written, then the words of the called script's subcommand.
+    /// The call's words, as written, then the words of the called command's subcommand.
     pub name: String,
-    /// The script the call names.
+    /// The script or program the call names.
     pub target: PathBuf,
-    /// The command, as the module for the script's tree would define it.
+    /// The command, as the module for the script's tree, or for the program's spec, would
+    /// define it.
     pub command: Command,
     /// Where the first call of it names its script, in the caller.
     pub at: Range<usize>,
+    /// How the definition runs what the call names.
+    pub runs: Runs,
+}
+
+/// How a shadow's definition runs what its call names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Runs {
+    /// A script nusage runs: the definition binds its `$usage` and `run`s it.
+    Script,
+    /// A program described by a spec: the definition builds its argv from its parameters
+    /// and runs it as `word` names it, the call's own word for a program on PATH, so that
+    /// PATH finds it where the script runs, or its absolute path. `spec` is the spec beside
+    /// it, which an editor leads a call to.
+    Program { word: String, spec: PathBuf },
 }
 
 /// Something about a call that a reader should know, at its byte range in the script.
@@ -64,17 +87,18 @@ pub struct Calls {
 /// here.
 pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
     let mut calls = Calls::default();
-    // Every call of a script names a `.nu` file; most scripts have none to parse for.
-    if !source.contains(".nu") {
-        return calls;
-    }
     let dir = path.parent().unwrap_or(Path::new(""));
     let mut shadows = BTreeMap::new();
     for call in nusage_nu::script_calls(source, path) {
         let (name, named) = match &call {
             ScriptCall::External { head, args } => match named_script(head, args) {
                 Some(found) => found,
-                None => continue,
+                None => {
+                    if let Some(typed) = typed(dir, &head.text, texts) {
+                        shadow_typed(&mut shadows, &mut calls, head, typed, texts);
+                    }
+                    continue;
+                }
             },
             ScriptCall::Run { path: named } => {
                 if runs_with_nusage(&resolve(dir, &named.text), texts) {
@@ -103,29 +127,174 @@ pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
         if !runs_with_nusage(&target, texts) {
             continue;
         }
-        match commands_of(&target, texts) {
-            Ok(commands) => {
-                for (words, command) in commands {
-                    let name = std::iter::once(name.as_str())
-                        .chain(words.iter().map(String::as_str))
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    shadows.entry(name.clone()).or_insert(Shadow {
-                        name,
-                        target: target.clone(),
-                        command,
-                        at: named.span.clone(),
-                    });
-                }
-            }
-            Err(err) => calls.findings.push(Finding {
-                span: named.span.clone(),
-                message: err.to_string(),
-            }),
-        }
+        let commands = commands_of(&target, texts);
+        add_shadows(
+            &mut shadows,
+            &mut calls,
+            &name,
+            named,
+            &target,
+            commands,
+            Runs::Script,
+        );
     }
     calls.shadows = shadows.into_values().collect();
     calls
+}
+
+/// What an external call's head runs, when it has a spec to type it by: a script nusage
+/// runs, by its header, or a program, by the spec beside it.
+enum Typed {
+    Script(PathBuf),
+    Program {
+        file: PathBuf,
+        spec: PathBuf,
+        word: String,
+    },
+}
+
+/// What the word at the head of an external call runs, as Nushell finds it: by a path from
+/// the caller's directory, as a script's call is read, or by its name on PATH; then whether
+/// it has a spec.
+fn typed(dir: &Path, word: &str, texts: &Texts) -> Option<Typed> {
+    let file = find_program(dir, word)?;
+    if runs_with_nusage(&file, texts) {
+        return Some(Typed::Script(file));
+    }
+    let spec = sidecar(&file)?;
+    let word = if is_path(word) {
+        nusage_nu::word(&file.to_string_lossy())
+    } else {
+        word.to_string()
+    };
+    Some(Typed::Program { file, spec, word })
+}
+
+fn shadow_typed(
+    shadows: &mut BTreeMap<String, Shadow>,
+    calls: &mut Calls,
+    head: &Word,
+    typed: Typed,
+    texts: &Texts,
+) {
+    match typed {
+        Typed::Script(file) => {
+            let commands = commands_of(&file, texts);
+            add_shadows(
+                shadows,
+                calls,
+                &head.text,
+                head,
+                &file,
+                commands,
+                Runs::Script,
+            );
+        }
+        Typed::Program { file, spec, word } => {
+            let commands = program_commands(&spec);
+            let runs = Runs::Program { word, spec };
+            add_shadows(shadows, calls, &head.text, head, &file, commands, runs);
+        }
+    }
+}
+
+/// A shadow for each command the call can select, named by the call's words and the
+/// command's own; what the commands could not be read for is a finding at the call.
+fn add_shadows(
+    shadows: &mut BTreeMap<String, Shadow>,
+    calls: &mut Calls,
+    name: &str,
+    named: &Word,
+    target: &Path,
+    commands: Result<Vec<(Vec<String>, Command)>, Diagnostic>,
+    runs: Runs,
+) {
+    match commands {
+        Ok(commands) => {
+            for (words, command) in commands {
+                let name = std::iter::once(name)
+                    .chain(words.iter().map(String::as_str))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                shadows.entry(name.clone()).or_insert(Shadow {
+                    name,
+                    target: target.to_path_buf(),
+                    command,
+                    at: named.span.clone(),
+                    runs: runs.clone(),
+                });
+            }
+        }
+        Err(err) => calls.findings.push(Finding {
+            span: named.span.clone(),
+            message: err.to_string(),
+        }),
+    }
+}
+
+/// The file an external call's head runs: a path from the caller's directory, or the first
+/// executable file of that name on PATH. A word with a separator in it but no path prefix
+/// is neither, and Nushell does not run it from PATH either.
+fn find_program(dir: &Path, word: &str) -> Option<PathBuf> {
+    if is_path(word) {
+        let file = resolve(dir, word);
+        return file.is_file().then_some(file);
+    }
+    if word.contains('/') || word.contains(std::path::MAIN_SEPARATOR) {
+        return None;
+    }
+    let names = [
+        word.to_string(),
+        format!("{word}{}", std::env::consts::EXE_SUFFIX),
+    ];
+    std::env::var_os("PATH")
+        .iter()
+        .flat_map(std::env::split_paths)
+        .flat_map(|dir| names.iter().map(move |name| dir.join(name)))
+        .find(|file| is_executable(file))
+}
+
+fn is_executable(file: &Path) -> bool {
+    let Ok(metadata) = std::fs::metadata(file) else {
+        return false;
+    };
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        metadata.is_file() && metadata.permissions().mode() & 0o111 != 0
+    }
+    #[cfg(not(unix))]
+    {
+        metadata.is_file()
+    }
+}
+
+/// A program's spec, where usage looks for a script's: `.<file name>.usage.kdl` beside it,
+/// or beside the file it links to, so a link on PATH finds the spec its program's install
+/// put beside the program.
+pub fn sidecar(program: &Path) -> Option<PathBuf> {
+    let beside = |file: &Path| {
+        let name = file.file_name()?.to_string_lossy().into_owned();
+        let spec = file.with_file_name(format!(".{name}.usage.kdl"));
+        spec.is_file().then_some(spec)
+    };
+    beside(program).or_else(|| {
+        std::fs::canonicalize(program)
+            .ok()
+            .filter(|target| target != program)
+            .and_then(|target| beside(&target))
+    })
+}
+
+/// The commands of a program's spec, its mounts run, each with the words that select it.
+fn program_commands(spec: &Path) -> Result<Vec<(Vec<String>, Command)>, Diagnostic> {
+    let assembled = nusage_spec::assemble_mounted(spec)?;
+    let tree = nusage_model::model(&assembled)?;
+    Ok(tree
+        .commands
+        .into_iter()
+        .map(|command| (command.path.words().to_vec(), command))
+        .collect())
 }
 
 /// The call's name and the word naming its script, for the forms that call a script:
@@ -358,6 +527,13 @@ impl<'a> Writer<'a> {
     }
 
     fn def(&mut self, shadow: &Shadow) -> Result<Def, Unwritten> {
+        if let Runs::Program { word, .. } = &shadow.runs {
+            return Ok(crate::binary::call_wrapper(
+                &shadow.name,
+                word,
+                &shadow.command,
+            )?);
+        }
         let params = shadow
             .command
             .positionals
@@ -472,6 +648,56 @@ fn io(command: &Command) -> Result<Option<(Type, Type)>, SyntaxError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A program a call names by its path, with a spec beside it, is typed by that spec:
+    /// a shadow per command, named by the call's words, running the program by its absolute
+    /// path. One with no spec beside it is the external it was.
+    #[cfg(unix)]
+    #[test]
+    fn a_program_with_a_spec_beside_it_is_typed_by_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("nusage-calls-program-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in ["tool", "plain"] {
+            let file = dir.join(name);
+            std::fs::write(&file, "#!/bin/sh\necho \"$@\"\n").unwrap();
+            std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        std::fs::write(
+            dir.join(".tool.usage.kdl"),
+            "name \"tool\"\nbin \"tool\"\ncmd \"greet\" {\n    flag \"--name <name>\"\n}\n",
+        )
+        .unwrap();
+        let script = dir.join("caller.nu");
+        let calls = scan(
+            &script,
+            "./tool greet --name ana\n./plain x\n",
+            &Texts::new(),
+        );
+        let shadows: Vec<_> = calls
+            .shadows
+            .iter()
+            .map(|shadow| (shadow.name.as_str(), shadow.runs.clone()))
+            .collect();
+        let word = nusage_nu::word(&dir.join("tool").to_string_lossy());
+        let program = Runs::Program {
+            word: word.clone(),
+            spec: dir.join(".tool.usage.kdl"),
+        };
+        assert_eq!(
+            shadows,
+            [("./tool", program.clone()), ("./tool greet", program)]
+        );
+        let mut calls = calls;
+        let defs = definitions(&script, &mut calls, Paths::Absolute, &Texts::new());
+        let greet = nusage_nu::print_line(&defs[1]);
+        assert!(
+            greet.starts_with("def \"./tool greet\" [--name: string]"),
+            "{greet}"
+        );
+        assert!(greet.contains(&format!("^{word} greet")), "{greet}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn paths_are_the_callers() {

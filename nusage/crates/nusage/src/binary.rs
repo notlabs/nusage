@@ -26,6 +26,19 @@ pub(crate) const HELPERS: &str = include_str!("binary-helpers.nu");
 /// decodes a JSON document that has one.
 pub(crate) const DECODED: &str = include_str!("binary-decoded.nu");
 
+/// The helpers that definitions printed as `text` call, ahead of them: those of a program
+/// call's wrapper, written where no module of a binary carries them.
+pub(crate) fn helpers_for(text: &str) -> Vec<Item> {
+    let mut items = Vec::new();
+    if text.contains("nus argv") {
+        items.push(Item::Verbatim(HELPERS.to_string()));
+    }
+    if text.contains("nus decoded") {
+        items.push(Item::Verbatim(DECODED.to_string()));
+    }
+    items
+}
+
 /// The module for a binary: the helpers, the completer when a parameter wants one, then a
 /// wrapper per command. `spec` is the spec file's path relative to the module's directory,
 /// for the completer, which runs usage's against it.
@@ -90,18 +103,42 @@ def "{SPEC_COMPLETER}" [place: record] {{
 }
 
 fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
+    let name = if command.path.is_root() {
+        "main".to_string()
+    } else {
+        format!("{} {}", tree.bin, command.path)
+    };
+    let mut def = wrapper_named(&name, &tree.bin, command, Target::Binary)?;
+    def.export = true;
+    def.doc = doc_of(command);
+    def.attrs = usage_attrs(command)?;
+    Ok(def)
+}
+
+/// The command of a program a script calls, as the definition that stands in for the call:
+/// named as the call writes it, `name`, and running the program as `program`, the word the
+/// call names it by on PATH or its absolute path. Its body is a module's wrapper's.
+pub(crate) fn call_wrapper(
+    name: &str,
+    program: &str,
+    command: &Command,
+) -> Result<Def, SyntaxError> {
+    wrapper_named(name, program, command, Target::Program)
+}
+
+fn wrapper_named(
+    name: &str,
+    program: &str,
+    command: &Command,
+    target: Target,
+) -> Result<Def, SyntaxError> {
     if command.execution != Execution::External {
         return Err(SyntaxError(format!(
             "`{}` is a script; the binary target only wraps binaries",
             command.path
         )));
     }
-    let name = if command.path.is_root() {
-        "main".to_string()
-    } else {
-        format!("{} {}", tree.bin, command.path)
-    };
-    let (params, argv) = params_and_argv(command, Target::Binary)?;
+    let (params, argv) = params_and_argv(command, target)?;
     let io = match &command.output {
         Some(output) => Some((Type::new("nothing")?, Type::new(output.as_str())?)),
         None => None,
@@ -123,7 +160,7 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         .collect();
     args.push(Expr::Spread(Box::new(argv)));
     let run = Expr::External {
-        name: tree.bin.clone(),
+        name: program.to_string(),
         args,
     };
 
@@ -160,9 +197,9 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
         None => vec![Stmt::Pipeline(vec![run])],
     };
     Ok(Def {
-        export: true,
-        doc: doc_of(command),
-        attrs: usage_attrs(command)?,
+        export: false,
+        doc: Vec::new(),
+        attrs: Vec::new(),
         name: CommandName::new(name)?,
         params: Params::new(params)?,
         io,

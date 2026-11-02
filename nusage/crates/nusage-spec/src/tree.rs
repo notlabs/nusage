@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -242,7 +242,29 @@ pub fn assemble_text(name: &str, kdl: &str) -> Result<Assembled, Diagnostic> {
         Path::new(&format!("{name}.usage.kdl")),
         kdl.to_string(),
         &[],
+        Mounts::Keep,
     )
+}
+
+/// [`assemble`] for the spec file of a program a call runs, with its `mount`s resolved: each
+/// mount's `run` is run as usage runs it, by the shell in the current directory, and the
+/// spec its output is joins the command the mount is on, as usage's own parser joins it.
+/// What the call then types is what the program says it has now, a task runner's tasks
+/// among it. A mounted spec's own mounts are run in turn.
+pub fn assemble_mounted(path: &Path) -> Result<Assembled, Diagnostic> {
+    let text = fs::read_to_string(path)
+        .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?;
+    assemble_spec_text(path, text, &[], Mounts::Run)
+}
+
+/// What becomes of a spec's `mount`s.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mounts {
+    /// Kept as they are, for a module generated once: the mounted commands are the
+    /// program's to say when it runs.
+    Keep,
+    /// Run, and the commands they give joined to the spec.
+    Run,
 }
 
 /// A spec file: the root's declaration is its top-level nodes, each `cmd` node is a command
@@ -250,13 +272,14 @@ pub fn assemble_text(name: &str, kdl: &str) -> Result<Assembled, Diagnostic> {
 fn assemble_spec_file(path: &Path, overlays: &[PathBuf]) -> Result<Assembled, Diagnostic> {
     let text = fs::read_to_string(path)
         .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?;
-    assemble_spec_text(path, text, overlays)
+    assemble_spec_text(path, text, overlays, Mounts::Keep)
 }
 
 fn assemble_spec_text(
     path: &Path,
     text: String,
     overlays: &[PathBuf],
+    mounts: Mounts,
 ) -> Result<Assembled, Diagnostic> {
     let mut doc: KdlDocument = text
         .parse()
@@ -293,6 +316,9 @@ fn assemble_spec_text(
     };
     let mut spec = usage::Spec::parse_str_with_path(&usage_text, path)
         .map_err(|err| Diagnostic::new(path, format!("usage rejects the spec: {err}")))?;
+    if mounts == Mounts::Run {
+        resolve_mounts(&mut spec, path)?;
+    }
     if spec.name.is_empty() {
         let stem = file_stem(path)?.trim_end_matches(".usage").to_string();
         spec.name = stem.clone();
@@ -459,6 +485,60 @@ fn children(
     Ok(subcommands)
 }
 
+/// Run every mount the spec has, and those the specs they give have, once each, then join
+/// what they give to the spec with usage's own resolution.
+fn resolve_mounts(spec: &mut usage::Spec, path: &Path) -> Result<(), Diagnostic> {
+    let mut outputs = HashMap::new();
+    let mut pending = mounts_in(&spec.cmd);
+    while let Some(run) = pending.pop() {
+        if outputs.contains_key(&run) {
+            continue;
+        }
+        let output = run_mount(&run)
+            .map_err(|why| Diagnostic::new(path, format!("mount `{run}`: {why}")))?;
+        let mounted: usage::Spec = output.parse().map_err(|err| {
+            Diagnostic::new(
+                path,
+                format!("mount `{run}` gave no spec usage reads: {err}"),
+            )
+        })?;
+        pending.extend(mounts_in(&mounted.cmd));
+        outputs.insert(run, output);
+    }
+    if outputs.is_empty() {
+        return Ok(());
+    }
+    spec.resolve_mount_outputs(&outputs)
+        .map_err(|err| Diagnostic::new(path, format!("usage cannot join the mounts: {err}")))
+}
+
+/// The `run` of each mount on the command and the commands below it.
+fn mounts_in(cmd: &SpecCommand) -> Vec<String> {
+    cmd.mounts
+        .iter()
+        .map(|mount| mount.run.clone())
+        .chain(cmd.subcommands.values().flat_map(mounts_in))
+        .collect()
+}
+
+/// A mount's command, by the shell, as usage runs it; its standard output is the spec.
+fn run_mount(run: &str) -> Result<String, String> {
+    let output = if cfg!(windows) {
+        std::process::Command::new("cmd").args(["/C", run]).output()
+    } else {
+        std::process::Command::new("sh").args(["-c", run]).output()
+    }
+    .map_err(|err| err.to_string())?;
+    if !output.status.success() {
+        return Err(format!(
+            "exited with {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    String::from_utf8(output.stdout).map_err(|err| err.to_string())
+}
+
 fn reject_mounts(header: &Header) -> Result<(), Diagnostic> {
     if let Some(node) = header.nodes.iter().find(|node| node.name == "mount") {
         return Err(Diagnostic::new(
@@ -589,5 +669,50 @@ mod tests {
         let cmd = &assembled.spec.cmd.subcommands["du"];
         assert_eq!(cmd.outputs.len(), 1);
         assert_eq!(cmd.outputs[0].framing, usage::Framing::Text);
+    }
+
+    /// A spec's `mount` is what its program says it has: run for the program a call runs,
+    /// whose spec then has the commands the mount gives, and their own mounts' too, and kept
+    /// as it is for a module generated once.
+    #[cfg(unix)]
+    #[test]
+    fn a_mount_joins_the_commands_its_program_gives() {
+        let dir = std::env::temp_dir().join(format!("nusage-spec-mount-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let tasks = dir.join("tasks.kdl");
+        fs::write(
+            &tasks,
+            "cmd \"build\" {\n    flag \"--release\"\n    mount run=\"echo 'cmd fast'\"\n}\n",
+        )
+        .unwrap();
+        let path = dir.join(".runner.usage.kdl");
+        fs::write(
+            &path,
+            format!(
+                "name \"runner\"\nbin \"runner\"\ncmd \"run\" {{\n    mount run=\"cat '{}'\"\n}}\n",
+                tasks.display()
+            ),
+        )
+        .unwrap();
+        let mounted = assemble_mounted(&path).unwrap();
+        let run = &mounted.spec.cmd.subcommands["run"];
+        let build = &run.subcommands["build"];
+        assert!(build.flags.iter().any(|flag| flag.name == "release"));
+        assert!(build.subcommands.contains_key("fast"));
+        assert!(
+            mounted
+                .headers
+                .contains_key(&CommandPath(vec!["run".into(), "build".into()]))
+        );
+        let kept = assemble(&path).unwrap();
+        assert!(kept.spec.cmd.subcommands["run"].subcommands.is_empty());
+        fs::write(
+            &path,
+            "name \"runner\"\ncmd \"run\" {\n    mount run=\"exit 3\"\n}\n",
+        )
+        .unwrap();
+        let failed = assemble_mounted(&path).unwrap_err().to_string();
+        assert!(failed.contains("mount `exit 3`"), "{failed}");
+        fs::remove_dir_all(dir).unwrap();
     }
 }

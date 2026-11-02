@@ -26,6 +26,9 @@ pub enum Target {
     /// complete, since that script's providers and usage's completer are not where the call
     /// is.
     Call,
+    /// A `def` that runs a program with a spec, named as a call writes it: no defaults, as for
+    /// a binary, and only static choices complete, as for a script's call.
+    Program,
 }
 
 pub fn attr_usage_alias() -> Result<Stmt, SyntaxError> {
@@ -81,20 +84,20 @@ pub fn usage_attrs(command: &Command) -> Result<Vec<Attr>, SyntaxError> {
 pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxError> {
     let completer = match &param.completer {
         Some(Completer::Inline(items)) => Some(NuCompleter::List(items.clone())),
-        Some(Completer::Command(_)) if target == Target::Call => None,
+        Some(Completer::Command(_)) if matches!(target, Target::Call | Target::Program) => None,
         Some(Completer::Command(path)) => {
             Some(NuCompleter::Command(CommandName::new(path.to_string())?))
         }
         // A script's bare `type=` says what the value is and completes nothing here.
         Some(Completer::Spec) => match target {
             Target::Binary => Some(NuCompleter::Command(CommandName::new(SPEC_COMPLETER)?)),
-            Target::Script | Target::Call => None,
+            Target::Script | Target::Call | Target::Program => None,
         },
         None => None,
     };
     let default = match target {
         Target::Script | Target::Call => param.default.clone(),
-        Target::Binary => None,
+        Target::Binary | Target::Program => None,
     };
     let doc = param.doc.clone();
     let main = match param.kind {

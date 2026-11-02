@@ -14,6 +14,11 @@ Early development.
   as Nushell runs any script, with the typed commands of the scripts it calls defined
   before it: each binds the called script's `$usage` from its parameters and `run`s it, so
   a script calling a script stays in the same Nushell and gets the value back typed.
+  A call of any other program, by a path or by its name on PATH, is typed the same way
+  when a usage spec lies beside the file it runs, `.<file name>.usage.kdl`, where usage
+  looks for a script's: its definitions build the program's argv from their parameters, so
+  Nushell holds the call to the spec and no module needs `use`. The spec's `mount`s run
+  when the script does, so a task runner's spec that mounts its tasks types each task.
   `nu_plugin_nus` is nusage inside Nushell: the commands a module calls on its hot path,
   with the CLI's own signatures, served by one process across calls; `nus validate` holds
   documents to a schema. `mise run //nusage:plugins` registers it.
@@ -40,7 +45,7 @@ prints. It reports the calls the analyzer resolves, not a complete dependency gr
 
 An editor that runs `nus lsp` where it would run `nu --lsp` checks a script nusage runs as
 nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to
-that script's header, and each `mise run` of a task whose file is one. Or leave the editor as it is and opt in through mise: after `mise dot
+that script's header, and each call of a program to the spec beside it. Or leave the editor as it is and opt in through mise: after `mise dot
 apply`, with `MISE_ENV=nus-lsp` in the environment the editor starts from, every `nu`
 mise starts is `nus nu`, which serves `nus lsp` when asked for `nu --lsp` and is
 Nushell for anything else. That `nus` is the released one, so the environment wants a
