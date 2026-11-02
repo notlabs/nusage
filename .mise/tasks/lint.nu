@@ -44,7 +44,7 @@ group-start nufmt
 for file in (
     ^git ls-files "*.nu"
     | lines
-    | where $it !~ "/expected/" and $it !~ '^catalog/lib/[^/]+/mod\.nu$'
+    | where $it !~ "/expected/"
 ) {
     if not (formatted $file nufmt { ^nufmt --stdin }) {
         $failed = $failed | append $"nufmt: ($file)"

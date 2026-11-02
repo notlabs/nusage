@@ -27,7 +27,7 @@ let crates = $graph | where id =~ '^cargo:'
 assert ($crates | is-not-empty)
 assert ($crates | all {|project| $project.root | str starts-with nusage/crates/ })
 let tasks = ^mise tasks ls --all --json | from json | get name
-let platform_roots = $roots | where $it != catalog/schemas
+let platform_roots = $roots
 assert equal (
     $tasks | where $it =~ ':check:platform$' | sort
 ) ($platform_roots | each {|root| $"//($root):check:platform" } | sort)
@@ -37,23 +37,7 @@ let cases = [
     {path: nusage/crates/nu_plugin_future/src/lib.rs, roots: $roots}
     {
         path: nusage/fixtures/script/script.nu
-        roots: [nusage catalog catalog/cobra catalog/schemas intent]
-    }
-    {
-        path: catalog/lib/mise/mod.nu
-        roots: [catalog]
-    }
-    {
-        path: catalog/clap/src/main.rs
-        roots: [catalog/clap catalog]
-    }
-    {
-        path: catalog/cobra/export.go
-        roots: [catalog/cobra catalog]
-    }
-    {
-        path: catalog/schemas/lib.nu
-        roots: [catalog/schemas catalog]
+        roots: [nusage intent]
     }
     {
         path: intent/claims/identity.nuon
@@ -65,7 +49,7 @@ let cases = [
     }
     {path: .mise/lib/actions.nu, roots: $roots}
     {path: Cargo.lock, roots: $roots}
-    {path: catalog/mise.toml, roots: $roots}
+    {path: intent/mise.toml, roots: $roots}
 ]
 
 # Synthetic children of HEAD change one path each. A private index leaves the
