@@ -72,9 +72,9 @@ and leaving takes away everything they set; an environment met again has its ove
 as they were. `$env.MISE_ENV = "…"` switches environments the same way. Above them is the
 overlay `prompt`, where what is set at the prompt lands, so it stays from one directory to
 the next; a `PATH` set there hides mise's for the rest of the session. `overlay list` shows
-them all. A shell mise started with a project's environment, through its `nu` wrapper, has
-that environment reverted first. A script, and `nu --mcp`, keep the environment they started
-with. `mise shell` needs mise's own activation: `$env.MISE_<TOOL>_VERSION` does the same here.
+them all. A shell that starts with mise's environment already set, as mise's `nu` wrapper,
+an editor or an activated parent shell starts it, has it taken out first. A script, and
+`nu --mcp`, keep the environment they started with. `mise shell` needs mise's own activation: `$env.MISE_<TOOL>_VERSION` does the same here.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nus built here. `mise run //:link <project>` installs this
