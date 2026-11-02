@@ -57,11 +57,12 @@ struct Session {
 
 impl Session {
     fn start(nu: &Path, dir: &Path, path: &str) -> Self {
+        // No startup files: a machine's own, such as an autoload that puts its tools first on
+        // PATH, would be in the session.
         let mut child = Command::new(nu)
-            .arg("--mcp")
+            .args(["--no-config-file", "--mcp"])
             .current_dir(dir)
             .env("PATH", path)
-            .env("XDG_CONFIG_HOME", dir.join("config"))
             .env_remove("NUS_MODULES")
             .env_remove("NUS_TOOLS")
             .env_remove("MISE_ENV")
