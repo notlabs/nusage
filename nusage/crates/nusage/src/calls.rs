@@ -95,7 +95,7 @@ pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
                 Some(found) => found,
                 None => {
                     if let Some(typed) = typed(dir, &head.text, texts) {
-                        shadow_typed(&mut shadows, &mut calls, head, typed, texts);
+                        shadow_typed(&mut shadows, &mut calls, head, args, typed, texts);
                     }
                     continue;
                 }
@@ -174,6 +174,7 @@ fn shadow_typed(
     shadows: &mut BTreeMap<String, Shadow>,
     calls: &mut Calls,
     head: &Word,
+    args: &[Word],
     typed: Typed,
     texts: &Texts,
 ) {
@@ -191,7 +192,19 @@ fn shadow_typed(
             );
         }
         Typed::Program { file, spec, word } => {
-            let commands = program_commands(&spec);
+            // A program's spec may have hundreds of commands, a task runner's more once its
+            // tasks are mounted: only those the call's words name are defined, the root and
+            // each subcommand down to the deepest, which is the one Nushell then calls.
+            let words: Vec<&str> = args.iter().map(|arg| arg.text.as_str()).collect();
+            let commands = program_commands(&spec).map(|commands| {
+                commands
+                    .into_iter()
+                    .filter(|(path, _)| {
+                        path.len() <= words.len()
+                            && path.iter().zip(&words).all(|(word, arg)| word == arg)
+                    })
+                    .collect()
+            });
             let runs = Runs::Program { word, spec };
             add_shadows(shadows, calls, &head.text, head, &file, commands, runs);
         }
