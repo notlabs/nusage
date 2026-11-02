@@ -12,9 +12,12 @@
 # package whose wrapped tool the project has at another version than the package was
 # generated from. `nu` is `nus nu`: an editor's `nu --lsp` is nusage's language server, which
 # checks a script as nus runs it, and any other `nu` is Nushell itself.
+#
+# mise hands the templates its tools in no fixed order, so each sorts its entries: the same
+# tools are the same value, from one run of mise to the next.
 [env]
-NUS_MODULES = { value = "{ {%- for name, tool in tools -%}{%- if 'packslip:github.com/notlabs/nusage/catalog/' in name -%}{%- set module = name | split(pat='/') | last -%}'{{ module }}': '{{ tool.path }}/{{ module }}', {% endif -%}{%- endfor -%} }", tools = true }
-NUS_TOOLS = { value = "{ {%- for name, tool in tools -%}'{{ name }}': '{{ tool.version }}', {% endfor -%} }", tools = true }
+NUS_MODULES = { value = '''{%- set_global entries = [] -%}{%- for name, tool in tools -%}{%- if 'packslip:github.com/notlabs/nusage/catalog/' in name -%}{%- set module = name | split(pat='/') | last -%}{%- set_global entries = entries | concat(with="'" ~ module ~ "': '" ~ tool.path ~ "/" ~ module ~ "'") -%}{%- endif -%}{%- endfor -%}{ {{ entries | sort | join(sep=", ") }} }''', tools = true }
+NUS_TOOLS = { value = '''{%- set_global entries = [] -%}{%- for name, tool in tools -%}{%- set_global entries = entries | concat(with="'" ~ name ~ "': '" ~ tool.version ~ "'") -%}{%- endfor -%}{ {{ entries | sort | join(sep=", ") }} }''', tools = true }
 
 [wrappers.nu]
 command = "nus"
