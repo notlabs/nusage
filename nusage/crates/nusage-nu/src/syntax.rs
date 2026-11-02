@@ -241,6 +241,8 @@ pub enum Completer {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
+    /// `use PATH *`: import a module's commands into this scope.
+    Use { path: String },
     /// `alias NAME = TARGET`
     Alias {
         name: CommandName,

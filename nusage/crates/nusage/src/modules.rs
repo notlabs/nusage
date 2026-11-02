@@ -24,14 +24,33 @@ pub const MODULES: &str = "NUS_MODULES";
 /// The variable naming the project's tools' versions.
 pub const TOOLS: &str = "NUS_TOOLS";
 
-/// The modules `source`, the script at `script`, gets: for each call Nushell cannot resolve
-/// whose first word `NUS_MODULES` names, the module's directory, in the order of the first
-/// such call; or why the script cannot have one.
-pub fn implicit(script: &Path, source: &str) -> Result<Vec<PathBuf>, String> {
-    let Some(modules) = record(MODULES)? else {
-        return Ok(Vec::new());
-    };
-    select(script, source, &modules, record(TOOLS)?.as_ref())
+/// The project's packages and tools, read once for the preparation of a script and all
+/// its calls. Passed explicitly to the definition writer: exported modules must not pick
+/// up paths from the machine generating them.
+#[derive(Debug, Default)]
+pub struct Context {
+    modules: BTreeMap<String, String>,
+    tools: Option<BTreeMap<String, String>>,
+}
+
+impl Context {
+    pub fn from_env() -> Result<Self, String> {
+        let Some(modules) = record(MODULES)? else {
+            return Ok(Self::default());
+        };
+        Ok(Self {
+            modules,
+            tools: record(TOOLS)?,
+        })
+    }
+
+    /// The modules this script's unresolved calls name, with their tool versions checked.
+    pub fn implicit(&self, script: &Path, source: &str) -> Result<Vec<PathBuf>, String> {
+        if self.modules.is_empty() {
+            return Ok(Vec::new());
+        }
+        select(script, source, &self.modules, self.tools.as_ref())
+    }
 }
 
 /// Every module `NUS_MODULES` names, for an interactive session, which has no calls to read
@@ -67,6 +86,16 @@ pub fn uses(modules: &[PathBuf]) -> Vec<String> {
     modules
         .iter()
         .map(|dir| format!("use {} *", nusage_nu::word(&dir.to_string_lossy())))
+        .collect()
+}
+
+/// Imports in a generated script scope, before its nested definitions and `run`.
+pub fn statements(modules: &[PathBuf]) -> Vec<nusage_nu::Stmt> {
+    modules
+        .iter()
+        .map(|dir| nusage_nu::Stmt::Use {
+            path: dir.to_string_lossy().into_owned(),
+        })
         .collect()
 }
 
