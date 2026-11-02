@@ -47,6 +47,16 @@ Required positional parameters, declared Nushell types and literal defaults are 
 in the generated definition. Scripts that need the additional constraints on internal
 calls can check them in their body.
 
+A script's specification comes from its `#USAGE` header or, when present, the hidden
+`.<filename>.usage.kdl` sidecar beside it. Relative `include` paths resolve against
+that source file, and `mount` adds the specification printed by its command.
+
+Nusage-specific type annotations, such as `arg (int)"<n>"`, are preserved in the
+header, a directly loaded sidecar, and their inline `cmd` declarations. Annotations
+from included files or mounted output are currently not preserved. Moving that integer
+argument into an included file therefore makes its value a string; keep typed
+declarations inline or in the sidecar when their Nushell types are required.
+
 Run `nus inspect script.nu | from json` to read the analyzer's resolved calls and
 findings as values, without running the script. The output's contract is
 `nusage/schemas/inspection.schema.json`; its command models are the ones `nus model`
