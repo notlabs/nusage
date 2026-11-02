@@ -2,50 +2,34 @@
 //! `./x.nu ...`, `nus x.nu ...` or `nu x.nu ...`, and Nushell types none of them: an
 //! external call returns text, whatever the script returned. So a call of a script whose
 //! shebang names nusage is shadowed by a command named as the call writes it, which is that
-//! script's typed wrapper: its signature is the script's header, and it runs the script
-//! through the interpreter, which hands the value back as NUON, of the type the script's
-//! output declares. The value comes back through a file the call names, so what the script
-//! prints passes through as any command's does. The shadows are defined where the script
-//! runs, by the interpreter and by the module, and stand in its first line where Nushell
-//! checks it, so what is checked is what runs. `^./x.nu` is still the external, and its text.
+//! script's typed command: its signature is the script's header, and its body binds `$usage`
+//! from its parameters and `run`s the script, which returns its value in the caller's own
+//! Nushell, of the type its output declares, while what it prints passes through. The
+//! shadows of the scripts the called script calls are defined inside that body, since a
+//! call's path is its script's, and `run` reads a script's calls where it parses it. The
+//! shadows are defined where the script runs, by the interpreter and by the module, and
+//! stand in its first line where Nushell checks it, so what is checked is what runs.
+//! `^./x.nu` is still the external, and its text.
 //!
 //! A path is the caller's: `./x.nu` names the script beside the caller, wherever it runs
-//! from. `run x.nu` cannot be shadowed, being Nushell's keyword, and hands a nusage script
-//! the caller's `$usage` rather than the arguments after it; it is reported, not shadowed.
+//! from. `run x.nu` hands a nusage script the caller's `$usage` rather than the arguments
+//! after it; it is reported, not shadowed.
 //!
-//! A task of mise's is called the same way, `mise run <task> ...` or `mise r <task> ...`:
-//! when the file it runs is a script nusage runs, the call is shadowed too, and the shadow
-//! runs the task as mise would, with the tasks it depends on and its environment, from the
-//! caller's directory, which is where mise is asked what the name means ([`crate::tasks`]):
-//! in the engine the caller runs in when the shadow's `nus call` is the engine's own
-//! command, by mise in a process of its own otherwise. `^mise run` is still the external,
-//! and so is a call with mise's own flags before the task; one that runs more tasks after
-//! `:::` needs the caret, or the shadow takes them for the script's arguments.
+//! Calls may go round, a script calling itself or two calling each other. A script met
+//! again on the way down is not read again: its definition `run`s it, and its own calls are
+//! the definitions already around it, which Nushell finds where it parses the script. That
+//! holds as long as each of those names the script the call names there; where one does
+//! not, the call is left the external it is, and a finding says why.
 
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::path::{Component, Path, PathBuf};
 
-use nusage_model::{Command, CommandPath};
-use nusage_nu::{
-    CommandName, Def, Expr, Ident, Params, ScriptCall, Stmt, SyntaxError, Type, Word, word,
-};
+use nusage_model::{Command, CommandPath, Execution};
+use nusage_nu::{CommandName, Def, Expr, Ident, Params, ScriptCall, Stmt, SyntaxError, Type, Word};
 use nusage_spec::{Diagnostic, Texts};
 
-use crate::binary::params_and_argv;
-use crate::common::{Target, relative};
-
-/// The variable a shadow sets for the script it runs: the file the interpreter writes the
-/// script's value to, as NUON. The interpreter does not pass it on.
-pub const OUTPUT_VAR: &str = "NUS_OUTPUT_FILE";
-
-/// The variable naming the script whose value the file is for: a program that runs it, as
-/// mise does a task, may run other scripts before or after it. The interpreter does not pass
-/// it on either.
-pub const OUTPUT_SCRIPT_VAR: &str = "NUS_OUTPUT_SCRIPT";
-
-/// The helper a shadow runs its script with, which names that file and reads it back.
-pub const CALL_HELPER: &str = include_str!("script-call.nu");
+use crate::common::{Target, nu_params, relative, usage_record};
 
 /// A command standing in for calls of one command of another script.
 #[derive(Debug, Clone)]
@@ -54,21 +38,10 @@ pub struct Shadow {
     pub name: String,
     /// The script the call names.
     pub target: PathBuf,
-    /// What runs it.
-    pub through: Through,
-    /// The subcommand's words, which select it after the script on the interpreter's argv.
-    pub words: Vec<String>,
     /// The command, as the module for the script's tree would define it.
     pub command: Command,
-}
-
-/// What a shadow runs its script through.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Through {
-    /// The interpreter, with the script's path.
-    Nusage,
-    /// mise, as the task of this name, asked from the caller's directory.
-    Mise { dir: PathBuf, task: String },
+    /// Where the first call of it names its script, in the caller.
+    pub at: Range<usize>,
 }
 
 /// Something about a call that a reader should know, at its byte range in the script.
@@ -91,49 +64,18 @@ pub struct Calls {
 /// here.
 pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
     let mut calls = Calls::default();
-    // Every call of a script names a `.nu` file or mise; most scripts have none to parse for.
-    if !source.contains(".nu") && !source.contains("mise") {
+    // Every call of a script names a `.nu` file; most scripts have none to parse for.
+    if !source.contains(".nu") {
         return calls;
     }
     let dir = path.parent().unwrap_or(Path::new(""));
     let mut shadows = BTreeMap::new();
     for call in nusage_nu::script_calls(source, path) {
-        let (name, named, target, through) = match &call {
-            ScriptCall::External { head, args } => {
-                if let Some((name, named)) = named_script(head, args) {
-                    let target = resolve(dir, &named.text);
-                    if !target.is_file() && !texts.contains_key(&target) {
-                        calls.findings.push(Finding {
-                            span: named.span.clone(),
-                            message: format!("{} is not a file", target.display()),
-                        });
-                        continue;
-                    }
-                    (name, named, target, Through::Nusage)
-                } else if let Some((name, named)) = named_task(head, args) {
-                    match crate::tasks::task(dir, &named.text) {
-                        Ok(Some(task)) => (
-                            name,
-                            named,
-                            task.file,
-                            Through::Mise {
-                                dir: dir.to_path_buf(),
-                                task: task.name,
-                            },
-                        ),
-                        Ok(None) => continue,
-                        Err(message) => {
-                            calls.findings.push(Finding {
-                                span: named.span.clone(),
-                                message,
-                            });
-                            continue;
-                        }
-                    }
-                } else {
-                    continue;
-                }
-            }
+        let (name, named) = match &call {
+            ScriptCall::External { head, args } => match named_script(head, args) {
+                Some(found) => found,
+                None => continue,
+            },
             ScriptCall::Run { path: named } => {
                 if runs_with_nusage(&resolve(dir, &named.text), texts) {
                     calls.findings.push(Finding {
@@ -150,6 +92,14 @@ pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
                 continue;
             }
         };
+        let target = resolve(dir, &named.text);
+        if !target.is_file() && !texts.contains_key(&target) {
+            calls.findings.push(Finding {
+                span: named.span.clone(),
+                message: format!("{} is not a file", target.display()),
+            });
+            continue;
+        }
         if !runs_with_nusage(&target, texts) {
             continue;
         }
@@ -163,9 +113,8 @@ pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
                     shadows.entry(name.clone()).or_insert(Shadow {
                         name,
                         target: target.clone(),
-                        through: through.clone(),
-                        words,
                         command,
+                        at: named.span.clone(),
                     });
                 }
             }
@@ -188,19 +137,6 @@ fn named_script<'a>(head: &'a Word, args: &'a [Word]) -> Option<(String, &'a Wor
     let script = args.first().filter(|arg| arg.text.ends_with(".nu"))?;
     matches!(head.text.as_str(), "nus" | "nu")
         .then(|| (format!("{} {}", head.text, script.text), script))
-}
-
-/// The call's name and the word naming its task, for `mise run <task>` and `mise r <task>`:
-/// the task first after `run`, before any flag of mise's own.
-fn named_task<'a>(head: &'a Word, args: &'a [Word]) -> Option<(String, &'a Word)> {
-    let [run, task, ..] = args else {
-        return None;
-    };
-    let named = head.text == "mise"
-        && matches!(run.text.as_str(), "run" | "r")
-        && !task.text.starts_with('-')
-        && task.text != ":::";
-    named.then(|| (format!("mise {} {}", run.text, task.text), task))
 }
 
 /// Whether Nushell runs the word as a path rather than looking it up as a name: relative to
@@ -320,70 +256,209 @@ pub fn place_in_tree(script: &Path) -> Result<(PathBuf, CommandPath), Diagnostic
     Ok((dir.to_path_buf(), path))
 }
 
-/// How a shadow reaches the script it runs.
+/// How the scripts the definitions `run` are written.
 #[derive(Debug, Clone, Copy)]
-pub enum Runner<'a> {
-    /// From a module in this directory: the script relative to the module's file, and the
-    /// `nus` and mise on `PATH`.
-    Module(&'a Path),
-    /// The script by its absolute path, run by this `nus`, a path or a name on `PATH`: for
-    /// the interpreter, and for the line that stands in for a script's first.
-    Absolute(&'a Path),
+pub enum Paths<'a> {
+    /// Relative to the directory of the module the definitions are in, as Nushell reads a
+    /// `run` from that file.
+    From(&'a Path),
+    /// Absolute: for the interpreter, and for the line that stands in for a script's first.
+    Absolute,
 }
 
-/// The shadow as a definition: the called command's parameters, as a wrapper of a binary
-/// has them, and a body that hands its input and argv to [`CALL_HELPER`]'s `nus call`.
-pub fn shadow_def(shadow: &Shadow, runner: Runner) -> Result<Def, SyntaxError> {
-    let (params, argv) = params_and_argv(&shadow.command, Target::Call)?;
-    let mut body = Vec::new();
-    // A path from the module's directory, as the module's own file has it.
-    let mut from_module = |name: &str, path: &Path| -> Result<Expr, SyntaxError> {
-        let Runner::Module(base) = runner else {
-            return Ok(Expr::Str(path.to_string_lossy().into_owned()));
-        };
-        body.push(Stmt::Const {
-            name: Ident::new(name)?,
-            value: Expr::Raw(format!("path self {}", word(&relative(base, path)))),
-        });
-        Ok(Expr::Var(Ident::new(name)?))
-    };
-    let script = from_module("script", &shadow.target)?;
-    let mut args = vec![script.clone()];
-    match &shadow.through {
-        Through::Nusage => args.extend([
-            Expr::Str(match runner {
-                Runner::Module(_) => "nus".into(),
-                Runner::Absolute(nusage) => nusage.to_string_lossy().into_owned(),
-            }),
-            script,
-        ]),
-        Through::Mise { dir, task } => args.extend([
-            Expr::Str("mise".into()),
-            // Quoted: bare, it would be a flag of `nus call`'s own.
-            Expr::Raw(r#""-C""#.into()),
-            from_module("dir", dir)?,
-            Expr::Str("run".into()),
-            Expr::Str(task.clone()),
-        ]),
+/// Why a definition could not be written.
+#[derive(Debug)]
+pub enum Unwritten {
+    Syntax(SyntaxError),
+    /// A script its definition would run, which cannot be read.
+    Unreadable {
+        script: PathBuf,
+        why: String,
+    },
+    /// A script met again on the way down calls `name`, and the definition of that name
+    /// around it is another script's, or none.
+    Round {
+        script: PathBuf,
+        name: String,
+    },
+}
+
+impl std::fmt::Display for Unwritten {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Unwritten::Syntax(err) => write!(f, "{err}"),
+            Unwritten::Unreadable { script, why } => write!(f, "{}: {why}", script.display()),
+            Unwritten::Round { script, name } => write!(
+                f,
+                "the calls come back round to {}, whose `{name}` would reach another script \
+                 there; the call is left the external it is",
+                script.display()
+            ),
+        }
     }
-    args.extend(shadow.words.iter().cloned().map(Expr::Str));
-    args.push(Expr::Spread(Box::new(argv)));
-    body.push(Stmt::Pipeline(vec![
-        Expr::Var(Ident::new("in")?),
-        Expr::Call {
-            name: CommandName::new("nus call")?,
-            args,
-        },
-    ]));
-    Ok(Def {
-        export: false,
-        doc: Vec::new(),
-        attrs: Vec::new(),
-        name: CommandName::new(&shadow.name)?,
-        params: Params::new(params)?,
-        io: io(&shadow.command)?,
-        body,
-    })
+}
+
+impl From<SyntaxError> for Unwritten {
+    fn from(err: SyntaxError) -> Self {
+        Unwritten::Syntax(err)
+    }
+}
+
+/// The definitions of the shadows of `calls`, the calls of the script at `script`, as they
+/// stand before the script: each with the definitions its own script needs inside its body.
+/// A shadow whose definition cannot be written is taken out of `calls`, the call left the
+/// external it is, and what kept it out joins the findings at its call; the definitions
+/// follow the shadows that remain, one each, in order.
+pub fn definitions(script: &Path, calls: &mut Calls, paths: Paths, texts: &Texts) -> Vec<Def> {
+    let mut writer = Writer::new(paths, texts);
+    writer.chain.push(script.to_path_buf());
+    writer.scope.push(names(&calls.shadows));
+    let mut defs = Vec::new();
+    let mut kept = Vec::new();
+    for shadow in std::mem::take(&mut calls.shadows) {
+        match writer.def(&shadow) {
+            Ok(def) => {
+                defs.push(def);
+                kept.push(shadow);
+            }
+            Err(why) => calls.findings.push(Finding {
+                span: shadow.at.clone(),
+                message: why.to_string(),
+            }),
+        }
+    }
+    calls.shadows = kept;
+    defs
+}
+
+/// The body of a definition that runs `command`'s script: the definitions of the scripts
+/// it calls, `$usage` from the definition's parameters, and the script `run` with the
+/// definition's input.
+pub fn script_body(command: &Command, paths: Paths, texts: &Texts) -> Result<Vec<Stmt>, Unwritten> {
+    Writer::new(paths, texts).body(command)
+}
+
+/// What the definitions are written with: the scripts the definition being written sits
+/// inside, outermost first, and the names each of them defines around it.
+struct Writer<'a> {
+    paths: Paths<'a>,
+    texts: &'a Texts,
+    chain: Vec<PathBuf>,
+    scope: Vec<Vec<(String, PathBuf)>>,
+}
+
+impl<'a> Writer<'a> {
+    fn new(paths: Paths<'a>, texts: &'a Texts) -> Self {
+        Writer {
+            paths,
+            texts,
+            chain: Vec::new(),
+            scope: Vec::new(),
+        }
+    }
+
+    fn def(&mut self, shadow: &Shadow) -> Result<Def, Unwritten> {
+        let params = shadow
+            .command
+            .positionals
+            .iter()
+            .chain(shadow.command.flags.iter())
+            .map(|param| nu_params(param, Target::Call))
+            .collect::<Result<Vec<_>, _>>()?
+            .concat();
+        Ok(Def {
+            export: false,
+            doc: Vec::new(),
+            attrs: Vec::new(),
+            name: CommandName::new(&shadow.name)?,
+            params: Params::new(params)?,
+            io: io(&shadow.command)?,
+            body: self.body(&shadow.command)?,
+        })
+    }
+
+    fn body(&mut self, command: &Command) -> Result<Vec<Stmt>, Unwritten> {
+        let script = script_of(command)?;
+        let mut body = Vec::new();
+        if self.chain.contains(&script) {
+            // Met again: Nushell finds its calls among the definitions around it.
+            let shadows = self.shadows_of(&script)?;
+            for shadow in &shadows {
+                let around = self
+                    .scope
+                    .iter()
+                    .rev()
+                    .flatten()
+                    .find(|(name, _)| name == &shadow.name);
+                if around.map(|(_, target)| target) != Some(&shadow.target) {
+                    return Err(Unwritten::Round {
+                        script,
+                        name: shadow.name.clone(),
+                    });
+                }
+            }
+        } else {
+            let shadows = self.shadows_of(&script)?;
+            self.chain.push(script.clone());
+            self.scope.push(names(&shadows));
+            let defs = shadows
+                .iter()
+                .map(|shadow| self.def(shadow))
+                .collect::<Result<Vec<_>, _>>();
+            self.scope.pop();
+            self.chain.pop();
+            body.extend(defs?.into_iter().map(|def| Stmt::Def(Box::new(def))));
+        }
+        body.push(Stmt::Let {
+            name: Ident::new("usage")?,
+            value: usage_record(command)?,
+        });
+        body.push(Stmt::Pipeline(vec![
+            Expr::Var(Ident::new("in")?),
+            Expr::Call {
+                name: CommandName::new("run")?,
+                args: vec![Expr::Str(self.path(&script))],
+            },
+        ]));
+        Ok(body)
+    }
+
+    /// The shadows the script's own calls need, its text read from `texts` when it holds it.
+    fn shadows_of(&self, script: &Path) -> Result<Vec<Shadow>, Unwritten> {
+        let source = match self.texts.get(script) {
+            Some(text) => text.clone(),
+            None => std::fs::read_to_string(script).map_err(|err| Unwritten::Unreadable {
+                script: script.to_path_buf(),
+                why: err.to_string(),
+            })?,
+        };
+        Ok(scan(script, &source, self.texts).shadows)
+    }
+
+    fn path(&self, script: &Path) -> String {
+        match self.paths {
+            Paths::From(base) => relative(base, script),
+            Paths::Absolute => script.to_string_lossy().into_owned(),
+        }
+    }
+}
+
+/// The script a command runs.
+fn script_of(command: &Command) -> Result<PathBuf, Unwritten> {
+    match &command.execution {
+        Execution::Script(script) => Ok(script.clone()),
+        _ => Err(Unwritten::Syntax(SyntaxError(format!(
+            "`{}` is not a script's command",
+            command.path
+        )))),
+    }
+}
+
+fn names(shadows: &[Shadow]) -> Vec<(String, PathBuf)> {
+    shadows
+        .iter()
+        .map(|shadow| (shadow.name.clone(), shadow.target.clone()))
+        .collect()
 }
 
 /// A script takes no input of its own and returns what its output declares.
@@ -436,66 +511,124 @@ mod tests {
         assert_eq!(as_path("../x.nu"), "../x.nu");
     }
 
-    #[test]
-    fn the_forms_that_run_a_task() {
-        let word = |text: &str| Word {
-            text: text.into(),
-            span: 0..text.len(),
-        };
-        let named = |head: &str, args: &[&str]| {
-            let args: Vec<Word> = args.iter().map(|arg| word(arg)).collect();
-            named_task(&word(head), &args).map(|(name, task)| (name, task.text.clone()))
-        };
-        assert_eq!(
-            named("mise", &["run", "build", "--release"]),
-            Some(("mise run build".into(), "build".into()))
-        );
-        assert_eq!(
-            named("mise", &["r", "//app:test"]),
-            Some(("mise r //app:test".into(), "//app:test".into()))
-        );
-        // mise's own flags before the task, no task, or another command of mise's.
-        assert_eq!(named("mise", &["run", "-q", "build"]), None);
-        assert_eq!(named("mise", &["run"]), None);
-        assert_eq!(named("mise", &["tasks", "build"]), None);
-        assert_eq!(named("nu", &["run", "build"]), None);
+    /// A directory of its own for a test's scripts.
+    fn scripts(files: &[(&str, &str)]) -> PathBuf {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "nusage-calls-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        for (name, text) in files {
+            let file = dir.join(name);
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, text).unwrap();
+        }
+        dir
+    }
+
+    fn written(script: &Path) -> (Vec<String>, Vec<Finding>) {
+        let source = std::fs::read_to_string(script).unwrap();
+        let mut calls = scan(script, &source, &Texts::new());
+        let defs = definitions(script, &mut calls, Paths::Absolute, &Texts::new());
+        (
+            defs.iter().map(nusage_nu::print_line).collect(),
+            calls.findings,
+        )
     }
 
     #[test]
-    fn a_task_runs_through_mise_from_the_callers_directory() {
+    fn a_definition_binds_usage_from_its_parameters_and_runs_the_script() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/script-calls");
-        let callee = fixture.join("callee.nu");
-        let (words, command) = commands_of(&callee, &Texts::new()).unwrap().remove(0);
-        let shadow = Shadow {
-            name: "mise run greet".into(),
-            target: callee.clone(),
-            through: Through::Mise {
-                dir: fixture.clone(),
-                task: "greet".into(),
-            },
-            words,
-            command,
-        };
-        let module = nusage_nu::print_line(
-            &shadow_def(&shadow, Runner::Module(&fixture.join("expected"))).unwrap(),
+        let (defs, findings) = written(&fixture.join("script.nu"));
+        assert!(findings.is_empty(), "{findings:?}");
+        let path = resolve(&fixture, "callee.nu");
+        let def = defs
+            .iter()
+            .find(|def| def.starts_with("def \"./callee.nu\""))
+            .expect("the path call's definition");
+        assert!(
+            def.contains("--times: int = 1"),
+            "a declared default applies: {def}"
         );
         assert!(
-            module.contains(
-                r#"const script = path self "../callee.nu"; const dir = path self ".."; $in | nus call $script mise "-C" $dir run greet ...(nus argv"#
+            def.contains(
+                "let usage = { cmd: [] args: {name: $name} flags: {loud: $loud, times: $times, chatty: $chatty} }"
             ),
-            "{module}"
-        );
-        let absolute = nusage_nu::print_line(
-            &shadow_def(&shadow, Runner::Absolute(Path::new("/bin/nus"))).unwrap(),
+            "{def}"
         );
         assert!(
-            absolute.contains(&format!(
-                "nus call {} mise \"-C\" {} run greet ...(",
-                word(&callee.to_string_lossy()),
-                word(&fixture.to_string_lossy())
-            )),
-            "{absolute}"
+            def.ends_with(&format!("$in | run {:?} }}", path.to_string_lossy())),
+            "{def}"
         );
+    }
+
+    #[test]
+    fn the_scripts_a_called_script_calls_are_defined_inside_its_definition() {
+        let shebang = "#!/usr/bin/env nus\n";
+        let dir = scripts(&[
+            ("main.nu", &format!("{shebang}./a/a.nu\n./b.nu\n")),
+            ("b.nu", &format!("{shebang}\"root b\"\n")),
+            ("a/a.nu", &format!("{shebang}./b.nu\n")),
+            ("a/b.nu", &format!("{shebang}\"a/b\"\n")),
+        ]);
+        let (defs, findings) = written(&dir.join("main.nu"));
+        assert!(findings.is_empty(), "{findings:?}");
+        let a = defs
+            .iter()
+            .find(|def| def.starts_with("def \"./a/a.nu\""))
+            .unwrap();
+        // `a.nu`'s own `./b.nu` is its sibling, defined where only its run sees it.
+        let inner = format!(
+            "def \"./b.nu\" [] {{ let usage = {{ cmd: [] args: {{}} flags: {{}} }}; $in | run {:?} }}",
+            dir.join("a/b.nu").to_string_lossy()
+        );
+        assert!(a.contains(&inner), "{a}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_script_met_again_runs_with_the_definitions_around_it() {
+        let shebang = "#!/usr/bin/env nus\n#USAGE arg \"<n>\"\n";
+        let dir = scripts(&[
+            ("a.nu", &format!("{shebang}./b.nu 1\n")),
+            ("b.nu", &format!("{shebang}./a.nu 0\n")),
+        ]);
+        let (defs, findings) = written(&dir.join("a.nu"));
+        assert!(findings.is_empty(), "{findings:?}");
+        assert_eq!(defs.len(), 1);
+        // `b.nu`'s `./a.nu` is defined inside, and `a.nu`'s `./b.nu` there is the one around.
+        let a_again = format!(
+            "def \"./a.nu\" [n: string] {{ let usage = {{ cmd: [] args: {{n: $n}} flags: {{}} }}; $in | run {:?} }}",
+            dir.join("a.nu").to_string_lossy()
+        );
+        assert!(defs[0].contains(&a_again), "{}", defs[0]);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_round_whose_names_reach_other_scripts_is_left_external() {
+        let shebang = "#!/usr/bin/env nus\n";
+        // `x/a.nu` calls `./c.nu` (its sibling) and `../y/b.nu`; `y/b.nu` calls `./c.nu` (its
+        // own sibling) and `../x/a.nu`. Met again inside `b.nu`'s definition, `a.nu`'s
+        // `./c.nu` would reach `y/c.nu`.
+        let dir = scripts(&[
+            ("x/a.nu", &format!("{shebang}./c.nu\n../y/b.nu\n")),
+            ("x/c.nu", &format!("{shebang}1\n")),
+            ("y/b.nu", &format!("{shebang}./c.nu\n../x/a.nu\n")),
+            ("y/c.nu", &format!("{shebang}2\n")),
+        ]);
+        let (defs, findings) = written(&dir.join("x/a.nu"));
+        assert!(defs.iter().any(|def| def.starts_with("def \"./c.nu\"")));
+        assert!(!defs.iter().any(|def| def.starts_with("def \"../y/b.nu\"")));
+        assert_eq!(findings.len(), 1, "{findings:?}");
+        assert!(
+            findings[0].message.contains("come back round"),
+            "{findings:?}"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

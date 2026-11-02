@@ -1,8 +1,10 @@
-//! `nus nu`: `nu`, as mise's command wrapper starts it in the `nus-lsp` environment, so
-//! an editor that starts `nu --lsp` gets nusage's language server without being told of it:
-//! kakehashi with nusage's layer when kakehashi is on PATH, which highlights a script's header
-//! and bridges the script to `nus lsp`, else `nus lsp` alone. Anything else is `nu`, as
-//! it was asked for.
+//! `nus nu`: `nu`, as a command wrapper standing in Nushell's place starts it (mise's
+//! `[wrappers.nu]` with `args = ["nu"]`, say), so an editor that starts `nu --lsp` gets
+//! nusage's language server without being told of it: kakehashi with nusage's layer when
+//! kakehashi is on PATH, which highlights a script's header and bridges the script to `nus
+//! lsp`, else `nus lsp` alone. Anything else is `nu`, as it was asked for. The arguments are
+//! read by Nushell's own command line, as a usage spec, so `--lsp` is found among Nushell's
+//! flags and never among a script's.
 
 use std::ffi::OsStr;
 use std::io;
@@ -14,7 +16,7 @@ pub const SERVING: &str = "NUS_LSP";
 
 /// Set on the `nu` this runs, to this process's id. Should that `nu` lead back here, through
 /// a shim or wrapper [`real_nu`] did not see for one, the `nus nu` it reaches is this same
-/// process, as mise's shims and wrappers exec on unix, and it stops instead of going round
+/// process, as a wrapper that execs on unix leaves it, and it stops instead of going round
 /// for ever. A `nu` that Nushell starts in turn is a process of its own, and runs.
 const RAN: &str = "NUS_NU_PID";
 
@@ -51,60 +53,35 @@ pub fn run(args: &[String]) -> io::Result<i32> {
     }
 }
 
+/// Nushell's own command line, as a usage spec.
+const SPEC: &str = include_str!("nu.usage.kdl");
+
 /// Whether `nu` is asked to serve its language server, and then the rest of its arguments:
-/// `--lsp` among Nushell's own flags, before a script or a command takes the rest.
+/// `--lsp` among Nushell's own flags, before a script or a command takes the rest. usage
+/// reads the arguments by Nushell's spec; arguments it cannot read are Nushell's to refuse.
 fn lsp_requested(args: &[String]) -> Option<Vec<String>> {
-    // Nushell's flags that take the word after them, as `nu --help` lists them.
-    const VALUED: &[&str] = &[
-        "-c",
-        "--commands",
-        "-e",
-        "--execute",
-        "-m",
-        "--table-mode",
-        "--error-style",
-        "--mcp-transport",
-        "--mcp-port",
-        "--mcp-host",
-        "-I",
-        "--include-path",
-        "--config",
-        "--env-config",
-        "--config-home",
-        "--log-level",
-        "--log-target",
-        "--log-file",
-        "--log-include",
-        "--log-exclude",
-        "--ide-goto-def",
-        "--ide-hover",
-        "--ide-complete",
-        "--ide-check",
-        "--experimental-options",
-        "--plugin-config",
-        "--plugins",
-    ];
-    let mut words = args.iter().enumerate();
-    while let Some((at, word)) = words.next() {
-        if word == "--lsp" {
-            let mut rest = args.to_vec();
-            rest.remove(at);
-            return Some(rest);
-        }
-        if VALUED.contains(&word.as_str()) {
-            words.next();
-        } else if !word.starts_with('-') {
-            // A script: what follows is its own.
-            return None;
-        }
+    let spec: usage::Spec = SPEC.parse().expect("Nushell's spec reads");
+    let argv: Vec<String> = std::iter::once("nu".to_string())
+        .chain(args.iter().cloned())
+        .collect();
+    let parsed = usage::parse::Parser::new(&spec)
+        .without_running_commands()
+        .parse(&argv)
+        .ok()?;
+    if !parsed.flags.keys().any(|flag| flag.name == "lsp") {
+        return None;
     }
-    None
+    let at = args.iter().position(|word| word == "--lsp")?;
+    let mut rest = args.to_vec();
+    rest.remove(at);
+    Some(rest)
 }
 
-/// The `nu` to run: the first on PATH that is not one of mise's shims or wrappers, which would
-/// lead back here; they are links to mise itself. Under mise's wrapper the PATH holds none of
-/// them, mise takes their directories off it for the command, so the toolset's `nu` is first.
-/// Should either stop being so, [`RAN`] stops the loop.
+/// The `nu` to run: the first on PATH that is Nushell, a file named `nu` once its links are
+/// followed, and not this program. A shim or wrapper is a link to another program, such as a
+/// version manager's, and may lead back here, so it is passed over. A wrapper that takes its
+/// own directory off PATH for the command it starts, as mise's does, leaves none to pass.
+/// Should one that does not look so lead back here, [`RAN`] stops the loop.
 pub fn real_nu() -> PathBuf {
     let here = std::env::current_exe().and_then(std::fs::canonicalize).ok();
     let name = format!("nu{}", std::env::consts::EXE_SUFFIX);
@@ -116,8 +93,8 @@ pub fn real_nu() -> PathBuf {
             let Ok(target) = std::fs::canonicalize(candidate) else {
                 return false;
             };
-            let mise = target.file_stem() == Some(OsStr::new("mise"));
-            target.is_file() && !mise && Some(&target) != here.as_ref()
+            let nushell = target.file_stem() == Some(OsStr::new("nu"));
+            target.is_file() && nushell && Some(&target) != here.as_ref()
         })
         .unwrap_or_else(|| PathBuf::from(name))
 }
@@ -143,7 +120,7 @@ fn layer(nusage: &Path, args: &[String]) -> io::Result<PathBuf> {
         .map(|(path, text)| (*path, text.to_string()))
         .collect();
     files.push(("kakehashi.toml", config));
-    let dir = cache_dir()
+    let dir = crate::common::cache_dir()
         .join("nusage")
         .join("kakehashi")
         .join(digest(&files));
@@ -200,40 +177,19 @@ languages = ["nu", "nushell"]
     )
 }
 
-/// The user's cache directory, as each platform has one.
-fn cache_dir() -> PathBuf {
-    let var = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
-    if cfg!(windows) {
-        if let Some(dir) = var("LOCALAPPDATA") {
-            return PathBuf::from(dir);
-        }
-    } else if cfg!(target_os = "macos") {
-        if let Some(home) = var("HOME") {
-            return PathBuf::from(home).join("Library/Caches");
-        }
-    } else if let Some(dir) = var("XDG_CACHE_HOME") {
-        return PathBuf::from(dir);
-    } else if let Some(home) = var("HOME") {
-        return PathBuf::from(home).join(".cache");
-    }
-    std::env::temp_dir()
-}
-
-/// A name for the layer's contents, the same from one build of nusage to the next (FNV-1a),
-/// so the layers in the cache are as many as the contents they have had.
+/// A name for the layer's contents, the same from one build of nusage to the next, so the
+/// layers in the cache are as many as the contents they have had.
 fn digest(files: &[(&str, String)]) -> String {
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for (path, text) in files {
-        for byte in path.bytes().chain([0]).chain(text.bytes()).chain([0]) {
-            hash = (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3);
-        }
-    }
-    format!("{hash:016x}")
+    crate::common::fnv1a(
+        files
+            .iter()
+            .flat_map(|(path, text)| path.bytes().chain([0]).chain(text.bytes()).chain([0])),
+    )
 }
 
 /// Become the command, as a wrapper should: on unix the process is replaced, so signals,
 /// the terminal and the exit status are the command's own; elsewhere it runs to its end.
-fn replace_with(command: &mut Command) -> io::Result<i32> {
+pub(crate) fn replace_with(command: &mut Command) -> io::Result<i32> {
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -265,6 +221,71 @@ mod tests {
         assert_eq!(lsp_requested(&words("-c foo --lsp")), Some(words("-c foo")));
         assert_eq!(lsp_requested(&words("--ide-check 10 x.nu")), None);
         assert_eq!(lsp_requested(&words("--mcp")), None);
+        // A flag's value that reads as `--lsp` is the value, and a repeated flag takes its
+        // value each time.
+        assert_eq!(lsp_requested(&words("-c --lsp")), None);
+        assert_eq!(
+            lsp_requested(&words("--plugins a --plugins b --lsp")),
+            Some(words("--plugins a --plugins b"))
+        );
+        // A flag Nushell does not have is Nushell's to refuse.
+        assert_eq!(lsp_requested(&words("--no-such-flag --lsp")), None);
+    }
+
+    /// The spec is the Nushell nusage is built against: its version is that of the Nushell
+    /// crates in Cargo.lock, and where the `nu` on PATH is that version, its flags are the
+    /// ones `nu --help` lists, each taking a value as it does there.
+    #[test]
+    fn the_spec_is_nushells_own() {
+        let spec: usage::Spec = SPEC.parse().unwrap();
+        let lock = std::fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Cargo.lock"),
+        )
+        .unwrap();
+        let crates = lock
+            .split("[[package]]")
+            .find(|package| package.contains("name = \"nu-protocol\""))
+            .and_then(|package| {
+                package.lines().find_map(|line| {
+                    Some(
+                        line.strip_prefix("version = \"")?
+                            .strip_suffix('"')?
+                            .to_string(),
+                    )
+                })
+            })
+            .expect("nu-protocol in Cargo.lock");
+        assert_eq!(spec.version.as_deref(), Some(crates.as_str()));
+        let version = Command::new(real_nu()).arg("--version").output();
+        let Ok(version) = version else {
+            return;
+        };
+        if String::from_utf8_lossy(&version.stdout).trim() != crates {
+            return;
+        }
+        let help = Command::new(real_nu()).arg("--help").output().unwrap();
+        let listed: std::collections::BTreeMap<String, bool> =
+            String::from_utf8_lossy(&help.stdout)
+                .lines()
+                .filter_map(|line| {
+                    let line = line.trim_start();
+                    // `-c, --commands <string>`, `--stdin`: the long name, and a value when
+                    // one is named.
+                    let long = line.strip_prefix('-')?.rsplit(", ").next()?;
+                    let (name, value) = match long.split_once(' ') {
+                        Some((name, _)) => (name, true),
+                        None => (long, false),
+                    };
+                    Some((name.trim_start_matches('-').to_string(), value))
+                })
+                .collect();
+        let declared: std::collections::BTreeMap<String, bool> = spec
+            .cmd
+            .flags
+            .iter()
+            .filter_map(|flag| Some((flag.long.first()?.clone(), flag.arg.is_some())))
+            .collect();
+        assert_eq!(declared, listed);
     }
 
     #[test]

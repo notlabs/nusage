@@ -51,6 +51,11 @@ pub fn print_line(def: &Def) -> String {
         .body
         .iter()
         .map(|stmt| {
+            // A definition inside is written the same way: its parameters' comments would
+            // otherwise run to the end of the line.
+            if let Stmt::Def(inner) = stmt {
+                return print_line(inner);
+            }
             let tokens: Tokens = quote!($(stmt_tokens(stmt)));
             let text = tokens
                 .to_file_string()

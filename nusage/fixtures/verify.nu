@@ -26,8 +26,8 @@
 #   mise run //nusage:verify-fixtures fixtures/minimal      # one
 #   mise run //nusage:verify-fixtures --update-signatures   # rewrite expected/signatures.nuon
 #
-# `NUS_BIN` names the nus to check, and `NUS_PLUGIN` its plugin; the build `//nusage:build`
-# copies both into `.bin` by default.
+# `NUS_BIN` names the nus to check; the build `//nusage:build` copies it into `.bin` by
+# default.
 
 # One row per check: shim, interpreter, run and (when present) completion per case, then
 # signatures.
@@ -52,9 +52,7 @@ def verify-fixture [dir: path, update: bool] {
         } else {
             [
                 (row $name shim $id (check-shim $import $bin $case))
-                (row $name shim-plugin $id (check-shim-plugin $dir $bin $case))
                 (row $name interpreter $id (check-interpreter $dir $bin $case))
-                (row $name executor $id (check-executor $dir $bin $case))
                 (row $name run $id (check-run $dir $bin $case))
                 (row $name prelude $id (check-prelude $dir $bin $case))
             ] | append (
@@ -149,50 +147,10 @@ def words-of [case: record] {
     $case.invoke? | default ($case.argv | str join ' ')
 }
 
-# The module's shadows run the scripts they call with the `nus` on PATH: the one built here.
+# The module runs the scripts it wraps, and those they call, with `run`: no `nus` is needed.
 def check-shim [import: string, bin: string, case: record] {
     let code = $"($import); ($bin) (words-of $case) | to nuon"
-    run-nu $code {
-        PATH: (search-path [
-            ($env.NUS_BIN | path dirname)
-        ])
-    } | after-printed $case | compare (expected-output $case)
-}
-
-# The module written for a session with the plugin registered, `nus generate --plugin`: the
-# helpers the plugin serves are called and not defined, so its shadows run their scripts in
-# the plugin's process. Written afresh into a directory of its own, run under this Nushell
-# with the built plugin, and held to the same cases as the module that stands on its own.
-def check-shim-plugin [dir: path, bin: string, case: record] {
-    if not ($env.NUS_BIN | path exists) {
-        return (skipped $"($env.NUS_BIN) is not built")
-    }
-    if not ($env.NUS_PLUGIN | path exists) {
-        return (skipped $"($env.NUS_PLUGIN) is not built")
-    }
-    let single = $dir | path join script.nu
-    let source = if ($single | path exists) {
-        $single
-    } else {
-        $dir | path join $bin
-    }
-    let out = mktemp --directory
-    let module = $out | path join $"($bin).nu"
-    let generated = ^$env.NUS_BIN generate --plugin $source --out $module | complete
-    if $generated.exit_code != 0 {
-        rm --recursive $out
-        return {
-            ok: false
-            detail: ($generated.stderr | str trim)
-        }
-    }
-    let outcome = run-nu $"use ($module | to nuon); ($bin) (words-of $case) | to nuon" {
-        PATH: (search-path [
-            ($env.NUS_BIN | path dirname)
-        ])
-    } --plugins [$env.NUS_PLUGIN] | after-printed $case | compare (expected-output $case)
-    rm --recursive $out
-    $outcome
+    run-nu $code {} | after-printed $case | compare (expected-output $case)
 }
 
 def check-interpreter [dir: path, bin: string, case: record] {
@@ -207,20 +165,6 @@ def check-interpreter [dir: path, bin: string, case: record] {
     run-nu $code {
         NUS_ARGS: ($case.usage | to nuon)
     } | after-printed $case | compare (expected-output $case)
-}
-
-# The plugin's `nus call`: the script run in an engine inside the plugin's process, by the
-# built plugin under this Nushell, which must return the interpreter's value after what the
-# script printed.
-def check-executor [dir: path, bin: string, case: record] {
-    if not ($env.NUS_PLUGIN | path exists) {
-        return (skipped $"($env.NUS_PLUGIN) is not built")
-    }
-    # The root script, with the case's argv: the executor routes to the subcommand's, as
-    # the interpreter does.
-    let script = script-for $dir $bin []
-    let code = $"nus call ($script | to nuon) nus ($script | to nuon) ...($case.argv | to nuon) | to nuon"
-    run-nu $code {} --plugins [$env.NUS_PLUGIN] | after-printed $case | compare (expected-output $case)
 }
 
 # A binary call against the fixture's fake binary: the argv it recorded must be the case's
@@ -396,15 +340,8 @@ def check-prelude [dir: path, bin: string, case: record] {
     } | compare $case.usage
 }
 
-def run-nu [code: string, env_vars: record, --plugins: list<path> = []] {
-    let plugins = if ($plugins | is-empty) {
-        []
-    } else {
-        [
-            "--plugins" ($plugins | to nuon)
-        ]
-    }
-    let out = with-env $env_vars { ^$nu.current-exe -n ...$plugins -c $code } | complete
+def run-nu [code: string, env_vars: record] {
+    let out = with-env $env_vars { ^$nu.current-exe -n -c $code } | complete
     if $out.exit_code != 0 {
         {
             ok: false
@@ -506,12 +443,6 @@ $env.NUS_BIN = $env.NUS_BIN? | default (
     | path dirname
     | path dirname
     | path join .bin nus
-)
-$env.NUS_PLUGIN = $env.NUS_PLUGIN? | default (
-    $root
-    | path dirname
-    | path dirname
-    | path join .bin nu_plugin_nus
 )
 let fixtures = if ($usage.args.fixtures | is-empty) {
     ls $root | where type == dir | get name

@@ -22,7 +22,6 @@
         "required": [
           "name",
           "target",
-          "through",
           "command"
         ],
         "additionalProperties": false,
@@ -36,42 +35,6 @@
           "command": {
             "type": "object",
             "description": "The command model serialized by nus model."
-          },
-          "through": {
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "const": "nus"
-                  }
-                },
-                "required": [
-                  "kind"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "const": "mise"
-                  },
-                  "dir": {
-                    "type": "string"
-                  },
-                  "task": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "dir",
-                  "task"
-                ],
-                "additionalProperties": false
-              }
-            ]
           }
         }
       }

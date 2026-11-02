@@ -11,8 +11,9 @@
 //! posed the argv, which usage routes.
 //!
 //! Not posed: vectors that choose `argv0`, since a script is called by its own name; vectors
-//! with `mounts`, since the interpreter runs no command while parsing; and vectors whose
-//! `cmd` nodes carry properties other than `help`, which a header has no line for.
+//! with `mounts`, whose mounted specs are given as the output of commands that do not exist,
+//! where nusage runs a mount's command; and vectors whose `cmd` nodes carry properties other
+//! than `help`, which a header has no line for.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;

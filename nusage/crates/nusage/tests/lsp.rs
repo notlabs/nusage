@@ -573,3 +573,60 @@ fn a_nu_another_one_ran_runs() {
     assert!(output.status.success(), "{output:?}");
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "inner");
 }
+
+/// A package of its own for a test: the module `greet`, typed, and its record.
+fn package(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("nus-lsp-package-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("greet")).unwrap();
+    std::fs::write(
+        dir.join("greet/mod.nu"),
+        "export def \"greet twice\" [n: int]: nothing -> int { $n * 2 }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("package.nuon"),
+        "{name: greet, version: \"0.1.0\", module: greet, tool: {name: greeter, bin: greet, version: \"1.2.0\"}}\n",
+    )
+    .unwrap();
+    dir
+}
+
+/// The editor checks a script with the modules its calls get, as the interpreter runs it: a
+/// call that does not fit the module's signature is said, where without the module it is an
+/// external Nushell takes as it is. A tool of the wrong version is said on the first line.
+#[test]
+fn a_call_is_checked_against_the_module_its_word_names() {
+    let root = package("calls");
+    let text = "#!/usr/bin/env nus\ngreet twice abc\n";
+    let Some((_, diagnostics)) = session(text, None, &[]) else {
+        return;
+    };
+    let without = said(&diagnostics);
+    assert!(without.iter().all(|(line, _)| *line != 1), "{without:?}");
+    let modules = (
+        "NUS_MODULES",
+        format!("{{greet: '{}'}}", root.join("greet").display()),
+    );
+    let vars = [
+        modules.clone(),
+        ("NUS_TOOLS", "{greeter: '1.2.0'}".to_string()),
+    ];
+    let (_, diagnostics) = session_with(&["lsp"], &vars, text, None, &[]).unwrap();
+    let with = said(&diagnostics);
+    assert!(
+        with.iter()
+            .any(|(line, message)| *line == 1 && message.contains("int")),
+        "{with:?}"
+    );
+    let vars = [modules, ("NUS_TOOLS", "{greeter: '1.3.0'}".to_string())];
+    let (_, diagnostics) = session_with(&["lsp"], &vars, text, None, &[]).unwrap();
+    let other = said(&diagnostics);
+    assert!(
+        other
+            .iter()
+            .any(|(line, message)| *line == 0 && message.contains("greeter 1.3.0")),
+        "{other:?}"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
