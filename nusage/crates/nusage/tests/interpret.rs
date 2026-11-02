@@ -252,7 +252,10 @@ fn a_call_gets_the_module_its_word_names() {
     let other = nus_with(&dir, "calls.nu", &[], None, &[modules, tools("1.3.0")]).unwrap();
     assert!(!other.status.success(), "{other:?}");
     let said = String::from_utf8_lossy(&other.stderr);
-    assert!(said.contains("greeter 1.2.0") && said.contains("greeter 1.3.0"), "{said}");
+    assert!(
+        said.contains("greeter 1.2.0") && said.contains("greeter 1.3.0"),
+        "{said}"
+    );
     std::fs::remove_dir_all(dir).unwrap();
     std::fs::remove_dir_all(package).unwrap();
 }

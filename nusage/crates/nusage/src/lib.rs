@@ -17,12 +17,12 @@ mod http;
 mod inspect;
 mod interpret;
 mod lsp;
+mod modules;
 mod nu;
 mod prelude;
 mod shim;
 mod switch_overlay;
 mod validate;
-mod modules;
 
 use std::path::{Path, PathBuf};
 

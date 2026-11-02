@@ -608,11 +608,15 @@ fn a_call_is_checked_against_the_module_its_word_names() {
         "NUS_MODULES",
         format!("{{greet: '{}'}}", root.join("greet").display()),
     );
-    let vars = [modules.clone(), ("NUS_TOOLS", "{greeter: '1.2.0'}".to_string())];
+    let vars = [
+        modules.clone(),
+        ("NUS_TOOLS", "{greeter: '1.2.0'}".to_string()),
+    ];
     let (_, diagnostics) = session_with(&["lsp"], &vars, text, None, &[]).unwrap();
     let with = said(&diagnostics);
     assert!(
-        with.iter().any(|(line, message)| *line == 1 && message.contains("int")),
+        with.iter()
+            .any(|(line, message)| *line == 1 && message.contains("int")),
         "{with:?}"
     );
     let vars = [modules, ("NUS_TOOLS", "{greeter: '1.3.0'}".to_string())];

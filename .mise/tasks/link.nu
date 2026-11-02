@@ -16,6 +16,7 @@
 let root = $env.MISE_PROJECT_ROOT? | default $env.PWD
 let project = $usage.args.project | path expand
 let links = $root | path join target nusage-link
+
 const PREFIX = "packslip:github.com/notlabs/nusage/catalog/"
 
 let wanted = do {
@@ -25,12 +26,11 @@ let wanted = do {
     {tool: $row.tool, version: ($row.installs | get requested_version | compact | first)}
 } | where {|row| $row.tool == "github:notlabs/nusage" or ($row.tool | str starts-with $PREFIX) }
 if ($wanted | is-empty) {
-    error make --unspanned {
-        msg: $"($project) names no notlabs/nusage tool in its mise config"
-    }
+    error make --unspanned {msg: $"($project) names no notlabs/nusage tool in its mise config"}
 }
 
 let packed = open ($root | path join catalog dist packages packages.json)
+
 let linked = $wanted | each {|row|
     let dir = $links | path join ($row.tool | str replace --all --regex '[^A-Za-z0-9.-]+' '-') $row.version
     rm --recursive --force $dir

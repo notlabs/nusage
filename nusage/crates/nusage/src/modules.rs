@@ -69,11 +69,7 @@ fn select(
 /// Whether the project's own version of the tool the module's package wraps is the version
 /// the package was generated from. A module with no package record, or a package that pins
 /// no tool, has nothing to hold.
-fn check(
-    word: &str,
-    dir: &Path,
-    tools: Option<&BTreeMap<String, String>>,
-) -> Result<(), String> {
+fn check(word: &str, dir: &Path, tools: Option<&BTreeMap<String, String>>) -> Result<(), String> {
     let Some(file) = dir
         .parent()
         .map(|parent| parent.join("package.nuon"))
@@ -86,9 +82,21 @@ fn check(
     let package = nuon::from_nuon(&text, None)
         .map_err(|err| format!("{} does not read as NUON: {err}", file.display()))?;
     let field = |value: &Value, name: &str| -> Option<String> {
-        Some(value.as_record().ok()?.get(name)?.as_str().ok()?.to_string())
+        Some(
+            value
+                .as_record()
+                .ok()?
+                .get(name)?
+                .as_str()
+                .ok()?
+                .to_string(),
+        )
     };
-    let Some(tool) = package.as_record().ok().and_then(|record| record.get("tool")) else {
+    let Some(tool) = package
+        .as_record()
+        .ok()
+        .and_then(|record| record.get("tool"))
+    else {
         return Ok(());
     };
     let (Some(name), Some(version)) = (field(tool, "name"), field(tool, "version")) else {
@@ -150,10 +158,8 @@ mod tests {
 
     /// An empty directory of the test's own.
     fn scratch(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "nusage-modules-{name}-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("nusage-modules-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -189,16 +195,17 @@ mod tests {
         let modules = map(&[("greet", &module.to_string_lossy())]);
         let script = root.join("script.nu");
         let source = "greet | str length\ngreet\ndef other [] { ^greet }\nprint ok\n";
-        assert_eq!(
-            select(&script, source, &modules, None).unwrap(),
-            [module.clone()]
-        );
+        let found = select(&script, source, &modules, None).unwrap();
+        assert_eq!(found, std::slice::from_ref(&module));
         // The binary itself, `^greet`, and a word of the script's own are not the module's.
         let own = "def greet [] { 'mine' }\ngreet\n^greet\n";
         assert!(select(&script, own, &modules, None).unwrap().is_empty());
         assert_eq!(
-            uses(&[module.clone()]),
-            [format!("use {} *", nusage_nu::word(&module.to_string_lossy()))]
+            uses(&found),
+            [format!(
+                "use {} *",
+                nusage_nu::word(&module.to_string_lossy())
+            )]
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -213,7 +220,10 @@ mod tests {
         assert!(select(&script, "greet\n", &modules, Some(&same)).is_ok());
         let other = map(&[("greeter", "1.3.0")]);
         let why = select(&script, "greet\n", &modules, Some(&other)).unwrap_err();
-        assert!(why.contains("greeter 1.2.0") && why.contains("greeter 1.3.0"), "{why}");
+        assert!(
+            why.contains("greeter 1.2.0") && why.contains("greeter 1.3.0"),
+            "{why}"
+        );
         let none = map(&[]);
         let why = select(&script, "greet\n", &modules, Some(&none)).unwrap_err();
         assert!(why.contains("does not install"), "{why}");
