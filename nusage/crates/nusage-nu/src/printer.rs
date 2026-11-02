@@ -292,9 +292,6 @@ fn expr_tokens(expr: &Expr, statement_value: bool) -> Tokens {
         Expr::External { name, args } => {
             quote!(^$(name.as_str())$(for arg in args => $[' ']$(expr_tokens(arg, false))))
         }
-        Expr::ExternalOf { head, args } => {
-            quote!(^($(expr_tokens(head, false)))$(for arg in args => $[' ']$(expr_tokens(arg, false))))
-        }
         Expr::Group(inner) => quote!(($(expr_tokens(inner, false)))),
         Expr::Infix { lhs, op, rhs } => {
             quote!($(expr_tokens(lhs, false)) $(op.as_str()) $(expr_tokens(rhs, false)))

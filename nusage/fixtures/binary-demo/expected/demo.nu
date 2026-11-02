@@ -36,14 +36,6 @@ def "nus flag-words" []: record -> list<string> {
     } | flatten
 }
 
-# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
-# that names one, else the name, found on PATH.
-def "nus bin" []: nothing -> string {
-    let bins = $env.NUS_BINS? | default {}
-    let bins = if ($bins | describe) == string { $bins | from nuon } else { $bins }
-    $bins."demo"? | default demo
-}
-
 # Completions from usage's own completer, against the spec this module was generated
 # from, with the words typed so far. Nothing when the `usage` CLI is not installed.
 def "nus complete" [place: record] {
@@ -65,7 +57,7 @@ def "nus complete" [place: record] {
 export def main [
     --verbose (-v): int,  # Say more
 ]: nothing -> string {
-    ^(nus bin) ...(nus argv [] {--verbose: $verbose})
+    ^demo ...(nus argv [] {--verbose: $verbose})
 }
 
 # Install a plugin
@@ -82,7 +74,7 @@ export def "demo install" [
     --dir (-d): path,               # Install into this directory
     --env_: string,                 # Environment to install into
 ]: nothing -> string {
-    ^(nus bin) install ...(nus argv [$plugin $version] {
+    ^demo install ...(nus argv [$plugin $version] {
         --verbose: $verbose
         --global: $global
         --dir: $dir
@@ -101,7 +93,7 @@ export def "demo run" [
     --verbose (-v): int,          # Say more
     --set (-e): list<string>,     # Variable to set, repeatable
 ]: nothing -> string {
-    ^(nus bin) run ...(nus argv [$task ...$args] {--verbose: $verbose, --set: $set})
+    ^demo run ...(nus argv [$task ...$args] {--verbose: $verbose, --set: $set})
 }
 
 # Show status
@@ -112,7 +104,7 @@ export def "demo run" [
 export def "demo status" [
     --verbose (-v): int,  # Say more
 ]: nothing -> record<ok: bool, tasks: list<string>> {
-    ^(nus bin) status --format json ...(nus argv [] {--verbose: $verbose}) | from json
+    ^demo status --format json ...(nus argv [] {--verbose: $verbose}) | from json
 }
 
 # Stream events
@@ -122,7 +114,7 @@ export def "demo status" [
 export def "demo events" [
     --verbose (-v): int,  # Say more
 ]: nothing -> table<at: datetime, kind: string> {
-    ^(nus bin) events --json ...(nus argv [] {--verbose: $verbose}) | from json --objects | into datetime at
+    ^demo events --json ...(nus argv [] {--verbose: $verbose}) | from json --objects | into datetime at
 }
 
 # Tag items
@@ -135,5 +127,5 @@ export def "demo tag" [
     --verbose (-v): int,   # Say more
     --label (-l): string,  # Label for the item that follows
 ]: nothing -> string {
-    ^(nus bin) tag ...(nus argv [...$item] {--verbose: $verbose} {--label: $label})
+    ^demo tag ...(nus argv [...$item] {--verbose: $verbose} {--label: $label})
 }

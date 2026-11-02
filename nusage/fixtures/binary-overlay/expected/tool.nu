@@ -36,17 +36,9 @@ def "nus flag-words" []: record -> list<string> {
     } | flatten
 }
 
-# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
-# that names one, else the name, found on PATH.
-def "nus bin" []: nothing -> string {
-    let bins = $env.NUS_BINS? | default {}
-    let bins = if ($bins | describe) == string { $bins | from nuon } else { $bins }
-    $bins."tool"? | default tool
-}
-
 # A tool whose own spec, as `tool usage` prints it, declares no outputs or types
 export def main []: nothing -> string {
-    ^(nus bin) ...(nus argv [] {})
+    ^tool ...(nus argv [] {})
 }
 
 # List things
@@ -57,5 +49,5 @@ export def main []: nothing -> string {
 export def "tool ls" [
     name?: string,  # Only this one, by name
 ]: nothing -> table<name: string, size: filesize> {
-    ^(nus bin) ls --json ...(nus argv [$name] {}) | from json | into filesize size
+    ^tool ls --json ...(nus argv [$name] {}) | from json | into filesize size
 }

@@ -36,14 +36,6 @@ def "nus flag-words" []: record -> list<string> {
     } | flatten
 }
 
-# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
-# that names one, else the name, found on PATH.
-def "nus bin" []: nothing -> string {
-    let bins = $env.NUS_BINS? | default {}
-    let bins = if ($bins | describe) == string { $bins | from nuon } else { $bins }
-    $bins."gh"? | default gh
-}
-
 # A binary's output decoded as the module's closure decodes it. When that fails and the
 # `nus` this module was generated with is on PATH, the output is held to the schema the
 # spec declares, line by line with `--lines`, so the error names what does not match it
@@ -90,7 +82,7 @@ def "nus decoded" [
 @usage 'version "2.103.3"'
 @usage 'example "$ gh issue create\n$ gh repo clone cli/cli\n$ gh pr checkout 321"'
 export def main []: nothing -> string {
-    ^(nus bin) ...(nus argv [] {})
+    ^gh ...(nus argv [] {})
 }
 
 # Manage issues
@@ -104,7 +96,7 @@ export def main []: nothing -> string {
 export def "gh issue" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) issue ...(nus argv [] {--repo: $repo})
+    ^gh issue ...(nus argv [] {--repo: $repo})
 }
 
 # Work with issue artifacts (preview)
@@ -117,7 +109,7 @@ export def "gh issue" [
 export def "gh issue artifact" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) issue artifact ...(nus argv [] {--repo: $repo})
+    ^gh issue artifact ...(nus argv [] {--repo: $repo})
 }
 
 # Create issue artifacts (preview)
@@ -166,7 +158,7 @@ export def "gh issue artifact create" [
     --name: string,                     # Name for a single artifact
     --type: string,                     # Type for documents: {generic|plan|embedded_html}
 ]: nothing -> string {
-    ^(nus bin) issue artifact create ...(nus argv [$issue_number_or_issue_url $file_name] {
+    ^gh issue artifact create ...(nus argv [$issue_number_or_issue_url $file_name] {
         --repo: $repo
         --attach: $attach
         --body: $body
@@ -194,7 +186,7 @@ export def "gh issue artifact delete" [
     --repo (-R): string,         # Select another repository using the `[HOST/]OWNER/REPO` format
     --yes,                       # Confirm deletion without prompting
 ]: nothing -> string {
-    ^(nus bin) issue artifact delete ...(nus argv [...$artifact_number] {--repo: $repo, --yes: $yes})
+    ^gh issue artifact delete ...(nus argv [...$artifact_number] {--repo: $repo, --yes: $yes})
 }
 
 # Download issue artifacts (preview)
@@ -231,7 +223,7 @@ export def "gh issue artifact download" [
     --output (-O): string,       # The `file` to write a single artifact to (use "-" to write to standard output)
     --skip-existing,             # Skip downloading when files of the same name exist
 ]: nothing -> string {
-    ^(nus bin) issue artifact download ...(nus argv [...$artifact_number] {
+    ^gh issue artifact download ...(nus argv [...$artifact_number] {
         --repo: $repo
         --clobber: $clobber
         --dir: $dir
@@ -279,7 +271,7 @@ export def "gh issue artifact edit" [
     --name: string,             # New name
     --restore-version: string,  # Restore the version with this `number` from the edit history
 ]: nothing -> string {
-    ^(nus bin) issue artifact edit ...(nus argv [$artifact_number] {
+    ^gh issue artifact edit ...(nus argv [$artifact_number] {
         --repo: $repo
         --attach: $attach
         --body: $body
@@ -321,7 +313,7 @@ export def "gh issue artifact list" [
     --template (-t): string,            # Format JSON output using a Go template; see "gh help formatting"
     --type: string,                     # Filter by type: {generic|plan|link|embedded_html}
 ]: nothing -> string {
-    ^(nus bin) issue artifact list ...(nus argv [$issue_number_or_issue_url] {
+    ^gh issue artifact list ...(nus argv [$issue_number_or_issue_url] {
         --repo: $repo
         --jq: $jq
         --json: $json
@@ -364,7 +356,7 @@ export def "gh issue artifact view" [
     --template (-t): string,  # Format JSON output using a Go template; see "gh help formatting"
     --web (-w),               # Open a document's page on GitHub, or a link's URL
 ]: nothing -> string {
-    ^(nus bin) issue artifact view ...(nus argv [$artifact_number] {
+    ^gh issue artifact view ...(nus argv [$artifact_number] {
         --repo: $repo
         --jq: $jq
         --json: $json
@@ -392,7 +384,7 @@ export def "gh issue close" [
     --duplicate-of: string,  # Mark as duplicate of another issue by number or URL
     --reason (-r): string,   # Reason for closing: {completed|not planned|duplicate}
 ]: nothing -> string {
-    ^(nus bin) issue close ...(nus argv [$number_or_url] {
+    ^gh issue close ...(nus argv [$number_or_url] {
         --repo: $repo
         --comment: $comment
         --duplicate-of: $duplicate_of
@@ -449,7 +441,7 @@ export def "gh issue comment" [
     --web (-w),                # Open the web browser to write the comment
     --yes,                     # Skip the delete confirmation prompt when --delete-last is provided
 ]: nothing -> string {
-    ^(nus bin) issue comment ...(nus argv [$number_or_url] {
+    ^gh issue comment ...(nus argv [$number_or_url] {
         --repo: $repo
         --attach: $attach
         --body: $body
@@ -554,7 +546,7 @@ export def "gh issue create" [
     --type: string,            # Set the issue type by `name`
     --web (-w),                # Open the browser to create an issue
 ]: nothing -> string {
-    ^(nus bin) issue create ...(nus argv [] {
+    ^gh issue create ...(nus argv [] {
         --repo: $repo
         --assignee: $assignee
         --attach: $attach
@@ -584,7 +576,7 @@ export def "gh issue delete" [
     --repo (-R): string,    # Select another repository using the `[HOST/]OWNER/REPO` format
     --yes,                  # Confirm deletion without prompting
 ]: nothing -> string {
-    ^(nus bin) issue delete ...(nus argv [$number_or_url] {--repo: $repo, --yes: $yes})
+    ^gh issue delete ...(nus argv [$number_or_url] {--repo: $repo, --yes: $yes})
 }
 
 # Manage linked branches for an issue
@@ -622,7 +614,7 @@ export def "gh issue develop" [
     --name (-n): string,    # Name of the branch to create
     --worktree: string,     # Check out the branch into a worktree at the given `path`
 ]: nothing -> string {
-    ^(nus bin) issue develop ...(nus argv [$number_or_url] {
+    ^gh issue develop ...(nus argv [$number_or_url] {
         --repo: $repo
         --base: $base
         --branch-repo: $branch_repo
@@ -749,7 +741,7 @@ export def "gh issue edit" [
     --title (-t): string,         # Set the new title.
     --type: string,               # Set the issue type by `name`
 ]: nothing -> string {
-    ^(nus bin) issue edit ...(nus argv [$numbers_or_urls] {
+    ^gh issue edit ...(nus argv [$numbers_or_urls] {
         --repo: $repo
         --add-assignee: $add_assignee
         --add-blocked-by: $add_blocked_by
@@ -843,7 +835,7 @@ export def "gh issue list" [
     --state (-s): string,      # Filter by state: {open|closed|all}
     --type: string,            # Filter by issue type `name`
 ]: nothing -> table<number: int, title: string, state: string, stateReason: string, url: string, author: record<is_bot: bool, login: string, id: oneof<string, nothing>, name: oneof<string, nothing>>, createdAt: datetime, updatedAt: datetime, closedAt: oneof<datetime, nothing>, labels: table<id: string, name: string, description: string, color: string>, assignees: table<id: string, login: string, name: string, databaseId: int>, body: string> {
-    let text = ^(nus bin) issue list --json "number,title,state,stateReason,url,author,createdAt,updatedAt,closedAt,labels,assignees,body" ...(nus argv [] {
+    let text = ^gh issue list --json "number,title,state,stateReason,url,author,createdAt,updatedAt,closedAt,labels,assignees,body" ...(nus argv [] {
         --repo: $repo
         --app: $app
         --assignee: $assignee
@@ -869,7 +861,7 @@ export def "gh issue lock" [
     --repo (-R): string,    # Select another repository using the `[HOST/]OWNER/REPO` format
     --reason (-r): string,  # Optional reason for locking conversation (off_topic, resolved, spam, too_heated).
 ]: nothing -> string {
-    ^(nus bin) issue lock ...(nus argv [$number_or_url] {--repo: $repo, --reason: $reason})
+    ^gh issue lock ...(nus argv [$number_or_url] {--repo: $repo, --reason: $reason})
 }
 
 # Pin an issue
@@ -884,7 +876,7 @@ export def "gh issue pin" [
     number_or_url: string,
     --repo (-R): string,    # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) issue pin ...(nus argv [$number_or_url] {--repo: $repo})
+    ^gh issue pin ...(nus argv [$number_or_url] {--repo: $repo})
 }
 
 # Reopen issue
@@ -897,7 +889,7 @@ export def "gh issue reopen" [
     --repo (-R): string,     # Select another repository using the `[HOST/]OWNER/REPO` format
     --comment (-c): string,  # Add a reopening comment
 ]: nothing -> string {
-    ^(nus bin) issue reopen ...(nus argv [$number_or_url] {--repo: $repo, --comment: $comment})
+    ^gh issue reopen ...(nus argv [$number_or_url] {--repo: $repo, --comment: $comment})
 }
 
 # Show status of relevant issues
@@ -916,7 +908,7 @@ export def "gh issue status" [
     --json: string,           # Output JSON with the specified `fields`
     --template (-t): string,  # Format JSON output using a Go template; see "gh help formatting"
 ]: nothing -> string {
-    ^(nus bin) issue status ...(nus argv [] {
+    ^gh issue status ...(nus argv [] {
         --repo: $repo
         --jq: $jq
         --json: $json
@@ -932,7 +924,7 @@ export def "gh issue transfer" [
     destination_repo: string,
     --repo (-R): string,       # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) issue transfer ...(nus argv [$number_or_url $destination_repo] {--repo: $repo})
+    ^gh issue transfer ...(nus argv [$number_or_url $destination_repo] {--repo: $repo})
 }
 
 # Unlock issue conversation
@@ -941,7 +933,7 @@ export def "gh issue unlock" [
     number_or_url: string,
     --repo (-R): string,    # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) issue unlock ...(nus argv [$number_or_url] {--repo: $repo})
+    ^gh issue unlock ...(nus argv [$number_or_url] {--repo: $repo})
 }
 
 # Unpin an issue
@@ -956,7 +948,7 @@ export def "gh issue unpin" [
     number_or_url: string,
     --repo (-R): string,    # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) issue unpin ...(nus argv [$number_or_url] {--repo: $repo})
+    ^gh issue unpin ...(nus argv [$number_or_url] {--repo: $repo})
 }
 
 # View an issue
@@ -986,7 +978,7 @@ export def "gh issue view" [
     --repo (-R): string,    # Select another repository using the `[HOST/]OWNER/REPO` format
     --comments (-c),        # View issue comments
 ]: nothing -> record<number: int, title: string, state: string, stateReason: string, url: string, author: record<is_bot: bool, login: string, id: oneof<string, nothing>, name: oneof<string, nothing>>, createdAt: datetime, updatedAt: datetime, closedAt: oneof<datetime, nothing>, labels: table<id: string, name: string, description: string, color: string>, assignees: table<id: string, login: string, name: string, databaseId: int>, body: string> {
-    let text = ^(nus bin) issue view --json "number,title,state,stateReason,url,author,createdAt,updatedAt,closedAt,labels,assignees,body" ...(nus argv [$number_or_url] {--repo: $repo, --comments: $comments})
+    let text = ^gh issue view --json "number,title,state,stateReason,url,author,createdAt,updatedAt,closedAt,labels,assignees,body" ...(nus argv [$number_or_url] {--repo: $repo, --comments: $comments})
     nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"An issue, as `gh issue view --json` selects its fields\",\"$ref\":\"#/$defs/issue\",\"$defs\":{\"author\":{\"type\":\"object\",\"required\":[\"is_bot\",\"login\"],\"additionalProperties\":false,\"properties\":{\"is_bot\":{\"type\":\"boolean\"},\"login\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"}}},\"label\":{\"type\":\"object\",\"required\":[\"id\",\"name\",\"description\",\"color\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"color\":{\"type\":\"string\"}}},\"user\":{\"type\":\"object\",\"required\":[\"id\",\"login\",\"name\",\"databaseId\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\"},\"login\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"databaseId\":{\"type\":\"integer\"}}},\"issue\":{\"type\":\"object\",\"required\":[\"number\",\"title\",\"state\",\"stateReason\",\"url\",\"author\",\"createdAt\",\"updatedAt\",\"closedAt\",\"labels\",\"assignees\",\"body\"],\"additionalProperties\":false,\"properties\":{\"number\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"state\":{\"enum\":[\"OPEN\",\"CLOSED\"]},\"stateReason\":{\"type\":\"string\"},\"url\":{\"type\":\"string\"},\"author\":{\"$ref\":\"#/$defs/author\"},\"createdAt\":{\"type\":\"string\",\"format\":\"date-time\"},\"updatedAt\":{\"type\":\"string\",\"format\":\"date-time\"},\"closedAt\":{\"anyOf\":[{\"type\":\"string\",\"format\":\"date-time\"},{\"type\":\"null\"}]},\"labels\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/label\"}},\"assignees\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/user\"}},\"body\":{\"type\":\"string\"}}}}}" { from json | update author { default null id } | update author { default null name } | into datetime createdAt | into datetime updatedAt | update closedAt {|row| if $row.closedAt == null { null } else { $row.closedAt | into datetime } } }
 }
 
@@ -1001,7 +993,7 @@ export def "gh issue view" [
 export def "gh pr" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) pr ...(nus argv [] {--repo: $repo})
+    ^gh pr ...(nus argv [] {--repo: $repo})
 }
 
 # Check out a pull request in git
@@ -1026,7 +1018,7 @@ export def "gh pr checkout" [
     --recurse-submodules,              # Update all submodules after checkout
     --worktree: string,                # Check out the pull request into a worktree at the given `path`
 ]: nothing -> string {
-    ^(nus bin) pr checkout ...(nus argv [$number_or_url_or_branch] {
+    ^gh pr checkout ...(nus argv [$number_or_url_or_branch] {
         --repo: $repo
         --branch: $branch
         --detach: $detach
@@ -1072,7 +1064,7 @@ export def "gh pr checks" [
     --interval (-i): string,           # Refresh interval in seconds in watch mode
     --required,                        # Only show checks that are required
 ]: nothing -> table<name: string, state: string, startedAt: datetime, completedAt: datetime, link: string, bucket: string, event: string, workflow: string, description: string> {
-    let text = ^(nus bin) pr checks --json "name,state,startedAt,completedAt,link,bucket,event,workflow,description" ...(nus argv [$number_or_url_or_branch] {
+    let text = ^gh pr checks --json "name,state,startedAt,completedAt,link,bucket,event,workflow,description" ...(nus argv [$number_or_url_or_branch] {
         --repo: $repo
         --fail-fast: $fail_fast
         --interval: $interval
@@ -1093,7 +1085,7 @@ export def "gh pr close" [
     --comment (-c): string,           # Leave a closing comment
     --delete-branch (-d),             # Delete the local and remote branch after close
 ]: nothing -> string {
-    ^(nus bin) pr close ...(nus argv [$number_or_url_or_branch] {--repo: $repo, --comment: $comment, --delete-branch: $delete_branch})
+    ^gh pr close ...(nus argv [$number_or_url_or_branch] {--repo: $repo, --comment: $comment, --delete-branch: $delete_branch})
 }
 
 # Add a comment to a pull request
@@ -1145,7 +1137,7 @@ export def "gh pr comment" [
     --web (-w),                        # Open the web browser to write the comment
     --yes,                             # Skip the delete confirmation prompt when --delete-last is provided
 ]: nothing -> string {
-    ^(nus bin) pr comment ...(nus argv [$number_or_url_or_branch] {
+    ^gh pr comment ...(nus argv [$number_or_url_or_branch] {
         --repo: $repo
         --attach: $attach
         --body: $body
@@ -1283,7 +1275,7 @@ export def "gh pr create" [
     --title (-t): string,      # Title for the pull request
     --web (-w),                # Open the web browser to create a pull request
 ]: nothing -> string {
-    ^(nus bin) pr create ...(nus argv [] {
+    ^gh pr create ...(nus argv [] {
         --repo: $repo
         --assignee: $assignee
         --attach: $attach
@@ -1346,7 +1338,7 @@ export def "gh pr diff" [
     --patch,                           # Display diff in patch format
     --web (-w),                        # Open the pull request diff in the browser
 ]: nothing -> string {
-    ^(nus bin) pr diff ...(nus argv [$number_or_url_or_branch] {
+    ^gh pr diff ...(nus argv [$number_or_url_or_branch] {
         --repo: $repo
         --allow-escape-sequences: $allow_escape_sequences
         --color: $color
@@ -1454,7 +1446,7 @@ export def "gh pr edit" [
     --remove-reviewer: string,         # Remove reviewers by their `login`. Use "@copilot" to remove review request from Copilot.
     --title (-t): string,              # Set the new title.
 ]: nothing -> string {
-    ^(nus bin) pr edit ...(nus argv [$number_or_url_or_branch] {
+    ^gh pr edit ...(nus argv [$number_or_url_or_branch] {
         --repo: $repo
         --add-assignee: $add_assignee
         --add-label: $add_label
@@ -1539,7 +1531,7 @@ export def "gh pr list" [
     --search (-S): string,    # Search pull requests with `query`
     --state (-s): string,     # Filter by state: {open|closed|merged|all}
 ]: nothing -> table<number: int, title: string, state: string, isDraft: bool, url: string, author: record<is_bot: bool, login: string, id: oneof<string, nothing>, name: oneof<string, nothing>>, headRefName: string, baseRefName: string, createdAt: datetime, updatedAt: datetime, closedAt: oneof<datetime, nothing>, mergedAt: oneof<datetime, nothing>, labels: table<id: string, name: string, description: string, color: string>, reviewDecision: string, body: string> {
-    let text = ^(nus bin) pr list --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body" ...(nus argv [] {
+    let text = ^gh pr list --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body" ...(nus argv [] {
         --repo: $repo
         --app: $app
         --assignee: $assignee
@@ -1565,7 +1557,7 @@ export def "gh pr lock" [
     --repo (-R): string,    # Select another repository using the `[HOST/]OWNER/REPO` format
     --reason (-r): string,  # Optional reason for locking conversation (off_topic, resolved, spam, too_heated).
 ]: nothing -> string {
-    ^(nus bin) pr lock ...(nus argv [$number_or_url] {--repo: $repo, --reason: $reason})
+    ^gh pr lock ...(nus argv [$number_or_url] {--repo: $repo, --reason: $reason})
 }
 
 # Merge a pull request
@@ -1619,7 +1611,7 @@ export def "gh pr merge" [
     --squash (-s),                     # Squash the commits into one commit and merge it into the base branch
     --subject (-t): string,            # Subject `text` for the merge commit
 ]: nothing -> string {
-    ^(nus bin) pr merge ...(nus argv [$number_or_url_or_branch] {
+    ^gh pr merge ...(nus argv [$number_or_url_or_branch] {
         --repo: $repo
         --admin: $admin
         --author-email: $author_email
@@ -1650,7 +1642,7 @@ export def "gh pr ready" [
     --repo (-R): string,               # Select another repository using the `[HOST/]OWNER/REPO` format
     --undo,                            # Convert a pull request to "draft"
 ]: nothing -> string {
-    ^(nus bin) pr ready ...(nus argv [$number_or_url_or_branch] {--repo: $repo, --undo: $undo})
+    ^gh pr ready ...(nus argv [$number_or_url_or_branch] {--repo: $repo, --undo: $undo})
 }
 
 # Reopen a pull request
@@ -1663,7 +1655,7 @@ export def "gh pr reopen" [
     --repo (-R): string,              # Select another repository using the `[HOST/]OWNER/REPO` format
     --comment (-c): string,           # Add a reopening comment
 ]: nothing -> string {
-    ^(nus bin) pr reopen ...(nus argv [$number_or_url_or_branch] {--repo: $repo, --comment: $comment})
+    ^gh pr reopen ...(nus argv [$number_or_url_or_branch] {--repo: $repo, --comment: $comment})
 }
 
 # Revert a pull request
@@ -1686,7 +1678,7 @@ export def "gh pr revert" [
     --draft (-d),                     # Mark revert pull request as a draft
     --title (-t): string,             # Title for the revert pull request
 ]: nothing -> string {
-    ^(nus bin) pr revert ...(nus argv [$number_or_url_or_branch] {
+    ^gh pr revert ...(nus argv [$number_or_url_or_branch] {
         --repo: $repo
         --body: $body
         --body-file: $body_file
@@ -1719,7 +1711,7 @@ export def "gh pr review" [
     --comment (-c),                    # Comment on a pull request
     --request-changes (-r),            # Request changes on a pull request
 ]: nothing -> string {
-    ^(nus bin) pr review ...(nus argv [$number_or_url_or_branch] {
+    ^gh pr review ...(nus argv [$number_or_url_or_branch] {
         --repo: $repo
         --approve: $approve
         --body: $body
@@ -1753,7 +1745,7 @@ export def "gh pr status" [
     --json: string,           # Output JSON with the specified `fields`
     --template (-t): string,  # Format JSON output using a Go template; see "gh help formatting"
 ]: nothing -> string {
-    ^(nus bin) pr status ...(nus argv [] {
+    ^gh pr status ...(nus argv [] {
         --repo: $repo
         --conflict-status: $conflict_status
         --jq: $jq
@@ -1768,7 +1760,7 @@ export def "gh pr unlock" [
     number_or_url: string,
     --repo (-R): string,    # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) pr unlock ...(nus argv [$number_or_url] {--repo: $repo})
+    ^gh pr unlock ...(nus argv [$number_or_url] {--repo: $repo})
 }
 
 # Update a pull request branch
@@ -1789,7 +1781,7 @@ export def "gh pr update-branch" [
     --repo (-R): string,               # Select another repository using the `[HOST/]OWNER/REPO` format
     --rebase,                          # Update PR branch by rebasing on top of latest base branch
 ]: nothing -> string {
-    ^(nus bin) pr update-branch ...(nus argv [$number_or_url_or_branch] {--repo: $repo, --rebase: $rebase})
+    ^gh pr update-branch ...(nus argv [$number_or_url_or_branch] {--repo: $repo, --rebase: $rebase})
 }
 
 # View a pull request
@@ -1822,7 +1814,7 @@ export def "gh pr view" [
     --repo (-R): string,               # Select another repository using the `[HOST/]OWNER/REPO` format
     --comments (-c),                   # View pull request comments
 ]: nothing -> record<number: int, title: string, state: string, isDraft: bool, url: string, author: record<is_bot: bool, login: string, id: oneof<string, nothing>, name: oneof<string, nothing>>, headRefName: string, baseRefName: string, createdAt: datetime, updatedAt: datetime, closedAt: oneof<datetime, nothing>, mergedAt: oneof<datetime, nothing>, labels: table<id: string, name: string, description: string, color: string>, reviewDecision: string, body: string> {
-    let text = ^(nus bin) pr view --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body" ...(nus argv [$number_or_url_or_branch] {--repo: $repo, --comments: $comments})
+    let text = ^gh pr view --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body" ...(nus argv [$number_or_url_or_branch] {--repo: $repo, --comments: $comments})
     nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A pull request, as `gh pr view --json` selects its fields\",\"$ref\":\"#/$defs/pull_request\",\"$defs\":{\"author\":{\"type\":\"object\",\"required\":[\"is_bot\",\"login\"],\"additionalProperties\":false,\"properties\":{\"is_bot\":{\"type\":\"boolean\"},\"login\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"}}},\"label\":{\"type\":\"object\",\"required\":[\"id\",\"name\",\"description\",\"color\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"color\":{\"type\":\"string\"}}},\"pull_request\":{\"type\":\"object\",\"required\":[\"number\",\"title\",\"state\",\"isDraft\",\"url\",\"author\",\"headRefName\",\"baseRefName\",\"createdAt\",\"updatedAt\",\"closedAt\",\"mergedAt\",\"labels\",\"reviewDecision\",\"body\"],\"additionalProperties\":false,\"properties\":{\"number\":{\"type\":\"integer\"},\"title\":{\"type\":\"string\"},\"state\":{\"enum\":[\"OPEN\",\"CLOSED\",\"MERGED\"]},\"isDraft\":{\"type\":\"boolean\"},\"url\":{\"type\":\"string\"},\"author\":{\"$ref\":\"#/$defs/author\"},\"headRefName\":{\"type\":\"string\"},\"baseRefName\":{\"type\":\"string\"},\"createdAt\":{\"type\":\"string\",\"format\":\"date-time\"},\"updatedAt\":{\"type\":\"string\",\"format\":\"date-time\"},\"closedAt\":{\"anyOf\":[{\"type\":\"string\",\"format\":\"date-time\"},{\"type\":\"null\"}]},\"mergedAt\":{\"anyOf\":[{\"type\":\"string\",\"format\":\"date-time\"},{\"type\":\"null\"}]},\"labels\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/label\"}},\"reviewDecision\":{\"enum\":[\"\",\"APPROVED\",\"CHANGES_REQUESTED\",\"REVIEW_REQUIRED\"]},\"body\":{\"type\":\"string\"}}}}}" { from json | update author { default null id } | update author { default null name } | into datetime createdAt | into datetime updatedAt | update closedAt {|row| if $row.closedAt == null { null } else { $row.closedAt | into datetime } } | update mergedAt {|row| if $row.mergedAt == null { null } else { $row.mergedAt | into datetime } } }
 }
 
@@ -1833,7 +1825,7 @@ export def "gh pr view" [
 export def "gh release" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) release ...(nus argv [] {--repo: $repo})
+    ^gh release ...(nus argv [] {--repo: $repo})
 }
 
 # Create a new release
@@ -1927,7 +1919,7 @@ export def "gh release create" [
     --title (-t): string,            # Release title
     --verify-tag,                    # Abort in case the git tag doesn't already exist in the remote repository
 ]: nothing -> string {
-    ^(nus bin) release create ...(nus argv [$tag ...$filename_or_pattern] {
+    ^gh release create ...(nus argv [$tag ...$filename_or_pattern] {
         --repo: $repo
         --discussion-category: $discussion_category
         --draft: $draft
@@ -1955,7 +1947,7 @@ export def "gh release delete" [
     --cleanup-tag,        # Delete the specified tag in addition to its release
     --yes (-y),           # Skip the confirmation prompt
 ]: nothing -> string {
-    ^(nus bin) release delete ...(nus argv [$tag] {--repo: $repo, --cleanup-tag: $cleanup_tag, --yes: $yes})
+    ^gh release delete ...(nus argv [$tag] {--repo: $repo, --cleanup-tag: $cleanup_tag, --yes: $yes})
 }
 
 # Delete an asset from a release
@@ -1968,7 +1960,7 @@ export def "gh release delete-asset" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
     --yes (-y),           # Skip the confirmation prompt
 ]: nothing -> string {
-    ^(nus bin) release delete-asset ...(nus argv [$tag $asset_name] {--repo: $repo, --yes: $yes})
+    ^gh release delete-asset ...(nus argv [$tag $asset_name] {--repo: $repo, --yes: $yes})
 }
 
 # Download release assets
@@ -2007,7 +1999,7 @@ export def "gh release download" [
     --pattern (-p): string,    # Download only assets that match a glob pattern
     --skip-existing,           # Skip downloading when files of the same name exist
 ]: nothing -> string {
-    ^(nus bin) release download ...(nus argv [$tag] {
+    ^gh release download ...(nus argv [$tag] {
         --repo: $repo
         --allow-escape-sequences: $allow_escape_sequences
         --archive: $archive
@@ -2058,7 +2050,7 @@ export def "gh release edit" [
     --title (-t): string,           # Release title
     --verify-tag,                   # Abort in case the git tag doesn't already exist in the remote repository
 ]: nothing -> string {
-    ^(nus bin) release edit ...(nus argv [$tag] {
+    ^gh release edit ...(nus argv [$tag] {
         --repo: $repo
         --discussion-category: $discussion_category
         --draft: $draft
@@ -2100,7 +2092,7 @@ export def "gh release list" [
     --limit (-L): string,    # Maximum number of items to fetch
     --order (-O): string,    # Order of releases returned: {asc|desc}
 ]: nothing -> table<name: string, tagName: string, isDraft: bool, isLatest: bool, isPrerelease: bool, isImmutable: bool, createdAt: datetime, publishedAt: datetime> {
-    let text = ^(nus bin) release list --json "name,tagName,isDraft,isLatest,isPrerelease,isImmutable,createdAt,publishedAt" ...(nus argv [] {
+    let text = ^gh release list --json "name,tagName,isDraft,isLatest,isPrerelease,isImmutable,createdAt,publishedAt" ...(nus argv [] {
         --repo: $repo
         --exclude-drafts: $exclude_drafts
         --exclude-pre-releases: $exclude_pre_releases
@@ -2129,7 +2121,7 @@ export def "gh release upload" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
     --clobber,            # Delete and re-upload existing assets of the same name
 ]: nothing -> string {
-    ^(nus bin) release upload ...(nus argv [$tag ...$files] {--repo: $repo, --clobber: $clobber})
+    ^gh release upload ...(nus argv [$tag ...$files] {--repo: $repo, --clobber: $clobber})
 }
 
 # View information about a release
@@ -2155,7 +2147,7 @@ export def "gh release view" [
     tag?: string,
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> record<tagName: string, name: string, body: string, isDraft: bool, isPrerelease: bool, isImmutable: bool, createdAt: datetime, publishedAt: oneof<datetime, nothing>, targetCommitish: string, url: string, author: record<id: string, login: string>, assets: table<url: string, apiUrl: string, id: string, name: string, label: string, size: int, digest: oneof<string, nothing>, state: string, createdAt: datetime, updatedAt: datetime, downloadCount: int, contentType: string>> {
-    let text = ^(nus bin) release view --json "tagName,name,body,isDraft,isPrerelease,isImmutable,createdAt,publishedAt,targetCommitish,url,author,assets" ...(nus argv [$tag] {--repo: $repo})
+    let text = ^gh release view --json "tagName,name,body,isDraft,isPrerelease,isImmutable,createdAt,publishedAt,targetCommitish,url,author,assets" ...(nus argv [$tag] {--repo: $repo})
     nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A release with its assets, as `gh release view --json` selects its fields\",\"type\":\"object\",\"required\":[\"tagName\",\"name\",\"body\",\"isDraft\",\"isPrerelease\",\"isImmutable\",\"createdAt\",\"publishedAt\",\"targetCommitish\",\"url\",\"author\",\"assets\"],\"additionalProperties\":false,\"properties\":{\"tagName\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"body\":{\"type\":\"string\"},\"isDraft\":{\"type\":\"boolean\"},\"isPrerelease\":{\"type\":\"boolean\"},\"isImmutable\":{\"type\":\"boolean\"},\"createdAt\":{\"type\":\"string\",\"format\":\"date-time\"},\"publishedAt\":{\"anyOf\":[{\"type\":\"string\",\"format\":\"date-time\"},{\"type\":\"null\"}]},\"targetCommitish\":{\"type\":\"string\"},\"url\":{\"type\":\"string\"},\"author\":{\"type\":\"object\",\"required\":[\"id\",\"login\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\"},\"login\":{\"type\":\"string\"}}},\"assets\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"url\",\"apiUrl\",\"id\",\"name\",\"label\",\"size\",\"digest\",\"state\",\"createdAt\",\"updatedAt\",\"downloadCount\",\"contentType\"],\"additionalProperties\":false,\"properties\":{\"url\":{\"type\":\"string\"},\"apiUrl\":{\"type\":\"string\"},\"id\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"label\":{\"type\":\"string\"},\"size\":{\"type\":\"integer\"},\"digest\":{\"type\":[\"string\",\"null\"]},\"state\":{\"type\":\"string\"},\"createdAt\":{\"type\":\"string\",\"format\":\"date-time\"},\"updatedAt\":{\"type\":\"string\",\"format\":\"date-time\"},\"downloadCount\":{\"type\":\"integer\"},\"contentType\":{\"type\":\"string\"}}}}}}" { from json | into datetime createdAt | update publishedAt {|row| if $row.publishedAt == null { null } else { $row.publishedAt | into datetime } } | update assets {|row| $row.assets | into datetime createdAt } | update assets {|row| $row.assets | into datetime updatedAt } }
 }
 
@@ -2165,7 +2157,7 @@ export def "gh release view" [
 @usage 'long_help "Work with GitHub repositories."'
 @usage 'example "$ gh repo create\n$ gh repo clone cli/cli\n$ gh repo view --web"'
 export def "gh repo" []: nothing -> string {
-    ^(nus bin) repo ...(nus argv [] {})
+    ^gh repo ...(nus argv [] {})
 }
 
 # Archive a repository
@@ -2181,7 +2173,7 @@ export def "gh repo archive" [
     repository?: string,
     --yes (-y),           # Skip the confirmation prompt
 ]: nothing -> string {
-    ^(nus bin) repo archive ...(nus argv [$repository] {--yes: $yes})
+    ^gh repo archive ...(nus argv [$repository] {--yes: $yes})
 }
 
 # Manage autolink references
@@ -2198,7 +2190,7 @@ export def "gh repo archive" [
 export def "gh repo autolink" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) repo autolink ...(nus argv [] {--repo: $repo})
+    ^gh repo autolink ...(nus argv [] {--repo: $repo})
 }
 
 # Create a new autolink reference
@@ -2230,7 +2222,7 @@ export def "gh repo autolink create" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
     --numeric (-n),       # Mark autolink as numeric
 ]: nothing -> string {
-    ^(nus bin) repo autolink create ...(nus argv [$keyprefix $urltemplate] {--repo: $repo, --numeric: $numeric})
+    ^gh repo autolink create ...(nus argv [$keyprefix $urltemplate] {--repo: $repo, --numeric: $numeric})
 }
 
 # Delete an autolink reference
@@ -2244,7 +2236,7 @@ export def "gh repo autolink delete" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
     --yes,                # Confirm deletion without prompting
 ]: nothing -> string {
-    ^(nus bin) repo autolink delete ...(nus argv [$id] {--repo: $repo, --yes: $yes})
+    ^gh repo autolink delete ...(nus argv [$id] {--repo: $repo, --yes: $yes})
 }
 
 # List autolink references for a GitHub repository
@@ -2271,7 +2263,7 @@ export def "gh repo autolink list" [
     --template (-t): string,  # Format JSON output using a Go template; see "gh help formatting"
     --web (-w),               # List autolink references in the web browser
 ]: nothing -> string {
-    ^(nus bin) repo autolink list ...(nus argv [] {
+    ^gh repo autolink list ...(nus argv [] {
         --repo: $repo
         --jq: $jq
         --json: $json
@@ -2301,7 +2293,7 @@ export def "gh repo autolink view" [
     --json: string,           # Output JSON with the specified `fields`
     --template (-t): string,  # Format JSON output using a Go template; see "gh help formatting"
 ]: nothing -> string {
-    ^(nus bin) repo autolink view ...(nus argv [$id] {
+    ^gh repo autolink view ...(nus argv [$id] {
         --repo: $repo
         --jq: $jq
         --json: $json
@@ -2342,7 +2334,7 @@ export def "gh repo clone" [
     --no-upstream,                        # Do not add an upstream remote when cloning a fork
     --upstream-remote-name (-u): string,  # Upstream remote name when cloning a fork
 ]: nothing -> string {
-    ^(nus bin) repo clone ...(nus argv [$repository $directory] {--no-upstream: $no_upstream, --upstream-remote-name: $upstream_remote_name})
+    ^gh repo clone ...(nus argv [$repository $directory] {--no-upstream: $no_upstream, --upstream-remote-name: $upstream_remote_name})
 }
 
 # Create a new repository
@@ -2427,7 +2419,7 @@ export def "gh repo create" [
     --team (-t): string,         # The `name` of the organization team to be granted access
     --template (-p): string,     # Make the new repository based on a template `repository`
 ]: nothing -> string {
-    ^(nus bin) repo create ...(nus argv [$name] {
+    ^gh repo create ...(nus argv [$name] {
         --add-readme: $add_readme
         --clone: $clone
         --description: $description
@@ -2468,7 +2460,7 @@ export def "gh repo delete" [
     repository?: string,
     --yes,                # Confirm deletion without prompting
 ]: nothing -> string {
-    ^(nus bin) repo delete ...(nus argv [$repository] {--yes: $yes})
+    ^gh repo delete ...(nus argv [$repository] {--yes: $yes})
 }
 
 # Manage deploy keys in a repository
@@ -2478,7 +2470,7 @@ export def "gh repo delete" [
 export def "gh repo deploy-key" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) repo deploy-key ...(nus argv [] {--repo: $repo})
+    ^gh repo deploy-key ...(nus argv [] {--repo: $repo})
 }
 
 # Add a deploy key to a GitHub repository
@@ -2499,7 +2491,7 @@ export def "gh repo deploy-key add" [
     --allow-write (-w),    # Allow write access for the key
     --title (-t): string,  # Title of the new key
 ]: nothing -> string {
-    ^(nus bin) repo deploy-key add ...(nus argv [$key_file] {--repo: $repo, --allow-write: $allow_write, --title: $title})
+    ^gh repo deploy-key add ...(nus argv [$key_file] {--repo: $repo, --allow-write: $allow_write, --title: $title})
 }
 
 # Delete a deploy key from a GitHub repository
@@ -2508,7 +2500,7 @@ export def "gh repo deploy-key delete" [
     key_id: string,
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) repo deploy-key delete ...(nus argv [$key_id] {--repo: $repo})
+    ^gh repo deploy-key delete ...(nus argv [$key_id] {--repo: $repo})
 }
 
 # List deploy keys in a GitHub repository
@@ -2528,7 +2520,7 @@ export def "gh repo deploy-key list" [
     --json: string,           # Output JSON with the specified `fields`
     --template (-t): string,  # Format JSON output using a Go template; see "gh help formatting"
 ]: nothing -> string {
-    ^(nus bin) repo deploy-key list ...(nus argv [] {
+    ^gh repo deploy-key list ...(nus argv [] {
         --repo: $repo
         --jq: $jq
         --json: $json
@@ -2624,7 +2616,7 @@ export def "gh repo edit" [
     --template,                                # Make the repository available as a template repository
     --visibility: string,                      # Change the visibility of the repository to {public,private,internal}
 ]: nothing -> string {
-    ^(nus bin) repo edit ...(nus argv [$repository] {
+    ^gh repo edit ...(nus argv [$repository] {
         --accept-visibility-change-consequences: $accept_visibility_change_consequences
         --add-topic: $add_topic
         --allow-forking: $allow_forking
@@ -2687,7 +2679,7 @@ export def "gh repo fork" [
     --remote,               # Add a git remote for the fork
     --remote-name: string,  # Specify the name for the new remote
 ]: nothing -> string {
-    ^(nus bin) repo fork ...(nus argv [$repository] {
+    ^gh repo fork ...(nus argv [$repository] {
         --clone: $clone
         --default-branch-only: $default_branch_only
         --fork-name: $fork_name
@@ -2699,13 +2691,13 @@ export def "gh repo fork" [
 
 # List and view available repository gitignore templates
 export def "gh repo gitignore" []: nothing -> string {
-    ^(nus bin) repo gitignore ...(nus argv [] {})
+    ^gh repo gitignore ...(nus argv [] {})
 }
 
 # List available repository gitignore templates
 @usage 'alias ls'
 export def "gh repo gitignore list" []: nothing -> string {
-    ^(nus bin) repo gitignore list ...(nus argv [] {})
+    ^gh repo gitignore list ...(nus argv [] {})
 }
 
 # View an available repository gitignore template
@@ -2721,12 +2713,12 @@ export def "gh repo gitignore list" []: nothing -> string {
 export def "gh repo gitignore view" [
     template: string,
 ]: nothing -> string {
-    ^(nus bin) repo gitignore view ...(nus argv [$template] {})
+    ^gh repo gitignore view ...(nus argv [$template] {})
 }
 
 # Explore repository licenses
 export def "gh repo license" []: nothing -> string {
-    ^(nus bin) repo license ...(nus argv [] {})
+    ^gh repo license ...(nus argv [] {})
 }
 
 # List common repository licenses
@@ -2735,7 +2727,7 @@ export def "gh repo license" []: nothing -> string {
 @usage 'alias ls'
 @usage 'long_help "List common repository licenses.\n\nFor even more licenses, visit <https://choosealicense.com/appendix>\n"'
 export def "gh repo license list" []: nothing -> string {
-    ^(nus bin) repo license list ...(nus argv [] {})
+    ^gh repo license list ...(nus argv [] {})
 }
 
 # View a specific repository license
@@ -2751,7 +2743,7 @@ export def "gh repo license view" [
     license_key_or_spdx_id: string,
     --web (-w),                      # Open https://choosealicense.com/ in the browser
 ]: nothing -> string {
-    ^(nus bin) repo license view ...(nus argv [$license_key_or_spdx_id] {--web: $web})
+    ^gh repo license view ...(nus argv [$license_key_or_spdx_id] {--web: $web})
 }
 
 # List repositories owned by user or organization
@@ -2803,7 +2795,7 @@ export def "gh repo list" [
     --topic: string,          # Filter by topic
     --visibility: string,     # Filter by repository visibility: {public|private|internal}
 ]: nothing -> table<name: string, nameWithOwner: string, owner: record<id: string, login: string>, description: string, url: string, isPrivate: bool, isArchived: bool, isFork: bool, defaultBranchRef: record<name: string>, stargazerCount: int, forkCount: int, createdAt: datetime, updatedAt: datetime, pushedAt: oneof<datetime, nothing>> {
-    let text = ^(nus bin) repo list --json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt" ...(nus argv [$owner] {
+    let text = ^gh repo list --json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt" ...(nus argv [$owner] {
         --archived: $archived
         --fork: $fork
         --language: $language
@@ -2851,7 +2843,7 @@ export def "gh repo read-dir" [
     --ref: string,            # The branch, tag, or commit to list from
     --template (-t): string,  # Format JSON output using a Go template; see "gh help formatting"
 ]: nothing -> string {
-    ^(nus bin) repo read-dir ...(nus argv [$path] {
+    ^gh repo read-dir ...(nus argv [$path] {
         --repo: $repo
         --jq: $jq
         --json: $json
@@ -2911,7 +2903,7 @@ export def "gh repo read-file" [
     --ref: string,             # The branch, tag, or commit to read from
     --template (-t): string,   # Format JSON output using a Go template; see "gh help formatting"
 ]: nothing -> string {
-    ^(nus bin) repo read-file ...(nus argv [$path] {
+    ^gh repo read-file ...(nus argv [$path] {
         --repo: $repo
         --allow-escape-sequences: $allow_escape_sequences
         --clobber: $clobber
@@ -2950,7 +2942,7 @@ export def "gh repo rename" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
     --yes (-y),           # Skip the confirmation prompt
 ]: nothing -> string {
-    ^(nus bin) repo rename ...(nus argv [$new_name] {--repo: $repo, --yes: $yes})
+    ^gh repo rename ...(nus argv [$new_name] {--repo: $repo, --yes: $yes})
 }
 
 # Configure default repository for this directory
@@ -2976,7 +2968,7 @@ export def "gh repo set-default" [
     --unset (-u),         # Unset the current default repository
     --view (-v),          # View the current default repository
 ]: nothing -> string {
-    ^(nus bin) repo set-default ...(nus argv [$repository] {--unset: $unset, --view: $view})
+    ^gh repo set-default ...(nus argv [$repository] {--unset: $unset, --view: $view})
 }
 
 # Sync a repository
@@ -3007,7 +2999,7 @@ export def "gh repo sync" [
     --force,                          # Hard reset the branch of the destination repository to match the source repository
     --source (-s): string,            # Source repository
 ]: nothing -> string {
-    ^(nus bin) repo sync ...(nus argv [$destination_repository] {--branch: $branch, --force: $force, --source: $source})
+    ^gh repo sync ...(nus argv [$destination_repository] {--branch: $branch, --force: $force, --source: $source})
 }
 
 # Unarchive a repository
@@ -3023,7 +3015,7 @@ export def "gh repo unarchive" [
     repository?: string,
     --yes (-y),           # Skip the confirmation prompt
 ]: nothing -> string {
-    ^(nus bin) repo unarchive ...(nus argv [$repository] {--yes: $yes})
+    ^gh repo unarchive ...(nus argv [$repository] {--yes: $yes})
 }
 
 # View a repository
@@ -3055,7 +3047,7 @@ export def "gh repo view" [
     repository?: string,
     --branch (-b): string,  # View a specific branch of the repository
 ]: nothing -> record<name: string, nameWithOwner: string, owner: record<id: string, login: string>, description: string, url: string, isPrivate: bool, isArchived: bool, isFork: bool, defaultBranchRef: record<name: string>, stargazerCount: int, forkCount: int, createdAt: datetime, updatedAt: datetime, pushedAt: oneof<datetime, nothing>> {
-    let text = ^(nus bin) repo view --json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt" ...(nus argv [$repository] {--branch: $branch})
+    let text = ^gh repo view --json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt" ...(nus argv [$repository] {--branch: $branch})
     nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"A repository, as `gh repo view --json` selects its fields\",\"$ref\":\"#/$defs/repository\",\"$defs\":{\"repository\":{\"type\":\"object\",\"required\":[\"name\",\"nameWithOwner\",\"owner\",\"description\",\"url\",\"isPrivate\",\"isArchived\",\"isFork\",\"defaultBranchRef\",\"stargazerCount\",\"forkCount\",\"createdAt\",\"updatedAt\",\"pushedAt\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"},\"nameWithOwner\":{\"type\":\"string\"},\"owner\":{\"type\":\"object\",\"required\":[\"id\",\"login\"],\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\"},\"login\":{\"type\":\"string\"}}},\"description\":{\"type\":\"string\"},\"url\":{\"type\":\"string\"},\"isPrivate\":{\"type\":\"boolean\"},\"isArchived\":{\"type\":\"boolean\"},\"isFork\":{\"type\":\"boolean\"},\"defaultBranchRef\":{\"type\":\"object\",\"required\":[\"name\"],\"additionalProperties\":false,\"properties\":{\"name\":{\"type\":\"string\"}}},\"stargazerCount\":{\"type\":\"integer\"},\"forkCount\":{\"type\":\"integer\"},\"createdAt\":{\"type\":\"string\",\"format\":\"date-time\"},\"updatedAt\":{\"type\":\"string\",\"format\":\"date-time\"},\"pushedAt\":{\"anyOf\":[{\"type\":\"string\",\"format\":\"date-time\"},{\"type\":\"null\"}]}}}}}" { from json | into datetime createdAt | into datetime updatedAt | update pushedAt {|row| if $row.pushedAt == null { null } else { $row.pushedAt | into datetime } } }
 }
 
@@ -3069,7 +3061,7 @@ export def "gh repo view" [
 export def "gh run" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) run ...(nus argv [] {--repo: $repo})
+    ^gh run ...(nus argv [] {--repo: $repo})
 }
 
 # Cancel a workflow run
@@ -3080,7 +3072,7 @@ export def "gh run cancel" [
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
     --force,              # Force cancel a workflow run
 ]: nothing -> string {
-    ^(nus bin) run cancel ...(nus argv [$run_id] {--repo: $repo, --force: $force})
+    ^gh run cancel ...(nus argv [$run_id] {--repo: $repo, --force: $force})
 }
 
 # Delete a workflow run
@@ -3090,7 +3082,7 @@ export def "gh run delete" [
     run_id?: string,
     --repo (-R): string,  # Select another repository using the `[HOST/]OWNER/REPO` format
 ]: nothing -> string {
-    ^(nus bin) run delete ...(nus argv [$run_id] {--repo: $repo})
+    ^gh run delete ...(nus argv [$run_id] {--repo: $repo})
 }
 
 # Download artifacts generated by a workflow run
@@ -3123,7 +3115,7 @@ export def "gh run download" [
     --name (-n): string,     # Download artifacts that match any of the given names
     --pattern (-p): string,  # Download artifacts that match a glob pattern
 ]: nothing -> string {
-    ^(nus bin) run download ...(nus argv [$run_id] {
+    ^gh run download ...(nus argv [$run_id] {
         --repo: $repo
         --dir: $dir
         --name: $name
@@ -3188,7 +3180,7 @@ export def "gh run list" [
     --user (-u): string,      # Filter runs by user who triggered the run
     --workflow (-w): string,  # Filter runs by workflow
 ]: nothing -> table<databaseId: int, number: int, attempt: int, name: string, displayTitle: string, workflowName: string, headBranch: string, headSha: string, event: string, status: string, conclusion: string, createdAt: datetime, updatedAt: datetime, startedAt: datetime, url: string> {
-    let text = ^(nus bin) run list --json "databaseId,number,attempt,name,displayTitle,workflowName,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,startedAt,url" ...(nus argv [] {
+    let text = ^gh run list --json "databaseId,number,attempt,name,displayTitle,workflowName,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,startedAt,url" ...(nus argv [] {
         --repo: $repo
         --all: $all
         --branch: $branch
@@ -3231,7 +3223,7 @@ export def "gh run rerun" [
     --failed,             # Rerun only failed jobs, including dependencies
     --job (-j): string,   # Rerun a specific job ID from a run, including dependencies
 ]: nothing -> string {
-    ^(nus bin) run rerun ...(nus argv [$run_id] {
+    ^gh run rerun ...(nus argv [$run_id] {
         --repo: $repo
         --debug: $debug
         --failed: $failed
@@ -3283,7 +3275,7 @@ export def "gh run view" [
     --job (-j): string,      # View a specific job ID from a run
     --verbose (-v),          # Show job steps
 ]: nothing -> record<databaseId: int, number: int, attempt: int, name: string, displayTitle: string, workflowName: string, headBranch: string, headSha: string, event: string, status: string, conclusion: string, createdAt: datetime, updatedAt: datetime, startedAt: datetime, url: string> {
-    let text = ^(nus bin) run view --json "databaseId,number,attempt,name,displayTitle,workflowName,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,startedAt,url" ...(nus argv [$run_id] {
+    let text = ^gh run view --json "databaseId,number,attempt,name,displayTitle,workflowName,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,startedAt,url" ...(nus argv [$run_id] {
         --repo: $repo
         --attempt: $attempt
         --exit-status: $exit_status
@@ -3315,7 +3307,7 @@ export def "gh run watch" [
     --exit-status,            # Exit with non-zero status if run fails
     --interval (-i): string,  # Refresh interval in seconds
 ]: nothing -> string {
-    ^(nus bin) run watch ...(nus argv [$run_id] {
+    ^gh run watch ...(nus argv [$run_id] {
         --repo: $repo
         --compact: $compact
         --exit-status: $exit_status

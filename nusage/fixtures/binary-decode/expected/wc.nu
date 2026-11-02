@@ -36,17 +36,9 @@ def "nus flag-words" []: record -> list<string> {
     } | flatten
 }
 
-# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
-# that names one, else the name, found on PATH.
-def "nus bin" []: nothing -> string {
-    let bins = $env.NUS_BINS? | default {}
-    let bins = if ($bins | describe) == string { $bins | from nuon } else { $bins }
-    $bins."wc"? | default wc
-}
-
 # A tool with text outputs no reader covers: each declares the pipeline that decodes it
 export def main []: nothing -> string {
-    ^(nus bin) ...(nus argv [] {})
+    ^wc ...(nus argv [] {})
 }
 
 # List things, one per line as `name size`
@@ -54,7 +46,7 @@ export def main []: nothing -> string {
     nusage-decode "lines | parse \"{name} {size}\""
 }'
 export def "wc ls" []: nothing -> table<name: string, size: filesize> {
-    ^(nus bin) ls ...(nus argv [] {}) | lines | parse "{name} {size}" | into filesize size
+    ^wc ls ...(nus argv [] {}) | lines | parse "{name} {size}" | into filesize size
 }
 
 # Disk use, one per line as `size path`
@@ -62,5 +54,5 @@ export def "wc ls" []: nothing -> table<name: string, size: filesize> {
         nusage-decode "detect columns --no-headers | rename size path"
     }'
 export def "wc du" []: nothing -> table<size: filesize, path: string> {
-    ^(nus bin) du ...(nus argv [] {}) | detect columns --no-headers | rename size path | into filesize size
+    ^wc du ...(nus argv [] {}) | detect columns --no-headers | rename size path | into filesize size
 }

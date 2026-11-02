@@ -36,14 +36,6 @@ def "nus flag-words" []: record -> list<string> {
     } | flatten
 }
 
-# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
-# that names one, else the name, found on PATH.
-def "nus bin" []: nothing -> string {
-    let bins = $env.NUS_BINS? | default {}
-    let bins = if ($bins | describe) == string { $bins | from nuon } else { $bins }
-    $bins."vcs"? | default vcs
-}
-
 # A binary's output decoded as the module's closure decodes it. When that fails and the
 # `nus` this module was generated with is on PATH, the output is held to the schema the
 # spec declares, line by line with `--lines`, so the error names what does not match it
@@ -89,7 +81,7 @@ def "nus decoded" [
 export def main [
     --repository (-R): string,  # Where to work
 ]: nothing -> string {
-    ^(nus bin) ...(nus argv [] {--repository: $repository})
+    ^vcs ...(nus argv [] {--repository: $repository})
 }
 
 # Show revisions
@@ -108,7 +100,7 @@ export def "vcs log" [
     --revision (-r): list<string>,  # Which revisions to show
     --limit (-n): int,              # At most this many revisions
 ]: nothing -> table<commit_id: string, author: record<name: string, timestamp: datetime>> {
-    let text = ^(nus bin) log --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [...$filesets] {--repository: $repository, --revision: $revision, --limit: ([$limit] | compact)})
+    let text = ^vcs log --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [...$filesets] {--repository: $repository, --revision: $revision, --limit: ([$limit] | compact)})
     nus decoded $text "{\"type\":\"object\",\"required\":[\"commit_id\",\"author\"],\"properties\":{\"commit_id\":{\"type\":\"string\"},\"author\":{\"type\":\"object\",\"required\":[\"name\",\"timestamp\"],\"properties\":{\"name\":{\"type\":\"string\"},\"timestamp\":{\"type\":\"string\",\"format\":\"date-time\"}}}}}" { from json --objects | into datetime author.timestamp } --lines
 }
 
@@ -121,6 +113,6 @@ export def "vcs log" [
 export def "vcs evolog" [
     --repository (-R): string,  # Where to work
 ]: nothing -> table<commit_id: string, operation: oneof<record<time: record<start: datetime>>, nothing>> {
-    let text = ^(nus bin) evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [] {--repository: $repository})
+    let text = ^vcs evolog --no-graph --template "json(self) ++ \"\\n\"" ...(nus argv [] {--repository: $repository})
     nus decoded $text "{\"type\":\"object\",\"required\":[\"commit_id\",\"operation\"],\"properties\":{\"commit_id\":{\"type\":\"string\"},\"operation\":{\"anyOf\":[{\"type\":\"object\",\"required\":[\"time\"],\"properties\":{\"time\":{\"type\":\"object\",\"required\":[\"start\"],\"properties\":{\"start\":{\"type\":\"string\",\"format\":\"date-time\"}}}}},{\"type\":\"null\"}]}}}" { from json --objects | update operation {|row| if $row.operation == null { null } else { $row.operation | into datetime time.start } } } --lines
 }

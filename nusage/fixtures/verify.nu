@@ -173,26 +173,14 @@ def check-interpreter [dir: path, bin: string, case: record] {
 # PATH, as a module holds a failed decode to its schema through it.
 def check-invoke [dir: path, import: string, case: record] {
     let argv_file = mktemp
-    let fake = $dir | path join fake
-    let env_vars = {
-        PATH: (search-path (
-            if ($case.mapped? | default false) { [] } else { [$fake] }
-            | append ($env.NUS_BIN | path dirname)
-        ))
+    let out = run-nu $"($import); ($case.invoke) | to nuon" {
+        PATH: (search-path [
+            ($dir | path join fake)
+            ($env.NUS_BIN | path dirname)
+        ])
         NUS_FAKE_STDOUT: ($case.stdout? | default "")
         NUS_FAKE_ARGV: $argv_file
     }
-    # A `mapped` case leaves the fake off PATH and names it in `$env.NUS_BINS` instead, as
-    # NUON, the form a parent process hands down.
-    let env_vars = if ($case.mapped? | default false) {
-        let bin = ls $fake | get name | first
-        $env_vars | insert NUS_BINS ({
-            ($bin | path basename): $bin
-        } | to nuon)
-    } else {
-        $env_vars
-    }
-    let out = run-nu $"($import); ($case.invoke) | to nuon" $env_vars
     let argv = open --raw $argv_file | lines
     rm $argv_file
     if ($case.error? | is-not-empty) {

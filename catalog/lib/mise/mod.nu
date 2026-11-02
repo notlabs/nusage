@@ -36,14 +36,6 @@ def "nus flag-words" []: record -> list<string> {
     } | flatten
 }
 
-# The binary the wrappers run: its path in `$env.NUS_BINS`, a record or its NUON, when
-# that names one, else the name, found on PATH.
-def "nus bin" []: nothing -> string {
-    let bins = $env.NUS_BINS? | default {}
-    let bins = if ($bins | describe) == string { $bins | from nuon } else { $bins }
-    $bins."mise"? | default mise
-}
-
 # Completions from usage's own completer, against the spec this module was generated
 # from, with the words typed so far. Nothing when the `usage` CLI is not installed.
 def "nus complete" [place: record] {
@@ -374,7 +366,7 @@ export def main [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) ...(nus argv [$task ...$task_args] {
+    ^mise ...(nus argv [$task ...$task_args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -499,7 +491,7 @@ export def "mise activate" [
     --no-hook-env,                                             # Do not run hook-env automatically
     --shims,                                                   # Put the shims directory on PATH instead of updating PATH at each prompt
 ]: nothing -> string {
-    ^(nus bin) activate ...(nus argv [$shell_type] {
+    ^mise activate ...(nus argv [$shell_type] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -554,7 +546,7 @@ export def "mise tool-alias" [
     --silent,                            # Suppress all task output and mise non-error messages
     --no-header,                         # Do not print the table header
 ]: nothing -> string {
-    ^(nus bin) tool-alias ...(nus argv [] {
+    ^mise tool-alias ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -606,7 +598,7 @@ export def "mise tool-alias get" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) tool-alias get ...(nus argv [$tool $alias] {
+    ^mise tool-alias get ...(nus argv [$tool $alias] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -667,7 +659,7 @@ export def "mise tool-alias ls" [
     --silent,                        # Suppress all task output and mise non-error messages
     --no-header,                     # Do not print the table header
 ]: nothing -> string {
-    ^(nus bin) tool-alias ls ...(nus argv [$tool] {
+    ^mise tool-alias ls ...(nus argv [$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -718,7 +710,7 @@ export def "mise tool-alias set" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) tool-alias set ...(nus argv [$tool $alias $value] {
+    ^mise tool-alias set ...(nus argv [$tool $alias $value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -762,7 +754,7 @@ export def "mise tool-alias unset" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) tool-alias unset ...(nus argv [$tool $alias] {
+    ^mise tool-alias unset ...(nus argv [$tool $alias] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -805,7 +797,7 @@ export def "mise backends" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) backends ...(nus argv [] {
+    ^mise backends ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -840,7 +832,7 @@ export def "mise backends ls" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) backends ls ...(nus argv [] {
+    ^mise backends ls ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -900,7 +892,7 @@ export def "mise backends switch" [
     --silent,                                # Suppress all task output and mise non-error messages
     --global (-g),                           # Switch tools in the global config's lockfile instead of the project's
 ]: nothing -> string {
-    ^(nus bin) backends switch ...(nus argv [...$tool_version] {
+    ^mise backends switch ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -950,7 +942,7 @@ export def "mise bin-paths" [
     --silent,                                # Suppress all task output and mise non-error messages
     --bin-names,                             # Print executable names instead of bin directories
 ]: nothing -> table<name: string, path: string, symlink: bool> {
-    let text = ^(nus bin) bin-paths --json ...(nus argv [...$tool_version] {
+    let text = ^mise bin-paths --json ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1213,7 +1205,7 @@ export def "mise bootstrap" [
     --update,                                                                                                                                                                                                # Refresh package metadata and update repositories before applying
     --upgrade,                                                                                                                                                                                               # Upgrade installed packages and tools as well as installing missing ones
 ]: nothing -> string {
-    ^(nus bin) bootstrap ...(nus argv [] {
+    ^mise bootstrap ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1268,7 +1260,7 @@ export def "mise bootstrap accounts" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap accounts ...(nus argv [] {
+    ^mise bootstrap accounts ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1297,7 +1289,7 @@ export def "mise bootstrap accounts apply" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap accounts apply ...(nus argv [] {
+    ^mise bootstrap accounts apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1328,7 +1320,7 @@ export def "mise bootstrap accounts status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if any account differs from the config (all are still listed)
 ] {
-    ^(nus bin) bootstrap accounts status --json ...(nus argv [] {
+    ^mise bootstrap accounts status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1366,7 +1358,7 @@ export def "mise bootstrap compose" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap compose ...(nus argv [] {
+    ^mise bootstrap compose ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1395,7 +1387,7 @@ export def "mise bootstrap compose apply" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap compose apply ...(nus argv [] {
+    ^mise bootstrap compose apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1426,7 +1418,7 @@ export def "mise bootstrap compose status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if any Compose project differs from the config (all are still listed)
 ] {
-    ^(nus bin) bootstrap compose status --json ...(nus argv [] {
+    ^mise bootstrap compose status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1469,7 +1461,7 @@ export def "mise bootstrap files" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap files ...(nus argv [] {
+    ^mise bootstrap files ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1500,7 +1492,7 @@ export def "mise bootstrap files apply" [
     --silent,                        # Suppress all task output and mise non-error messages
     --prompt-secrets,                # Prompt securely for missing bootstrap secret inputs
 ]: nothing -> string {
-    ^(nus bin) bootstrap files apply ...(nus argv [] {
+    ^mise bootstrap files apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1534,7 +1526,7 @@ export def "mise bootstrap files status" [
     --prompt-secrets,                # Prompt securely for missing bootstrap secret inputs
     --missing,                       # Exit with status 1 if any file or directory differs from the config (all are still listed)
 ] {
-    ^(nus bin) bootstrap files status --json ...(nus argv [] {
+    ^mise bootstrap files status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1579,7 +1571,7 @@ export def "mise bootstrap firewall" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap firewall ...(nus argv [] {
+    ^mise bootstrap firewall ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1608,7 +1600,7 @@ export def "mise bootstrap firewall apply" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap firewall apply ...(nus argv [] {
+    ^mise bootstrap firewall apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1639,7 +1631,7 @@ export def "mise bootstrap firewall status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if the firewall differs from the config
 ] {
-    ^(nus bin) bootstrap firewall status --json ...(nus argv [] {
+    ^mise bootstrap firewall status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1675,7 +1667,7 @@ export def "mise bootstrap linux" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap linux ...(nus argv [] {
+    ^mise bootstrap linux ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1717,7 +1709,7 @@ export def "mise bootstrap linux systemd-units" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap linux systemd-units ...(nus argv [] {
+    ^mise bootstrap linux systemd-units ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1746,7 +1738,7 @@ export def "mise bootstrap linux systemd-units apply" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap linux systemd-units apply ...(nus argv [] {
+    ^mise bootstrap linux systemd-units apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1777,7 +1769,7 @@ export def "mise bootstrap linux systemd-units status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if any unit differs from the config (all are still listed)
 ] {
-    ^(nus bin) bootstrap linux systemd-units status --json ...(nus argv [] {
+    ^mise bootstrap linux systemd-units status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1804,7 +1796,7 @@ export def "mise bootstrap macos" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap macos ...(nus argv [] {
+    ^mise bootstrap macos ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1845,7 +1837,7 @@ export def "mise bootstrap macos defaults" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap macos defaults ...(nus argv [] {
+    ^mise bootstrap macos defaults ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1874,7 +1866,7 @@ export def "mise bootstrap macos defaults apply" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap macos defaults apply ...(nus argv [] {
+    ^mise bootstrap macos defaults apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1905,7 +1897,7 @@ export def "mise bootstrap macos defaults status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if any preference differs from the config (all are still listed)
 ] {
-    ^(nus bin) bootstrap macos defaults status --json ...(nus argv [] {
+    ^mise bootstrap macos defaults status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1948,7 +1940,7 @@ export def "mise bootstrap macos launchd-agents" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap macos launchd-agents ...(nus argv [] {
+    ^mise bootstrap macos launchd-agents ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -1977,7 +1969,7 @@ export def "mise bootstrap macos launchd-agents apply" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap macos launchd-agents apply ...(nus argv [] {
+    ^mise bootstrap macos launchd-agents apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2008,7 +2000,7 @@ export def "mise bootstrap macos launchd-agents status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if any LaunchAgent differs from the config (all are still listed)
 ] {
-    ^(nus bin) bootstrap macos launchd-agents status --json ...(nus argv [] {
+    ^mise bootstrap macos launchd-agents status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2047,7 +2039,7 @@ export def "mise bootstrap mise-shell-activate" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap mise-shell-activate ...(nus argv [] {
+    ^mise bootstrap mise-shell-activate ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2076,7 +2068,7 @@ export def "mise bootstrap mise-shell-activate apply" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap mise-shell-activate apply ...(nus argv [] {
+    ^mise bootstrap mise-shell-activate apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2107,7 +2099,7 @@ export def "mise bootstrap mise-shell-activate status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if any shell activation differs from the config (all are still listed)
 ] {
-    ^(nus bin) bootstrap mise-shell-activate status --json ...(nus argv [] {
+    ^mise bootstrap mise-shell-activate status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2153,7 +2145,7 @@ export def "mise bootstrap packages" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages ...(nus argv [] {
+    ^mise bootstrap packages ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2235,7 +2227,7 @@ export def "mise bootstrap packages apply" [
     --update,                        # Refresh package manager metadata first, where the manager supports it
     --manager (-m): string,          # Only apply packages for this built-in or plugin manager
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages apply ...(nus argv [...$package] {
+    ^mise bootstrap packages apply ...(nus argv [...$package] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2281,7 +2273,7 @@ export def "mise bootstrap packages brew" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages brew ...(nus argv [] {
+    ^mise bootstrap packages brew ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2322,7 +2314,7 @@ export def "mise bootstrap packages brew tap" [
     --local (-l),                    # Write to the local config instead of the global config
     --path (-p): string,             # Write to this config file or directory
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages brew tap ...(nus argv [$tap $url] {
+    ^mise bootstrap packages brew tap ...(nus argv [$tap $url] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2363,7 +2355,7 @@ export def "mise bootstrap packages brew untap" [
     --local (-l),                    # Write to the local config instead of the global config
     --path (-p): string,             # Write to this config file or directory
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages brew untap ...(nus argv [...$taps] {
+    ^mise bootstrap packages brew untap ...(nus argv [...$taps] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2418,7 +2410,7 @@ export def "mise bootstrap packages export" [
     --silent,                        # Suppress all task output and mise non-error messages
     --format: string@[nix],          # Output format
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages export ...(nus argv [] {
+    ^mise bootstrap packages export ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2493,7 +2485,7 @@ export def "mise bootstrap packages import" [
     --all,                           # Import every linked formula, including dependencies
     --path (-p): string,             # Write to this config file or directory
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages import ...(nus argv [] {
+    ^mise bootstrap packages import ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2566,7 +2558,7 @@ export def "mise bootstrap packages prune" [
     --silent,                        # Suppress all task output and mise non-error messages
     --manager (-m): string,          # Package manager to prune: `brew`, `brew-cask`, or a package plugin
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages prune ...(nus argv [] {
+    ^mise bootstrap packages prune ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -2603,7 +2595,7 @@ export def "mise bootstrap packages status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if any package differs from the config (all are still listed)
 ] {
-    ^(nus bin) bootstrap packages status --json ...(nus argv [] {
+    ^mise bootstrap packages status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2665,7 +2657,7 @@ export def "mise bootstrap packages upgrade" [
     --silent,                        # Suppress all task output and mise non-error messages
     --manager (-m): string,          # Only upgrade packages for this built-in or plugin manager
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages upgrade ...(nus argv [...$package] {
+    ^mise bootstrap packages upgrade ...(nus argv [...$package] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2750,7 +2742,7 @@ export def "mise bootstrap packages use" [
     --path (-p): string,             # Write to this config file or directory
     --no-install,                    # Write the package declarations without checking or installing packages
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages use ...(nus argv [...$package] {
+    ^mise bootstrap packages use ...(nus argv [...$package] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2808,7 +2800,7 @@ export def "mise bootstrap packages where" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap packages where ...(nus argv [$package] {
+    ^mise bootstrap packages where ...(nus argv [$package] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2864,7 +2856,7 @@ export def "mise bootstrap plan" [
     --prompt-secrets,                # Prompt securely for missing bootstrap secret inputs
     --detailed-exitcode,             # Exit 0 if nothing would change, 2 if something would, 1 on errors or unknown state
 ] {
-    ^(nus bin) bootstrap plan --json ...(nus argv [] {
+    ^mise bootstrap plan --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2907,7 +2899,7 @@ export def "mise bootstrap plugins" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap plugins ...(nus argv [] {
+    ^mise bootstrap plugins ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2942,7 +2934,7 @@ export def "mise bootstrap plugins apply" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap plugins apply ...(nus argv [] {
+    ^mise bootstrap plugins apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -2971,7 +2963,7 @@ export def "mise bootstrap plugins status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if a declared plugin is not installed
 ]: nothing -> string {
-    ^(nus bin) bootstrap plugins status ...(nus argv [] {
+    ^mise bootstrap plugins status ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3240,7 +3232,7 @@ export def "mise bootstrap remote" [
     --github-relay-log-format: string,                                                                                                                                                                       # Relay log and summary format, `text` or `jsonl` (needs `--github-relay-read-only`)
     --github-relay-max-duration: string,                                                                                                                                                                     # End borrowed access after a duration such as `1h`; `0s` lasts the whole run (needs `--github-relay-read-only`)
 ]: nothing -> string {
-    ^(nus bin) bootstrap remote ...(nus argv [...$target] {
+    ^mise bootstrap remote ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3312,7 +3304,7 @@ export def "mise bootstrap repos" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap repos ...(nus argv [] {
+    ^mise bootstrap repos ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3343,7 +3335,7 @@ export def "mise bootstrap repos apply" [
     --silent,                        # Suppress all task output and mise non-error messages
     --skip-dirty,                    # Skip repositories with local changes instead of failing
 ]: nothing -> string {
-    ^(nus bin) bootstrap repos apply ...(nus argv [] {
+    ^mise bootstrap repos apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3394,7 +3386,7 @@ export def "mise bootstrap repos exec" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap repos exec ...(nus argv [...$path] {
+    ^mise bootstrap repos exec ...(nus argv [...$path] {
         --continue-on-error: $continue_on_error
         --cd: $cd
         --env: $env_
@@ -3426,7 +3418,7 @@ export def "mise bootstrap repos status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if any repository differs from the config (all are still listed)
 ] {
-    ^(nus bin) bootstrap repos status --json ...(nus argv [] {
+    ^mise bootstrap repos status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3473,7 +3465,7 @@ export def "mise bootstrap repos update" [
     --silent,                        # Suppress all task output and mise non-error messages
     --skip-dirty,                    # Skip repositories with local changes instead of failing
 ]: nothing -> string {
-    ^(nus bin) bootstrap repos update ...(nus argv [...$path] {
+    ^mise bootstrap repos update ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3512,7 +3504,7 @@ export def "mise bootstrap secrets" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap secrets ...(nus argv [] {
+    ^mise bootstrap secrets ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3542,7 +3534,7 @@ export def "mise bootstrap secrets status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if a declared secret input is unset, empty, or not valid Unicode
 ] {
-    ^(nus bin) bootstrap secrets status --json ...(nus argv [] {
+    ^mise bootstrap secrets status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3591,7 +3583,7 @@ export def "mise bootstrap services" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap services ...(nus argv [] {
+    ^mise bootstrap services ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3620,7 +3612,7 @@ export def "mise bootstrap services apply" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap services apply ...(nus argv [] {
+    ^mise bootstrap services apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3675,7 +3667,7 @@ export def "mise bootstrap services remove" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap services remove ...(nus argv [$name] {
+    ^mise bootstrap services remove ...(nus argv [$name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3706,7 +3698,7 @@ export def "mise bootstrap services status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if any service differs from the config (all are still listed)
 ] {
-    ^(nus bin) bootstrap services status --json ...(nus argv [] {
+    ^mise bootstrap services status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3764,7 +3756,7 @@ export def "mise bootstrap status" [
     --prompt-secrets,                # Prompt securely for missing bootstrap secret inputs
     --missing,                       # Exit with status 1 if anything differs from the config (all entries are still listed)
 ] {
-    ^(nus bin) bootstrap status --json ...(nus argv [] {
+    ^mise bootstrap status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3847,7 +3839,7 @@ export def "mise bootstrap unapply" [
     --silent,                        # Suppress all task output and mise non-error messages
     --prompt-secrets,                # Prompt securely for missing bootstrap secret inputs
 ]: nothing -> string {
-    ^(nus bin) bootstrap unapply ...(nus argv [...$env_] {
+    ^mise bootstrap unapply ...(nus argv [...$env_] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -3885,7 +3877,7 @@ export def "mise bootstrap user" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap user ...(nus argv [] {
+    ^mise bootstrap user ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3914,7 +3906,7 @@ export def "mise bootstrap user apply" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) bootstrap user apply ...(nus argv [] {
+    ^mise bootstrap user apply ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3945,7 +3937,7 @@ export def "mise bootstrap user status" [
     --silent,                        # Suppress all task output and mise non-error messages
     --missing,                       # Exit with status 1 if your login shell differs from the config
 ] {
-    ^(nus bin) bootstrap user status --json ...(nus argv [] {
+    ^mise bootstrap user status --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -3983,7 +3975,7 @@ export def "mise cache" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) cache ...(nus argv [] {
+    ^mise cache ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4036,7 +4028,7 @@ export def "mise cache clear" [
     --silent,                        # Suppress all task output and mise non-error messages
     --task: string@"nus complete",   # [experimental] Clear task artifact cache entries for a task name or pattern
 ]: nothing -> string {
-    ^(nus bin) cache clear ...(nus argv [...$tool] {
+    ^mise cache clear ...(nus argv [...$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4064,7 +4056,7 @@ export def "mise cache path" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) cache path ...(nus argv [] {
+    ^mise cache path ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4108,7 +4100,7 @@ export def "mise cache prune" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) cache prune ...(nus argv [...$tool] {
+    ^mise cache prune ...(nus argv [...$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4153,7 +4145,7 @@ export def "mise cache task" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^(nus bin) cache task --json ...(nus argv [$task] {
+    ^mise cache task --json ...(nus argv [$task] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4254,7 +4246,7 @@ export def "mise completion" [
     --silent,                                      # Suppress all task output and mise non-error messages
     --install,                                     # Install the script where this shell looks for it, instead of printing it
 ]: nothing -> string {
-    ^(nus bin) completion ...(nus argv [$shell] {
+    ^mise completion ...(nus argv [$shell] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -4311,7 +4303,7 @@ export def "mise config" [
     --no-header,                     # Do not print the table header
     --tracked-configs,               # List every config file mise has loaded, in any project
 ]: nothing -> table<path: string, tools: list<string>, override: bool> {
-    let text = ^(nus bin) config --json ...(nus argv [] {
+    let text = ^mise config --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4397,7 +4389,7 @@ export def "mise config explain" [
     --system,                          # Read the system config file
     --override,                        # Read the global override file, `config.override.toml`
 ]: nothing -> table<key: string, path: list<string>, line: int, description: oneof<string, nothing>, deprecated: bool, known: bool, suggestion: oneof<string, nothing>> {
-    let text = ^(nus bin) config explain --json ...(nus argv [$key] {
+    let text = ^mise config explain --json ...(nus argv [$key] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4473,7 +4465,7 @@ export def "mise config get" [
     --system,                          # Read the system config file
     --override,                        # Read the global override file, `config.override.toml`
 ]: nothing -> string {
-    ^(nus bin) config get ...(nus argv [$key] {
+    ^mise config get ...(nus argv [$key] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4541,7 +4533,7 @@ export def "mise config ls" [
     --no-header,                     # Do not print the table header
     --tracked-configs,               # List every config file mise has loaded, in any project
 ]: nothing -> table<path: string, tools: list<string>, override: bool> {
-    let text = ^(nus bin) config ls --json ...(nus argv [] {
+    let text = ^mise config ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4663,7 +4655,7 @@ export def "mise config set" [
     --remove,                                                        # Remove the value from an existing list
     --type (-t): string@[infer string integer float bool list set],  # TOML type to store the value as; inferred from the value by default
 ]: nothing -> string {
-    ^(nus bin) config set ...(nus argv [$key $value] {
+    ^mise config set ...(nus argv [$key $value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4714,7 +4706,7 @@ export def "mise deactivate" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) deactivate ...(nus argv [] {
+    ^mise deactivate ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4761,7 +4753,7 @@ export def "mise daemons" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^(nus bin) daemons --json ...(nus argv [] {
+    ^mise daemons --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4796,7 +4788,7 @@ export def "mise daemons providers" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons providers ...(nus argv [] {
+    ^mise daemons providers ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4824,7 +4816,7 @@ export def "mise daemons providers ls" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^(nus bin) daemons providers ls --json ...(nus argv [] {
+    ^mise daemons providers ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4852,7 +4844,7 @@ export def "mise daemons providers start" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons providers start ...(nus argv [...$names] {
+    ^mise daemons providers start ...(nus argv [...$names] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4880,7 +4872,7 @@ export def "mise daemons providers stop" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons providers stop ...(nus argv [...$names] {
+    ^mise daemons providers stop ...(nus argv [...$names] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4908,7 +4900,7 @@ export def "mise daemons providers restart" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons providers restart ...(nus argv [...$names] {
+    ^mise daemons providers restart ...(nus argv [...$names] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4950,7 +4942,7 @@ export def "mise daemons start" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons start ...(nus argv [...$args] {
+    ^mise daemons start ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -4988,7 +4980,7 @@ export def "mise daemons register" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons register ...(nus argv [] {
+    ^mise daemons register ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5024,7 +5016,7 @@ export def "mise daemons stop" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons stop ...(nus argv [...$args] {
+    ^mise daemons stop ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5060,7 +5052,7 @@ export def "mise daemons restart" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons restart ...(nus argv [...$args] {
+    ^mise daemons restart ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5097,7 +5089,7 @@ export def "mise daemons ls" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^(nus bin) daemons ls --json ...(nus argv [] {
+    ^mise daemons ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5137,7 +5129,7 @@ export def "mise daemons urls" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^(nus bin) daemons urls --json ...(nus argv [] {
+    ^mise daemons urls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5174,7 +5166,7 @@ export def "mise daemons logs" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons logs ...(nus argv [...$args] {
+    ^mise daemons logs ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5210,7 +5202,7 @@ export def "mise daemons status" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons status ...(nus argv [...$args] {
+    ^mise daemons status ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5245,7 +5237,7 @@ export def "mise daemons tui" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons tui ...(nus argv [...$args] {
+    ^mise daemons tui ...(nus argv [...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5290,7 +5282,7 @@ export def "mise daemons prune" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) daemons prune ...(nus argv [] {
+    ^mise daemons prune ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5340,7 +5332,7 @@ export def "mise dotfiles" [
     --silent,                        # Suppress all task output and mise non-error messages
     --local,                         # Work on this machine's local-only history (`mode = "track-local"`), which is never shared
 ]: nothing -> string {
-    ^(nus bin) dotfiles ...(nus argv [] {
+    ^mise dotfiles ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5436,7 +5428,7 @@ export def "mise dotfiles add" [
     --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
     --group: string,                 # Capture into the tree of this dotfile group
 ]: nothing -> string {
-    ^(nus bin) dotfiles add ...(nus argv [...$target] {
+    ^mise dotfiles add ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -5511,7 +5503,7 @@ export def "mise dotfiles apply" [
     --prune,                         # Also remove files that dotfile groups deployed but no active entry deploys now
     --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
 ]: nothing -> string {
-    ^(nus bin) dotfiles apply ...(nus argv [...$target] {
+    ^mise dotfiles apply ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -5556,7 +5548,7 @@ export def "mise dotfiles capture" [
     --silent,                        # Suppress all task output and mise non-error messages
     --label: string,                 # Describe this operation in history
 ]: nothing -> string {
-    ^(nus bin) dotfiles capture ...(nus argv [...$command] {
+    ^mise dotfiles capture ...(nus argv [...$command] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5602,7 +5594,7 @@ export def "mise dotfiles conflicts" [
     --silent,                        # Suppress all task output and mise non-error messages
     --difftool,                      # Open the comparison in Git's configured diff or merge tool
 ]: nothing -> string {
-    ^(nus bin) dotfiles conflicts ...(nus argv [...$path] {
+    ^mise dotfiles conflicts ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5643,7 +5635,7 @@ export def "mise dotfiles diff" [
     --silent,                        # Suppress all task output and mise non-error messages
     --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
 ]: nothing -> string {
-    ^(nus bin) dotfiles diff ...(nus argv [...$target] {
+    ^mise dotfiles diff ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5702,7 +5694,7 @@ export def "mise dotfiles edit" [
     --group: string,                 # Dotfile group whose tree holds the target, when several groups deploy into its directory
     --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
 ]: nothing -> string {
-    ^(nus bin) dotfiles edit ...(nus argv [$target] {
+    ^mise dotfiles edit ...(nus argv [$target] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5747,7 +5739,7 @@ export def "mise dotfiles exclude" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) dotfiles exclude ...(nus argv [$glob] {
+    ^mise dotfiles exclude ...(nus argv [$glob] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5814,7 +5806,7 @@ export def "mise dotfiles history" [
     --label: string,                 # Only checkpoints with this label
     --pending,                       # Only checkpoints recorded by operations that did not finish
 ] {
-    ^(nus bin) dotfiles history --json ...(nus argv [] {
+    ^mise dotfiles history --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5850,7 +5842,7 @@ export def "mise dotfiles history describe" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) dotfiles history describe ...(nus argv [$ref $text] {
+    ^mise dotfiles history describe ...(nus argv [$ref $text] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5907,7 +5899,7 @@ export def "mise dotfiles history diff" [
     --patch (-p),                    # Print the full patch instead of a per-file summary
     --exit-code,                     # Exit 1 when the two sides differ
 ]: nothing -> string {
-    ^(nus bin) dotfiles history diff ...(nus argv [$a $b] {
+    ^mise dotfiles history diff ...(nus argv [$a $b] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -5965,7 +5957,7 @@ export def "mise dotfiles history ls" [
     --label: string,                 # Only checkpoints with this label
     --pending,                       # Only checkpoints recorded by operations that did not finish
 ] {
-    ^(nus bin) dotfiles history ls --json ...(nus argv [] {
+    ^mise dotfiles history ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6032,7 +6024,7 @@ export def "mise dotfiles history purge" [
     --backup,                        # Keep the replaced history in the repository under `refs/mise/purge-backup/`
     --keep-objects,                  # Leave the replaced objects on disk instead of deleting them
 ]: nothing -> string {
-    ^(nus bin) dotfiles history purge ...(nus argv [...$path] {
+    ^mise dotfiles history purge ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6080,7 +6072,7 @@ export def "mise dotfiles history show" [
     --path: string,                  # Resolve `latest~N` among the checkpoints where this path changed
     --files,                         # List every file in the snapshot
 ] {
-    ^(nus bin) dotfiles history show --json ...(nus argv [$ref] {
+    ^mise dotfiles history show --json ...(nus argv [$ref] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6118,7 +6110,7 @@ export def "mise dotfiles include" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) dotfiles include ...(nus argv [$glob] {
+    ^mise dotfiles include ...(nus argv [$glob] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6156,7 +6148,7 @@ export def "mise dotfiles notify" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) dotfiles notify ...(nus argv [] {
+    ^mise dotfiles notify ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6198,7 +6190,7 @@ export def "mise dotfiles origin" [
     --silent,                        # Suppress all task output and mise non-error messages
     --remove,                        # Disconnect the origin by removing `[history.origin]`; local checkpoints and fetched history stay
 ]: nothing -> string {
-    ^(nus bin) dotfiles origin ...(nus argv [] {
+    ^mise dotfiles origin ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6259,7 +6251,7 @@ export def "mise dotfiles origin set" [
     --branch: string,                # The branch to sync (default: the repository's default branch)
     --sync: string,                  # How to sync with the repository: sync, fetch-only, or manual
 ]: nothing -> string {
-    ^(nus bin) dotfiles origin set ...(nus argv [$url] {
+    ^mise dotfiles origin set ...(nus argv [$url] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6305,7 +6297,7 @@ export def "mise dotfiles paths" [
     --preview: string,               # List the files that tracking this path would save, without tracking it
     --noisy,                         # List the paths the watcher found changing constantly and saves less often
 ] {
-    ^(nus bin) dotfiles paths --json ...(nus argv [] {
+    ^mise dotfiles paths --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6381,7 +6373,7 @@ export def "mise dotfiles pull" [
     --take-remote-all,               # Resolve every remaining conflict with the origin's version
     --keep-local-all,                # Resolve every remaining conflict by keeping this machine's version
 ]: nothing -> string {
-    ^(nus bin) dotfiles pull ...(nus argv [...$path] {
+    ^mise dotfiles pull ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6426,7 +6418,7 @@ export def "mise dotfiles recover" [
     --silent,                        # Suppress all task output and mise non-error messages
     --keep-current,                  # Keep the files on disk instead of restoring the recovery copies
 ]: nothing -> string {
-    ^(nus bin) dotfiles recover ...(nus argv [$operation] {
+    ^mise dotfiles recover ...(nus argv [$operation] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6476,7 +6468,7 @@ export def "mise dotfiles rollback" [
     --to: string,                    # The checkpoint to roll back to: numeric ID, `latest`, `latest~N`, or `commit:<sha>`
     --all,                           # With `--to`, restore everything the checkpoint covers
 ]: nothing -> string {
-    ^(nus bin) dotfiles rollback ...(nus argv [...$path] {
+    ^mise dotfiles rollback ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -6547,7 +6539,7 @@ export def "mise dotfiles save" [
     --best-effort,                   # Warn instead of failing when the checkpoint cannot be written
     --re-encrypt,                    # Re-encrypt every saved encrypted file to the current recipients
 ]: nothing -> string {
-    ^(nus bin) dotfiles save ...(nus argv [...$path] {
+    ^mise dotfiles save ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6618,7 +6610,7 @@ export def "mise dotfiles status" [
     --missing,                       # Exit with code 1 if any dotfile is not in its desired state (missing, source missing, or differs)
     --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
 ] {
-    ^(nus bin) dotfiles status --json ...(nus argv [...$target] {
+    ^mise dotfiles status --json ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6667,7 +6659,7 @@ export def "mise dotfiles sync" [
     --allow-plaintext-history,       # Allow pushing older unencrypted versions of files that are now encrypted, and versions that look like they contain secrets
     --best-effort,                   # Warn instead of failing when the origin is unreachable
 ]: nothing -> string {
-    ^(nus bin) dotfiles sync ...(nus argv [] {
+    ^mise dotfiles sync ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6740,7 +6732,7 @@ export def "mise dotfiles track" [
     --encrypt,                       # Encrypt contents before saving them to history (requires `[history.encryption] recipients`)
     --allow-plaintext,               # Save an explicitly tracked credential-named file in plaintext
 ]: nothing -> string {
-    ^(nus bin) dotfiles track ...(nus argv [...$path] {
+    ^mise dotfiles track ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6802,7 +6794,7 @@ export def "mise dotfiles unapply" [
     --group: list<string>,           # Only unapply the files of this dotfile group, even one that is no longer selected or declared
     --prompt-secrets,                # Prompt for `[bootstrap.secrets]` values that templates need and the environment does not set
 ]: nothing -> string {
-    ^(nus bin) dotfiles unapply ...(nus argv [...$target] {
+    ^mise dotfiles unapply ...(nus argv [...$target] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -6851,7 +6843,7 @@ export def "mise dotfiles undo" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) dotfiles undo ...(nus argv [$ref] {
+    ^mise dotfiles undo ...(nus argv [$ref] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6893,7 +6885,7 @@ export def "mise dotfiles untrack" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) dotfiles untrack ...(nus argv [...$path] {
+    ^mise dotfiles untrack ...(nus argv [...$path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6951,7 +6943,7 @@ export def "mise dotfiles watch" [
     --silent,                        # Suppress all task output and mise non-error messages
     --once,                          # Rescan and sync once, then exit (for timers and cron)
 ] {
-    ^(nus bin) dotfiles watch --json ...(nus argv [] {
+    ^mise dotfiles watch --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -6996,7 +6988,7 @@ export def "mise doctor" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^(nus bin) doctor --json ...(nus argv [] {
+    ^mise doctor --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7040,7 +7032,7 @@ export def "mise doctor path" [
     --silent,                        # Suppress all task output and mise non-error messages
     --full (-f),                     # Print every PATH entry, including those mise does not provide
 ]: nothing -> string {
-    ^(nus bin) doctor path ...(nus argv [] {
+    ^mise doctor path ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7088,7 +7080,7 @@ export def "mise doctor project" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> record<errors: list<string>, checks: table<name: string, description: oneof<string, nothing>, source: oneof<string, nothing>, status: string, message: oneof<string, nothing>, hint: oneof<string, nothing>>> {
-    let text = ^(nus bin) doctor project --json ...(nus argv [] {
+    let text = ^mise doctor project --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7139,7 +7131,7 @@ export def "mise en" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) en ...(nus argv [$dir] {
+    ^mise en ...(nus argv [$dir] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7227,7 +7219,7 @@ export def "mise env" [
     --values,                                                   # Only show values of environment variables
     --paths,                                                    # Print the PATH entries mise manages, in PATH order, one per line
 ]: nothing -> record {
-    let text = ^(nus bin) env --json ...(nus argv [...$tool_version] {
+    let text = ^mise env --json ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7367,7 +7359,7 @@ export def "mise exec" [
     --secrets: list<string>@"nus complete",  # [experimental] Give the command these secrets (comma-separated); by default it gets none
     --secrets-all,                           # [experimental] Give the command every secret the project can inject, except file secrets
 ]: nothing -> string {
-    ^(nus bin) exec ...(nus argv [...$tool_version] {
+    ^mise exec ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7451,7 +7443,7 @@ export def "mise fmt" [
     --check (-c),                    # Check whether the configs are formatted without rewriting them; exits 1 if any are not
     --stdin (-s),                    # Format TOML from stdin and print it to stdout, without touching any file
 ]: nothing -> string {
-    ^(nus bin) fmt ...(nus argv [] {
+    ^mise fmt ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7481,7 +7473,7 @@ export def "mise generate" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) generate ...(nus argv [] {
+    ^mise generate ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7536,7 +7528,7 @@ export def "mise generate config" [
     --global (-g),                              # Generate the global config file (~/.config/mise/config.toml)
     --tool-versions (-t): path@"nus complete",  # Copy the tools from this .tool-versions file into the config, without opening the editor
 ]: nothing -> string {
-    ^(nus bin) generate config ...(nus argv [$path] {
+    ^mise generate config ...(nus argv [$path] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -7598,7 +7590,7 @@ export def "mise generate devcontainer" [
     --name (-n): string,             # Container name; defaults to mise
     --write (-w),                    # Write to .devcontainer/devcontainer.json instead of printing
 ]: nothing -> string {
-    ^(nus bin) generate devcontainer ...(nus argv [] {
+    ^mise generate devcontainer ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7680,7 +7672,7 @@ export def "mise generate git-pre-commit" [
     --write (-w),                        # Write the hook to the hooks directory and make it executable
     --hook: string,                      # Which git hook to write, such as pre-push
 ]: nothing -> string {
-    ^(nus bin) generate git-pre-commit ...(nus argv [...$mise_arg] {
+    ^mise generate git-pre-commit ...(nus argv [...$mise_arg] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7737,7 +7729,7 @@ export def "mise generate github-action" [
     --write (-w),                        # Write the workflow to `.github/workflows/<NAME>.yml` instead of printing it
     --name: string,                      # Name of the workflow and its file
 ]: nothing -> string {
-    ^(nus bin) generate github-action ...(nus argv [] {
+    ^mise generate github-action ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7819,7 +7811,7 @@ export def "mise generate install-script" [
     --localized-dir: path@"nus complete",  # Directory for mise data when using --localize, relative to the project
     --windows,                             # Also write a Windows launcher, `<PATH>.cmd`
 ]: nothing -> string {
-    ^(nus bin) generate install-script ...(nus argv [] {
+    ^mise generate install-script ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7895,7 +7887,7 @@ export def "mise generate task-docs" [
     --index (-I),                    # Write only an index of tasks, intended for use with `--multi`
     --multi (-m),                    # Render each task as a separate document; requires `--output` to be a directory
 ]: nothing -> string {
-    ^(nus bin) generate task-docs ...(nus argv [] {
+    ^mise generate task-docs ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -7987,7 +7979,7 @@ export def "mise generate task-stubs" [
     --mise-bin (-m): string,               # mise executable the stubs run; defaults to mise from PATH
     --windows-launcher: string@[cmd exe],  # What to write beside each stub for Windows to launch
 ]: nothing -> string {
-    ^(nus bin) generate task-stubs ...(nus argv [] {
+    ^mise generate task-stubs ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8137,7 +8129,7 @@ export def "mise generate tool-stub" [
     --skip-download,                                   # Do not download artifacts, so checksums, sizes, and the detected binary path are left out
     --url (-u): string,                                # URL to download the tool from
 ]: nothing -> string {
-    ^(nus bin) generate tool-stub ...(nus argv [$output] {
+    ^mise generate tool-stub ...(nus argv [$output] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8204,7 +8196,7 @@ export def "mise implode" [
     --silent,                        # Suppress all task output and mise non-error messages
     --config,                        # Also remove the config directory
 ]: nothing -> string {
-    ^(nus bin) implode ...(nus argv [] {
+    ^mise implode ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8276,7 +8268,7 @@ export def "mise edit" [
     --global (-g),                              # Edit the global config file (~/.config/mise/config.toml)
     --tool-versions (-t): path@"nus complete",  # Copy the tools from this .tool-versions file into the config, without opening the editor
 ]: nothing -> string {
-    ^(nus bin) edit ...(nus argv [$path] {
+    ^mise edit ...(nus argv [$path] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -8433,7 +8425,7 @@ export def "mise install" [
     --shared: path@"nus complete",           # Install into DIR instead of the mise data directory
     --system,                                # Install into the system-wide shared directory
 ]: nothing -> string {
-    ^(nus bin) install ...(nus argv [...$tool_version] {
+    ^mise install ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -8492,7 +8484,7 @@ export def "mise install-into" [
     --locked,                             # Require download URLs from the lockfile when installing
     --silent,                             # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) install-into ...(nus argv [$tool_version $path] {
+    ^mise install-into ...(nus argv [$tool_version $path] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8537,7 +8529,7 @@ export def "mise installs" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) installs ...(nus argv [] {
+    ^mise installs ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8589,7 +8581,7 @@ export def "mise installs ls" [
     --silent,                        # Suppress all task output and mise non-error messages
     --no-header,                     # Do not print the table header
 ]: nothing -> table<name: string, dir: string, backend: string, version: string, platform: string, mode: string, options: record, requested_as: oneof<string, nothing>, checksum: oneof<string, nothing>, pinned: bool, selected: bool, shared: bool> {
-    let text = ^(nus bin) installs ls --json ...(nus argv [...$tool] {
+    let text = ^mise installs ls --json ...(nus argv [...$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8674,7 +8666,7 @@ export def "mise installs migrate" [
     --locked,                                # Require download URLs from the lockfile when installing
     --silent,                                # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) installs migrate ...(nus argv [...$tool_version] {
+    ^mise installs migrate ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8730,7 +8722,7 @@ export def "mise installs select" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) installs select ...(nus argv [$installation] {
+    ^mise installs select ...(nus argv [$installation] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8790,7 +8782,7 @@ export def "mise latest" [
     --installed (-i),                     # Print the latest installed version instead of the latest available one
     --minimum-release-age: string,        # Only consider versions released before a date or at least a duration ago
 ]: nothing -> string {
-    ^(nus bin) latest ...(nus argv [$tool_version $asdf_version] {
+    ^mise latest ...(nus argv [$tool_version $asdf_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -8839,7 +8831,7 @@ export def "mise link" [
     --locked,                             # Require download URLs from the lockfile when installing
     --silent,                             # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) link ...(nus argv [$tool_version $path] {
+    ^mise link ...(nus argv [$tool_version $path] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -9009,7 +9001,7 @@ export def "mise lock" [
     --upgrade,                       # Upgrade lockfiles to the latest format
     --sidecars,                      # List native dependency sidecars instead of updating lockfiles
 ] {
-    ^(nus bin) lock --json ...(nus argv [...$tool] {
+    ^mise lock --json ...(nus argv [...$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9143,7 +9135,7 @@ export def "mise ls" [
     --prefix: string@"nus complete",              # Only show versions starting with PREFIX (requires a tool argument)
     --prunable,                                   # List only tools that can be pruned with `mise prune`
 ]: nothing -> oneof<record, table<version: string, install_path: string, installed: bool, active: bool>> {
-    let text = ^(nus bin) ls --json ...(nus argv [...$installed_tool] {
+    let text = ^mise ls --json ...(nus argv [...$installed_tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9251,7 +9243,7 @@ export def "mise ls-remote" [
     --prerelease,                          # Include prerelease versions
     --strict-metadata,                     # Exit with an error when release metadata cannot be fetched
 ]: nothing -> oneof<table<version: string>, table<tool: string, version: string, prerelease: oneof<bool, nothing>>> {
-    let text = ^(nus bin) ls-remote --json ...(nus argv [$tool_version $prefix] {
+    let text = ^mise ls-remote --json ...(nus argv [$tool_version $prefix] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9335,7 +9327,7 @@ export def "mise lsp" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) lsp ...(nus argv [] {
+    ^mise lsp ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9413,7 +9405,7 @@ export def "mise mcp" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) mcp ...(nus argv [] {
+    ^mise mcp ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9456,7 +9448,7 @@ export def "mise oci" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) oci ...(nus argv [] {
+    ^mise oci ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9576,7 +9568,7 @@ export def "mise oci build" [
     --no-cache,                          # Rebuild tool layers without reading or writing the local layer cache
     --owner: string,                     # UID[:GID] to assign to every tar entry in generated layers
 ]: nothing -> string {
-    ^(nus bin) oci build ...(nus argv [] {
+    ^mise oci build ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9723,7 +9715,7 @@ export def "mise oci push" [
     --owner: string,                   # UID[:GID] to assign to every tar entry when building
     --update-index,                    # Maintain the tag as a multi-arch image index
 ]: nothing -> string {
-    ^(nus bin) oci push ...(nus argv [$ref] {
+    ^mise oci push ...(nus argv [$ref] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9869,7 +9861,7 @@ export def "mise oci run" [
     --tty (-t),                             # Allocate a TTY (pass `-t` to the engine)
     --workdir (-w): string,                 # Working directory inside the container
 ]: nothing -> string {
-    ^(nus bin) oci run ...(nus argv [...$cmd] {
+    ^mise oci run ...(nus argv [...$cmd] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9932,7 +9924,7 @@ export def "mise packslip" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) packslip ...(nus argv [] {
+    ^mise packslip ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -9980,7 +9972,7 @@ export def "mise packslip forget" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) packslip forget ...(nus argv [$project] {
+    ^mise packslip forget ...(nus argv [$project] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10028,7 +10020,7 @@ export def "mise packslip pins" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^(nus bin) packslip pins --json ...(nus argv [] {
+    ^mise packslip pins --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10144,7 +10136,7 @@ export def "mise outdated" [
     --local,                                 # Only check tools defined in project config files
     --no-header,                             # Do not print the table header
 ]: nothing -> record {
-    let text = ^(nus bin) outdated --json ...(nus argv [...$tool_version] {
+    let text = ^mise outdated --json ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10197,7 +10189,7 @@ export def "mise patrons" [
     --silent,                        # Suppress all task output and mise non-error messages
     --refresh,                       # Fetch the list now instead of using the cached copy
 ] {
-    ^(nus bin) patrons --json ...(nus argv [] {
+    ^mise patrons --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10261,7 +10253,7 @@ export def "mise plugins" [
     --urls (-u),                     # Show each plugin's Git URL, ref, and commit
     --user,                          # List installed plugins
 ]: nothing -> string {
-    ^(nus bin) plugins ...(nus argv [] {
+    ^mise plugins ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10347,7 +10339,7 @@ export def "mise plugins install" [
     --silent,                            # Suppress all task output and mise non-error messages
     --all (-a),                          # Install every plugin the current config needs that is not installed yet
 ]: nothing -> string {
-    ^(nus bin) plugins install ...(nus argv [$new_plugin $git_url ...$rest] {
+    ^mise plugins install ...(nus argv [$new_plugin $git_url ...$rest] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -10401,7 +10393,7 @@ export def "mise plugins link" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) plugins link ...(nus argv [$name $dir] {
+    ^mise plugins link ...(nus argv [$name $dir] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -10465,7 +10457,7 @@ export def "mise plugins ls" [
     --user,                          # List installed plugins
     --outdated (-o),                 # Only show plugins whose Git remote has newer commits
 ]: nothing -> string {
-    ^(nus bin) plugins ls ...(nus argv [] {
+    ^mise plugins ls ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10516,7 +10508,7 @@ export def "mise plugins ls-remote" [
     --urls (-u),                     # Show the plugin source for each shorthand, e.g. vfox:jdx/vfox-poetry
     --only-names,                    # Only show the name of each plugin, without the `*` marking installed plugins
 ]: nothing -> string {
-    ^(nus bin) plugins ls-remote ...(nus argv [] {
+    ^mise plugins ls-remote ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10566,7 +10558,7 @@ export def "mise plugins uninstall" [
     --all (-a),                        # Remove all plugins
     --purge (-p),                      # Also remove a tool plugin's installs, downloads, and cache
 ]: nothing -> string {
-    ^(nus bin) plugins uninstall ...(nus argv [...$plugin] {
+    ^mise plugins uninstall ...(nus argv [...$plugin] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10614,7 +10606,7 @@ export def "mise plugins update" [
     --locked,                          # Require download URLs from the lockfile when installing
     --silent,                          # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) plugins update ...(nus argv [...$plugin] {
+    ^mise plugins update ...(nus argv [...$plugin] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10692,7 +10684,7 @@ export def "mise deps" [
     --only: list<string>,            # Run only these providers
     --skip: list<string>,            # Skip these providers
 ]: nothing -> string {
-    ^(nus bin) deps ...(nus argv [$provider] {
+    ^mise deps ...(nus argv [$provider] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -10748,7 +10740,7 @@ export def "mise deps add" [
     --silent,                        # Suppress all task output and mise non-error messages
     --dev (-D),                      # Add as a development dependency
 ]: nothing -> string {
-    ^(nus bin) deps add ...(nus argv [...$packages] {
+    ^mise deps add ...(nus argv [...$packages] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10819,7 +10811,7 @@ export def "mise deps install" [
     --only: list<string>,            # Run only these providers
     --skip: list<string>,            # Skip these providers
 ]: nothing -> string {
-    ^(nus bin) deps install ...(nus argv [$provider] {
+    ^mise deps install ...(nus argv [$provider] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -10866,7 +10858,7 @@ export def "mise deps remove" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) deps remove ...(nus argv [...$packages] {
+    ^mise deps remove ...(nus argv [...$packages] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -10942,7 +10934,7 @@ export def "mise prune" [
     --dry-run-code,                            # Like --dry-run, but exit with code 1 if there are tools to prune
     --tools,                                   # Only delete unused tool versions
 ]: nothing -> string {
-    ^(nus bin) prune ...(nus argv [...$installed_tool] {
+    ^mise prune ...(nus argv [...$installed_tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11021,7 +11013,7 @@ export def "mise registry" [
     --hide-aliased,                         # Hide names that are aliases of another registry tool
     --security,                             # Include security features for each tool's backends in JSON output
 ]: nothing -> oneof<record<short: string, backends: list<string>>, table<short: string, backends: list<string>>> {
-    let text = ^(nus bin) registry --json ...(nus argv [$name] {
+    let text = ^mise registry --json ...(nus argv [$name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11087,7 +11079,7 @@ export def "mise reshim" [
     --silent,                        # Suppress all task output and mise non-error messages
     --system,                        # Rebuild the system shims, for tools installed with `mise install --system`
 ]: nothing -> string {
-    ^(nus bin) reshim ...(nus argv [$tool $version] {
+    ^mise reshim ...(nus argv [$tool $version] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -11398,7 +11390,7 @@ export def "mise run" [
     --task-cache-stats,                                                     # [experimental] Report artifact cache hits, restored bytes, and time saved
     --timeout: string,                                                      # Stop the run if it takes longer than this, e.g. 30s or 5m
 ]: nothing -> string {
-    ^(nus bin) run ...(nus argv [] {
+    ^mise run ...(nus argv [] {
         --continue-on-error: $continue_on_error
         --cd: $cd
         --env: $env_
@@ -11518,7 +11510,7 @@ export def "mise search" [
     --match-type (-m): string@[equal contains fuzzy],  # Match type: equal, contains, or fuzzy
     --no-header,                                       # Do not print the table header
 ]: nothing -> string {
-    ^(nus bin) search ...(nus argv [$name] {
+    ^mise search ...(nus argv [$name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11561,7 +11553,7 @@ export def "mise secrets" [
     --silent,                        # Suppress all task output and mise non-error messages
     --no-header,                     # Do not print the table header
 ] {
-    ^(nus bin) secrets --json ...(nus argv [] {
+    ^mise secrets --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11633,7 +11625,7 @@ export def "mise secrets ls" [
     --silent,                        # Suppress all task output and mise non-error messages
     --no-header,                     # Do not print the table header
 ] {
-    ^(nus bin) secrets ls --json ...(nus argv [] {
+    ^mise secrets ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11710,7 +11702,7 @@ export def "mise self-update" [
     --minimum-release-age: string,   # Minimum release age for this update, such as 7d
     --no-plugins,                    # Do not update installed plugins
 ]: nothing -> string {
-    ^(nus bin) self-update ...(nus argv [$version] {
+    ^mise self-update ...(nus argv [$version] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -11849,7 +11841,7 @@ export def "mise set" [
     --prompt,                             # Prompt for environment variable values (input is masked only with --age-encrypt)
     --stdin,                              # Read the value from stdin, for multiline input
 ]: nothing -> string {
-    ^(nus bin) set ...(nus argv [...$env_var] {
+    ^mise set ...(nus argv [...$env_var] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11928,7 +11920,7 @@ export def "mise settings" [
     --toml (-T),                      # Output in TOML format
     --json-extended,                  # Output in JSON format with sources
 ] {
-    ^(nus bin) settings --json ...(nus argv [$setting $value] {
+    ^mise settings --json ...(nus argv [$setting $value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -11990,7 +11982,7 @@ export def "mise settings add" [
     --local (-l),                    # Use only the nearest project config
     --override,                      # Write to the global override file, `config.override.toml`
 ]: nothing -> string {
-    ^(nus bin) settings add ...(nus argv [$setting $value] {
+    ^mise settings add ...(nus argv [$setting $value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12041,7 +12033,7 @@ export def "mise settings get" [
     --silent,                        # Suppress all task output and mise non-error messages
     --local (-l),                    # Use only the nearest project config
 ]: nothing -> string {
-    ^(nus bin) settings get ...(nus argv [$setting] {
+    ^mise settings get ...(nus argv [$setting] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12105,7 +12097,7 @@ export def "mise settings ls" [
     --toml (-T),                      # Output in TOML format
     --json-extended,                  # Output in JSON format with sources
 ] {
-    ^(nus bin) settings ls --json ...(nus argv [$setting] {
+    ^mise settings ls --json ...(nus argv [$setting] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12177,7 +12169,7 @@ export def "mise settings set" [
     --local (-l),                    # Use only the nearest project config
     --override,                      # Write to the global override file, `config.override.toml`
 ]: nothing -> string {
-    ^(nus bin) settings set ...(nus argv [$setting $value] {
+    ^mise settings set ...(nus argv [$setting $value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12236,7 +12228,7 @@ export def "mise settings unset" [
     --local (-l),                    # Use only the nearest project config
     --override,                      # Write to the global override file, `config.override.toml`
 ]: nothing -> string {
-    ^(nus bin) settings unset ...(nus argv [$key] {
+    ^mise settings unset ...(nus argv [$key] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12300,7 +12292,7 @@ export def "mise shell" [
     --silent,                                # Suppress all task output and mise non-error messages
     --unset (-u),                            # Remove a version set earlier with `mise shell`
 ]: nothing -> string {
-    ^(nus bin) shell ...(nus argv [...$tool_version] {
+    ^mise shell ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12411,7 +12403,7 @@ export def "mise ssh" [
     --github-relay-log-format: string,    # Relay log and summary format: text or jsonl (default: the github_relay.log_format setting)
     --github-relay-max-duration: string,  # End borrowed access after a duration such as 1h; 0s lasts the whole session
 ]: nothing -> string {
-    ^(nus bin) ssh ...(nus argv [$destination ...$command] {
+    ^mise ssh ...(nus argv [$destination ...$command] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12462,7 +12454,7 @@ export def "mise shell-alias" [
     --silent,                        # Suppress all task output and mise non-error messages
     --no-header,                     # Do not print the table header
 ]: nothing -> string {
-    ^(nus bin) shell-alias ...(nus argv [] {
+    ^mise shell-alias ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12495,7 +12487,7 @@ export def "mise shell-alias get" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) shell-alias get ...(nus argv [$shell_alias] {
+    ^mise shell-alias get ...(nus argv [$shell_alias] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12539,7 +12531,7 @@ export def "mise shell-alias ls" [
     --silent,                        # Suppress all task output and mise non-error messages
     --no-header,                     # Do not print the table header
 ]: nothing -> string {
-    ^(nus bin) shell-alias ls ...(nus argv [] {
+    ^mise shell-alias ls ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12584,7 +12576,7 @@ export def "mise shell-alias set" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) shell-alias set ...(nus argv [$shell_alias $command] {
+    ^mise shell-alias set ...(nus argv [$shell_alias $command] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12623,7 +12615,7 @@ export def "mise shell-alias unset" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) shell-alias unset ...(nus argv [$shell_alias] {
+    ^mise shell-alias unset ...(nus argv [$shell_alias] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12669,7 +12661,7 @@ export def "mise skills" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) skills ...(nus argv [] {
+    ^mise skills ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12717,7 +12709,7 @@ export def "mise skills ls" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> table<name: string, tool: string, version: string, path: string> {
-    let text = ^(nus bin) skills ls --json ...(nus argv [] {
+    let text = ^mise skills ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12788,7 +12780,7 @@ export def "mise skills sync" [
     --global (-g),                   # Link into the skills.dir directory under your home directory instead of the project's
     --prune,                         # Remove links mise made for skills that are no longer active
 ]: nothing -> string {
-    ^(nus bin) skills sync ...(nus argv [] {
+    ^mise skills sync ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12817,7 +12809,7 @@ export def "mise sponsors" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) sponsors ...(nus argv [] {
+    ^mise sponsors ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12854,7 +12846,7 @@ export def "mise sync" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) sync ...(nus argv [] {
+    ^mise sync ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12903,7 +12895,7 @@ export def "mise sync node" [
     --nodenv,                        # Get tool versions from nodenv
     --nvm,                           # Get tool versions from nvm
 ]: nothing -> string {
-    ^(nus bin) sync node ...(nus argv [] {
+    ^mise sync node ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -12961,7 +12953,7 @@ export def "mise sync python" [
     --pyenv,                         # Get tool versions from pyenv
     --uv,                            # Link uv's python versions into mise and mise's python versions into uv
 ]: nothing -> string {
-    ^(nus bin) sync python ...(nus argv [] {
+    ^mise sync python ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13009,7 +13001,7 @@ export def "mise sync ruby" [
     --silent,                        # Suppress all task output and mise non-error messages
     --brew,                          # Get tool versions from Homebrew
 ]: nothing -> string {
-    ^(nus bin) sync ruby ...(nus argv [] {
+    ^mise sync ruby ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13093,7 +13085,7 @@ export def "mise tasks" [
     --sort: string@[name alias description source],  # Column to sort by (default: name)
     --sort-order: string@[asc desc],                 # Sort direction (default: asc)
 ]: nothing -> table<name: string, aliases: list<string>, description: string, source: string, config_sources: list<string>, depends: list<oneof<string, list<string>, record<task: string>>>, daemons: oneof<bool, string, list<string>, nothing>, secrets: list<string>, depends_post: list<oneof<string, list<string>, record<task: string>>>, wait_for: list<oneof<string, list<string>, record<task: string>>>, env: list<string>, dir: oneof<string, nothing>, hide: bool, global: bool, raw: bool, interactive: bool, sources: list<string>, outputs: oneof<list<string>, record<auto: bool>>, shell: oneof<string, nothing>, quiet: bool, silent: oneof<bool, string>, tools: record, usage: string, timeout: oneof<string, nothing>, run: list<oneof<string, record<task: string>, record<tasks: list<string>>>>, args: list<string>, file: oneof<string, nothing>> {
-    let text = ^(nus bin) tasks --json ...(nus argv [$task] {
+    let text = ^mise tasks --json ...(nus argv [$task] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13194,7 +13186,7 @@ export def "mise tasks add" [
     --outputs: list<string>,                       # Glob patterns of files this task creates, used to skip it when they are up to date
     --run-windows: string,                         # Command to run on Windows (TOML tasks only; ignored with `--file`)
 ]: nothing -> string {
-    ^(nus bin) tasks add ...(nus argv [$task ...$run] {
+    ^mise tasks add ...(nus argv [$task ...$run] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13251,7 +13243,7 @@ export def "mise tasks deps" [
     --compact,                       # Collapse repeated dependencies after their first occurrence
     --dot,                           # Display dependencies in DOT format
 ]: nothing -> string {
-    ^(nus bin) tasks deps ...(nus argv [...$tasks] {
+    ^mise tasks deps ...(nus argv [...$tasks] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13293,7 +13285,7 @@ export def "mise tasks edit" [
     --silent,                        # Suppress all task output and mise non-error messages
     --path (-p),                     # Print the task's file path instead of opening it
 ]: nothing -> string {
-    ^(nus bin) tasks edit ...(nus argv [$task] {
+    ^mise tasks edit ...(nus argv [$task] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13342,7 +13334,7 @@ export def "mise tasks graph" [
     --no-header,                     # Do not print table headers
     --explain,                       # Show which provider and workspace file each project, dependency, and task field came from
 ] {
-    ^(nus bin) tasks graph --json ...(nus argv [] {
+    ^mise tasks graph --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13383,7 +13375,7 @@ export def "mise tasks info" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ] {
-    ^(nus bin) tasks info --json ...(nus argv [$task] {
+    ^mise tasks info --json ...(nus argv [$task] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13468,7 +13460,7 @@ export def "mise tasks ls" [
     --sort: string@[name alias description source],  # Column to sort by (default: name)
     --sort-order: string@[asc desc],                 # Sort direction (default: asc)
 ]: nothing -> table<name: string, aliases: list<string>, description: string, source: string, config_sources: list<string>, depends: list<oneof<string, list<string>, record<task: string>>>, daemons: oneof<bool, string, list<string>, nothing>, secrets: list<string>, depends_post: list<oneof<string, list<string>, record<task: string>>>, wait_for: list<oneof<string, list<string>, record<task: string>>>, env: list<string>, dir: oneof<string, nothing>, hide: bool, global: bool, raw: bool, interactive: bool, sources: list<string>, outputs: oneof<list<string>, record<auto: bool>>, shell: oneof<string, nothing>, quiet: bool, silent: oneof<bool, string>, tools: record, usage: string, timeout: oneof<string, nothing>, run: list<oneof<string, record<task: string>, record<tasks: list<string>>>>, args: list<string>, file: oneof<string, nothing>> {
-    let text = ^(nus bin) tasks ls --json ...(nus argv [] {
+    let text = ^mise tasks ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13527,7 +13519,7 @@ export def "mise tasks validate" [
     --silent,                        # Suppress all task output and mise non-error messages
     --errors-only,                   # Only show errors (skip warnings)
 ]: nothing -> record<tasks_validated: int, errors: int, warnings: int, issues: table<task: string, severity: string, category: string, message: string, details: oneof<string, nothing>>> {
-    let text = ^(nus bin) tasks validate --json ...(nus argv [...$tasks] {
+    let text = ^mise tasks validate --json ...(nus argv [...$tasks] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13620,7 +13612,7 @@ export def "mise test-tool" [
     --all-config,                    # Test all tools specified in config files
     --include-non-defined,           # Also test registry tools that have no `test` entry by running `<tool> --version`
 ]: nothing -> string {
-    ^(nus bin) test-tool ...(nus argv [...$tools] {
+    ^mise test-tool ...(nus argv [...$tools] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13660,7 +13652,7 @@ export def "mise token" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) token ...(nus argv [] {
+    ^mise token ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13711,7 +13703,7 @@ export def "mise token forgejo" [
     --silent,                        # Suppress all task output and mise non-error messages
     --unmask,                        # Show the full unmasked token
 ]: nothing -> string {
-    ^(nus bin) token forgejo ...(nus argv [$host] {
+    ^mise token forgejo ...(nus argv [$host] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13776,7 +13768,7 @@ export def "mise token github" [
     --refresh,                       # With --oauth, get a new OAuth token even if the cached one has not expired, through the refresh-token grant or a new device-code flow. Use it after changing the GitHub App's installations or permissions: cached tokens keep their original access until they expire.
     --unmask,                        # Show the full unmasked token
 ]: nothing -> string {
-    ^(nus bin) token github ...(nus argv [$host] {
+    ^mise token github ...(nus argv [$host] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13830,7 +13822,7 @@ export def "mise token gitlab" [
     --silent,                        # Suppress all task output and mise non-error messages
     --unmask,                        # Show the full unmasked token
 ]: nothing -> string {
-    ^(nus bin) token gitlab ...(nus argv [$host] {
+    ^mise token gitlab ...(nus argv [$host] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13905,7 +13897,7 @@ export def "mise tool" [
     --tool-options,                  # Only show tool options
     --url,                           # Only show the project URL from the registry
 ] {
-    ^(nus bin) tool --json ...(nus argv [$tool] {
+    ^mise tool --json ...(nus argv [$tool] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -13987,7 +13979,7 @@ export def "mise tool-stub" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) tool-stub ...(nus argv [$file ...$args] {
+    ^mise tool-stub ...(nus argv [$file ...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14089,7 +14081,7 @@ export def "mise trust" [
     --show,                             # Show the trust status of config files in the current directory and its parents
     --untrust,                          # Remove explicit trust for this config
 ]: nothing -> string {
-    ^(nus bin) trust ...(nus argv [$config_file] {
+    ^mise trust ...(nus argv [$config_file] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14149,7 +14141,7 @@ export def "mise uninstall" [
     --all (-a),                                        # Remove every installed version of the named tools, or of every tool when none is named
     --dry-run-code,                                    # Like --dry-run, but exit with code 1 if there are tools to uninstall
 ]: nothing -> string {
-    ^(nus bin) uninstall ...(nus argv [...$installed_tool_version] {
+    ^mise uninstall ...(nus argv [...$installed_tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14214,7 +14206,7 @@ export def "mise unset" [
     --global (-g),                      # Use the global config file
     --override,                         # Use the global override file, `config.override.toml`
 ]: nothing -> string {
-    ^(nus bin) unset ...(nus argv [...$env_key] {
+    ^mise unset ...(nus argv [...$env_key] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14258,7 +14250,7 @@ export def "mise untrust" [
     --locked,                           # Require download URLs from the lockfile when installing
     --silent,                           # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) untrust ...(nus argv [$config_file] {
+    ^mise untrust ...(nus argv [$config_file] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14349,7 +14341,7 @@ export def "mise unuse" [
     --override,                                        # Write to the global override file, `config.override.toml`
     --no-prune,                                        # Do not also prune the installed version
 ]: nothing -> string {
-    ^(nus bin) unuse ...(nus argv [...$installed_tool_version] {
+    ^mise unuse ...(nus argv [...$installed_tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14508,7 +14500,7 @@ export def "mise upgrade" [
     --no-prune,                                        # Do not uninstall the versions that were upgraded away from
     --prune,                                           # Immediately uninstall the versions that were upgraded away from
 ]: nothing -> string {
-    ^(nus bin) upgrade ...(nus argv [...$installed_tool_version] {
+    ^mise upgrade ...(nus argv [...$installed_tool_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14707,7 +14699,7 @@ export def "mise use" [
     --postinstall: string,                   # Command to run after installing this tool
     --tool-option: list<string>,             # Set an option for the tool that follows; repeat for several options
 ]: nothing -> string {
-    ^(nus bin) use ...(nus argv [...$tool_version] {
+    ^mise use ...(nus argv [...$tool_version] {
         --cd: $cd
         --env: $env_
         --force: $force
@@ -14769,7 +14761,7 @@ export def "mise vars" [
     --silent,                        # Suppress all task output and mise non-error messages
     --no-header,                     # Do not print the table header
 ]: nothing -> string {
-    ^(nus bin) vars ...(nus argv [...$name_value] {
+    ^mise vars ...(nus argv [...$name_value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14812,7 +14804,7 @@ export def "mise vars ls" [
     --silent,                        # Suppress all task output and mise non-error messages
     --no-header,                     # Do not print the table header
 ]: nothing -> string {
-    ^(nus bin) vars ls ...(nus argv [] {
+    ^mise vars ls ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14861,7 +14853,7 @@ export def "mise vars prompt" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) vars prompt ...(nus argv [...$name_value] {
+    ^mise vars prompt ...(nus argv [...$name_value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14900,7 +14892,7 @@ export def "mise vars unset" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) vars unset ...(nus argv [...$name] {
+    ^mise vars unset ...(nus argv [...$name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14947,7 +14939,7 @@ export def "mise version" [
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
 ]: nothing -> record<version: string, latest: oneof<string, nothing>, os: string, arch: string, build_time: string> {
-    let text = ^(nus bin) version --json ...(nus argv [] {
+    let text = ^mise version --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -15596,7 +15588,7 @@ export def "mise watch" [
     --print-events,                                                               # Print the events that trigger each run
     --manual,                                                                     # Show the manual page
 ]: nothing -> string {
-    ^(nus bin) watch ...(nus argv [$task ...$args] {
+    ^mise watch ...(nus argv [$task ...$args] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -15694,7 +15686,7 @@ export def "mise where" [
     --locked,                             # Require download URLs from the lockfile when installing
     --silent,                             # Suppress all task output and mise non-error messages
 ]: nothing -> string {
-    ^(nus bin) where ...(nus argv [$tool_version $asdf_version] {
+    ^mise where ...(nus argv [$tool_version $asdf_version] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -15754,7 +15746,7 @@ export def "mise which" [
     --silent,                            # Suppress all task output and mise non-error messages
     --plugin,                            # Show the name of the tool that provides the executable
 ]: nothing -> string {
-    ^(nus bin) which ...(nus argv [$bin_name] {
+    ^mise which ...(nus argv [$bin_name] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
