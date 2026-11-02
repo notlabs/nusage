@@ -17,9 +17,7 @@ let out = root | path join $usage.flags.out
 mkdir $out
 let entries = entries $usage.args.tool | where {|entry| ($entry.version? | default "") != "" }
 if ($entries | is-empty) {
-    error make --unspanned {
-        msg: "no entry has a `version`, which releases it as a package of its own"
-    }
+    error make --unspanned {msg: "no entry has a `version`, which releases it as a package of its own"}
 }
 let packed = $entries | each {|entry|
     let files = files $entry.name
@@ -63,6 +61,7 @@ let packed = $entries | each {|entry|
         archive: $archive
     }
 }
+
 let packed = $packed | update archive {|row| $row.archive | path relative-to (root) }
 $packed | to json --raw | save --force ($out | path join packages.json)
 $packed | each {|row| $"($row.tag): ($row.archive)" } | str join "\n"

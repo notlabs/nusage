@@ -22,13 +22,13 @@ pub fn current() -> Result<Option<PathBuf>, String> {
     };
     let dir = PathBuf::from(value);
     if !dir.is_absolute() {
-        return Err(format!(
-            "{VAR} is {}, not an absolute path",
-            dir.display()
-        ));
+        return Err(format!("{VAR} is {}, not an absolute path", dir.display()));
     }
     if !dir.is_dir() {
-        return Err(format!("{VAR} names {}, which is no directory", dir.display()));
+        return Err(format!(
+            "{VAR} names {}, which is no directory",
+            dir.display()
+        ));
     }
     Ok(Some(dir))
 }

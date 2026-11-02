@@ -186,7 +186,9 @@ def check-invoke [dir: path, import: string, case: record] {
     # NUON, the form a parent process hands down.
     let env_vars = if ($case.mapped? | default false) {
         let bin = ls $fake | get name | first
-        $env_vars | insert NUS_BINS ({($bin | path basename): $bin} | to nuon)
+        $env_vars | insert NUS_BINS ({
+            ($bin | path basename): $bin
+        } | to nuon)
     } else {
         $env_vars
     }

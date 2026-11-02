@@ -232,7 +232,10 @@ fn a_script_imports_from_the_view_it_is_given() {
             "uses.nu",
             "#!/usr/bin/env nus\nuse pkg+notlabs/catalog/greet\n[(greet hello ana) (greet bins)] | to nuon\n",
         ),
-        ("shadowed/pkg+notlabs/catalog/greet/mod.nu", "export def hello [] { 'beside' }\n"),
+        (
+            "shadowed/pkg+notlabs/catalog/greet/mod.nu",
+            "export def hello [] { 'beside' }\n",
+        ),
         (
             "shadowed/uses.nu",
             "#!/usr/bin/env nus\nuse pkg+notlabs/catalog/greet\ngreet hello\n",
