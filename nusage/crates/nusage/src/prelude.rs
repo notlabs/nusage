@@ -24,6 +24,9 @@ pub struct Analysis {
     /// Why the header cannot be read, when it cannot: the line then binds `$usage` with no
     /// type, so the script still checks.
     pub header: Option<Diagnostic>,
+    /// Why the script cannot have the view `NUS_VIEW` names ([`crate::view`]), which the
+    /// interpreter would refuse it for.
+    pub view: Option<String>,
 }
 
 /// The analysis of the script at `script` as `source` has it, with the other scripts it
@@ -42,7 +45,16 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
     // What a checker needs is the type. Run as it is, the line binds the record `NUS_USAGE`
     // holds as NUON, so a harness can hold a record to the type, as the fixtures' does.
     let value = "($env.NUS_USAGE? | default \"{}\" | from nuon)";
-    let (mut line, header) = match command_of(script, &texts) {
+    // The view comes first, so the script's imports resolve as the interpreter resolves them.
+    let (mut line, view) = match crate::view::current() {
+        Ok(Some(view)) => (
+            crate::view::check_prefix(&view),
+            crate::view::refusal(&view, script.parent().unwrap_or(Path::new("/"))),
+        ),
+        Ok(None) => (String::new(), None),
+        Err(why) => (String::new(), Some(why)),
+    };
+    let header = match command_of(script, &texts) {
         Ok((command, alone)) => {
             // A script that runs commands its spec declares below its own reads a different
             // `$usage` for each, which `cmd` says: no one command's arguments are its type.
@@ -51,9 +63,13 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
             } else {
                 "record<cmd: list<string>, args: record, flags: record>".to_string()
             };
-            (format!("let usage: {ty} = {value}"), None)
+            line.push_str(&format!("let usage: {ty} = {value}"));
+            None
         }
-        Err(err) => (format!("let usage = {value}"), Some(err)),
+        Err(err) => {
+            line.push_str(&format!("let usage = {value}"));
+            Some(err)
+        }
     };
     let mut calls = calls::scan(script, source, &texts);
     let defs = calls::definitions(script, &mut calls, Paths::Absolute, &texts);
@@ -70,6 +86,7 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
         shadows,
         calls,
         header,
+        view,
     })
 }
 

@@ -573,3 +573,58 @@ fn a_nu_another_one_ran_runs() {
     assert!(output.status.success(), "{output:?}");
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "inner");
 }
+
+/// A view of its own for a test, holding the given files.
+fn view(name: &str, files: &[(&str, &str)]) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("nus-lsp-view-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    for (file, text) in files {
+        let path = dir.join(file);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    }
+    dir
+}
+
+/// With `NUS_VIEW`, the editor resolves a script's imports from the view, as the interpreter
+/// does: the line standing in for the shebang names the view first. An entry of the view's
+/// that is also beside the script is said on that line, since the interpreter refuses it.
+#[test]
+fn imports_resolve_from_the_view_and_a_shadowed_view_is_said() {
+    let greet = (
+        "pkg+test/greet/mod.nu",
+        "export def hello [who: string]: nothing -> string { $\"hello ($who)\" }\n",
+    );
+    let text = "#!/usr/bin/env nus\nuse pkg+test/greet\ngreet hello ana | str length\n";
+    let unviewed = view("unviewed", &[greet]);
+    let Some((_, diagnostics)) = session(text, None, &[]) else {
+        return;
+    };
+    let without = said(&diagnostics);
+    assert!(
+        without
+            .iter()
+            .any(|(line, message)| *line == 1 && message.contains("not found")),
+        "{without:?}"
+    );
+    let vars = [("NUS_VIEW", unviewed.to_string_lossy().into_owned())];
+    let (_, diagnostics) = session_with(&["lsp"], &vars, text, None, &[]).unwrap();
+    let with = said(&diagnostics);
+    assert!(
+        with.iter()
+            .all(|(_, message)| !message.contains("not found") && !message.contains("view")),
+        "{with:?}"
+    );
+    // `callee.nu` is beside the script the session opens.
+    let shadowed = view("shadowed", &[greet, ("callee.nu", "")]);
+    let vars = [("NUS_VIEW", shadowed.to_string_lossy().into_owned())];
+    let (_, diagnostics) = session_with(&["lsp"], &vars, text, None, &[]).unwrap();
+    let said = said(&diagnostics);
+    assert!(
+        said.iter()
+            .any(|(line, message)| *line == 0 && message.contains("`callee.nu`")),
+        "{said:?}"
+    );
+    std::fs::remove_dir_all(unviewed).unwrap();
+    std::fs::remove_dir_all(shadowed).unwrap();
+}

@@ -49,6 +49,34 @@ pub fn shadowed(view: &Path, dir: &Path) -> Vec<String> {
     names
 }
 
+/// Why a script in `dir` cannot have the view: an entry beside it would take the place of the
+/// view's, so its imports would not mean what the view says.
+pub fn refusal(view: &Path, dir: &Path) -> Option<String> {
+    let shadowed = shadowed(view, dir);
+    if shadowed.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "{} beside the script would take the place of the view's in {}: an import names one \
+         module",
+        shadowed
+            .iter()
+            .map(|name| format!("`{name}`"))
+            .collect::<Vec<_>>()
+            .join(", "),
+        view.display()
+    ))
+}
+
+/// The view as a checker reads it, opening the line that stands in for a script's first:
+/// the view as its only library directory, which the imports after it resolve against.
+pub fn check_prefix(view: &Path) -> String {
+    format!(
+        "const NU_LIB_DIRS = [{}]; ",
+        nusage_nu::word(&view.to_string_lossy())
+    )
+}
+
 /// The lines that open a script's program: the view as its only library directory, and the
 /// view's map of binaries, as the NUON text a process started from the script also gets.
 pub fn prelude(view: &Path) -> Result<String, String> {

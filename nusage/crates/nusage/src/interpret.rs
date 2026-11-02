@@ -129,21 +129,8 @@ pub fn program(script: &Path, record: &Value) -> Result<String, Diagnostic> {
     let mut code = String::new();
     if let Some(view) = crate::view::current().map_err(|why| Diagnostic::new(script, why))? {
         let dir = script.parent().unwrap_or(Path::new("/"));
-        let shadowed = crate::view::shadowed(&view, dir);
-        if !shadowed.is_empty() {
-            return Err(Diagnostic::new(
-                script,
-                format!(
-                    "{} beside the script would take the place of the view's in {}: an \
-                     import names one module",
-                    shadowed
-                        .iter()
-                        .map(|name| format!("`{name}`"))
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    view.display()
-                ),
-            ));
+        if let Some(why) = crate::view::refusal(&view, dir) {
+            return Err(Diagnostic::new(script, why));
         }
         code.push_str(&crate::view::prelude(&view).map_err(|why| Diagnostic::new(script, why))?);
     }

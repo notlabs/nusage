@@ -4,7 +4,9 @@
 #
 # - writes `.config/mise/conf.d/nuse.toml`: a hidden task per package that wraps a binary,
 #   pinning the mise tool and version the package's spec was read from, so `mise lock` locks
-#   that version and `mise run nuse:<module> -- ...` runs it; and `NUS_VIEW`, naming the view;
+#   that version and `mise run nuse:<module> -- ...` runs it; `NUS_VIEW`, naming the view; and
+#   the `nu` wrapper, `nus nu`, so an editor that starts `nu --lsp` here gets nusage's
+#   language server, which checks a script with the view as `nus` runs it;
 # - installs those versions, and resolves each binary's path with `mise which --tool`;
 # - builds the view, `.nuse/view` (ignored by version control): each package's module linked
 #   at `pkg+<owner>/<repo>/<path>`, its packslip project with `github.com/` written `pkg+`
@@ -64,9 +66,14 @@ def fragment [packages: table]: nothing -> string {
     [
         "# Written by `nuse sync`; edits are overwritten. Each hidden task pins the binary a nusage"
         "# package's wrappers were read from, for `mise lock` and `nuse sync`; NUS_VIEW names the"
-        "# modules `nus` gives a script."
+        "# modules `nus` gives a script, and `nu` is `nus nu`, so an editor's `nu --lsp` is"
+        "# nusage's language server and any other `nu` Nushell itself."
         "[env]"
         $"NUS_VIEW = \"{{ config_root }}/($VIEW)\""
+        ""
+        "[wrappers.nu]"
+        "command = \"nus\""
+        "args = [\"nu\"]"
         ""
         ...$tasks
     ] | str join "\n"
@@ -84,6 +91,8 @@ def "main sync" [
     mkdir ($file | path dirname)
     if not ($file | path exists) or (open --raw $file) != $text {
         $text | save --force $file
+        # A wrapper takes effect through mise's shims once they are made again.
+        ^mise reshim
     }
     let pinned = $packages | where {|row| $row.package.tool? != null }
     let bins = $pinned | each {|row|
