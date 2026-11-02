@@ -37,8 +37,8 @@ versions, `NUS_TOOLS`. A call nothing defines whose first word is a package's ge
 project has at another version than the package was generated from is refused. `^jj` is still
 the binary. The fragment also makes `nu` the `nus nu` wrapper: an editor that starts `nu --lsp`
 through mise's shims in the project gets nusage's language server, which checks a script with
-the same imports. `mise reshim` after adding the include. An interactive session imports a
-package itself, by the path `mise where` gives.
+the same imports. `mise reshim` after adding the include. An interactive Nushell has every
+package as the overlay `nus`, which follows the working directory, from `nus activate nu`.
 
 ### The tasks elsewhere
 

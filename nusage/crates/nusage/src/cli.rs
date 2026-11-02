@@ -36,6 +36,8 @@ pub enum Commands {
     Overlay(Overlay),
     Lsp(Lsp),
     Nu(Nu),
+    Activate(Activate),
+    Modules(Modules),
     Parse(Parse),
     Prelude(Prelude),
     Inspect(Inspect),
@@ -399,5 +401,51 @@ impl Run for Nu {
     fn run(self) -> Self::Output {
         let code = crate::nu(&self.args).map_err(|err| err.to_string())?;
         std::process::exit(code)
+    }
+}
+
+/// Print what activates mise and nusage in a shell, in place of `mise activate`
+///
+/// For Nushell, `nu`, save it where Nushell autoloads instead of `mise activate nu`: `nus
+/// activate nu | save --force ($nu.user-autoload-dirs | first | path join nus.nu)`. The
+/// environment mise resolves for the working directory and `MISE_ENV` is then the overlay
+/// `mise`, and the typed commands of the packages it names, as `nus modules` writes them, the
+/// overlay `nus` above it. Before each prompt a hook asks mise for the environment and reloads
+/// both when it changed, so the line after a `cd` has them. Only an interactive shell is
+/// activated.
+#[derive(Args)]
+pub struct Activate {
+    /// The shell: `nu`
+    shell: String,
+}
+
+impl Run for Activate {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        print!("{}", crate::activate::script(&self.shell)?);
+        Ok(())
+    }
+}
+
+/// Print a module that exports every package `NUS_MODULES` names, for `overlay use`
+///
+/// A package whose tool `NUS_TOOLS` gives at another version than the package was generated
+/// from is left out, and why is said on standard error, so a session has the rest.
+#[derive(Args)]
+pub struct Modules;
+
+impl Run for Modules {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        let (modules, left) = crate::modules::every();
+        for why in &left {
+            eprintln!("nus: {why}");
+        }
+        for line in crate::modules::exports(&modules) {
+            println!("{line}");
+        }
+        Ok(())
     }
 }

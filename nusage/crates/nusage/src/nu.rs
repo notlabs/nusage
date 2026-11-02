@@ -2,10 +2,10 @@
 //! `[wrappers.nu]` with `args = ["nu"]`, say), so an editor that starts `nu --lsp` gets
 //! nusage's language server without being told of it: kakehashi with nusage's layer when
 //! kakehashi is on PATH, which highlights a script's header and bridges the script to `nus
-//! lsp`, else `nus lsp` alone. An interactive shell is `nu` with every module `NUS_MODULES`
-//! names imported before its first prompt ([`crate::modules`]). Anything else is `nu`, as it
-//! was asked for. The arguments are read by Nushell's own command line, as a usage spec, so
-//! `--lsp` is found among Nushell's flags and never among a script's.
+//! lsp`, else `nus lsp` alone. Anything else is `nu`, as it was asked for: an interactive
+//! shell has its packages from `nus activate nu`, as overlays that follow the working
+//! directory ([`crate::activate`]). The arguments are read by Nushell's own command line, as
+//! a usage spec, so `--lsp` is found among Nushell's flags and never among a script's.
 
 use std::ffi::OsStr;
 use std::io;
@@ -42,20 +42,7 @@ pub fn run(args: &[String]) -> io::Result<i32> {
         ));
     }
     let Some(rest) = lsp_requested(args).filter(|_| std::env::var_os(SERVING).is_none()) else {
-        let mut args = args.to_vec();
-        // An interactive session has every module `NUS_MODULES` names: it has no calls to
-        // read beforehand, and what it imports it keeps. A package whose tool is at another
-        // version is left out, and said why, rather than the session refused.
-        if interactive(&args) {
-            let (modules, left) = crate::modules::every();
-            for why in &left {
-                eprintln!("nus: {why}");
-            }
-            if !modules.is_empty() {
-                args = with_execute(&args, &crate::modules::uses(&modules).join("\n"));
-            }
-        }
-        return replace_with(Command::new(real_nu()).args(&args).env(RAN, pid));
+        return replace_with(Command::new(real_nu()).args(args).env(RAN, pid));
     };
     let nusage = std::env::current_exe()?;
     match on_path("kakehashi") {
@@ -89,62 +76,6 @@ fn lsp_requested(args: &[String]) -> Option<Vec<String>> {
     let mut rest = args.to_vec();
     rest.remove(at);
     Some(rest)
-}
-
-/// Whether these arguments start Nushell's interactive shell: no script and no command to run,
-/// and none of the servers or one-off answers. usage reads them by Nushell's spec; arguments
-/// it cannot read are Nushell's to refuse, and start nothing here.
-fn interactive(args: &[String]) -> bool {
-    const ELSEWHERE: &[&str] = &[
-        "commands",
-        "lsp",
-        "dap",
-        "mcp",
-        "version",
-        "help",
-        "ide-goto-def",
-        "ide-hover",
-        "ide-complete",
-        "ide-check",
-        "ide-ast",
-    ];
-    let spec: usage::Spec = SPEC.parse().expect("Nushell's spec reads");
-    let argv: Vec<String> = std::iter::once("nu".to_string())
-        .chain(args.iter().cloned())
-        .collect();
-    let Ok(parsed) = usage::parse::Parser::new(&spec)
-        .without_running_commands()
-        .parse(&argv)
-    else {
-        return false;
-    };
-    parsed.args.keys().all(|arg| arg.name != "script")
-        && parsed
-            .flags
-            .keys()
-            .all(|flag| !ELSEWHERE.contains(&flag.name.as_str()))
-}
-
-/// The arguments with `code` run before the session's first prompt: ahead of the commands
-/// `-e`/`--execute` already gives, or as a `--execute` of its own.
-fn with_execute(args: &[String], code: &str) -> Vec<String> {
-    let mut out = args.to_vec();
-    if let Some(at) = out
-        .iter()
-        .position(|word| word == "-e" || word == "--execute")
-        && let Some(theirs) = out.get(at + 1).cloned()
-    {
-        out[at + 1] = format!("{code}\n{theirs}");
-        return out;
-    }
-    if let Some(at) = out.iter().position(|word| word.starts_with("--execute=")) {
-        let theirs = &out[at]["--execute=".len()..];
-        out[at] = format!("--execute={code}\n{theirs}");
-        return out;
-    }
-    out.push("--execute".to_string());
-    out.push(code.to_string());
-    out
 }
 
 /// The `nu` to run: the first on PATH that is Nushell, a file named `nu` once its links are
@@ -300,45 +231,6 @@ mod tests {
         );
         // A flag Nushell does not have is Nushell's to refuse.
         assert_eq!(lsp_requested(&words("--no-such-flag --lsp")), None);
-    }
-
-    #[test]
-    fn an_interactive_shell_is_one_with_no_script_command_or_server() {
-        for shell in ["", "-n", "-l", "--login -e ls", "--config x.nu", "-i"] {
-            assert!(interactive(&words(shell)), "{shell:?}");
-        }
-        for other in [
-            "script.nu",
-            "script.nu -e x",
-            "-c ls",
-            "--lsp",
-            "--mcp",
-            "--version",
-            "--ide-check 10 x.nu",
-            "--no-such-flag",
-        ] {
-            assert!(!interactive(&words(other)), "{other:?}");
-        }
-    }
-
-    #[test]
-    fn the_imports_run_before_the_sessions_own_commands() {
-        assert_eq!(
-            with_execute(&words("-n"), "use /a *"),
-            ["-n", "--execute", "use /a *"]
-        );
-        assert_eq!(
-            with_execute(&words("-e ls -n"), "use /a *"),
-            ["-e", "use /a *\nls", "-n"]
-        );
-        assert_eq!(
-            with_execute(&words("--execute ls"), "use /a *"),
-            ["--execute", "use /a *\nls"]
-        );
-        assert_eq!(
-            with_execute(&words("--execute=ls"), "use /a *"),
-            ["--execute=use /a *\nls"]
-        );
     }
 
     /// The spec is the Nushell nusage is built against: its version is that of the Nushell

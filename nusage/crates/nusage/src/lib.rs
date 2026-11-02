@@ -7,6 +7,7 @@
 //! service beside it. Each stage prints: [`spec`] the assembled spec, [`model`] the command
 //! model, [`generate`] the module. The CLI in `main.rs` is a thin shell around it.
 
+mod activate;
 mod binary;
 mod calls;
 pub mod cli;
