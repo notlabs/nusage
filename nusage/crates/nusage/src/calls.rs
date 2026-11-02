@@ -9,6 +9,8 @@
 //! call's path is its script's, and `run` reads a script's calls where it parses it. The
 //! shadows are defined where the script runs, by the interpreter and by the module, and
 //! stand in its first line where Nushell checks it, so what is checked is what runs.
+//! Runtime and editor definitions also import each called script's project packages in
+//! that script's scope, checking their tool versions before any script runs.
 //! `^./x.nu` is still the external, and its text.
 //!
 //! A path is the caller's: `./x.nu` names the script beside the caller, wherever it runs
@@ -30,6 +32,7 @@ use nusage_nu::{CommandName, Def, Expr, Ident, Params, ScriptCall, Stmt, SyntaxE
 use nusage_spec::{Diagnostic, Texts};
 
 use crate::common::{Target, nu_params, relative, usage_record};
+use crate::modules;
 
 /// A command standing in for calls of one command of another script.
 #[derive(Debug, Clone)]
@@ -270,6 +273,9 @@ pub enum Paths<'a> {
 #[derive(Debug)]
 pub enum Unwritten {
     Syntax(SyntaxError),
+    /// A package required by this script cannot be used. Execution must stop rather than
+    /// dropping the typed definition and leaving an external call behind.
+    Modules(Diagnostic),
     /// A script its definition would run, which cannot be read.
     Unreadable {
         script: PathBuf,
@@ -287,6 +293,7 @@ impl std::fmt::Display for Unwritten {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Unwritten::Syntax(err) => write!(f, "{err}"),
+            Unwritten::Modules(err) => write!(f, "{err}"),
             Unwritten::Unreadable { script, why } => write!(f, "{}: {why}", script.display()),
             Unwritten::Round { script, name } => write!(
                 f,
@@ -309,8 +316,15 @@ impl From<SyntaxError> for Unwritten {
 /// A shadow whose definition cannot be written is taken out of `calls`, the call left the
 /// external it is, and what kept it out joins the findings at its call; the definitions
 /// follow the shadows that remain, one each, in order.
-pub fn definitions(script: &Path, calls: &mut Calls, paths: Paths, texts: &Texts) -> Vec<Def> {
-    let mut writer = Writer::new(paths, texts);
+/// A required package that cannot be used is an error, including in nested calls.
+pub fn definitions(
+    script: &Path,
+    calls: &mut Calls,
+    paths: Paths,
+    texts: &Texts,
+    modules: &modules::Context,
+) -> Result<Vec<Def>, Diagnostic> {
+    let mut writer = Writer::new(paths, texts, Some(modules));
     writer.chain.push(script.to_path_buf());
     writer.scope.push(names(&calls.shadows));
     let mut defs = Vec::new();
@@ -321,6 +335,7 @@ pub fn definitions(script: &Path, calls: &mut Calls, paths: Paths, texts: &Texts
                 defs.push(def);
                 kept.push(shadow);
             }
+            Err(Unwritten::Modules(err)) => return Err(err),
             Err(why) => calls.findings.push(Finding {
                 span: shadow.at.clone(),
                 message: why.to_string(),
@@ -328,14 +343,15 @@ pub fn definitions(script: &Path, calls: &mut Calls, paths: Paths, texts: &Texts
         }
     }
     calls.shadows = kept;
-    defs
+    Ok(defs)
 }
 
 /// The body of a definition that runs `command`'s script: the definitions of the scripts
 /// it calls, `$usage` from the definition's parameters, and the script `run` with the
 /// definition's input.
 pub fn script_body(command: &Command, paths: Paths, texts: &Texts) -> Result<Vec<Stmt>, Unwritten> {
-    Writer::new(paths, texts).body(command)
+    // Exported modules are independent of the generating project's installed packages.
+    Writer::new(paths, texts, None).body(command)
 }
 
 /// What the definitions are written with: the scripts the definition being written sits
@@ -343,15 +359,17 @@ pub fn script_body(command: &Command, paths: Paths, texts: &Texts) -> Result<Vec
 struct Writer<'a> {
     paths: Paths<'a>,
     texts: &'a Texts,
+    modules: Option<&'a modules::Context>,
     chain: Vec<PathBuf>,
     scope: Vec<Vec<(String, PathBuf)>>,
 }
 
 impl<'a> Writer<'a> {
-    fn new(paths: Paths<'a>, texts: &'a Texts) -> Self {
+    fn new(paths: Paths<'a>, texts: &'a Texts, modules: Option<&'a modules::Context>) -> Self {
         Writer {
             paths,
             texts,
+            modules,
             chain: Vec::new(),
             scope: Vec::new(),
         }
@@ -379,10 +397,17 @@ impl<'a> Writer<'a> {
 
     fn body(&mut self, command: &Command) -> Result<Vec<Stmt>, Unwritten> {
         let script = script_of(command)?;
+        let source = self.source_of(&script)?;
         let mut body = Vec::new();
+        if let Some(context) = self.modules {
+            let imports = context
+                .implicit(&script, &source)
+                .map_err(|why| Unwritten::Modules(Diagnostic::new(&script, why)))?;
+            body.extend(modules::statements(&imports));
+        }
+        let shadows = scan(&script, &source, self.texts).shadows;
         if self.chain.contains(&script) {
             // Met again: Nushell finds its calls among the definitions around it.
-            let shadows = self.shadows_of(&script)?;
             for shadow in &shadows {
                 let around = self
                     .scope
@@ -398,7 +423,6 @@ impl<'a> Writer<'a> {
                 }
             }
         } else {
-            let shadows = self.shadows_of(&script)?;
             self.chain.push(script.clone());
             self.scope.push(names(&shadows));
             let defs = shadows
@@ -423,16 +447,15 @@ impl<'a> Writer<'a> {
         Ok(body)
     }
 
-    /// The shadows the script's own calls need, its text read from `texts` when it holds it.
-    fn shadows_of(&self, script: &Path) -> Result<Vec<Shadow>, Unwritten> {
-        let source = match self.texts.get(script) {
-            Some(text) => text.clone(),
+    /// Read an editor's unsaved text when available, for both kinds of dependency.
+    fn source_of(&self, script: &Path) -> Result<String, Unwritten> {
+        match self.texts.get(script) {
+            Some(text) => Ok(text.clone()),
             None => std::fs::read_to_string(script).map_err(|err| Unwritten::Unreadable {
                 script: script.to_path_buf(),
                 why: err.to_string(),
-            })?,
-        };
-        Ok(scan(script, &source, self.texts).shadows)
+            }),
+        }
     }
 
     fn path(&self, script: &Path) -> String {
@@ -532,7 +555,14 @@ mod tests {
     fn written(script: &Path) -> (Vec<String>, Vec<Finding>) {
         let source = std::fs::read_to_string(script).unwrap();
         let mut calls = scan(script, &source, &Texts::new());
-        let defs = definitions(script, &mut calls, Paths::Absolute, &Texts::new());
+        let defs = definitions(
+            script,
+            &mut calls,
+            Paths::Absolute,
+            &Texts::new(),
+            &modules::Context::default(),
+        )
+        .unwrap();
         (
             defs.iter().map(nusage_nu::print_line).collect(),
             calls.findings,

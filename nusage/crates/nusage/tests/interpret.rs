@@ -259,3 +259,120 @@ fn a_call_gets_the_module_its_word_names() {
     std::fs::remove_dir_all(dir).unwrap();
     std::fs::remove_dir_all(package).unwrap();
 }
+
+fn number_package(version: &str) -> (PathBuf, [(&'static str, String); 2]) {
+    let package = scripts(&[
+        (
+            "greet/mod.nu",
+            "export def \"greet twice\" [n: int]: nothing -> int { $n * 2 }\n",
+        ),
+        (
+            "package.nuon",
+            "{name: greet, version: '0.1.0', module: greet, tool: {name: greeter, bin: greet, version: '1.2.0'}}\n",
+        ),
+    ]);
+    let vars = [
+        (
+            "NUS_MODULES",
+            format!("{{greet: '{}'}}", package.join("greet").display()),
+        ),
+        ("NUS_TOOLS", format!("{{greeter: '{version}'}}")),
+    ];
+    (package, vars)
+}
+
+#[test]
+fn nested_calls_get_modules_in_their_own_scope() {
+    let (package, vars) = number_package("1.2.0");
+    let dir = scripts(&[
+        ("leaf.nu", "#!/usr/bin/env nus\ngreet twice 3\n"),
+        ("middle.nu", "#!/usr/bin/env nus\n./leaf.nu\n"),
+        (
+            "caller.nu",
+            "#!/usr/bin/env nus\ndef 'greet twice' [n: int] { $n + 100 }\n[(greet twice 1) (./middle.nu) (greet twice 2)] | to nuon\n",
+        ),
+    ]);
+    let Some(direct) = nus_with(&dir, "leaf.nu", &[], None, &vars) else {
+        return;
+    };
+    assert!(direct.status.success(), "{direct:?}");
+    assert_eq!(stdout(&direct), "6");
+    let nested = nus_with(&dir, "caller.nu", &[], None, &vars).unwrap();
+    assert!(nested.status.success(), "{nested:?}");
+    assert_eq!(stdout(&nested), "[101, 6, 102]");
+    std::fs::remove_dir_all(dir).unwrap();
+    std::fs::remove_dir_all(package).unwrap();
+}
+
+#[test]
+fn nested_module_mismatches_stop_before_execution() {
+    let (package, vars) = number_package("1.3.0");
+    let dir = scripts(&[
+        ("leaf.nu", "#!/usr/bin/env nus\ngreet twice 3\n"),
+        ("middle.nu", "#!/usr/bin/env nus\n./leaf.nu\n"),
+        (
+            "caller.nu",
+            "#!/usr/bin/env nus\n'ran' | save ran.txt\n./middle.nu\n",
+        ),
+    ]);
+    let Some(output) = nus_with(&dir, "caller.nu", &[], None, &vars) else {
+        return;
+    };
+    assert!(!output.status.success(), "{output:?}");
+    let said = String::from_utf8_lossy(&output.stderr);
+    for expected in ["leaf.nu", "greeter 1.2.0", "greeter 1.3.0"] {
+        assert!(said.contains(expected), "{said}");
+    }
+    assert!(!dir.join("ran.txt").exists(), "the caller must not start");
+    std::fs::remove_dir_all(dir).unwrap();
+    std::fs::remove_dir_all(package).unwrap();
+}
+
+#[test]
+fn mutual_calls_keep_their_modules() {
+    let (package, vars) = number_package("1.2.0");
+    let header =
+        "#!/usr/bin/env nus\n#USAGE arg (int)\"<n>\"\n#USAGE output (int)\"nuon\" default=#true\n";
+    let dir = scripts(&[
+        (
+            "a.nu",
+            &format!(
+                "{header}if $usage.args.n > 0 {{ ./b.nu ($usage.args.n - 1) }} else {{ greet twice 3 }}\n"
+            ),
+        ),
+        (
+            "b.nu",
+            &format!(
+                "{header}if $usage.args.n > 0 {{ ./a.nu ($usage.args.n - 1) }} else {{ greet twice 4 }}\n"
+            ),
+        ),
+        ("caller.nu", "#!/usr/bin/env nus\n./a.nu 3\n"),
+    ]);
+    let Some(output) = nus_with(&dir, "caller.nu", &[], None, &vars) else {
+        return;
+    };
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(stdout(&output), "8");
+    std::fs::remove_dir_all(dir).unwrap();
+    std::fs::remove_dir_all(package).unwrap();
+}
+
+#[test]
+fn nested_local_commands_and_explicit_externals_do_not_import_packages() {
+    // A package of the wrong version must not stop a script that does not use it.
+    let (package, vars) = number_package("1.3.0");
+    let dir = scripts(&[
+        (
+            "leaf.nu",
+            "#!/usr/bin/env nus\ndef 'greet twice' [n: int] { $n + 1 }\nif false { ^greet twice 2 }\ngreet twice 2\n",
+        ),
+        ("caller.nu", "#!/usr/bin/env nus\n./leaf.nu\n"),
+    ]);
+    let Some(output) = nus_with(&dir, "caller.nu", &[], None, &vars) else {
+        return;
+    };
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(stdout(&output), "3");
+    std::fs::remove_dir_all(dir).unwrap();
+    std::fs::remove_dir_all(package).unwrap();
+}

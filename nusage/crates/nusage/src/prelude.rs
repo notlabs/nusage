@@ -8,10 +8,33 @@ use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use nusage_model::{Command, Param, ParamKind};
-use nusage_nu::{Item, Module};
+use nusage_nu::{Def, Item, Module};
 use nusage_spec::{Diagnostic, Texts};
 
 use crate::calls::{self, Calls, Paths};
+use crate::modules;
+
+/// The same dependencies for execution and checking, including each called script's
+/// imports inside its definition. A package failure anywhere stops preparation.
+struct Prepared {
+    modules: Vec<PathBuf>,
+    calls: Calls,
+    definitions: Vec<Def>,
+}
+
+fn prepare(script: &Path, source: &str, texts: &Texts) -> Result<Prepared, Diagnostic> {
+    let context = modules::Context::from_env().map_err(|why| Diagnostic::new(script, why))?;
+    let modules = context
+        .implicit(script, source)
+        .map_err(|why| Diagnostic::new(script, why))?;
+    let mut calls = calls::scan(script, source, texts);
+    let definitions = calls::definitions(script, &mut calls, Paths::Absolute, texts, &context)?;
+    Ok(Prepared {
+        modules,
+        calls,
+        definitions,
+    })
+}
 
 /// The line that stands in for a script's first, and what a checker reports with it.
 #[derive(Debug, Clone)]
@@ -46,15 +69,22 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
     // holds as NUON, so a harness can hold a record to the type, as the fixtures' does.
     let value = "($env.NUS_USAGE? | default \"{}\" | from nuon)";
     // The modules the script's calls get come first, as the interpreter gives them.
-    let (mut line, modules) = match crate::modules::implicit(script, source) {
-        Ok(found) => (
-            crate::modules::uses(&found)
+    let (mut line, calls, defs, modules) = match prepare(script, source, &texts) {
+        Ok(prepared) => (
+            modules::uses(&prepared.modules)
                 .into_iter()
                 .map(|line| line + "; ")
                 .collect::<String>(),
+            prepared.calls,
+            prepared.definitions,
             None,
         ),
-        Err(why) => (String::new(), Some(why)),
+        Err(why) => (
+            String::new(),
+            Calls::default(),
+            Vec::new(),
+            Some(why.to_string()),
+        ),
     };
     let header = match command_of(script, &texts) {
         Ok((command, alone)) => {
@@ -73,8 +103,6 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
             Some(err)
         }
     };
-    let mut calls = calls::scan(script, source, &texts);
-    let defs = calls::definitions(script, &mut calls, Paths::Absolute, &texts);
     let mut shadows = Vec::new();
     // Made for each check, never kept, so it can name the script where it is.
     for (shadow, def) in calls.shadows.iter().zip(&defs) {
@@ -103,18 +131,17 @@ pub fn line(script: &Path) -> Result<(String, Calls), Diagnostic> {
     }
 }
 
-/// The Nushell the interpreter defines before the script: the shadows of the scripts it
-/// calls, each running its script by its absolute path. Empty when the script calls none.
+/// The imports and definitions the interpreter places before the script, with each
+/// called script's dependencies in its own definition. Paths are absolute.
 pub fn runtime(script: &Path) -> Result<String, Diagnostic> {
     let source = read(script)?;
-    let mut calls = calls::scan(script, &source, &Texts::new());
-    let defs = calls::definitions(script, &mut calls, Paths::Absolute, &Texts::new());
-    if defs.is_empty() {
+    let prepared = prepare(script, &source, &Texts::new())?;
+    if prepared.modules.is_empty() && prepared.definitions.is_empty() {
         return Ok(String::new());
     }
     Ok(nusage_nu::print(&Module {
-        preamble: Vec::new(),
-        items: defs.into_iter().map(Item::Def).collect(),
+        preamble: modules::statements(&prepared.modules),
+        items: prepared.definitions.into_iter().map(Item::Def).collect(),
     }))
 }
 

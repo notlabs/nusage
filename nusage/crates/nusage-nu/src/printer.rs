@@ -238,6 +238,7 @@ fn param_doc(param: &Param) -> Option<String> {
 
 fn stmt_tokens(stmt: &Stmt) -> Tokens {
     match stmt {
+        Stmt::Use { path } => quote!(use $(crate::word(path)) *),
         Stmt::Alias { name, target } => quote!(alias $(name.printed()) = $(target.printed())),
         Stmt::Let { name, value } => quote!(let $(name.as_str()) = $(expr_tokens(value, true))),
         Stmt::Const { name, value } => {
