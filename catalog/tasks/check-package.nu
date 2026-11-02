@@ -19,8 +19,18 @@ let config = $consumer | path join mise.toml
     env: {
         _: {
             path: (
+                # The program itself, not a shim or command wrapper that links to another,
+                # such as mise's: a `nu` wrapper, which a project's `[wrappers.nu]` makes, is
+                # first on PATH everywhere.
                 [nus nu usage]
-                | each {|tool| which $tool | where type == external | first | get path | path dirname }
+                | each {|tool|
+                    which --all $tool
+                    | where type == external
+                    | where {|found| ($found.path | path expand | path parse | get stem) == $tool }
+                    | first
+                    | get path
+                    | path dirname
+                }
                 | uniq
             )
         }

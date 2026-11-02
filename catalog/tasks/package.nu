@@ -17,7 +17,6 @@ if $version == "" {
     }
 }
 let out = root | path join $usage.flags.out
-
 let oci = $out | path join oci
 rm --recursive --force $oci
 mkdir ($oci | path join catalog)
