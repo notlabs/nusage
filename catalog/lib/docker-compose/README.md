@@ -29,12 +29,12 @@ mise run //catalog:check docker-compose
 mise run //catalog/cobra:check
 ```
 
-The first command builds the pinned upstream Go packages; subsequent runs use Go's build
-cache. The catalog's ordinary freshness and signature checks apply. Its version probe compares
-the spec with the installed binary; the full Go export belongs to `//catalog/cobra:check`.
-The small `check.nu` runs only `version`, offline. It does not start containers or connect to a daemon. The
-`ls` declaration is based on its serializer; its live Docker behavior has not been exercised
-here. A conformance suite and wider command coverage are later work.
+The first command builds the pinned upstream Go packages; subsequent runs use Go's build cache.
+The catalog's ordinary freshness and signature checks apply. Its version probe compares the
+spec with the installed binary; the full Go export belongs to `//catalog/cobra:check`. The
+small `check.nu` runs only `version`, offline. It does not start containers or connect to a
+daemon. The `ls` declaration is based on its serializer; its live Docker behavior has not been
+exercised here. A conformance suite and wider command coverage are later work.
 
 ## Extraction boundary
 
@@ -84,8 +84,9 @@ a Go type/AST analysis can see it without exporting that type. In contrast, `ps`
 custom marshaler, `events` builds a map, and `config` branches between serializers. A generic
 reflection pass over Go structs would miss those distinctions.
 
-The reusable route is to inventory output selectors from Cobra, attach source-backed
-framing and shape information to chosen commands, and generate ordinary Usage overlays.
-Keep an explicit override path for custom marshalers, maps, templates and alternate output
-flags. JSON, JSONL and YAML should use the catalog's generic decoder support; these cases
-do not need tool-specific runtime code. The gh investigation is in [../../cobra/README.md](../../cobra/README.md).
+The reusable route is to inventory output selectors from Cobra, attach source-backed framing
+and shape information to chosen commands, and generate ordinary Usage overlays. Keep an
+explicit override path for custom marshalers, maps, templates and alternate output flags. JSON,
+JSONL and YAML should use the catalog's generic decoder support; these cases do not need
+tool-specific runtime code. The gh investigation is in
+[../../cobra/README.md](../../cobra/README.md).

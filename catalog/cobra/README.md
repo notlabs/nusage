@@ -20,18 +20,18 @@ Separate Go modules let tools keep their own dependency versions.
 ## GitHub CLI
 
 The second example is [gh](../lib/gh/README.md), at
-[v2.103.3](https://github.com/cli/cli/tree/v2.103.3), whose construction boundary differs
-from Compose's. [`root.NewCmdRoot`](https://github.com/cli/cli/blob/v2.103.3/pkg/cmd/root/root.go)
+[v2.103.3](https://github.com/cli/cli/tree/v2.103.3), whose construction boundary differs from
+Compose's. [`root.NewCmdRoot`](https://github.com/cli/cli/blob/v2.103.3/pkg/cmd/root/root.go)
 takes a factory whose configuration and telemetry interfaces come from `internal/` packages,
 which only code inside the upstream module may import; the upstream
 [docs generator](https://github.com/cli/cli/blob/v2.103.3/cmd/gen-docs/main.go) builds there,
 with an empty in-memory configuration, no extensions and no-op telemetry. So does the
 extractor, `lib/gh/spec/main.go`: `gh.nu` clones cli/cli at the tag `lib/gh/spec/pin.toml`
-names, under the user's cache directory, copies the file in as `cmd/nusage-spec/main.go`,
-adds the adapter to the checkout's module at the pinned version, and runs it. The user's
-aliases, extensions, hosts and tokens stay out, `GH_*` and `GITHUB_*` cleared in the exporter
-process; nothing impersonates the upstream module path, and the checkout is never pushed.
-The catalog entry is the same `spec.run` hook as Compose's, with the version probe.
+names, under the user's cache directory, copies the file in as `cmd/nusage-spec/main.go`, adds
+the adapter to the checkout's module at the pinned version, and runs it. The user's aliases,
+extensions, hosts and tokens stay out, `GH_*` and `GITHUB_*` cleared in the exporter process;
+nothing impersonates the upstream module path, and the checkout is never pushed. The catalog
+entry is the same `spec.run` hook as Compose's, with the version probe.
 
 Output metadata is unusually useful:
 [`AddJSONFlags`](https://github.com/cli/cli/blob/v2.103.3/pkg/cmdutil/json_flags.go) records

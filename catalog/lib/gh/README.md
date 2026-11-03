@@ -38,13 +38,13 @@ view`'s log flags.
 | `release list` | a table of releases | name, tagName, the `is*` flags, createdAt, publishedAt |
 | `release view` | a release with its assets | tagName, name, body, the `is*` flags, the times, targetCommitish, url, author, assets |
 
-Each schema follows the exporter in cli/cli, which `outputs.nuon` names per output: an
-author is `{is_bot, login}` with `id` and `name` for a user, a time is RFC 3339 and decodes
-to a datetime, a time that may be absent is null. Check-rollup timestamps stay strings
-because its check-run and commit-status records have different shapes. A field the selection does not name is
-refused, so a schema says exactly what a wrapper returns. `search`, `api` and the other
-groups wait for their outputs to be declared the same way; `json-fields.json` says which
-take `--json`.
+Each schema follows the exporter in cli/cli, which `outputs.nuon` names per output: an author
+is `{is_bot, login}` with `id` and `name` for a user, a time is RFC 3339 and decodes to a
+datetime, a time that may be absent is null. Check-rollup timestamps stay strings because its
+check-run and commit-status records have different shapes. A field the selection does not name
+is refused, so a schema says exactly what a wrapper returns. `search`, `api` and the other
+groups wait for their outputs to be declared the same way; `json-fields.json` says which take
+`--json`.
 
 ## Repository status
 

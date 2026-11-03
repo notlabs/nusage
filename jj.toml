@@ -20,6 +20,11 @@ patterns = [
 command = ["taplo", "fmt", "-"]
 patterns = ["glob:'**/*.toml'"]
 
+# As `.rumdl.toml` has it, which also names what is not formatted.
+[fix.tools.rumdl]
+command = ["rumdl", "fmt", "--silent", "--stdin-filename", "$path", "-"]
+patterns = ["glob:'**/*.md'"]
+
 # Conflicts: `jj resolve` runs Mergiraf, the structural merge tool, which
 # `mise run //mergiraf:build` builds with Nushell support into `.bin`. jj's own configuration
 # of the tool applies. What it cannot merge keeps its markers, for `jj resolve --tool :builtin`
