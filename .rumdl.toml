@@ -1,5 +1,5 @@
-# Prose takes semantic line breaks, a line per sentence or clause, within 95 columns; tables and
-# code keep their width. release-plz writes the changelog.
+# Prose packs whole sentences into lines of up to 95 columns, and a longer sentence keeps a
+# line of its own; tables and code keep their width. release-plz writes the changelog.
 [global]
 exclude = ["CHANGELOG.md"]
 
@@ -8,4 +8,4 @@ line-length = 95
 tables = false
 code-blocks = false
 reflow = true
-reflow-mode = "semantic-line-breaks"
+reflow-mode = "sentence-pack"
