@@ -1,9 +1,9 @@
-# The TypeSafe AI API, as its official SDKs send it: `typesafe-sdk` 0.7.5 on PyPI, whose wire
-# models are generated from https://api.typesafe.ai/openapi.json, and `@typesafe-ai/sdk`
-# 0.7.0 on npm. The schemas are those models, with their descriptions; the paths, methods,
-# header and authentication are what the SDKs' transports send. Image assets travel as
-# `multipart/form-data`, a JSON `request` part followed by one part per image, which the
-# SDKs build and this document describes but the wrapper does not send: it sends JSON.
+# The TypeSafe AI API, as its official SDKs send it: `typesafe-sdk` on PyPI, whose wire models
+# are generated from https://api.typesafe.ai/openapi.json, and `@typesafe-ai/sdk` on npm. The
+# schemas are those models, with their descriptions; the paths, methods, header and
+# authentication are what the SDKs' transports send. Image assets travel as
+# `multipart/form-data`, a JSON `request` part followed by one part per image, which the SDKs
+# build and this document describes but the wrapper does not send: it sends JSON.
 openapi: 3.1.0
 info:
   title: TypeSafe AI

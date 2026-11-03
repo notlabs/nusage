@@ -1,10 +1,8 @@
 #!/usr/bin/env nus
-#USAGE about "Package the catalog's tasks for a release: the directory an OCI task catalog is pushed from"
 #USAGE flag "--out <dir>" default="dist" help="Where the package goes, relative to the catalog"
 # The OCI directory holds the tasks under `catalog/`, so that a consumer's
-# `task_config.includes` names them `catalog:spec`, `catalog:generate` and `catalog:check`;
-# this task and the module they share are not tasks there. The modules themselves are
-# released as packages of their own, by `pack`.
+# `task_config.includes` names each `catalog:<task>`; this task and the module they share are
+# not tasks there. The modules themselves are released as packages of their own, by `pack`.
 use catalog.nu *
 use support.nu *
 

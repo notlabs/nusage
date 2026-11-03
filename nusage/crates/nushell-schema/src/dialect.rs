@@ -1,8 +1,7 @@
 //! The dialect's meta-schemas, and schemas of other dialects read as this one.
 //!
-//! The identifiers are names, not locations: nothing is fetched from them. A schema that
-//! declares `"$schema": DIALECT_ID` says it is written in the dialect; one that declares
-//! nothing is read as if it did, since `x-nu` means nothing in any other.
+//! The identifiers are names, not locations: nothing is fetched from them.
+//! A schema that declares `"$schema": DIALECT_ID` says it is written in the dialect; one that declares nothing is read as if it did, since `x-nu` means nothing in any other.
 
 use serde_json::{Map, Value};
 
@@ -18,11 +17,9 @@ pub const DIALECT_SCHEMA: &str = include_str!("dialect/dialect.schema.json");
 /// The vocabulary's meta-schema, as JSON text.
 pub const VOCABULARY_SCHEMA: &str = include_str!("dialect/vocab.schema.json");
 
-/// Rewrite an OpenAPI 3.0 schema object into draft 2020-12, in place, so the reader and
-/// the validator take it as the dialect: `nullable: true` becomes `null` among the types,
-/// a boolean `exclusiveMinimum` or `exclusiveMaximum` becomes the bound itself, and
-/// `example` becomes `examples`. Subschemas are rewritten too. OpenAPI 3.1 schemas are
-/// draft 2020-12 already and come through unchanged.
+/// Rewrite an OpenAPI 3.0 schema object into draft 2020-12, in place, so the reader and the validator take it as the dialect: `nullable: true` becomes `null` among the types, a boolean `exclusiveMinimum` or `exclusiveMaximum` becomes the bound itself, and `example` becomes `examples`.
+/// Subschemas are rewritten too.
+/// OpenAPI 3.1 schemas are draft 2020-12 already and come through unchanged.
 pub fn from_openapi_30(schema: &mut Value) {
     let Some(object) = schema.as_object_mut() else {
         return;
@@ -77,8 +74,7 @@ pub fn from_openapi_30(schema: &mut Value) {
     }
 }
 
-/// `null` among the schema's types: added to `type`, or as a member beside a `$ref` or a
-/// union that stands for the type.
+/// `null` among the schema's types: added to `type`, or as a member beside a `$ref` or a union that stands for the type.
 fn make_nullable(object: &mut Map<String, Value>) {
     match object.get_mut("type") {
         Some(Value::String(one)) => {

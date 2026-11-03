@@ -1,5 +1,4 @@
-//! `nus lsp` in front of the pinned `nu --lsp`: requests are sent together, then answers
-//! are read through the shutdown acknowledgment before exit, draining all complete frames.
+//! `nus lsp` in front of the pinned `nu --lsp`: requests are sent together, then answers are read through the shutdown acknowledgment before exit, draining all complete frames.
 //! Without `nu` on PATH the session is skipped, except in CI, where it fails.
 
 use std::io::{self, BufRead, BufReader, Write};
@@ -32,8 +31,8 @@ fn at(text: &str, word: &str, into: usize) -> Json {
     json!({"line": line, "character": found.find(word).unwrap() + into})
 }
 
-/// The answers to a session: each request's result by id, and the diagnostics last published
-/// for the document. `None` when there is no `nu` to run it with.
+/// The answers to a session: each request's result by id, and the diagnostics last published for the document.
+/// `None` when there is no `nu` to run it with.
 fn session(
     open: &str,
     change: Option<&str>,
@@ -42,8 +41,7 @@ fn session(
     session_with(&["lsp"], &[], open, change, requests)
 }
 
-/// [`session`], with the server started as `nus` and these arguments, in this
-/// environment.
+/// [`session`], with the server started as `nus` and these arguments, in this environment.
 fn session_with(
     server: &[&str],
     vars: &[(&str, String)],
@@ -535,8 +533,7 @@ fn anything_else_is_nu_itself() {
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "ab");
 }
 
-/// A `nu` first on PATH that runs `nus nu` again, as a wrapper of mise's would that
-/// nusage cannot tell for one: the second time round, the same process stops.
+/// A `nu` first on PATH that runs `nus nu` again, as a wrapper of mise's would that nusage cannot tell for one: the second time round, the same process stops.
 #[cfg(unix)]
 #[test]
 fn a_nu_that_leads_back_here_stops() {
@@ -608,9 +605,8 @@ fn package(name: &str) -> PathBuf {
     dir
 }
 
-/// The editor checks a script with the modules its calls get, as the interpreter runs it: a
-/// call that does not fit the module's signature is said, where without the module it is an
-/// external Nushell takes as it is. A tool of the wrong version is said on the first line.
+/// The editor checks a script with the modules its calls get, as the interpreter runs it: a call that does not fit the module's signature is said, where without the module it is an external Nushell takes as it is.
+/// A tool of the wrong version is said on the first line.
 #[test]
 fn a_call_is_checked_against_the_module_its_word_names() {
     let root = package("calls");

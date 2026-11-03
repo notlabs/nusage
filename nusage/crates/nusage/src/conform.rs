@@ -1,8 +1,5 @@
-//! Whether a generated module carries what its spec shows, as usage reads the spec: the
-//! oracle is usage's own view of a command, not the model that wrote the module, so this
-//! holds the generator to usage rather than to itself. Every command usage shows is a
-//! definition with the spec's positionals, flags and completers, named as the generator
-//! names them, with its description once.
+//! Whether a generated module carries what its spec shows, as usage reads the spec: the oracle is usage's own view of a command, not the model that wrote the module, so this holds the generator to usage rather than to itself.
+//! Every command usage shows is a definition with the spec's positionals, flags and completers, named as the generator names them, with its description once.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -14,8 +11,7 @@ use usage::{Spec, SpecArg, SpecCommand, SpecFlag};
 
 use crate::common::restates;
 
-/// The findings for `module`, the text of the module written for `assembled` as
-/// `<name>.nu` in `dir`: empty when it conforms.
+/// The findings for `module`, the text of the module written for `assembled` as `<name>.nu` in `dir`: empty when it conforms.
 pub fn conform(
     assembled: &Assembled,
     name: &str,
@@ -48,8 +44,7 @@ struct Checker<'a> {
     /// For the `nusage-args` usage does not read.
     assembled: &'a Assembled,
     binary: bool,
-    /// The scripts other scripts name as completion providers: completion calls them with
-    /// the word to complete and nothing else, so they take no flags.
+    /// The scripts other scripts name as completion providers: completion calls them with the word to complete and nothing else, so they take no flags.
     providers: Vec<Vec<String>>,
     decls: &'a BTreeMap<String, Decl>,
 }
@@ -287,9 +282,7 @@ impl Checker<'_> {
         }
     }
 
-    /// Whether the definition completes the value: for a binary, whatever usage completes
-    /// and declared choices; for a script, its choices, since a `complete` node's bare type
-    /// completes nothing there.
+    /// Whether the definition completes the value: for a binary, whatever usage completes and declared choices; for a script, its choices, since a `complete` node's bare type completes nothing there.
     fn completes(&self, cmd: &SpecCommand, arg: &SpecArg) -> bool {
         let choices = arg
             .choices

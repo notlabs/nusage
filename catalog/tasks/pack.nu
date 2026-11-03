@@ -1,16 +1,9 @@
 #!/usr/bin/env nus
-#USAGE about "Pack each entry with a version as a release archive of its own"
 #USAGE arg "[tool]" help="One entry; every entry with a version when absent"
 #USAGE flag "--out <dir>" default="dist/packages" help="Where the archives go, relative to the catalog"
-# `packages.json` beside the archives lists them, `[{name, version, tag, archive}]` with the
-# archive's path relative to the catalog, for the release job.
-# An entry's archive, `nusage-<tool>-<version>.tar.gz`, holds:
-#   package.nuon  {name, version, module, tool?: {name, bin, version}}: the package, and the
-#                 mise tool and version of the binary its spec was read from, which nus
-#                 holds the project's own version of that tool to
-#   bin/          empty, so that mise puts nothing of the package on PATH
-#   <tool>/       the module's directory, without what only its maintenance uses
-# The name gives no platform, so packslip records the archive as running anywhere.
+# An entry's archive, `nusage-<tool>-<version>.tar.gz`, and `packages.json` beside the
+# archives for the release job. The name gives no platform, so packslip records the archive as
+# running anywhere.
 use catalog.nu *
 
 let out = root | path join $usage.flags.out
@@ -28,6 +21,8 @@ let packed = $entries | each {|entry|
     }
     let spec = open --raw $files.spec | lines
     let bin = $spec | parse --regex '^bin\s+"?(?<bin>[^"\s]+)"?\s*$' | get bin.0? | default $entry.name
+    # The mise tool and version of the binary the spec was read from, which nus holds the
+    # project's own version of that tool to.
     let tool = if ($entry.tool? | default "") == "" {
         null
     } else {
@@ -41,6 +36,7 @@ let packed = $entries | each {|entry|
     }
     let staged = $out | path join $".($entry.name)"
     rm --recursive --force $staged
+    # Empty, so that mise puts nothing of the package on PATH.
     mkdir ($staged | path join bin)
     cp --recursive $files.dir ($staged | path join $entry.name)
     # What a package keeps for its maintenance stays here, as the catalog tarball leaves it.

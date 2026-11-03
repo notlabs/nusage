@@ -1,8 +1,5 @@
-//! The HTTP mapping beside a spec: `<name>.http.kdl`, as `openapi-usage` writes it, saying
-//! what the call of each command sends. The spec is a usage spec like any binary's, and
-//! usage reads it alone; the mapping is nusage's, read here, and holds what usage's grammar
-//! has no place for: the method, the path with its `{params}`, where each parameter goes on
-//! the wire, the request body, and the service's base URL and authentication.
+//! The HTTP mapping beside a spec: `<name>.http.kdl`, as `openapi-usage` writes it, saying what the call of each command sends.
+//! The spec is a usage spec like any binary's, and usage reads it alone; the mapping is nusage's, read here, and holds what usage's grammar has no place for: the method, the path with its `{params}`, where each parameter goes on the wire, the request body, and the service's base URL and authentication.
 //!
 //! ```kdl
 //! base "https://petstore.example.com/v1"
@@ -19,11 +16,9 @@
 //! }
 //! ```
 //!
-//! A `path`, `query` or `header` node names the parameter as the wire has it, and the
-//! positional (`arg=`) or flag (`flag=`) of the spec that carries it, by usage's name. A
-//! `body` names the media type, the schema file beside the mapping when the body has one,
-//! and whether the call must send one. An `auth` is `bearer`, `basic`, or `header` or
-//! `query` with the `name=` the key goes under.
+//! A `path`, `query` or `header` node names the parameter as the wire has it, and the positional (`arg=`) or flag (`flag=`) of the spec that carries it, by usage's name.
+//! A `body` names the media type, the schema file beside the mapping when the body has one, and whether the call must send one.
+//! An `auth` is `bearer`, `basic`, or `header` or `query` with the `name=` the key goes under.
 
 use std::collections::BTreeMap;
 use std::fs;

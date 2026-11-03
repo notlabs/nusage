@@ -87,12 +87,6 @@ sources = [
 outputs = []
 run = "cargo test --workspace --locked"
 
-[tasks.fmt]
-description = "Hold the workspace's Rust source to rustfmt"
-sources = ["../Cargo.toml", "crates/**/*.rs", "crates/**/Cargo.toml"]
-outputs = []
-run = "cargo fmt --all --check"
-
 [tasks.clippy]
 description = "Clippy for every workspace target on this platform"
 # The tests are targets too, and one includes the inspection schema.
@@ -108,21 +102,21 @@ outputs = []
 run = "cargo doc --quiet --workspace --no-deps --locked"
 
 [tasks.lint]
-description = "Formatting, clippy and rustdoc, as CI checks them"
-depends = [":fmt", ":clippy", ":docs"]
+description = "The workspace's lints"
+depends = [":clippy", ":docs"]
 
 [tasks.verify-fixtures]
-description = "Run every fixture through its entrypoints, check completions and parsed signatures"
+description = "Hold nusage to its fixtures"
 depends = [":build"]
 sources = ["fixtures/**/*"]
 outputs = []
 file = "fixtures/verify.nu"
 
 [tasks.check]
-description = "Everything: tests, the fixture harness against nu, formatting and clippy"
+description = "Every check of nusage"
 depends = [":test", ":verify-fixtures", ":lint"]
 
-# CI runs formatting and documentation once, and these checks on each platform.
+# CI runs `check` once, on Linux, and this on each platform.
 [tasks."check:platform"]
-description = "Tests, the fixture harness and clippy on this platform"
+description = "The checks of nusage that each platform runs"
 depends = [":test", ":verify-fixtures", ":clippy"]

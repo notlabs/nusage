@@ -1,19 +1,13 @@
-//! An overlay: a usage KDL document merged onto a spec's document before usage reads it,
-//! so a spec one does not own, such as what a binary prints for `tool usage`, can be given
-//! what it lacks: `output` declarations, a `select`, type annotations on arguments, a
-//! `nusage-decode` pipeline on an output.
+//! An overlay: a usage KDL document merged onto a spec's document before usage reads it, so a spec one does not own, such as what a binary prints for `tool usage`, can be given what it lacks: `output` declarations, a `select`, type annotations on arguments, a `nusage-decode` pipeline on an output.
 //!
-//! usage itself has no merge: a redeclared `cmd` replaces the earlier one, and a `select`
-//! naming a flag the overlay does not repeat is rejected. Merging at the node level, before
-//! usage parses, keeps the overlay in usage's grammar and lets usage validate the whole.
+//! usage itself has no merge: a redeclared `cmd` replaces the earlier one, and a `select` naming a flag the overlay does not repeat is rejected.
+//! Merging at the node level, before usage parses, keeps the overlay in usage's grammar and lets usage validate the whole.
 
 use usage::kdl::{KdlDocument, KdlDocumentFormat, KdlNode, KdlNodeFormat};
 
-/// Merge `overlay` into `base`. A node merges into the base node with the same name and
-/// the same first argument: the overlay's arguments, annotations included, replace the
-/// base's, its properties go over the base's, and its children merge recursively; a node
-/// with no counterpart is added, and an `include` always is. So an overlay that states only
-/// a type on an output keeps the output's framing and selector.
+/// Merge `overlay` into `base`.
+/// A node merges into the base node with the same name and the same first argument: the overlay's arguments, annotations included, replace the base's, its properties go over the base's, and its children merge recursively; a node with no counterpart is added, and an `include` always is.
+/// So an overlay that states only a type on an output keeps the output's framing and selector.
 pub(crate) fn merge(base: &mut KdlDocument, overlay: &KdlDocument) {
     merge_nodes(base.nodes_mut(), overlay.nodes());
 }
@@ -71,10 +65,8 @@ fn merge_nodes(base: &mut Vec<KdlNode>, overlay: &[KdlNode]) {
     }
 }
 
-/// Lay out a block the overlay opened on a node that had none, as it would be written: a
-/// space before `{`, each child on its own line indented by four, `}` on its own. The node's
-/// text is what a module carries as an attribute, and the children brought the whitespace
-/// of the overlay file with them.
+/// Lay out a block the overlay opened on a node that had none, as it would be written: a space before `{`, each child on its own line indented by four, `}` on its own.
+/// The node's text is what a module carries as an attribute, and the children brought the whitespace of the overlay file with them.
 fn open_block(node: &mut KdlNode) {
     if let Some(format) = node.format_mut() {
         format.before_children = " ".into();

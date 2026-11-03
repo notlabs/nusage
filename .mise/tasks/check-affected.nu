@@ -1,5 +1,4 @@
 #!/usr/bin/env nus
-#USAGE about "Hold mise's affected selection to the checks each kind of change needs"
 #MISE description="Hold mise's affected selection to the checks each kind of change needs"
 #MISE depends=["//nusage:build"]
 #MISE sources=["**/mise*.toml", "**/mise.lock", "Cargo.toml", "nusage/crates/*/Cargo.toml", "!target/**"]

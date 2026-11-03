@@ -1,6 +1,5 @@
-//! The petstore module, generated from the fixture's spec and HTTP mapping, against a server
-//! of the test's own: what each wrapper sends, and the typed value it returns. Nushell runs
-//! the module, so without `nu` on PATH the test is skipped, except in CI, where it fails.
+//! The petstore module, generated from the fixture's spec and HTTP mapping, against a server of the test's own: what each wrapper sends, and the typed value it returns.
+//! Nushell runs the module, so without `nu` on PATH the test is skipped, except in CI, where it fails.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
@@ -70,8 +69,7 @@ fn serve(replies: Vec<(u16, &'static str)>) -> (String, std::thread::JoinHandle<
     (url, handle)
 }
 
-/// `code` run by `nu` with the petstore module in scope, pointed at `url`; the output, or
-/// `None` without a `nu` to run it.
+/// `code` run by `nu` with the petstore module in scope, pointed at `url`; the output, or `None` without a `nu` to run it.
 fn run(url: &str, code: &str) -> Option<std::process::Output> {
     if Command::new("nu").arg("--version").output().is_err() {
         assert!(

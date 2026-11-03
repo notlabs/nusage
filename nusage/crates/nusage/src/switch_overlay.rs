@@ -1,12 +1,10 @@
-//! An overlay for a CLI whose commands share a switch that selects a framed output, such as
-//! `--json`, and whose spec declares no `output`: for every command with the switch, one
-//! framed output the switch selects.
+//! An overlay for a CLI whose commands share a switch that selects a framed output, such as `--json`, and whose spec declares no `output`: for every command with the switch, one framed output the switch selects.
 
 use usage::kdl::{KdlDocument, KdlEntry, KdlNode};
 use usage::{Spec, SpecCommand};
 
-/// The overlay as usage KDL. A command already declaring an output the switch selects is
-/// left alone; the root's output goes at the top level, a subcommand's inside its `cmd`.
+/// The overlay as usage KDL.
+/// A command already declaring an output the switch selects is left alone; the root's output goes at the top level, a subcommand's inside its `cmd`.
 pub fn switch_overlay(spec: &Spec, switch: &str, framing: &str) -> String {
     let mut doc = KdlDocument::new();
     if wants_output(&spec.cmd, &spec.outputs, switch) {
@@ -21,8 +19,7 @@ pub fn switch_overlay(spec: &Spec, switch: &str, framing: &str) -> String {
     doc.to_string()
 }
 
-/// `cmd "name" { ... }` with the output and any subcommands that want one; `None` when
-/// nothing below wants one.
+/// `cmd "name" { ... }` with the output and any subcommands that want one; `None` when nothing below wants one.
 fn command_node(name: &str, cmd: &SpecCommand, switch: &str, framing: &str) -> Option<KdlNode> {
     let mut children = Vec::new();
     if wants_output(cmd, &cmd.outputs, switch) {

@@ -1,23 +1,19 @@
 //! The usage spec of a binary whose interface is the clap command its crate builds.
 //!
-//! A binary built with clap often describes itself nowhere else: no spec ships with it and
-//! nothing prints one. When its crate is also a library that builds the command, the spec can be
-//! read there, at the binary's version, with nothing in the binary's source changed. An
-//! extractor is a binary crate outside the binary's tree that depends on that library and hands
-//! its command to [`main`]; `clap/spec.nu` pins the version, runs the extractor and writes what it
-//! prints. A crate that keeps its command private to its own `main` needs a fork that makes it
-//! public, which the extractor depends on instead.
+//! A binary built with clap often describes itself nowhere else: no spec ships with it and nothing prints one.
+//! When its crate is also a library that builds the command, the spec can be read there, at the binary's version, with nothing in the binary's source changed.
+//! An extractor is a binary crate outside the binary's tree that depends on that library and hands its command to [`main`]; `clap/spec.nu` pins the version, runs the extractor and writes what it prints.
+//! A crate that keeps its command private to its own `main` needs a fork that makes it public, which the extractor depends on instead.
 //!
-//! usage converts the command. This crate names the binary and its version, which a library's
-//! command does not carry, and holds the printed spec to usage's reading of it.
+//! usage converts the command.
+//! This crate names the binary and its version, which a library's command does not carry, and holds the printed spec to usage's reading of it.
 
 use std::process::ExitCode;
 
 /// The spec of `command` as the binary `bin` at `version`, as KDL.
 ///
-/// clap's name for a command need not be the binary's, and the version is the binary's `main`
-/// to add. The text must read back through usage as the spec it was printed from: a generator
-/// reads the file, not the command, and should see what clap said.
+/// clap's name for a command need not be the binary's, and the version is the binary's `main` to add.
+/// The text must read back through usage as the spec it was printed from: a generator reads the file, not the command, and should see what clap said.
 pub fn spec(command: clap::Command, bin: &str, version: &str) -> Result<String, String> {
     let command = command.bin_name(bin).version(version.to_owned());
     let text = usage::Spec::from(&command).to_string();
@@ -41,8 +37,7 @@ pub fn spec(command: clap::Command, bin: &str, version: &str) -> Result<String, 
     Ok(text)
 }
 
-/// An extractor's `main`: prints the spec of `command` for the binary and version its arguments
-/// name, `<bin> <version>`.
+/// An extractor's `main`: prints the spec of `command` for the binary and version its arguments name, `<bin> <version>`.
 pub fn main(command: clap::Command) -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let [bin, version] = args.as_slice() else {
@@ -67,8 +62,7 @@ mod tests {
 
     use super::spec;
 
-    /// The shapes a clap CLI is made of: a global flag, a subcommand with an alias, choices, a
-    /// count, a default and a variadic positional.
+    /// The shapes a clap CLI is made of: a global flag, a subcommand with an alias, choices, a count, a default and a variadic positional.
     fn command() -> Command {
         Command::new("example")
             .about("An example")

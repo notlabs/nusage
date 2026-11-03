@@ -5,12 +5,10 @@ use usage_rs::Cli;
 
 /// Write an OpenAPI document as a usage spec, with the HTTP mapping beside it
 ///
-/// Each operation of the document is a command of the spec: a path parameter its positional,
-/// a query or header parameter its flag, a JSON response its output with the schema. The
-/// method, the path, where each parameter goes on the wire and the request body go in
-/// `<name>.http.kdl` beside `<name>.usage.kdl`, and each schema in `schemas/`, all in the
-/// directory `--out` names. Without `--out`, the spec alone is printed. The document is
-/// JSON, or YAML where its name ends in `.yaml` or `.yml`.
+/// Each operation of the document is a command of the spec: a path parameter its positional, a query or header parameter its flag, a JSON response its output with the schema.
+/// The method, the path, where each parameter goes on the wire and the request body go in `<name>.http.kdl` beside `<name>.usage.kdl`, and each schema in `schemas/`, all in the directory `--out` names.
+/// Without `--out`, the spec alone is printed.
+/// The document is JSON, or YAML where its name ends in `.yaml` or `.yml`.
 #[derive(Cli)]
 #[usage(bin = "openapi-usage", version)]
 struct OpenapiUsage {

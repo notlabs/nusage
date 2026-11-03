@@ -1,5 +1,4 @@
-# Documents the fixture does not produce, read from the serializers: a conflicted ref's
-# target, an untracked remote ref, a TOML datetime in the configuration, and the shapes the
+# Documents the fixture does not produce, read from the serializers, and the shapes the
 # schemas must refuse.
 [
     {id: ref-conflicted, output: bookmark-list, valid: true, document: {name: topic, target: [a1, b2, c3]}}

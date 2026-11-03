@@ -12,7 +12,9 @@
     # `nusage-args`: the wrapper owns `--json`, and `--jq` and `--template`, which transform
     # the selection, are hidden in `../gh.typed.overlay.kdl`. A source names a file of cli/cli
     # at the revision: the field list, the exporter that writes each field, and the type behind
-    # it.
+    # it. A schema refuses a field the selection does not name, so it says exactly what the
+    # wrapper returns. The times in `statusCheckRollup` stay strings, since its check-run and
+    # commit-status records differ.
     outputs: [
         {
             id: pr-list
@@ -114,10 +116,9 @@
             source: ["pkg/cmd/release/shared/fetch.go:23" "pkg/cmd/release/shared/fetch.go:44" "pkg/cmd/release/shared/fetch.go:87"]
         }
     ]
-    # The cases read this repository, with the token `check-schemas.nu` requires: a merged pull
-    # request, the repository itself, its workflow runs and its releases. No issue and no run
-    # is named, since an issue may be closed away and a run's id is the moment's; those outputs
-    # are held to `examples.nuon`.
+    # The cases read this repository, with the token `check-schemas.nu` requires. No issue and
+    # no run is named, since an issue may be closed away and a run's id is the moment's; those
+    # outputs are held to `examples.nuon`.
     cases: [
         {id: pr-list, output: pr-list, argv: [pr list --repo notlabs/nusage --state all --limit 3 --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body,headRefOid,isCrossRepository,mergeable,mergeStateStatus,statusCheckRollup"], exit_codes: [0], expect: {minItems: 1}}
         {id: pr-view, output: pr-view, argv: [pr view 34 --repo notlabs/nusage --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body,headRefOid,isCrossRepository,mergeable,mergeStateStatus,statusCheckRollup"], exit_codes: [0], expect: {properties: {number: {const: 34}, state: {const: MERGED}}}}

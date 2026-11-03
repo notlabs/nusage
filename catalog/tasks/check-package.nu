@@ -1,5 +1,4 @@
 #!/usr/bin/env nus
-#USAGE about "Run the packaged catalog tasks from an unrelated project"
 use std/assert
 
 const tasks = path self | path dirname

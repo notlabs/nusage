@@ -1,4 +1,13 @@
-# The runner of a schema suite; an integration's schemas, manifest and fixtures live with it.
+# The runner of an output-schema suite; a package keeps its schemas, manifest and examples
+# beside it. A suite is a NUON manifest: `format: 1`, the `tool`, and the `baseline` the
+# schemas were written from. `outputs` bind schemas to the tool's outputs: an `id`, the
+# `command` words, the output `name`, the `select` switch or, where no switch asks for the
+# output, the list of words that do (declared as `nusage-args`), the `framing` (`json` or
+# `jsonl`), the `schema` file beside the manifest, the `source` it was written from, and
+# `attach: false` for an output checked but not declared in the overlay. `cases` run the tool:
+# an `id`, the `output`, the whole `argv`, the `exit_codes` accepted, an `expect` schema the
+# output must also satisfy, and `records` for a JSON lines count. `run-suite` holds the tool's
+# raw stdout to the schemas through `nus validate` before anything decodes it.
 export def load-suite [manifest: path] {
     let manifest = $manifest | path expand
     let suite = open $manifest

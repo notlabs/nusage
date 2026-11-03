@@ -1,19 +1,11 @@
-//! usage's argv corpus through `nus parse`: each vector's spec becomes a script's
-//! `#USAGE` header, the script is parsed with the vector's argv and environment, and the
-//! `$usage` record has to hold everything `expect.ok` binds, or the arguments have to be
-//! rejected when the vector expects an error. The corpus is usage's own, at
-//! `$NUS_CORPUS` (the `corpus/` directory of its source, which `mise.toml` installs);
-//! without it the test is skipped. The format is usage's:
-//! https://github.com/jdx/usage/blob/main/corpus/README.md
+//! usage's argv corpus through `nus parse`: each vector's spec becomes a script's `#USAGE` header, the script is parsed with the vector's argv and environment, and the `$usage` record has to hold everything `expect.ok` binds, or the arguments have to be rejected when the vector expects an error.
+//! The corpus is usage's own, at `$NUS_CORPUS` (the `corpus/` directory of its source, which `mise.toml` installs); without it the test is skipped.
+//! The format is usage's:
+//! <https://github.com/jdx/usage/blob/main/corpus/README.md>
 //!
-//! A spec with `cmd` nodes is laid out as the tree the interpreter reads: the root's nodes
-//! in `mod.nu`, each command's in `<name>.nu` or `<name>/mod.nu`, and the root script is
-//! posed the argv, which usage routes.
+//! A spec with `cmd` nodes is laid out as the tree the interpreter reads: the root's nodes in `mod.nu`, each command's in `<name>.nu` or `<name>/mod.nu`, and the root script is posed the argv, which usage routes.
 //!
-//! Not posed: vectors that choose `argv0`, since a script is called by its own name; vectors
-//! with `mounts`, whose mounted specs are given as the output of commands that do not exist,
-//! where nusage runs a mount's command; and vectors whose `cmd` nodes carry properties other
-//! than `help`, which a header has no line for.
+//! Not posed: vectors that choose `argv0`, since a script is called by its own name; vectors with `mounts`, whose mounted specs are given as the output of commands that do not exist, where nusage runs a mount's command; and vectors whose `cmd` nodes carry properties other than `help`, which a header has no line for.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -144,8 +136,7 @@ fn has_command_properties(spec: &str) -> bool {
     check(doc.nodes())
 }
 
-/// Write a command's nodes as a script's header and return the script: `mod.nu` in `dir`
-/// for a command with subcommands, each laid out below it, else `<name>.nu`.
+/// Write a command's nodes as a script's header and return the script: `mod.nu` in `dir` for a command with subcommands, each laid out below it, else `<name>.nu`.
 fn write_command(dir: &Path, nodes: &[KdlNode], root: bool) -> PathBuf {
     let (commands, own): (Vec<&KdlNode>, Vec<&KdlNode>) =
         nodes.iter().partition(|node| node.name().value() == "cmd");
@@ -182,9 +173,9 @@ fn write_command(dir: &Path, nodes: &[KdlNode], root: bool) -> PathBuf {
     script
 }
 
-/// `expect.ok` as the record flattens it. `cmd` is omitted for the root, where the record
-/// has `[]`. A clause's instances are flattened: a positional the record holds as a list
-/// collects every instance's values, any other takes the first instance's.
+/// `expect.ok` as the record flattens it.
+/// `cmd` is omitted for the root, where the record has `[]`.
+/// A clause's instances are flattened: a positional the record holds as a list collects every instance's values, any other takes the first instance's.
 fn flattened(expected: &Json, bound: &Value) -> Json {
     let mut expected = expected.clone();
     let Some(object) = expected.as_object_mut() else {
@@ -223,9 +214,8 @@ fn flattened(expected: &Json, bound: &Value) -> Json {
     expected
 }
 
-/// Whether `bound` holds everything `expected` has: every key, under the name the record
-/// gives it, with the same value, where a count's list of booleans is the record's count
-/// and the record may hold more. `Some(why)` when not.
+/// Whether `bound` holds everything `expected` has: every key, under the name the record gives it, with the same value, where a count's list of booleans is the record's count and the record may hold more.
+/// `Some(why)` when not.
 fn holds(expected: &Json, bound: &Value, at: &str) -> Option<String> {
     match expected {
         Json::Object(fields) => {

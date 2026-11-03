@@ -1,5 +1,4 @@
 #!/usr/bin/env nus
-#USAGE about "Holds the intent to its schemas and its checked claims to nusage as it is"
 # Disposable: the claims, the traits and the schemas are what last. This holds each file to
 # its schema, the names the claims use to the traits and the graph's words, and runs each
 # checked claim against today's `nus prelude`, backed by `nus inspect`; an open claim
@@ -28,8 +27,8 @@ def write-files [dir: string, files: record] {
     }
 }
 
-# Inspect validates the resolved analysis on both sides. Prelude retains the existing
-# comparison semantics, including the caller's own $usage type.
+# A script's analysis as `nus inspect` reports it, which must have no findings, with the
+# prelude `nus prelude` writes for it.
 def analysis [dir: string, script: string]: nothing -> record {
     let result = do {
         cd $dir

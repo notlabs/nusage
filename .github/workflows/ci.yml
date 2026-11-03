@@ -40,6 +40,9 @@ jobs:
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
+      # The lint asks jj which files each of `jj fix`'s formatters takes, so the checkout is a
+      # jj repository too.
+      - run: jj git init --colocate
       # mise's task results, under the runner's temporary directory, from the Actions cache
       # as main last saved them.
       - run: echo "MISE_TASK_CACHE_DIR=$RUNNER_TEMP/mise-task-cache" >> "$GITHUB_ENV"
@@ -80,12 +83,11 @@ jobs:
               echo "run=true" >> "$GITHUB_OUTPUT"
             fi
           fi
-      # Formatting, workflow lint and documentation run once on Linux. Both platforms
-      # retain Rust tests, Clippy and the runtime/consumer checks.
+      # Linux runs each project's `check`; macOS its `check:platform`, what differs by platform.
       - name: Check repository
         run: |
           if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ -n "$AFFECTED_BASE" ]; then
-            # Root formatting and selection-regression checks cover the whole repository.
+            # The root's checks hold the whole repository, whatever the change.
             if [ "$RUNNER_OS" = Linux ]; then
               mise run //:check
             fi

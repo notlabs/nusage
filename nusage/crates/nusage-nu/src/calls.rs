@@ -1,5 +1,4 @@
-//! The calls in a script that may run another script, as Nushell's parser reads them: what is
-//! an external command and what is a definition is the parser's decision, not a pattern's.
+//! The calls in a script that may run another script, as Nushell's parser reads them: what is an external command and what is a definition is the parser's decision, not a pattern's.
 
 use std::ops::Range;
 use std::path::Path;
@@ -20,17 +19,16 @@ pub struct Word {
 /// A call that may run a script.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScriptCall {
-    /// An external command: its head and the bare words right after it, up to the first word
-    /// that is not one. A head written `^x` says the external is meant and is left out.
+    /// An external command: its head and the bare words right after it, up to the first word that is not one.
+    /// A head written `^x` says the external is meant and is left out.
     External { head: Word, args: Vec<Word> },
     /// `run <path>`, with the path as written.
     Run { path: Word },
 }
 
-/// The script's calls that may run a script, in source order, nested blocks included: a
-/// definition's body, a closure, a subexpression. `file` is where the script lives, for what
-/// the parser resolves at parse time. A script that does not parse still has calls to read;
-/// its errors are Nushell's to report.
+/// The script's calls that may run a script, in source order, nested blocks included: a definition's body, a closure, a subexpression.
+/// `file` is where the script lives, for what the parser resolves at parse time.
+/// A script that does not parse still has calls to read; its errors are Nushell's to report.
 pub fn script_calls(source: &str, file: &Path) -> Vec<ScriptCall> {
     let mut engine_state = ENGINE.clone();
     let dir = file.parent().unwrap_or(Path::new(""));
@@ -82,8 +80,7 @@ pub fn script_calls(source: &str, file: &Path) -> Vec<ScriptCall> {
     calls
 }
 
-/// The expression as a word written bare, as Nushell reads a path or a name: not quoted, not
-/// interpolated, not a variable.
+/// The expression as a word written bare, as Nushell reads a path or a name: not quoted, not interpolated, not a variable.
 fn bare_word(source: &str, offset: usize, expr: &Expression) -> Option<Word> {
     if !matches!(
         expr.expr,

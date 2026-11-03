@@ -10,12 +10,9 @@ use crate::SyntaxError;
 pub(crate) static ENGINE: LazyLock<EngineState> =
     LazyLock::new(|| nu_command::add_shell_command_context(nu_cmd_lang::create_default_context()));
 
-/// Whether Nushell parses the module, as `use <name>.nu` would: the source is parsed inside
-/// `module <name> { }`, which is where Nushell also rejects a definition named after the
-/// module or a parser keyword, or a parameter named like a built-in variable. `dir` is where
-/// the module file will live, for what the parser resolves at parse time: `run`'s path, and
-/// `path self`, which is the file's own. The error names the line of generated Nushell at
-/// fault.
+/// Whether Nushell parses the module, as `use <name>.nu` would: the source is parsed inside `module <name> { }`, which is where Nushell also rejects a definition named after the module or a parser keyword, or a parameter named like a built-in variable.
+/// `dir` is where the module file will live, for what the parser resolves at parse time: `run`'s path, and `path self`, which is the file's own.
+/// The error names the line of generated Nushell at fault.
 pub fn check_module(name: &str, source: &str, dir: Option<&Path>) -> Result<(), SyntaxError> {
     with_module(name, source, dir, |_| ())
 }
@@ -48,8 +45,8 @@ pub struct DeclFlag {
     pub completer: bool,
 }
 
-/// The definitions the module declares, as Nushell parses them, after [`check_module`]'s
-/// check. Nushell's own `--help` flag is left out.
+/// The definitions the module declares, as Nushell parses them, after [`check_module`]'s check.
+/// Nushell's own `--help` flag is left out.
 pub fn signatures(name: &str, source: &str, dir: Option<&Path>) -> Result<Vec<Decl>, SyntaxError> {
     with_module(name, source, dir, |working_set| {
         (ENGINE.num_decls()..working_set.num_decls())
@@ -83,8 +80,7 @@ pub fn signatures(name: &str, source: &str, dir: Option<&Path>) -> Result<Vec<De
     })
 }
 
-/// Parse the module as [`check_module`] describes and hand the parsed state to `read`, or
-/// the first parse error, naming the line of generated Nushell at fault.
+/// Parse the module as [`check_module`] describes and hand the parsed state to `read`, or the first parse error, naming the line of generated Nushell at fault.
 fn with_module<T>(
     name: &str,
     source: &str,
@@ -128,9 +124,7 @@ fn with_module<T>(
     )))
 }
 
-/// Whether Nushell reserves the name for one of its own variables, such as `env`, `in` and
-/// `nu`, so that no parameter can be called that. nu-parser keeps the list private; it is
-/// asked through `let`.
+/// Whether Nushell reserves the name for one of its own variables, such as `env`, `in` and `nu`, so that no parameter can be called that. nu-parser keeps the list private; it is asked through `let`.
 pub fn reserved_variable(name: &str) -> bool {
     let mut working_set = StateWorkingSet::new(&ENGINE);
     let source = format!("let {name} = 1");

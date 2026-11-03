@@ -1,10 +1,7 @@
-//! The HTTP target: one `export def` per command of a service described by a spec with an
-//! HTTP mapping beside it. The commands are named as a binary's are, `<name> <command>`
-//! with `main` for the root, so `use <name>.nu *` names them as the spec does. A wrapper's
-//! body hands `nus request` what the mapping says the call sends, the path parameters,
-//! query and headers from its typed parameters and the body from its input, and decodes the
-//! response as a binary wrapper decodes an output, with the same helper and the same hold to
-//! the schema when decoding fails. The root says where the service is.
+//! The HTTP target: one `export def` per command of a service described by a spec with an HTTP mapping beside it.
+//! The commands are named as a binary's are, `<name> <command>` with `main` for the root, so `use <name>.nu *` names them as the spec does.
+//! A wrapper's body hands `nus request` what the mapping says the call sends, the path parameters, query and headers from its typed parameters and the body from its input, and decodes the response as a binary wrapper decodes an output, with the same helper and the same hold to the schema when decoding fails.
+//! The root says where the service is.
 
 use nusage_model::{Auth, Body, Command, CommandTree, Execution, Location, Request, Service};
 use nusage_nu::{CommandName, Def, Expr, Ident, Item, Module, Params, Stmt, SyntaxError, Type};
@@ -177,10 +174,7 @@ fn wrapper(tree: &CommandTree, service: &Service, command: &Command) -> Result<D
     })
 }
 
-/// What `nus request` is handed: the service and where it is, how it authenticates, the
-/// method and path, and the parameters by where they go, each as the variable that carries
-/// it; the body as `carried`, the input or the variable bound to it, with its media type,
-/// when the call sends one.
+/// What `nus request` is handed: the service and where it is, how it authenticates, the method and path, and the parameters by where they go, each as the variable that carries it; the body as `carried`, the input or the variable bound to it, with its media type, when the call sends one.
 fn request_record(
     tree: &CommandTree,
     service: &Service,

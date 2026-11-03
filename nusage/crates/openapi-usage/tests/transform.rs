@@ -1,5 +1,4 @@
-//! The petstore, as OpenAPI 3.0 has it, through the transformer: the spec usage parses, the
-//! mapping beside it, and the schemas in the dialect.
+//! The petstore, as OpenAPI 3.0 has it, through the transformer: the spec usage parses, the mapping beside it, and the schemas in the dialect.
 
 use std::path::Path;
 
