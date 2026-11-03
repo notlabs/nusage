@@ -7,15 +7,11 @@ mr-boxington = "1.27.0"
 description = "Mr Boxington finds nothing wrong with its installation and cache"
 shell = "nu -c"
 run = '''
-let report = ^mbx doctor --json | from json
-for check in ($report.checks | where severity != pass) {
-    print $"($check.severity) ($check.name): ($check.detail)"
-}
-if ($report.checks | where severity == fail | is-not-empty) {
+if (^mbx doctor --json | from json | get checks | where severity == fail | is-not-empty) {
     exit 1
 }
 '''
-hint = "`mbx doctor` says what each finding means"
+hint = "`mbx doctor` names the check that failed and what it found"
 
 # A build directory apart from the target directory is one Mr Boxington cannot read
 # build-script declarations from, so it caches nothing, and one its budget does not prune.
@@ -26,8 +22,7 @@ shell = "nu -c"
 run = '''
 let cargo = ^cargo metadata --format-version 1 --no-deps | from json
 if $cargo.build_directory != $cargo.target_directory {
-    print $"Cargo builds in ($cargo.build_directory), apart from its target directory ($cargo.target_directory)"
     exit 1
 }
 '''
-hint = "Remove `build.build-dir` from the Cargo configuration that sets it"
+hint = "Remove `build.build-dir` from the Cargo configuration that sets it; `cargo metadata` reports both directories"
