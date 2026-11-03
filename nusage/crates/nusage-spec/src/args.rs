@@ -1,7 +1,5 @@
-//! `nusage-args`: the words that ask a binary for an output, where usage's `select` cannot
-//! say them. usage reads one switch whose presence picks the output, or a flag whose value is
-//! the output's name; jj is asked for its JSON with `--no-graph --template 'json(self) ++
-//! "\n"'`, which is neither. The node is a child of the `output` and holds any words:
+//! `nusage-args`: the words that ask a binary for an output, where usage's `select` cannot say them. usage reads one switch whose presence picks the output, or a flag whose value is the output's name; jj is asked for its JSON with `--no-graph --template 'json(self) ++ "\n"'`, which is neither.
+//! The node is a child of the `output` and holds any words:
 //!
 //! ```kdl
 //! cmd "log" {
@@ -11,8 +9,7 @@
 //! }
 //! ```
 //!
-//! usage rejects a node it does not know inside an `output`, so the node is taken out of the
-//! document before usage reads it, and kept beside the spec.
+//! usage rejects a node it does not know inside an `output`, so the node is taken out of the document before usage reads it, and kept beside the spec.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -27,8 +24,7 @@ pub const NODE: &str = "nusage-args";
 /// Each command's outputs' words, by output name.
 pub type OutputArgs = BTreeMap<CommandPath, BTreeMap<String, Vec<String>>>;
 
-/// Take every `nusage-args` out of `doc`'s `output` nodes, the top level's and each `cmd`'s,
-/// and return their words by command and output.
+/// Take every `nusage-args` out of `doc`'s `output` nodes, the top level's and each `cmd`'s, and return their words by command and output.
 pub(crate) fn lift(doc: &mut KdlDocument, file: &Path) -> Result<OutputArgs, Diagnostic> {
     let mut found = OutputArgs::new();
     lift_level(doc.nodes_mut(), &CommandPath::root(), file, &mut found)?;
@@ -67,8 +63,7 @@ fn lift_level(
     Ok(())
 }
 
-/// The output's words, with the node taken out; an `output` left with no children has its
-/// block removed too, since `output "json" {}` is not what was written.
+/// The output's words, with the node taken out; an `output` left with no children has its block removed too, since `output "json" {}` is not what was written.
 fn lift_output(
     output: &mut KdlNode,
     file: &Path,
@@ -151,8 +146,7 @@ fn first_arg(node: &KdlNode) -> Option<String> {
         .and_then(|entry| entry.value().as_string().map(str::to_string))
 }
 
-/// The flag a word names, without its dashes or an `=value`: `--template=x` names
-/// `template`, `-T` names `T`; a word that is a value names none.
+/// The flag a word names, without its dashes or an `=value`: `--template=x` names `template`, `-T` names `T`; a word that is a value names none.
 pub fn flag_word(word: &str) -> Option<&str> {
     let name = word.strip_prefix('-')?;
     let name = name.strip_prefix('-').unwrap_or(name);

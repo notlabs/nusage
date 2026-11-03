@@ -1,6 +1,7 @@
-// Compose v5.6.1: cmd/compose/version.go and cmd/compose/list.go.
-// These switches take precedence over --format, so the structured wrappers omit them.
-// Use ^docker-compose for the original CLI's other output modes.
+// Each output is declared from the Compose source at the spec's version. A switch that takes
+// precedence over --format is hidden; ^docker-compose keeps the CLI's other output modes.
+
+// cmd/compose/version.go writes a literal JSON object.
 cmd "version" {
     flag "--short" hide=#true
     output "pretty" default=#true
@@ -15,6 +16,8 @@ cmd "version" {
 """#
     }
 }
+// cmd/compose/list.go builds the rows its formatter writes as one array. Read from the
+// serializer; not yet run against a Docker daemon.
 cmd "ls" {
     flag "-q --quiet" hide=#true
     output "table" default=#true

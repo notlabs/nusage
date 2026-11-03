@@ -1,8 +1,5 @@
-//! A command's logic, apart from how the plugin receives it. The logic runs on its
-//! evaluated arguments, a context that answers for the caller's environment, and the input,
-//! and knows nothing of where it was called from; [`Adapter`] registers it in a plugin as a
-//! plugin command, handing it the protocol's [`Args`] and the engine interface as its
-//! [`Context`].
+//! A command's logic, apart from how the plugin receives it.
+//! The logic runs on its evaluated arguments, a context that answers for the caller's environment, and the input, and knows nothing of where it was called from; [`Adapter`] registers it in a plugin as a plugin command, handing it the protocol's [`Args`] and the engine interface as its [`Context`].
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -85,8 +82,7 @@ impl Args {
     }
 }
 
-/// What a command asks of where it was called from: the caller's environment and working
-/// directory, which a plugin reads over the protocol.
+/// What a command asks of where it was called from: the caller's environment and working directory, which a plugin reads over the protocol.
 pub trait Context {
     /// The environment variable, as text, when set.
     fn env(&self, name: &str) -> Result<Option<String>, LabeledError>;
@@ -113,8 +109,7 @@ impl Context for EngineInterface {
     }
 }
 
-/// A command's logic, with what the spec declares of it, cloned into its registration and
-/// shared between calls.
+/// A command's logic, with what the spec declares of it, cloned into its registration and shared between calls.
 pub trait Run: Clone + Send + Sync + 'static {
     fn declared(&self) -> &Declared;
     fn run(
@@ -125,8 +120,7 @@ pub trait Run: Clone + Send + Sync + 'static {
     ) -> Result<PipelineData, LabeledError>;
 }
 
-/// The command as a plugin's: the plugin protocol delivers the arguments evaluated, and the
-/// engine interface is the context.
+/// The command as a plugin's: the plugin protocol delivers the arguments evaluated, and the engine interface is the context.
 pub struct Adapter<P, R> {
     run: R,
     plugin: PhantomData<fn() -> P>,

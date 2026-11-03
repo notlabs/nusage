@@ -1,5 +1,4 @@
-//! `nus model` prints what a target is handed, as NUON a script reads back: the stage
-//! between the assembled spec and the module.
+//! `nus model` prints what a target is handed, as NUON a script reads back: the stage between the assembled spec and the module.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;

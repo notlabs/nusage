@@ -1,18 +1,10 @@
-//! The modules a project makes available to its scripts, which a script gets by calling
-//! them rather than importing them. `NUS_MODULES` is a NUON record from a command's first
-//! word to the absolute directory of the module exporting it; `NUS_TOOLS`, from each tool
-//! the project has to the version it resolves to. nusage's mise fragment,
-//! `nusage/conf.d/nus.toml`, writes both from the project's own installs.
+//! The modules a project makes available to its scripts, which a script gets by calling them rather than importing them.
+//! `NUS_MODULES` is a NUON record from a command's first word to the absolute directory of the module exporting it; `NUS_TOOLS`, from each tool the project has to the version it resolves to. nusage's mise fragment, `nusage/conf.d/nus.toml`, writes both from the project's own installs.
 //!
-//! A call Nushell cannot resolve, `jj log ...` where nothing defines `jj`, whose first word
-//! `NUS_MODULES` names, is the module's: the interpreter puts `use <module> *` before the
-//! script, by the module's absolute path, so nothing is searched, and the line the editor
-//! checks opens with the same. `^jj` is still the binary.
+//! A call Nushell cannot resolve, `jj log ...` where nothing defines `jj`, whose first word `NUS_MODULES` names, is the module's: the interpreter puts `use <module> *` before the script, by the module's absolute path, so nothing is searched, and the line the editor checks opens with the same.
+//! `^jj` is still the binary.
 //!
-//! A package records in `package.nuon`, beside its module, the tool and version its wrappers
-//! were generated from, and its wrappers run that tool's binary from PATH: a project whose
-//! own version of the tool differs cannot have the module, since its types describe another
-//! binary.
+//! A package records in `package.nuon`, beside its module, the tool and version its wrappers were generated from, and its wrappers run that tool's binary from PATH: a project whose own version of the tool differs cannot have the module, since its types describe another binary.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -24,9 +16,8 @@ pub const MODULES: &str = "NUS_MODULES";
 /// The variable naming the project's tools' versions.
 pub const TOOLS: &str = "NUS_TOOLS";
 
-/// The project's packages and tools, read once for the preparation of a script and all
-/// its calls. Passed explicitly to the definition writer: exported modules must not pick
-/// up paths from the machine generating them.
+/// The project's packages and tools, read once for the preparation of a script and all its calls.
+/// Passed explicitly to the definition writer: exported modules must not pick up paths from the machine generating them.
 #[derive(Debug, Default)]
 pub struct Context {
     modules: BTreeMap<String, String>,
@@ -53,9 +44,7 @@ impl Context {
     }
 }
 
-/// Every module `NUS_MODULES` names, for an interactive session, which has no calls to read
-/// beforehand; and why any is left out: a tool at another version than its package was
-/// generated from, or a variable that does not read.
+/// Every module `NUS_MODULES` names, for an interactive session, which has no calls to read beforehand; and why any is left out: a tool at another version than its package was generated from, or a variable that does not read.
 pub fn every() -> (Vec<PathBuf>, Vec<String>) {
     let modules = match record(MODULES) {
         Ok(Some(modules)) => modules,
@@ -86,8 +75,7 @@ pub fn uses(modules: &[PathBuf]) -> Vec<String> {
     lines("use", modules)
 }
 
-/// The lines of a module that exports the modules' commands, for `overlay use`: `export use
-/// <module> *`, by absolute path.
+/// The lines of a module that exports the modules' commands, for `overlay use`: `export use <module> *`, by absolute path.
 pub fn exports(modules: &[PathBuf]) -> Vec<String> {
     lines("export use", modules)
 }
@@ -133,9 +121,8 @@ fn select(
     Ok(found)
 }
 
-/// Whether the project's own version of the tool the module's package wraps is the version
-/// the package was generated from. A module with no package record, or a package that pins
-/// no tool, has nothing to hold.
+/// Whether the project's own version of the tool the module's package wraps is the version the package was generated from.
+/// A module with no package record, or a package that pins no tool, has nothing to hold.
 fn check(word: &str, dir: &Path, tools: Option<&BTreeMap<String, String>>) -> Result<(), String> {
     let Some(file) = dir
         .parent()

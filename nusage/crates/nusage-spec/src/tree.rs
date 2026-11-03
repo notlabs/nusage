@@ -40,8 +40,7 @@ impl fmt::Display for CommandPath {
     }
 }
 
-/// A `choices run="./x.nu"` that names a script in the tree: that script's command supplies
-/// the completions for the parameter.
+/// A `choices run="./x.nu"` that names a script in the tree: that script's command supplies the completions for the parameter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Provider {
     /// The command whose parameter is completed.
@@ -63,8 +62,7 @@ pub enum Source {
     Binary,
 }
 
-/// A script, a tree of scripts, or a spec file, as one usage spec plus what the spec cannot
-/// hold.
+/// A script, a tree of scripts, or a spec file, as one usage spec plus what the spec cannot hold.
 #[derive(Debug, Clone)]
 pub struct Assembled {
     /// The whole command tree. A valid usage spec, so every usage tool can read it.
@@ -74,8 +72,7 @@ pub struct Assembled {
     pub headers: BTreeMap<CommandPath, Header>,
     /// Completion providers resolved to commands in the tree.
     pub providers: Vec<Provider>,
-    /// The words that ask for an output where usage's `select` cannot say them: each
-    /// `nusage-args`, by the command whose `output` declared it.
+    /// The words that ask for an output where usage's `select` cannot say them: each `nusage-args`, by the command whose `output` declared it.
     pub output_args: OutputArgs,
     /// The HTTP mapping, when the spec describes a service: what each command's call sends.
     pub http: Option<crate::http::Http>,
@@ -90,9 +87,7 @@ impl Assembled {
         }
     }
 
-    /// The words that ask the command at `path` for its output `name`: the `nusage-args` of
-    /// the nearest command declaring them, the command's own or an ancestor's, as an output
-    /// a command declares is every command's under it.
+    /// The words that ask the command at `path` for its output `name`: the `nusage-args` of the nearest command declaring them, the command's own or an ancestor's, as an output a command declares is every command's under it.
     pub fn output_args(&self, path: &CommandPath, name: &str) -> Option<&[String]> {
         let mut words = path.words().to_vec();
         loop {
@@ -108,24 +103,19 @@ impl Assembled {
     }
 }
 
-/// Assemble a single script, a directory whose `mod.nu` is the root and whose files and
-/// subdirectories (each with its own `mod.nu`) are its subcommands, or a `.kdl` spec file
-/// describing a binary.
+/// Assemble a single script, a directory whose `mod.nu` is the root and whose files and subdirectories (each with its own `mod.nu`) are its subcommands, or a `.kdl` spec file describing a binary.
 pub fn assemble(source: &Path) -> Result<Assembled, Diagnostic> {
     assemble_with(source, &[])
 }
 
-/// [`assemble`], with overlays merged onto a spec file before usage reads it: each is a usage
-/// KDL document whose nodes are added to the spec's, a `cmd` merging into the command of the
-/// same name and any other node replacing the one with the same name and first argument.
+/// [`assemble`], with overlays merged onto a spec file before usage reads it: each is a usage KDL document whose nodes are added to the spec's, a `cmd` merging into the command of the same name and any other node replacing the one with the same name and first argument.
 /// Scripts take no overlay; their headers are their own.
 pub fn assemble_with(source: &Path, overlays: &[PathBuf]) -> Result<Assembled, Diagnostic> {
     assemble_from(source, overlays, &Texts::new())
 }
 
-/// [`assemble_with`], for a spec file that describes a service rather than a binary: the
-/// HTTP mapping at `http`, `<name>.http.kdl` as `openapi-usage` writes it beside the spec,
-/// says what each command's call sends. See [`crate::http`].
+/// [`assemble_with`], for a spec file that describes a service rather than a binary: the HTTP mapping at `http`, `<name>.http.kdl` as `openapi-usage` writes it beside the spec, says what each command's call sends.
+/// See [`crate::http`].
 pub fn assemble_http(
     source: &Path,
     overlays: &[PathBuf],
@@ -142,8 +132,7 @@ pub fn assemble_http(
     Ok(assembled)
 }
 
-/// [`assemble`] for a script or a tree, reading each script from the text `texts` holds for
-/// it when it holds one: as an editor has the scripts, saved or not.
+/// [`assemble`] for a script or a tree, reading each script from the text `texts` holds for it when it holds one: as an editor has the scripts, saved or not.
 pub fn assemble_in(source: &Path, texts: &Texts) -> Result<Assembled, Diagnostic> {
     assemble_from(source, &[], texts)
 }
@@ -237,9 +226,8 @@ fn assemble_single(path: &Path, texts: &Texts) -> Result<Assembled, Diagnostic> 
     Ok(out)
 }
 
-/// [`assemble`] for a spec given as KDL text rather than a file: `name` stands for the file,
-/// `<name>.usage.kdl`, in diagnostics and as the spec's name when the text declares none. For
-/// a spec a program carries in itself, as a plugin carries the spec of the CLI it stands for.
+/// [`assemble`] for a spec given as KDL text rather than a file: `name` stands for the file, `<name>.usage.kdl`, in diagnostics and as the spec's name when the text declares none.
+/// For a spec a program carries in itself, as a plugin carries the spec of the CLI it stands for.
 pub fn assemble_text(name: &str, kdl: &str) -> Result<Assembled, Diagnostic> {
     assemble_spec_text(
         Path::new(&format!("{name}.usage.kdl")),
@@ -248,8 +236,7 @@ pub fn assemble_text(name: &str, kdl: &str) -> Result<Assembled, Diagnostic> {
     )
 }
 
-/// A spec file: the root's declaration is its top-level nodes, each `cmd` node is a command
-/// whose declaration is its children.
+/// A spec file: the root's declaration is its top-level nodes, each `cmd` node is a command whose declaration is its children.
 fn assemble_spec_file(path: &Path, overlays: &[PathBuf]) -> Result<Assembled, Diagnostic> {
     let text = fs::read_to_string(path)
         .map_err(|err| Diagnostic::new(path, format!("cannot read: {err}")))?;
@@ -342,8 +329,7 @@ fn assemble_spec_text(
     })
 }
 
-/// Commands usage added that the source does not declare, from an `include`, get an empty
-/// declaration: usage's own help, no annotations and no attributes.
+/// Commands usage added that the source does not declare, from an `include`, get an empty declaration: usage's own help, no annotations and no attributes.
 fn fill_headers(
     cmd: &SpecCommand,
     path: &CommandPath,
@@ -416,8 +402,8 @@ fn group_header(dir: &Path, texts: &Texts) -> Result<crate::ScriptHeader, Diagno
     read_header_in(&mod_nu, texts)
 }
 
-/// The subcommands under `dir`, in name order: `x.nu` is the command `x`, a subdirectory with
-/// a `mod.nu` is a group. Other entries are ignored.
+/// The subcommands under `dir`, in name order: `x.nu` is the command `x`, a subdirectory with a `mod.nu` is a group.
+/// Other entries are ignored.
 fn children(
     dir: &Path,
     parent: &CommandPath,
@@ -477,10 +463,8 @@ fn insert_nested(
     }
 }
 
-/// The commands a script's spec declares below its own, in its header, by `include` or by
-/// `mount`, are the script's: it runs them, as usage runs a script for each of its commands,
-/// and reads which in `$usage.cmd`. A command keeps the script it has; one with none takes
-/// its parent's.
+/// The commands a script's spec declares below its own, in its header, by `include` or by `mount`, are the script's: it runs them, as usage runs a script for each of its commands, and reads which in `$usage.cmd`.
+/// A command keeps the script it has; one with none takes its parent's.
 fn inherit_bodies(
     cmd: &SpecCommand,
     path: &CommandPath,
@@ -496,9 +480,7 @@ fn inherit_bodies(
     }
 }
 
-/// usage's `mount`: each one's `run`, run as usage runs it, by the shell in the current
-/// directory, prints a spec whose commands join the command the mount is on, by usage's own
-/// resolution; the mounted specs' own mounts run in turn, each command once.
+/// usage's `mount`: each one's `run`, run as usage runs it, by the shell in the current directory, prints a spec whose commands join the command the mount is on, by usage's own resolution; the mounted specs' own mounts run in turn, each command once.
 fn resolve_mounts(spec: &mut usage::Spec, file: &Path) -> Result<(), Diagnostic> {
     let mut outputs = HashMap::new();
     let mut pending = mounts_in(&spec.cmd);
@@ -672,9 +654,7 @@ mod tests {
         assert_eq!(cmd.outputs[0].framing, usage::Framing::Text);
     }
 
-    /// The commands a script's spec declares below its own, inline or by `mount`, are the
-    /// script's to run: the mount's command runs, its spec joins, and each command has the
-    /// script as its body; an inline command's declaration keeps its node types.
+    /// The commands a script's spec declares below its own, inline or by `mount`, are the script's to run: the mount's command runs, its spec joins, and each command has the script as its body; an inline command's declaration keeps its node types.
     #[cfg(unix)]
     #[test]
     fn a_scripts_own_and_mounted_commands_are_its_to_run() {

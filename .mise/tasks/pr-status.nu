@@ -1,9 +1,8 @@
 #!/usr/bin/env nus
-#USAGE about "Report open PRs, stack dependencies and current-head checks"
 #USAGE flag "--repo <repo>" default="notlabs/nusage"
 #USAGE flag "--limit <limit>" default="100" { arg (int)"<limit>" }
 #USAGE flag "--json" help="Print JSON for another process instead of a Nushell table"
-#MISE description="Report open PRs, stack dependencies and current-head checks"
+#MISE description="Report where each open pull request stands"
 #MISE depends=["//nusage:build"]
 #MISE tools={gh="2.103.3"}
 #MISE cache={enabled=false}

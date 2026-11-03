@@ -1,15 +1,9 @@
-//! The interpreter entrypoint: `nus <script> [args...]`, what a `#!/usr/bin/env nus`
-//! line runs when anything outside Nushell executes the script.
+//! The interpreter entrypoint: `nus <script> [args...]`, what a `#!/usr/bin/env nus` line runs when anything outside Nushell executes the script.
 //!
-//! usage's own parser reads the arguments against the script's header, so help, errors,
-//! defaults and `negate` are usage's. The `$usage` record is built from the parse, and the
-//! script runs in the `nu` on PATH, as Nushell runs any script: what nusage hands it is the
-//! definitions of the scripts it calls ([`crate::calls`]), from a file of their own, then
-//! `let usage = ...; $in | run <script>`. A script inside a tree (a `mod.nu` beside it) is
-//! parsed as that tree's command, with its siblings as providers and its ancestors'
-//! globals; a script on its own is its own root. The interpreter becomes that `nu`, so the
-//! script's value is shown as Nushell shows it, an error reported as Nushell reports it, and
-//! the exit code the script's.
+//! usage's own parser reads the arguments against the script's header, so help, errors, defaults and `negate` are usage's.
+//! The `$usage` record is built from the parse, and the script runs in the `nu` on PATH, as Nushell runs any script: what nusage hands it is the definitions of the scripts it calls ([`crate::calls`]), from a file of their own, then `let usage = ...; $in | run <script>`.
+//! A script inside a tree (a `mod.nu` beside it) is parsed as that tree's command, with its siblings as providers and its ancestors' globals; a script on its own is its own root.
+//! The interpreter becomes that `nu`, so the script's value is shown as Nushell shows it, an error reported as Nushell reports it, and the exit code the script's.
 
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -30,10 +24,8 @@ pub enum Parsed {
     Rejected(String),
 }
 
-/// Parse the arguments against the script's header, as usage does, into the record a shim
-/// would build. In a tree, the arguments may select a subcommand of the script's command,
-/// as usage routes them, by name, alias or `default_subcommand`: the record is then that
-/// command's, and [`interpret`] runs its script.
+/// Parse the arguments against the script's header, as usage does, into the record a shim would build.
+/// In a tree, the arguments may select a subcommand of the script's command, as usage routes them, by name, alias or `default_subcommand`: the record is then that command's, and [`interpret`] runs its script.
 pub fn parse(script: &Path, args: &[String]) -> Result<Parsed, Diagnostic> {
     Ok(route(script, args)?.0)
 }
@@ -87,8 +79,7 @@ pub fn route(script: &Path, args: &[String]) -> Result<(Parsed, PathBuf), Diagno
     Ok((Parsed::Record(record), run))
 }
 
-/// Run the script with the arguments; the exit code is the script's, or 0 after printing
-/// help, or 2 when usage rejects the arguments.
+/// Run the script with the arguments; the exit code is the script's, or 0 after printing help, or 2 when usage rejects the arguments.
 pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
     let (parsed, run) = route(script, args)?;
     let record = match parsed {
@@ -120,11 +111,8 @@ pub fn interpret(script: &Path, args: &[String]) -> Result<i32, Diagnostic> {
     })
 }
 
-/// What the interpreter hands `nu` for the script at `script` with `record` as its
-/// `$usage`: the modules its calls get ([`crate::modules`]), the definitions of the scripts
-/// it calls, `source`d from a file named by its contents, then the record and the script
-/// `run` with the input. The definitions are written once for each of their contents, so a
-/// command line holds no more than the record and two paths.
+/// What the interpreter hands `nu` for the script at `script` with `record` as its `$usage`: the modules its calls get ([`crate::modules`]), the definitions of the scripts it calls, `source`d from a file named by its contents, then the record and the script `run` with the input.
+/// The definitions are written once for each of their contents, so a command line holds no more than the record and two paths.
 pub fn program(script: &Path, record: &Value) -> Result<String, Diagnostic> {
     let mut code = String::new();
     let definitions = crate::prelude::runtime(script)?;
@@ -145,8 +133,7 @@ pub fn program(script: &Path, record: &Value) -> Result<String, Diagnostic> {
     Ok(code)
 }
 
-/// `text` in the user's cache, in a file named by what it holds: written when no file holds
-/// it yet, beside it first and then moved, so a run reading it never sees half of it.
+/// `text` in the user's cache, in a file named by what it holds: written when no file holds it yet, beside it first and then moved, so a run reading it never sees half of it.
 fn written(text: &str) -> std::io::Result<PathBuf> {
     let dir = crate::common::cache_dir()
         .join("nusage")

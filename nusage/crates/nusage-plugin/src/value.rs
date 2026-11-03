@@ -1,11 +1,9 @@
-//! Values across the boundary: a JSON document as the value a command returns, and a value
-//! as the JSON document a schema is held to. JSON is what the CLI reads and writes, so a
-//! plugin that answers as the CLI does meets it here.
+//! Values across the boundary: a JSON document as the value a command returns, and a value as the JSON document a schema is held to.
+//! JSON is what the CLI reads and writes, so a plugin that answers as the CLI does meets it here.
 
 use nu_protocol::{LabeledError, Record, Span, Value};
 
-/// A JSON document as a value: an object a record with the document's key order, an array
-/// a list, a number an int when it is one.
+/// A JSON document as a value: an object a record with the document's key order, an array a list, a number an int when it is one.
 pub fn from_json(json: serde_json::Value, span: Span) -> Value {
     match json {
         serde_json::Value::Null => Value::nothing(span),
@@ -32,9 +30,8 @@ pub fn from_json(json: serde_json::Value, span: Span) -> Value {
     }
 }
 
-/// A value as a JSON document, as `to json` writes it: a date in RFC 3339, a filesize its
-/// bytes, a duration its nanoseconds. A value JSON has no form for is an error at the
-/// value.
+/// A value as a JSON document, as `to json` writes it: a date in RFC 3339, a filesize its bytes, a duration its nanoseconds.
+/// A value JSON has no form for is an error at the value.
 pub fn to_json(value: &Value) -> Result<serde_json::Value, LabeledError> {
     Ok(match value {
         Value::Nothing { .. } => serde_json::Value::Null,
@@ -67,8 +64,7 @@ pub fn to_json(value: &Value) -> Result<serde_json::Value, LabeledError> {
     })
 }
 
-/// A JSON document in one spelling for one value: object keys sorted, so that two documents
-/// that say the same thing are the same text, as a key or a hash wants.
+/// A JSON document in one spelling for one value: object keys sorted, so that two documents that say the same thing are the same text, as a key or a hash wants.
 pub fn canonical(json: &serde_json::Value) -> String {
     fn sorted(json: &serde_json::Value) -> serde_json::Value {
         match json {

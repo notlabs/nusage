@@ -1,6 +1,4 @@
-//! The line `nus prelude` writes stands in for a script's first where Nushell checks it,
-//! as an editor would have it: with it, Nushell's own parser knows `$usage` and checks each
-//! call of another script against that script's header.
+//! The line `nus prelude` writes stands in for a script's first where Nushell checks it, as an editor would have it: with it, Nushell's own parser knows `$usage` and checks each call of another script against that script's header.
 
 use std::path::{Path, PathBuf};
 
@@ -11,8 +9,7 @@ fn caller() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/script-calls/script.nu")
 }
 
-/// The script with the prelude in place of its first line, as Nushell's parser reads it:
-/// what it rejects, in the order it says so.
+/// The script with the prelude in place of its first line, as Nushell's parser reads it: what it rejects, in the order it says so.
 fn parse_errors(script: &Path, source: &str) -> Vec<String> {
     let (line, _) = nusage::prelude(script).expect("a prelude");
     assert!(!line.contains('\n'), "one line: {line}");

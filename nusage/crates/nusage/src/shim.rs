@@ -1,8 +1,5 @@
-//! The shim target: one `export def` per command whose body builds `$usage` and `run`s the
-//! script, after defining the shadows of the scripts that script calls ([`crate::calls`]):
-//! inside the body, since a call's path is its script's, and `run` reads a script's calls
-//! where it first parses it. The module stands on its own in any Nushell: a called script
-//! runs in the caller's, as the one the module wraps does.
+//! The shim target: one `export def` per command whose body builds `$usage` and `run`s the script, after defining the shadows of the scripts that script calls ([`crate::calls`]): inside the body, since a call's path is its script's, and `run` reads a script's calls where it first parses it.
+//! The module stands on its own in any Nushell: a called script runs in the caller's, as the one the module wraps does.
 
 use std::path::Path;
 

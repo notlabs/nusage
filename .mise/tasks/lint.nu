@@ -1,34 +1,46 @@
 #!/usr/bin/env nus
-#USAGE about "The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
-#MISE description="The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
+#MISE description="Hold the tree to what `jj fix` writes for it and to what its linters accept"
 #MISE depends=["//nusage:build"]
 #MISE output="interleave"
-#MISE sources=[".github/**/*", "**/*.nu", "**/*.toml", "!target/**", "!.jj/**"]
-#MISE outputs=[]
-# Unlabelled lines: GitHub reads an annotation only at the start of a line.
-# The formatters' own checks name a file and no more; a lint has to say what is wrong where,
-# so each file is formatted again and the difference printed, and in GitHub Actions each
-# hunk is an annotation on its lines, which the pull request shows inline, through the
-# module every task shares.
 use ../lib/actions.nu *
 
-# Whether a file is what its formatter writes for it; the difference printed when not.
-def formatted [file: string, formatter: string, format: closure] {
-    # A formatter reading standard input ends without the newline it writes to a file.
-    let content = open --raw $file | str trim --right --char (char nl)
-    let wanted = $content | do $format | str trim --right --char (char nl)
-    if $wanted == $content {
-        return true
+# A Git diff as each file's path and its own part of the diff.
+def files-of []: string -> table<path: string, diff: string> {
+    $in
+    | split row --regex '(?m)^diff --git '
+    | where $it != ""
+    | each {|part|
+        {
+            path: ($part | parse --regex '(?m)^\+\+\+ b/(?<path>.+)$' | get path.0)
+            diff: ($"diff --git ($part)" | str trim --right --char (char nl))
+        }
     }
-    let diff = $wanted + (char nl)
-    | ^diff --unified --label $file --label $"($file) as ($formatter) wants" $file -
-    | complete
-    print --no-newline $diff.stdout
-    annotate-diff $file $"($formatter): not formatted, `jj fix` writes it" $diff.stdout
-    false
 }
 
 mut failed = []
+
+# `jj fix` formats every file of the working copy with the formatters `jj.toml` gives it, and
+# the working copy keeps what it writes: what that changes was not formatted, and a formatter
+# that fails names the file it could not read.
+group-start formatting
+let before = ^jj log --no-pager --no-graph --revisions @ --template commit_id
+let fixed = ^jj fix --no-pager --quiet --include-unchanged-files --source @ | complete
+print --no-newline $fixed.stderr
+let refused = $fixed.stderr
+| parse --regex 'Fix tool `(?<tool>[^`]+)` exited with non-zero exit code for `(?<file>[^`]+)`'
+for file in $refused {
+    annotate error $"($file.tool) could not format it" --file $file.file
+    $failed = $failed | append $"($file.tool): ($file.file)"
+}
+if $fixed.exit_code != 0 {
+    $failed = $failed | append "jj fix"
+}
+for file in (^jj diff --no-pager --git --from $before --to @ | files-of) {
+    print $file.diff
+    annotate-diff $file.path "not formatted: `jj fix` writes this" $file.diff
+    $failed = $failed | append $"formatting: ($file.path)"
+}
+group-end
 
 group-start jactionlint
 let workflows = if (in-actions) {
@@ -42,23 +54,52 @@ if $workflows.exit_code != 0 {
 }
 group-end
 
-group-start nufmt
-for file in (
-    ^git ls-files "*.nu"
-    | lines
-    | where $it !~ "/expected/" and $it !~ '^catalog/lib/[^/]+/mod\.nu$'
-) {
-    if not (formatted $file nufmt { ^nufmt --stdin }) {
-        $failed = $failed | append $"nufmt: ($file)"
+# What formatting cannot fix in the Markdown, named where it is.
+group-start rumdl
+let markdown = ^rumdl check . --output-format json | complete
+
+let findings = try {
+    $markdown.stdout | from json
+} catch {
+    null
+}
+if $findings == null {
+    print --no-newline $markdown.stderr
+    $failed = $failed | append "rumdl"
+} else {
+    for finding in ($findings | where {|it| not ($it.fixable? | default false) }) {
+        print $"($finding.file):($finding.line):($finding.column): ($finding.rule) ($finding.message)"
+        annotate error $"rumdl ($finding.rule): ($finding.message)" --file $finding.file --line $finding.line
+        $failed = $failed | append $"rumdl: ($finding.file):($finding.line)"
     }
 }
 group-end
 
+# What formatting cannot settle in the YAML.
+group-start ryl
+let yaml = if (in-actions) {
+    ^ryl check --output-format github . | complete
+} else {
+    ^ryl check . | complete
+}
+print --no-newline $yaml.stdout $yaml.stderr
+if $yaml.exit_code != 0 {
+    $failed = $failed | append "ryl"
+}
+group-end
+
+# Each TOML file against the schema `.taplo.toml` gives it.
 group-start taplo
-for file in (^git ls-files "*.toml" | lines) {
-    if not (formatted $file taplo { ^taplo fmt - }) {
-        $failed = $failed | append $"taplo: ($file)"
-    }
+let toml = with-env {RUST_LOG: warn} { ^taplo check | complete }
+print --no-newline $toml.stderr
+for file in (
+    $toml.stderr
+    | parse --regex 'invalid file error=(?<why>.+?) path="(?<path>[^"]+)"'
+) {
+    annotate error $"taplo: ($file.why)" --file ($file.path | path relative-to (pwd))
+}
+if $toml.exit_code != 0 {
+    $failed = $failed | append "taplo"
 }
 group-end
 

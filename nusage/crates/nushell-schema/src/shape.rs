@@ -1,6 +1,5 @@
-//! A schema read as a Nushell type, with what JSON cannot carry: the fields to fill and the
-//! conversions to run after decoding. The crate's documentation says how a schema maps to a
-//! type.
+//! A schema read as a Nushell type, with what JSON cannot carry: the fields to fill and the conversions to run after decoding.
+//! The crate's documentation says how a schema maps to a type.
 
 use serde::Serialize;
 use serde_json::Value as Json;
@@ -16,42 +15,34 @@ impl NuType {
     }
 }
 
-/// A property the schema does not require, filled with `null` where its record leaves it
-/// out.
+/// A property the schema does not require, filled with `null` where its record leaves it out.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Fill {
     /// The cell path of the field.
     pub path: Vec<String>,
-    /// Where on the way to the record `null` may stand instead, as the lengths of the
-    /// prefixes of `path` that may be `null`, shortest first. A `null` is left as it is,
-    /// with no field under it to fill.
+    /// Where on the way to the record `null` may stand instead, as the lengths of the prefixes of `path` that may be `null`, shortest first.
+    /// A `null` is left as it is, with no field under it to fill.
     pub nullable: Vec<usize>,
 }
 
-/// A value JSON delivers as text or a number, converted to the declared type at a cell path
-/// (empty for the whole value).
+/// A value JSON delivers as text or a number, converted to the declared type at a cell path (empty for the whole value).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Conversion {
     /// The cell path of the value.
     pub path: Vec<String>,
-    /// `datetime`, `duration` or `filesize`; `binary` for text taken as bytes, `base64`
-    /// for text decoded.
+    /// `datetime`, `duration` or `filesize`; `binary` for text taken as bytes, `base64` for text decoded.
     pub ty: String,
-    /// For a number: what it counts, as the schema's `x-nu` says, spelled as in a Nushell
-    /// literal (`ms`, `sec`, `kB`). `None` for text, such as an ISO 8601 datetime.
+    /// For a number: what it counts, as the schema's `x-nu` says, spelled as in a Nushell literal (`ms`, `sec`, `kB`).
+    /// `None` for text, such as an ISO 8601 datetime.
     pub unit: Option<String>,
-    /// Where on the way to the value `null` may stand instead, as the lengths of the
-    /// prefixes of `path` that may be `null`, shortest first: the whole path for the value
-    /// itself. A `null` is left as it is, with nothing under it to convert.
+    /// Where on the way to the value `null` may stand instead, as the lengths of the prefixes of `path` that may be `null`, shortest first: the whole path for the value itself.
+    /// A `null` is left as it is, with nothing under it to convert.
     pub nullable: Vec<usize>,
-    /// Where on the way to the value a table stands, below the top, as the lengths of the
-    /// prefixes of `path` that are tables, shortest first: the rest of the path is a column
-    /// of each row, which a cell path from above does not reach.
+    /// Where on the way to the value a table stands, below the top, as the lengths of the prefixes of `path` that are tables, shortest first: the rest of the path is a column of each row, which a cell path from above does not reach.
     pub tables: Vec<usize>,
 }
 
-/// What a schema says about the value: its type, the optional properties to fill, and the
-/// conversions, in the order to run them.
+/// What a schema says about the value: its type, the optional properties to fill, and the conversions, in the order to run them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Shape {
     /// The Nushell type.
@@ -93,8 +84,7 @@ pub enum Error {
         /// The reference as written.
         reference: String,
     },
-    /// A conversion inside a union of several shapes, where which shape the value has is
-    /// not known after decoding.
+    /// A conversion inside a union of several shapes, where which shape the value has is not known after decoding.
     #[error(
         "{place}: a {what} inside a union of several shapes cannot be converted after \
          decoding; which shape the value has is not known"
@@ -203,10 +193,7 @@ struct Reader<'a> {
     /// The `$ref`s being followed, to stop at a cycle.
     refs: Vec<String>,
 }
-/// Where in the value a schema node sits: its cell path, whether a list or a union of
-/// several shapes stands between it and the top (where no cell path reaches, or not for
-/// every value), and the prefixes of its path that may be null, by length, itself or what
-/// it sits in.
+/// Where in the value a schema node sits: its cell path, whether a list or a union of several shapes stands between it and the top (where no cell path reaches, or not for every value), and the prefixes of its path that may be null, by length, itself or what it sits in.
 struct Place {
     path: Vec<String>,
     in_list: bool,
@@ -396,12 +383,9 @@ impl Reader<'_> {
         ty
     }
 
-    /// The one schema an `allOf` and the keywords beside it describe together: every branch
-    /// holds, so the properties are all of theirs, a property several describe is what they
-    /// say together, the required names are all of theirs, and the type is what every branch
-    /// that names one allows. A keyword the reader reads that two branches set differently
-    /// is an error: no value has two formats. What the reader does not read is left out,
-    /// and a branch that refers to itself adds nothing on the second visit.
+    /// The one schema an `allOf` and the keywords beside it describe together: every branch holds, so the properties are all of theirs, a property several describe is what they say together, the required names are all of theirs, and the type is what every branch that names one allows.
+    /// A keyword the reader reads that two branches set differently is an error: no value has two formats.
+    /// What the reader does not read is left out, and a branch that refers to itself adds nothing on the second visit.
     fn merged(&self, object: &serde_json::Map<String, Json>, place: &Place) -> Result<Json, Error> {
         let mut merged = serde_json::Map::new();
         let mut seen = Vec::new();
@@ -671,8 +655,7 @@ impl Reader<'_> {
         })
     }
 
-    /// Whether the schema describes an object, following a local `$ref` and the branches
-    /// of an `allOf`.
+    /// Whether the schema describes an object, following a local `$ref` and the branches of an `allOf`.
     fn is_object(&self, schema: &Json) -> bool {
         self.is_object_within(schema, 0)
     }
@@ -711,8 +694,7 @@ impl Reader<'_> {
 }
 
 impl Place {
-    /// The rows of a table: the same cell paths, nothing between them and the top but what
-    /// may be null on the way to the table, and the table itself where it is below the top.
+    /// The rows of a table: the same cell paths, nothing between them and the top but what may be null on the way to the table, and the table itself where it is below the top.
     fn field_less(&self) -> Self {
         let mut tables = self.tables.clone();
         if !self.path.is_empty() && tables.last() != Some(&self.path.len()) {

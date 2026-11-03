@@ -1,0 +1,13 @@
+# Prose packs whole sentences into lines of up to 95 columns, and a longer sentence keeps a
+# line of its own; tables and code keep their width. Rust's doc comments are Markdown too.
+# release-plz writes the changelog.
+[global]
+include = ["**/*.md", "**/*.rs"]
+exclude = ["CHANGELOG.md"]
+
+[MD013]
+line-length = 95
+tables = false
+code-blocks = false
+reflow = true
+reflow-mode = "sentence-pack"

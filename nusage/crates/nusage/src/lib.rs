@@ -1,11 +1,8 @@
-//! Typed Nushell commands from usage-annotated scripts, and typed wrappers from usage specs
-//! of binaries.
+//! Typed Nushell commands from usage-annotated scripts, and typed wrappers from usage specs of binaries.
 //!
-//! [`generate`] is the whole pipeline: assemble the source into one spec, derive the command
-//! model, write the module for the target the source implies: the shim for scripts, the
-//! binary target for a spec file, the HTTP target for a spec file with the mapping of a
-//! service beside it. Each stage prints: [`spec`] the assembled spec, [`model`] the command
-//! model, [`generate`] the module. The CLI in `main.rs` is a thin shell around it.
+//! [`generate`] is the whole pipeline: assemble the source into one spec, derive the command model, write the module for the target the source implies: the shim for scripts, the binary target for a spec file, the HTTP target for a spec file with the mapping of a service beside it.
+//! Each stage prints: [`spec`] the assembled spec, [`model`] the command model, [`generate`] the module.
+//! The CLI in `main.rs` is a thin shell around it.
 
 mod activate;
 mod binary;
@@ -36,23 +33,15 @@ use nusage_spec::Source;
 
 /// Generate the module for a script, a tree of scripts, or a `.kdl` spec file.
 ///
-/// Scripts get the shim target: a `def` per command that hands the script `$usage` and
-/// `run`s it. A spec file gets the binary target: a `def` per command of the binary it
-/// describes that runs the binary with the argv its parameters say and decodes the output
-/// the call selected, with Nushell's reader for its media type or framing, or the pipeline
-/// its `nusage-decode` node states; written as `<bin>.nu`, `use <bin>.nu *` names the commands as
-/// the binary does. `out` is where the module will be written; `run` paths inside a shim are
-/// relative to that file's directory, or to the current directory with `None`. The result
-/// has been parsed by Nushell: what Nushell rejects is a diagnostic here, not at `use`.
+/// Scripts get the shim target: a `def` per command that hands the script `$usage` and `run`s it.
+/// A spec file gets the binary target: a `def` per command of the binary it describes that runs the binary with the argv its parameters say and decodes the output the call selected, with Nushell's reader for its media type or framing, or the pipeline its `nusage-decode` node states; written as `<bin>.nu`, `use <bin>.nu *` names the commands as the binary does.
+/// `out` is where the module will be written; `run` paths inside a shim are relative to that file's directory, or to the current directory with `None`.
+/// The result has been parsed by Nushell: what Nushell rejects is a diagnostic here, not at `use`.
 pub fn generate(source: &Path, out: Option<&Path>) -> Result<String, Diagnostic> {
     generate_with(source, out, &[], None)
 }
 
-/// [`generate`], with overlays merged onto a spec file first, see
-/// [`nusage_spec::assemble_with`], and with the HTTP mapping of a spec that describes a
-/// service, see [`nusage_spec::assemble_http`]: then the module gets the HTTP target, a
-/// `def` per command that sends the request the mapping says and decodes the response as a
-/// binary's output is decoded, its body the input when the call sends one.
+/// [`generate`], with overlays merged onto a spec file first, see [`nusage_spec::assemble_with`], and with the HTTP mapping of a spec that describes a service, see [`nusage_spec::assemble_http`]: then the module gets the HTTP target, a `def` per command that sends the request the mapping says and decodes the response as a binary's output is decoded, its body the input when the call sends one.
 pub fn generate_with(
     source: &Path,
     out: Option<&Path>,
@@ -96,10 +85,7 @@ pub fn generate_with(
     Ok(text)
 }
 
-/// Check a module written for the source, with overlays, against the spec as usage reads
-/// it: every command the spec shows is a definition with the spec's positionals, flags and
-/// completers, named as the generator names them, with its description once. [`generate`]
-/// checks what it writes the same way.
+/// Check a module written for the source, with overlays, against the spec as usage reads it: every command the spec shows is a definition with the spec's positionals, flags and completers, named as the generator names them, with its description once. [`generate`] checks what it writes the same way.
 pub fn check(
     source: &Path,
     overlays: &[PathBuf],
@@ -140,9 +126,7 @@ fn assemble(
     }
 }
 
-/// The line that stands in for a script's first where Nushell checks it, binding `$usage`
-/// with its type and defining the shadows of the scripts it calls, and what those calls get
-/// wrong, each as `<script>:<line>:<column>: <what>`.
+/// The line that stands in for a script's first where Nushell checks it, binding `$usage` with its type and defining the shadows of the scripts it calls, and what those calls get wrong, each as `<script>:<line>:<column>: <what>`.
 pub fn prelude(script: &Path) -> Result<(String, Vec<String>), Diagnostic> {
     let (line, calls) = prelude::line(script)?;
     let source = std::fs::read_to_string(script)
@@ -160,30 +144,25 @@ pub fn prelude(script: &Path) -> Result<(String, Vec<String>), Diagnostic> {
     Ok((line, findings))
 }
 
-/// Serve Nushell's language server for the scripts nusage runs, on standard input and
-/// output: `nu --lsp`, with `args` after it, sees a script whose shebang names nusage with
-/// the line [`prelude`] writes in place of its first. The exit code is Nushell's.
+/// Serve Nushell's language server for the scripts nusage runs, on standard input and output: `nu --lsp`, with `args` after it, sees a script whose shebang names nusage with the line [`prelude`] writes in place of its first.
+/// The exit code is Nushell's.
 pub fn lsp(args: &[String]) -> std::io::Result<i32> {
     lsp::serve(args)
 }
 
-/// Run as `nu`, as a command wrapper standing in Nushell's place starts it: `nu --lsp`
-/// is nusage's language server, through kakehashi when it is on PATH, and anything else is
-/// `nu` itself. The exit code is what ran's.
+/// Run as `nu`, as a command wrapper standing in Nushell's place starts it: `nu --lsp` is nusage's language server, through kakehashi when it is on PATH, and anything else is `nu` itself.
+/// The exit code is what ran's.
 pub fn nu(args: &[String]) -> std::io::Result<i32> {
     nu::run(args)
 }
 
-/// The definitions the interpreter `source`s before the script: the shadows of the scripts
-/// it calls, each running its script by its absolute path.
+/// The definitions the interpreter `source`s before the script: the shadows of the scripts it calls, each running its script by its absolute path.
 pub fn prelude_run(script: &Path) -> Result<String, Diagnostic> {
     prelude::runtime(script)
 }
 
-/// The command model derived from the source, as NUON: what a target is handed, after every
-/// decision between usage's vocabulary and a Nushell signature is made and before any
-/// Nushell is written. The stages of [`generate`] are each printable: [`spec`] the
-/// assembled spec, this the model, [`generate`] the module.
+/// The command model derived from the source, as NUON: what a target is handed, after every decision between usage's vocabulary and a Nushell signature is made and before any Nushell is written.
+/// The stages of [`generate`] are each printable: [`spec`] the assembled spec, this the model, [`generate`] the module.
 pub fn model(
     source: &Path,
     overlays: &[PathBuf],
@@ -227,9 +206,7 @@ pub fn spec(source: &Path, overlays: &[PathBuf]) -> Result<String, Diagnostic> {
     Ok(assembled.spec.to_string())
 }
 
-/// An overlay declaring, for every command of the spec that has the switch, a framed output
-/// the switch selects, as usage KDL: what a binary with `--json` flags and no `output`
-/// declarations needs before its wrappers decode anything.
+/// An overlay declaring, for every command of the spec that has the switch, a framed output the switch selects, as usage KDL: what a binary with `--json` flags and no `output` declarations needs before its wrappers decode anything.
 pub fn switch_overlay(
     source: &Path,
     overlays: &[PathBuf],

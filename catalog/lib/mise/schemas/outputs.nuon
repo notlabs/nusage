@@ -6,10 +6,15 @@
         repository: "https://github.com/jdx/mise"
         revision: "61eb04dbc806cb646821e342b7abbbdaf1581e84"
     }
+    # Each schema is written from mise's serializers at the baseline's revision, which a source
+    # names a file of. An output with `attach: false` is checked but not declared in the
+    # generated overlay, since the module would give it the wrong type; each says why.
     outputs: [
         {id: version, command: [version], name: json, select: --json, framing: json, schema: version.schema.json, source: ["src/cli/version.rs:164"]}
         {id: env, command: [env], name: json, select: --json, framing: json, schema: env.schema.json, source: ["src/cli/env.rs:156"]}
         {id: config-ls, command: [config ls], name: json, select: --json, framing: json, schema: config-ls.schema.json, source: ["src/cli/config/ls.rs:123"]}
+        # One of two shapes, a map or a list, one tool's rows or `--all`'s: the module fills
+        # an optional field in whichever arrives. So do `registry` and `ls-remote`.
         {
             id: ls
             command: [ls]
@@ -28,6 +33,7 @@
             schema: "bin-paths.schema.json"
             source: ["src/cli/bin_paths.rs:53","src/cli/bin_paths.rs:72"]
         }
+        # Not attached: asked for beside the wrapper's `--json`, which mise prefers.
         {
             id: "env-extended"
             command: [env]
@@ -74,6 +80,9 @@
             schema: "tasks-ls.schema.json"
             source: ["src/cli/tasks/mod.rs","src/cli/tasks/ls.rs:316","crates/mise-config/src/task.rs:96","crates/mise-config/src/task.rs:170","crates/mise-config/src/task.rs:409","crates/mise-config/src/task.rs:562","crates/mise-config/src/task/dep.rs:168","crates/mise-config/src/task/outputs.rs:114"]
         }
+        # The module raises when mise exits non-zero, so the report this and `doctor project`
+        # write with exit status 1 reaches no caller; the suite holds it to its schema all the
+        # same.
         {
             id: "tasks-validate"
             command: [tasks,validate]
@@ -137,6 +146,8 @@
             schema: "skills-ls.schema.json"
             source: ["src/cli/skills/ls.rs:51","src/packslip.rs:783"]
         }
+        # Not attached, nor are the other `tool` outputs: each of its field filters changes
+        # the type of what it writes, and a wrapper has one.
         {
             id: "tool"
             command: [tool]
@@ -228,6 +239,7 @@
             attach: false
         }
     ]
+    # The cases run the real mise in `../schema-fixtures/project`, apart from the user's own.
     cases: [
         {id: version, output: version, argv: [version --json], exit_codes: [0], expect: {properties: {version: {pattern: '^[0-9]{4}[.][0-9]+[.][0-9]+'}}}}
         {id: env-populated, output: env, argv: [env --json], exit_codes: [0], expect: {required: [NUS_SCHEMA_FIXTURE], properties: {NUS_SCHEMA_FIXTURE: {const: "present"}}}}

@@ -1,11 +1,6 @@
-//! `nus nu`: `nu`, as a command wrapper standing in Nushell's place starts it (mise's
-//! `[wrappers.nu]` with `args = ["nu"]`, say), so an editor that starts `nu --lsp` gets
-//! nusage's language server without being told of it: kakehashi with nusage's layer when
-//! kakehashi is on PATH, which highlights a script's header and bridges the script to `nus
-//! lsp`, else `nus lsp` alone. Anything else is `nu`, as it was asked for: an interactive
-//! shell has its packages from `nus activate nu`, as overlays that follow the working
-//! directory ([`crate::activate`]). The arguments are read by Nushell's own command line, as
-//! a usage spec, so `--lsp` is found among Nushell's flags and never among a script's.
+//! `nus nu`: `nu`, as a command wrapper standing in Nushell's place starts it (mise's `[wrappers.nu]` with `args = ["nu"]`, say), so an editor that starts `nu --lsp` gets nusage's language server without being told of it: kakehashi with nusage's layer when kakehashi is on PATH, which highlights a script's header and bridges the script to `nus lsp`, else `nus lsp` alone.
+//! Anything else is `nu`, as it was asked for: an interactive shell has its packages from `nus activate nu`, as overlays that follow the working directory ([`crate::activate`]).
+//! The arguments are read by Nushell's own command line, as a usage spec, so `--lsp` is found among Nushell's flags and never among a script's.
 
 use std::ffi::OsStr;
 use std::io;
@@ -15,10 +10,9 @@ use std::process::Command;
 /// Set for the `nu` a language server of nusage's starts: that one is Nushell's own.
 pub const SERVING: &str = "NUS_LSP";
 
-/// Set on the `nu` this runs, to this process's id. Should that `nu` lead back here, through
-/// a shim or wrapper [`real_nu`] did not see for one, the `nus nu` it reaches is this same
-/// process, as a wrapper that execs on unix leaves it, and it stops instead of going round
-/// for ever. A `nu` that Nushell starts in turn is a process of its own, and runs.
+/// Set on the `nu` this runs, to this process's id.
+/// Should that `nu` lead back here, through a shim or wrapper [`real_nu`] did not see for one, the `nus nu` it reaches is this same process, as a wrapper that execs on unix leaves it, and it stops instead of going round for ever.
+/// A `nu` that Nushell starts in turn is a process of its own, and runs.
 const RAN: &str = "NUS_NU_PID";
 
 /// nusage's layer for kakehashi: the queries it adds, by path under the layer.
@@ -57,9 +51,7 @@ pub fn run(args: &[String]) -> io::Result<i32> {
 /// Nushell's own command line, as a usage spec.
 const SPEC: &str = include_str!("nu.usage.kdl");
 
-/// Whether `nu` is asked to serve its language server, and then the rest of its arguments:
-/// `--lsp` among Nushell's own flags, before a script or a command takes the rest. usage
-/// reads the arguments by Nushell's spec; arguments it cannot read are Nushell's to refuse.
+/// Whether `nu` is asked to serve its language server, and then the rest of its arguments: `--lsp` among Nushell's own flags, before a script or a command takes the rest. usage reads the arguments by Nushell's spec; arguments it cannot read are Nushell's to refuse.
 fn lsp_requested(args: &[String]) -> Option<Vec<String>> {
     let spec: usage::Spec = SPEC.parse().expect("Nushell's spec reads");
     let argv: Vec<String> = std::iter::once("nu".to_string())
@@ -78,10 +70,9 @@ fn lsp_requested(args: &[String]) -> Option<Vec<String>> {
     Some(rest)
 }
 
-/// The `nu` to run: the first on PATH that is Nushell, a file named `nu` once its links are
-/// followed, and not this program. A shim or wrapper is a link to another program, such as a
-/// version manager's, and may lead back here, so it is passed over. A wrapper that takes its
-/// own directory off PATH for the command it starts, as mise's does, leaves none to pass.
+/// The `nu` to run: the first on PATH that is Nushell, a file named `nu` once its links are followed, and not this program.
+/// A shim or wrapper is a link to another program, such as a version manager's, and may lead back here, so it is passed over.
+/// A wrapper that takes its own directory off PATH for the command it starts, as mise's does, leaves none to pass.
 /// Should one that does not look so lead back here, [`RAN`] stops the loop.
 pub fn real_nu() -> PathBuf {
     let here = std::env::current_exe().and_then(std::fs::canonicalize).ok();
@@ -110,10 +101,8 @@ fn on_path(program: &str) -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
 }
 
-/// Write nusage's layer for kakehashi where it can be read, and return its configuration
-/// file: the queries that inject a script's header and its `run=` scripts, and the
-/// configuration that bridges a script to `nus lsp` with Nushell's other arguments. The
-/// layer is named by what it holds, so one written for other arguments stands beside it.
+/// Write nusage's layer for kakehashi where it can be read, and return its configuration file: the queries that inject a script's header and its `run=` scripts, and the configuration that bridges a script to `nus lsp` with Nushell's other arguments.
+/// The layer is named by what it holds, so one written for other arguments stands beside it.
 fn layer(nusage: &Path, args: &[String]) -> io::Result<PathBuf> {
     let config = config(nusage, args);
     let mut files: Vec<(&str, String)> = LAYER
@@ -135,11 +124,10 @@ fn layer(nusage: &Path, args: &[String]) -> io::Result<PathBuf> {
     Ok(dir.join("kakehashi.toml"))
 }
 
-/// kakehashi's configuration in nusage's layer. Its queries come first and kakehashi's data
-/// after, which holds the parsers and queries it installs; this kakehashi serves Nushell
-/// documents alone, so what the layer adds to KDL is for headers. A script, under either
-/// language id an editor gives Nushell, is bridged to `nus lsp` as itself; the scripts
-/// its header's `run=` names are not, being a word each. `sh` is read with bash's parser.
+/// kakehashi's configuration in nusage's layer.
+/// Its queries come first and kakehashi's data after, which holds the parsers and queries it installs; this kakehashi serves Nushell documents alone, so what the layer adds to KDL is for headers.
+/// A script, under either language id an editor gives Nushell, is bridged to `nus lsp` as itself; the scripts its header's `run=` names are not, being a word each.
+/// `sh` is read with bash's parser.
 fn config(nusage: &Path, args: &[String]) -> String {
     let quoted = |text: &str| serde_json::to_string(text).expect("a string");
     let mut cmd = vec![
@@ -178,8 +166,7 @@ languages = ["nu", "nushell"]
     )
 }
 
-/// A name for the layer's contents, the same from one build of nusage to the next, so the
-/// layers in the cache are as many as the contents they have had.
+/// A name for the layer's contents, the same from one build of nusage to the next, so the layers in the cache are as many as the contents they have had.
 fn digest(files: &[(&str, String)]) -> String {
     crate::common::fnv1a(
         files
@@ -188,8 +175,7 @@ fn digest(files: &[(&str, String)]) -> String {
     )
 }
 
-/// Become the command, as a wrapper should: on unix the process is replaced, so signals,
-/// the terminal and the exit status are the command's own; elsewhere it runs to its end.
+/// Become the command, as a wrapper should: on unix the process is replaced, so signals, the terminal and the exit status are the command's own; elsewhere it runs to its end.
 pub(crate) fn replace_with(command: &mut Command) -> io::Result<i32> {
     #[cfg(unix)]
     {
@@ -233,9 +219,7 @@ mod tests {
         assert_eq!(lsp_requested(&words("--no-such-flag --lsp")), None);
     }
 
-    /// The spec is the Nushell nusage is built against: its version is that of the Nushell
-    /// crates in Cargo.lock, and where the `nu` on PATH is that version, its flags are the
-    /// ones `nu --help` lists, each taking a value as it does there.
+    /// The spec is the Nushell nusage is built against: its version is that of the Nushell crates in Cargo.lock, and where the `nu` on PATH is that version, its flags are the ones `nu --help` lists, each taking a value as it does there.
     #[test]
     fn the_spec_is_nushells_own() {
         let spec: usage::Spec = SPEC.parse().unwrap();

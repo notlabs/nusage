@@ -31,9 +31,6 @@ indexmap = "2"
 # and `nu-engine` only compiles when `nu-protocol` agrees, so the direct dependencies leave
 # `os` off too; `nu-command` turns it on everywhere for the tests that need it.
 nuon = "0.116.1"
-# Output schemas, and the corpus test's vectors. A schema's properties keep their order.
-jsonschema = { version = "0.60", default-features = false }
-serde_json = { version = "1", features = ["preserve_order"] }
 nu-protocol = { version = "0.116.1", default-features = false }
 nu-parser = "0.116.1"
 nu-cmd-lang = "0.116.1"
@@ -42,6 +39,9 @@ nu-utils = { version = "0.116.1", default-features = false }
 # The plugins: the protocol, and the harness that runs a plugin in process for its tests.
 nu-plugin = "0.116.1"
 nu-plugin-test-support = "0.116.1"
+# Output schemas, and the corpus test's vectors. A schema's properties keep their order.
+jsonschema = { version = "0.60", default-features = false }
+serde_json = { version = "1", features = ["preserve_order"] }
 # The printer's templates. 0.20 is the first release whose `quote!` sees line breaks on stable.
 genco = "0.20"
 # Snapshots of what a transformation writes, reviewed with `cargo insta`.

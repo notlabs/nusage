@@ -7,8 +7,11 @@
         revision: "v0.46.0"
     }
     # Every output is JSON lines from a template, `json(self)` per line, so each is asked for
-    # with `--template`, and with `--no-graph` where a graph would frame the lines. A source
-    # names a crate's file at 0.46.0 on crates.io.
+    # with `--template`, and with `--no-graph` where a graph would frame the lines: the wrapper
+    # owns both flags, and `^jj` takes any other template. A source names a crate's file at the
+    # baseline's version on crates.io. A configuration value is any TOML value, so its type is
+    # `any`. `diff`, `show` and the `file` commands have no output here, since their template
+    # types do not serialize.
     outputs: [
         {
             id: log
@@ -74,9 +77,7 @@
             source: ["jj-cli src/config.rs:111" "jj-cli src/config.rs:88" "jj-lib src/config.rs:301"]
         }
     ]
-    # The repository `check-schemas.nu` builds: `main` on an origin, a clone with a second
-    # commit under `feature` and the tag `v1`, a second workspace, and `main` deleted locally
-    # so its remote outlives it.
+    # The cases run in the repository `check-schemas.nu` builds.
     cases: [
         {id: log-all, output: log, argv: [log --no-graph --template 'json(self) ++ "\n"' --revision 'all()'], exit_codes: [0], records: 4}
         {id: log-root, output: log, argv: [log --no-graph --template 'json(self) ++ "\n"' --revision 'root()'], exit_codes: [0], records: 1, expect: {properties: {parents: {maxItems: 0}, author: {properties: {name: {const: ""}}}}}}

@@ -1,7 +1,5 @@
 // On each command `schemas/outputs.nuon` types: the wrapper owns `--json`, so the flags that
-// transform or replace its JSON are hidden. `--jq` and `--template` rewrite the selection,
-// `--web` opens a browser instead of printing, and `run view`'s log flags print a log.
-// `^gh` keeps them all.
+// rewrite its selection or print something else instead are hidden. `^gh` keeps them all.
 cmd "pr" {
     cmd "list" {
         flag "-q --jq" hide=#true

@@ -1,8 +1,7 @@
-//! `nus activate nu` in a real Nushell, with a `mise` that answers as mise does for a project
-//! directory, `proj`, and for anywhere else. Each step is its own evaluation in one session,
-//! as each line at a prompt is: `nu --mcp` evaluates them in turn without a terminal, and the
-//! hook's condition and code are run as the hook would run them. `nus modules` is the real
-//! one. Without Nushell on PATH the session is skipped, except in CI, where it fails.
+//! `nus activate nu` in a real Nushell, with a `mise` that answers as mise does for a project directory, `proj`, and for anywhere else.
+//! Each step is its own evaluation in one session, as each line at a prompt is: `nu --mcp` evaluates them in turn without a terminal, and the hook's condition and code are run as the hook would run them.
+//! `nus modules` is the real one.
+//! Without Nushell on PATH the session is skipped, except in CI, where it fails.
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -28,8 +27,7 @@ fn executable(file: &Path, text: &str) {
     }
 }
 
-/// The Nushell on PATH: the first `nu` that is a file named `nu` once its links are followed,
-/// as `nus nu` finds it, passing over a version manager's wrapper, a link to another program.
+/// The Nushell on PATH: the first `nu` that is a file named `nu` once its links are followed, as `nus nu` finds it, passing over a version manager's wrapper, a link to another program.
 fn nushell() -> Option<PathBuf> {
     let found = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
         .map(|dir| dir.join("nu"))

@@ -1,7 +1,5 @@
-//! What a script has before its first line. Where it runs, the interpreter defines the
-//! shadows of the scripts it calls ([`crate::calls`]) and binds `$usage`; where Nushell
-//! checks it, as an editor does, one line stands in for the script's first, the shebang,
-//! saying the same: `$usage` with its type, and the shadows as the interpreter defines them.
+//! What a script has before its first line.
+//! Where it runs, the interpreter defines the shadows of the scripts it calls ([`crate::calls`]) and binds `$usage`; where Nushell checks it, as an editor does, one line stands in for the script's first, the shebang, saying the same: `$usage` with its type, and the shadows as the interpreter defines them.
 //! Replacing a line with a line keeps every other line where it was.
 
 use std::ops::Range;
@@ -14,8 +12,8 @@ use nusage_spec::{Diagnostic, Texts};
 use crate::calls::{self, Calls, Paths};
 use crate::modules;
 
-/// The same dependencies for execution and checking, including each called script's
-/// imports inside its definition. A package failure anywhere stops preparation.
+/// The same dependencies for execution and checking, including each called script's imports inside its definition.
+/// A package failure anywhere stops preparation.
 struct Prepared {
     modules: Vec<PathBuf>,
     calls: Calls,
@@ -44,17 +42,14 @@ pub struct Analysis {
     pub shadows: Vec<(Range<usize>, PathBuf)>,
     /// What the script's calls of scripts get wrong.
     pub calls: Calls,
-    /// Why the header cannot be read, when it cannot: the line then binds `$usage` with no
-    /// type, so the script still checks.
+    /// Why the header cannot be read, when it cannot: the line then binds `$usage` with no type, so the script still checks.
     pub header: Option<Diagnostic>,
-    /// Why the script cannot have a module its calls name ([`crate::modules`]), which the
-    /// interpreter would refuse it for.
+    /// Why the script cannot have a module its calls name ([`crate::modules`]), which the interpreter would refuse it for.
     pub modules: Option<String>,
 }
 
-/// The analysis of the script at `script` as `source` has it, with the other scripts it
-/// reads as `texts` has them: an editor's, saved or not. The script must be one nusage runs:
-/// its shebang names it.
+/// The analysis of the script at `script` as `source` has it, with the other scripts it reads as `texts` has them: an editor's, saved or not.
+/// The script must be one nusage runs: its shebang names it.
 pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, Diagnostic> {
     if !calls::names_nusage(source) {
         return Err(Diagnostic::new(
@@ -120,8 +115,7 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
     })
 }
 
-/// The line that stands in for the script's first as it is on disk, and what its calls of
-/// scripts get wrong; a header that cannot be read is the error.
+/// The line that stands in for the script's first as it is on disk, and what its calls of scripts get wrong; a header that cannot be read is the error.
 pub fn line(script: &Path) -> Result<(String, Calls), Diagnostic> {
     let source = read(script)?;
     let analysis = analyze(script, &source, &Texts::new())?;
@@ -131,8 +125,8 @@ pub fn line(script: &Path) -> Result<(String, Calls), Diagnostic> {
     }
 }
 
-/// The imports and definitions the interpreter places before the script, with each
-/// called script's dependencies in its own definition. Paths are absolute.
+/// The imports and definitions the interpreter places before the script, with each called script's dependencies in its own definition.
+/// Paths are absolute.
 pub fn runtime(script: &Path) -> Result<String, Diagnostic> {
     let source = read(script)?;
     let prepared = prepare(script, &source, &Texts::new())?;
@@ -150,8 +144,7 @@ fn read(script: &Path) -> Result<String, Diagnostic> {
         .map_err(|err| Diagnostic::new(script, format!("cannot read: {err}")))
 }
 
-/// The command the script is in its tree, and whether it is the only command the script
-/// runs, or its spec declares more below it.
+/// The command the script is in its tree, and whether it is the only command the script runs, or its spec declares more below it.
 fn command_of(script: &Path, texts: &Texts) -> Result<(Command, bool), Diagnostic> {
     let (root, path) = calls::place_in_tree(script)?;
     let assembled = nusage_spec::assemble_in(&root, texts)?;
@@ -171,8 +164,7 @@ fn command_of(script: &Path, texts: &Texts) -> Result<(Command, bool), Diagnosti
     Ok((command, alone))
 }
 
-/// The type of the `$usage` record the command's script sees: every declared name is
-/// there, an absent value `null` unless a default applies.
+/// The type of the `$usage` record the command's script sees: every declared name is there, an absent value `null` unless a default applies.
 pub fn usage_type(command: &Command) -> String {
     let fields = |params: &[Param]| {
         params

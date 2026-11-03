@@ -1,5 +1,4 @@
 #!/usr/bin/env nus
-#USAGE about "Obtain each entry's spec into its package: as its tool prints it, or from the clap command its crate builds, left untouched when unchanged"
 #USAGE arg "[tool]" help="One entry; every entry when absent"
 #USAGE flag "--force" help="Write a clap entry's spec though it describes the binary's version, after a change to the extractor or to usage"
 # What depends on a spec stays fresh across runs when the file is written only on a change.
