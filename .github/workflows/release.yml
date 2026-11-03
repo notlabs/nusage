@@ -1,13 +1,13 @@
 name: release
 
 # After CI succeeds for the current main commit, release-plz tags the version Cargo.toml
-# declares at that exact checked commit when no tag exists. Its Linux binary is attached and the
-# draft release published. The version and changelog are committed beforehand
-# (`mise run release`); validation is CI's, so release assembly need not repeat it.
+# declares at that exact checked commit when no tag exists. The version and changelog are
+# committed beforehand (`mise run release`); validation is CI's, so release assembly need not
+# repeat it. A checked commit that is not a release is a prerelease instead: the next patch
+# version after the last release, with the number of commits since it, `v0.1.2-dev.37`, which
+# CI sets in its own checkout before building, so the binary reports it. Either way the
+# binaries `plan` names are attached to a draft release, and the release published.
 # The workflow's own token is enough: a tag it pushes runs no other workflow.
-#
-# The other targets are built on demand: run this workflow with the tag and the targets,
-# `all` or a comma-separated list, and they are attached to that release.
 #
 # The catalog's tasks release apart, by the same rule: a checked main commit whose
 # `catalog_version` has no release yet pushes the tasks `//catalog:assemble` writes to GHCR
@@ -27,17 +27,6 @@ on:
     workflows: [ci]
     types: [completed]
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: The release to attach binaries to, such as v0.1.1
-        required: true
-        type: string
-      targets:
-        description: The targets to build, `all` or comma-separated
-        required: true
-        default: all
-        type: string
 
 permissions: {}
 
@@ -84,60 +73,72 @@ jobs:
           tag=$(jq -r '.[] | select(.package_name == "nusage") | .tag' <<< "${RELEASES:-[]}")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-  # The tag and the targets: after CI, the tag release-plz made and Linux x86_64; on a
-  # dispatch, the given tag and targets.
+  # What this checked commit releases, and the targets built for it: the tag release-plz made,
+  # or else a prerelease of the commit, tagged here with a draft release for its binaries. A
+  # commit that is itself the last release's has nothing to prerelease.
   plan:
     needs: tag
-    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || needs.tag.outputs.tag != '') }}
+    if: ${{ !cancelled() && needs.tag.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: {}
+    permissions:
+      contents: write
     outputs:
       tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
       matrix: ${{ steps.plan.outputs.matrix }}
     steps:
+      # A prerelease's tag is pushed with git, so the checkout keeps its credentials.
+      # jactionlint ignore=artipacked
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
       - id: plan
         env:
-          EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASED_TAG: ${{ needs.tag.outputs.tag }}
-          INPUT_TAG: ${{ inputs.tag }}
-          INPUT_TARGETS: ${{ inputs.targets }}
-          ALL: |
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          # Releases and prereleases alike; another platform is another row.
+          TARGETS: |
             [
-              {"target": "x86_64-unknown-linux-gnu", "os": "ubuntu-latest", "build-tool": "cargo"},
-              {"target": "x86_64-unknown-linux-musl", "os": "ubuntu-latest", "build-tool": "cross"},
-              {"target": "aarch64-unknown-linux-gnu", "os": "ubuntu-24.04-arm", "build-tool": "cargo"},
-              {"target": "aarch64-unknown-linux-musl", "os": "ubuntu-24.04-arm", "build-tool": "cross"},
-              {"target": "x86_64-apple-darwin", "os": "macos-latest", "build-tool": "cargo"},
-              {"target": "aarch64-apple-darwin", "os": "macos-latest", "build-tool": "cargo"},
-              {"target": "x86_64-pc-windows-msvc", "os": "windows-latest", "build-tool": "cargo"},
-              {"target": "aarch64-pc-windows-msvc", "os": "windows-latest", "build-tool": "cargo"}
+              {"target": "x86_64-unknown-linux-gnu", "os": "ubuntu-latest", "build-tool": "cargo"}
             ]
         run: |
-          if [ "$EVENT" = workflow_run ]; then
+          if [ -n "$RELEASED_TAG" ]; then
             tag=$RELEASED_TAG
-            targets=x86_64-unknown-linux-gnu
+            prerelease=false
           else
-            tag=$INPUT_TAG
-            targets=$INPUT_TARGETS
+            last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude 'v*-*' "$SHA")
+            count=$(git rev-list --count "$last..$SHA")
+            if [ "$count" = 0 ]; then
+              echo "$SHA is $last, so there is nothing to prerelease"
+              exit 0
+            fi
+            IFS=. read -r major minor patch <<< "${last#v}"
+            tag="v$major.$minor.$((patch + 1))-dev.$count"
+            prerelease=true
+            # A rerun finds the tag and the release it made before, and builds again.
+            if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              git tag "$tag" "$SHA"
+              git push origin "refs/tags/$tag"
+            fi
+            if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease \
+                --title "${tag#v}" --notes "A prerelease of $SHA, $count commits after $last."
+            fi
           fi
-          if [ "$targets" = all ]; then
-            matrix=$(jq -c '.' <<< "$ALL")
-          else
-            matrix=$(jq -c --arg targets "$targets" \
-              '[.[] | select(.target as $t | ($targets | split(",") | map(gsub("\\s"; "")) | index($t)) != null)]' \
-              <<< "$ALL")
-          fi
-          if [ "$(jq 'length' <<< "$matrix")" = 0 ]; then
-            echo "::error::no target in '$targets' is known"
-            exit 1
-          fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$tag"
+            echo "version=${tag#v}"
+            echo "prerelease=$prerelease"
+            echo "matrix=$(jq -c . <<< "$TARGETS")"
+          } >> "$GITHUB_OUTPUT"
 
   assets:
     needs: plan
-    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.tag != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -160,6 +161,11 @@ jobs:
           cache: false
         env:
           MBX_DISABLE: "1"
+      # A prerelease's version is set in this checkout alone, so the binary reports it.
+      - if: needs.plan.outputs.prerelease == 'true'
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: release-plz set-version "$VERSION"
       - run: rustup target add ${{ matrix.target }}
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         if: matrix.build-tool == 'cross'
