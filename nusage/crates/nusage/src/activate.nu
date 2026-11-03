@@ -24,7 +24,8 @@
 # it: what mise sets there, from an empty PATH so that its PATH is only what mise adds, is
 # taken out, so that what is below the overlays is the same wherever the shell started.
 def --env nus-revert []: nothing -> nothing {
-    let mise = which mise | get path.0?
+    # The program, not this module's `mise`.
+    let mise = which --all mise | where type == external | get path.0?
     if $mise != null {
         let here = try {
             do {
