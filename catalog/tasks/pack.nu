@@ -44,7 +44,7 @@ let packed = $entries | each {|entry|
     mkdir ($staged | path join bin)
     cp --recursive $files.dir ($staged | path join $entry.name)
     # What a package keeps for its maintenance stays here, as the catalog tarball leaves it.
-    for kept in [spec schema-fixtures] {
+    for kept in [spec schema-fixtures mise.toml] {
         rm --recursive --force ($staged | path join $entry.name $kept)
     }
     {name: $entry.name, version: $entry.version, module: $entry.name}

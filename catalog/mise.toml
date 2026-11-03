@@ -59,8 +59,20 @@ depends = ["//nusage:build"]
 file = "tasks/generate.nu"
 
 [tasks.check]
-description = "Hold each entry's generated files to their inputs and its spec to the tool on PATH, its output to its schemas, and drive the tool through its module"
-depends = ["//nusage:build", ":check-package", ":check-release"]
+description = "Check each package, as its own check does, and the packaged tasks"
+depends = [
+  "//nusage:build",
+  ":check-package",
+  ":check-release",
+  "//catalog/lib/...:check",
+]
+
+# One entry's check, which each package's own `check` runs for its entry; every entry's
+# without one.
+[tasks.check-entry]
+description = "Hold an entry's generated files to their inputs and its spec to the tool on PATH, its output to its schemas, and drive the tool through its module"
+hide = true
+depends = ["//nusage:build"]
 file = "tasks/check.nu"
 tools = { docker-compose = "5.6.1", gh = "2.103.3" }
 

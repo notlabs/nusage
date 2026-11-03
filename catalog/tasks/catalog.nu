@@ -41,6 +41,8 @@
 #   check.nu            drives the tool through the module; `check` runs it with `lib` included
 #   spec/               a clap extractor, for an entry whose `spec` is `clap`
 #   nupm.nuon           the package's manifest, as nupm and numan read it
+#   mise.toml           the package's own `check`, extending the root's `catalog-entry-check`,
+#                       so that a change to one package checks that package; not packed
 
 use support.nu schema_overlay
 
