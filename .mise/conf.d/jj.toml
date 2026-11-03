@@ -1,0 +1,7 @@
+[tools]
+jujutsu = "0.46.0"
+
+# jj reads this repository's `jj.toml` after the user's own configuration, in the order jj
+# itself reads it; a path that does not exist is passed over.
+[env]
+JJ_CONFIG = '{% if os() == "windows" %}{{ env.USERPROFILE }}\.jjconfig.toml;{{ env.APPDATA }}\jj\config.toml;{{ env.APPDATA }}\jj\conf.d;{{ config_root }}\jj.toml{% else %}{{ env.HOME }}/.jjconfig.toml:{{ xdg_config_home }}/jj/config.toml:{{ xdg_config_home }}/jj/conf.d:{{ config_root }}/jj.toml{% endif %}'
