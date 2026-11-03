@@ -11,7 +11,7 @@ file = "gh.nu"
 [tasks.gh-json-fields]
 description = "Write the fields each gh command's --json accepts into the package, from the same checkout"
 depends = ["//nusage:build"]
-run = "nusage {{ config_root }}/gh.nu --json-fields | save --force {{ config_root }}/../lib/gh/json-fields.json"
+run = "nus {{ config_root }}/gh.nu --json-fields | save --force {{ config_root }}/../lib/gh/json-fields.json"
 
 [task_config]
 shell = "nu -c"
