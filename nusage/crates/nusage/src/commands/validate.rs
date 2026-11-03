@@ -1,10 +1,9 @@
-//! `nus validate`, as the CLI has it: a schema, documents, `--lines`. The documents are
-//! the files named and the input, with `-` consuming the input at that position. Text is
-//! one JSON document, or one per line with `--lines`; a value is the document it is,
-//! including null; a stream is one document per item. No input is no document. The result
-//! is every finding as a row, `{document, line, path, what}`, and no rows when every
-//! document conforms. A schema that cannot be read or is not in the dialect is an error,
-//! as the CLI's exit code 2 says nothing was held to anything.
+//! `nus validate`, as the CLI has it: a schema, documents, `--lines`.
+//! The documents are the files named and the input, with `-` consuming the input at that position.
+//! Text is one JSON document, or one per line with `--lines`; a value is the document it is, including null; a stream is one document per item.
+//! No input is no document.
+//! The result is every finding as a row, `{document, line, path, what}`, and no rows when every document conforms.
+//! A schema that cannot be read or is not in the dialect is an error, as the CLI's exit code 2 says nothing was held to anything.
 
 use nusage_plugin::nu_protocol::{LabeledError, PipelineData, Record, Span, Spanned, Type, Value};
 use nusage_plugin::{Args, CommandTree, Context, Declared, Run, value};
@@ -46,8 +45,7 @@ impl Held {
         }
     }
 
-    /// Text as one document, or one per line that is not blank with `--lines`; text that is
-    /// not JSON is a finding on the document, with no path into it.
+    /// Text as one document, or one per line that is not blank with `--lines`; text that is not JSON is a finding on the document, with no path into it.
     fn text(&mut self, name: &str, text: &str) {
         if self.lines {
             for (index, line) in text.lines().enumerate() {

@@ -1,27 +1,17 @@
-//! Scripts that call scripts. A script calls another the way it calls a binary, by its path:
-//! `./x.nu ...`, `nus x.nu ...` or `nu x.nu ...`, and Nushell types none of them: an
-//! external call returns text, whatever the script returned. So a call of a script whose
-//! shebang names nusage is shadowed by a command named as the call writes it, which is that
-//! script's typed command: its signature is the script's header, and its body binds `$usage`
-//! from its parameters and `run`s the script, which returns its value in the caller's own
-//! Nushell, of the type its output declares, while what it prints passes through. The
-//! shadows of the scripts the called script calls are defined inside that body, since a
-//! call's path is its script's, and `run` reads a script's calls where it parses it. The
-//! shadows are defined where the script runs, by the interpreter and by the module, and
-//! stand in its first line where Nushell checks it, so what is checked is what runs.
-//! Runtime and editor definitions also import each called script's project packages in
-//! that script's scope, checking their tool versions before any script runs.
+//! Scripts that call scripts.
+//! A script calls another the way it calls a binary, by its path: `./x.nu ...`, `nus x.nu ...` or `nu x.nu ...`, and Nushell types none of them: an external call returns text, whatever the script returned.
+//! So a call of a script whose shebang names nusage is shadowed by a command named as the call writes it, which is that script's typed command: its signature is the script's header, and its body binds `$usage` from its parameters and `run`s the script, which returns its value in the caller's own Nushell, of the type its output declares, while what it prints passes through.
+//! The shadows of the scripts the called script calls are defined inside that body, since a call's path is its script's, and `run` reads a script's calls where it parses it.
+//! The shadows are defined where the script runs, by the interpreter and by the module, and stand in its first line where Nushell checks it, so what is checked is what runs.
+//! Runtime and editor definitions also import each called script's project packages in that script's scope, checking their tool versions before any script runs.
 //! `^./x.nu` is still the external, and its text.
 //!
-//! A path is the caller's: `./x.nu` names the script beside the caller, wherever it runs
-//! from. `run x.nu` hands a nusage script the caller's `$usage` rather than the arguments
-//! after it; it is reported, not shadowed.
+//! A path is the caller's: `./x.nu` names the script beside the caller, wherever it runs from.
+//! `run x.nu` hands a nusage script the caller's `$usage` rather than the arguments after it; it is reported, not shadowed.
 //!
-//! Calls may go round, a script calling itself or two calling each other. A script met
-//! again on the way down is not read again: its definition `run`s it, and its own calls are
-//! the definitions already around it, which Nushell finds where it parses the script. That
-//! holds as long as each of those names the script the call names there; where one does
-//! not, the call is left the external it is, and a finding says why.
+//! Calls may go round, a script calling itself or two calling each other.
+//! A script met again on the way down is not read again: its definition `run`s it, and its own calls are the definitions already around it, which Nushell finds where it parses the script.
+//! That holds as long as each of those names the script the call names there; where one does not, the call is left the external it is, and a finding says why.
 
 use std::collections::BTreeMap;
 use std::ops::Range;
@@ -61,10 +51,8 @@ pub struct Calls {
     pub findings: Vec<Finding>,
 }
 
-/// The calls of scripts in `source`, the text of the script at `path`, with each script it
-/// calls read from `texts` when that holds it. A call whose script cannot be read as a
-/// nusage script is left the external it is: running it says why, and so does a finding
-/// here.
+/// The calls of scripts in `source`, the text of the script at `path`, with each script it calls read from `texts` when that holds it.
+/// A call whose script cannot be read as a nusage script is left the external it is: running it says why, and so does a finding here.
 pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
     let mut calls = Calls::default();
     // Every call of a script names a `.nu` file; most scripts have none to parse for.
@@ -131,8 +119,7 @@ pub fn scan(path: &Path, source: &str, texts: &Texts) -> Calls {
     calls
 }
 
-/// The call's name and the word naming its script, for the forms that call a script:
-/// a path to one, or `nus` or `nu` with one.
+/// The call's name and the word naming its script, for the forms that call a script: a path to one, or `nus` or `nu` with one.
 fn named_script<'a>(head: &'a Word, args: &'a [Word]) -> Option<(String, &'a Word)> {
     if head.text.ends_with(".nu") && is_path(&head.text) {
         return Some((head.text.clone(), head));
@@ -142,8 +129,7 @@ fn named_script<'a>(head: &'a Word, args: &'a [Word]) -> Option<(String, &'a Wor
         .then(|| (format!("{} {}", head.text, script.text), script))
 }
 
-/// Whether Nushell runs the word as a path rather than looking it up as a name: relative to
-/// here or to home, or absolute, and on Windows with a backslash too.
+/// Whether Nushell runs the word as a path rather than looking it up as a name: relative to here or to home, or absolute, and on Windows with a backslash too.
 fn is_path(word: &str) -> bool {
     let prefixes: &[&str] = if cfg!(windows) {
         &["./", "../", "~/", ".\\", "..\\", "~\\"]
@@ -164,8 +150,7 @@ fn as_path(word: &str) -> String {
     }
 }
 
-/// A path as the caller wrote it, against the caller's directory, folded without touching
-/// the filesystem: `~` is the home directory.
+/// A path as the caller wrote it, against the caller's directory, folded without touching the filesystem: `~` is the home directory.
 fn resolve(dir: &Path, word: &str) -> PathBuf {
     let home = word
         .strip_prefix("~/")
@@ -211,8 +196,7 @@ fn runs_with_nusage(path: &Path, texts: &Texts) -> bool {
     }
 }
 
-/// The command the script is in its tree, and the commands below it, each with the words
-/// that select it after the script.
+/// The command the script is in its tree, and the commands below it, each with the words that select it after the script.
 fn commands_of(script: &Path, texts: &Texts) -> Result<Vec<(Vec<String>, Command)>, Diagnostic> {
     let (root, path) = place_in_tree(script)?;
     let assembled = nusage_spec::assemble_in(&root, texts)?;
@@ -226,9 +210,8 @@ fn commands_of(script: &Path, texts: &Texts) -> Result<Vec<(Vec<String>, Command
         .collect())
 }
 
-/// Where the script stands: the root of the tree it belongs to and its path in it, or the
-/// script itself and the root path when no `mod.nu` lies beside it. The tree's root is the
-/// outermost directory that has a `mod.nu` in each directory down to the script's.
+/// Where the script stands: the root of the tree it belongs to and its path in it, or the script itself and the root path when no `mod.nu` lies beside it.
+/// The tree's root is the outermost directory that has a `mod.nu` in each directory down to the script's.
 pub fn place_in_tree(script: &Path) -> Result<(PathBuf, CommandPath), Diagnostic> {
     let script = std::path::absolute(script)
         .map_err(|err| Diagnostic::new(script, format!("cannot resolve: {err}")))?;
@@ -262,8 +245,7 @@ pub fn place_in_tree(script: &Path) -> Result<(PathBuf, CommandPath), Diagnostic
 /// How the scripts the definitions `run` are written.
 #[derive(Debug, Clone, Copy)]
 pub enum Paths<'a> {
-    /// Relative to the directory of the module the definitions are in, as Nushell reads a
-    /// `run` from that file.
+    /// Relative to the directory of the module the definitions are in, as Nushell reads a `run` from that file.
     From(&'a Path),
     /// Absolute: for the interpreter, and for the line that stands in for a script's first.
     Absolute,
@@ -273,16 +255,15 @@ pub enum Paths<'a> {
 #[derive(Debug)]
 pub enum Unwritten {
     Syntax(SyntaxError),
-    /// A package required by this script cannot be used. Execution must stop rather than
-    /// dropping the typed definition and leaving an external call behind.
+    /// A package required by this script cannot be used.
+    /// Execution must stop rather than dropping the typed definition and leaving an external call behind.
     Modules(Diagnostic),
     /// A script its definition would run, which cannot be read.
     Unreadable {
         script: PathBuf,
         why: String,
     },
-    /// A script met again on the way down calls `name`, and the definition of that name
-    /// around it is another script's, or none.
+    /// A script met again on the way down calls `name`, and the definition of that name around it is another script's, or none.
     Round {
         script: PathBuf,
         name: String,
@@ -311,11 +292,8 @@ impl From<SyntaxError> for Unwritten {
     }
 }
 
-/// The definitions of the shadows of `calls`, the calls of the script at `script`, as they
-/// stand before the script: each with the definitions its own script needs inside its body.
-/// A shadow whose definition cannot be written is taken out of `calls`, the call left the
-/// external it is, and what kept it out joins the findings at its call; the definitions
-/// follow the shadows that remain, one each, in order.
+/// The definitions of the shadows of `calls`, the calls of the script at `script`, as they stand before the script: each with the definitions its own script needs inside its body.
+/// A shadow whose definition cannot be written is taken out of `calls`, the call left the external it is, and what kept it out joins the findings at its call; the definitions follow the shadows that remain, one each, in order.
 /// A required package that cannot be used is an error, including in nested calls.
 pub fn definitions(
     script: &Path,
@@ -346,16 +324,13 @@ pub fn definitions(
     Ok(defs)
 }
 
-/// The body of a definition that runs `command`'s script: the definitions of the scripts
-/// it calls, `$usage` from the definition's parameters, and the script `run` with the
-/// definition's input.
+/// The body of a definition that runs `command`'s script: the definitions of the scripts it calls, `$usage` from the definition's parameters, and the script `run` with the definition's input.
 pub fn script_body(command: &Command, paths: Paths, texts: &Texts) -> Result<Vec<Stmt>, Unwritten> {
     // Exported modules are independent of the generating project's installed packages.
     Writer::new(paths, texts, None).body(command)
 }
 
-/// What the definitions are written with: the scripts the definition being written sits
-/// inside, outermost first, and the names each of them defines around it.
+/// What the definitions are written with: the scripts the definition being written sits inside, outermost first, and the names each of them defines around it.
 struct Writer<'a> {
     paths: Paths<'a>,
     texts: &'a Texts,

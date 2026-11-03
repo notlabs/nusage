@@ -325,8 +325,7 @@ impl Context<'_> {
             .unwrap_or_default()
     }
 
-    /// A positional as declared at `level`; `repeats` makes it the rest parameter whatever
-    /// usage says, for a clause's.
+    /// A positional as declared at `level`; `repeats` makes it the rest parameter whatever usage says, for a clause's.
     fn positional(
         &self,
         arg: &SpecArg,
@@ -375,9 +374,7 @@ impl Context<'_> {
     }
 
     /// A flag as declared at `level`, the command that declares it.
-    /// The mapping's request for the command, each parameter on the wire resolved to the
-    /// variable of the positional or flag that carries it, and the body's input type read
-    /// from its schema.
+    /// The mapping's request for the command, each parameter on the wire resolved to the variable of the positional or flag that carries it, and the body's input type read from its schema.
     fn request(
         &self,
         mapped: &nusage_spec::http::Request,
@@ -517,8 +514,8 @@ impl Context<'_> {
         })
     }
 
-    /// The completer for an argument. In order: a provider in the tree, static `choices`,
-    /// `choices run=`, then a `complete` node on the arg, on the command, or at the top level.
+    /// The completer for an argument.
+    /// In order: a provider in the tree, static `choices`, `choices run=`, then a `complete` node on the arg, on the command, or at the top level.
     fn completer_for(
         &self,
         arg: &SpecArg,
@@ -560,8 +557,8 @@ impl Context<'_> {
     }
 }
 
-/// A `complete` node: usage completes it, for a binary. A script's choices come from a
-/// sibling provider, except a bare `type=`, which only says what the value is.
+/// A `complete` node: usage completes it, for a binary.
+/// A script's choices come from a sibling provider, except a bare `type=`, which only says what the value is.
 fn spec_completer(
     complete: &SpecComplete,
     name: &str,
@@ -584,11 +581,7 @@ fn spec_completer(
     }
 }
 
-/// A usage name as a Nushell identifier: every run of characters an identifier cannot hold
-/// becomes one `_`, letters are lowercased (`dry-run` is `dry_run`, `TOOL@VERSION` is
-/// `tool_version`), and a leading
-/// digit gets one in front. usage's own `snake_case` does the same for its SDKs; it is a
-/// copy, since usage keeps it private.
+/// A usage name as a Nushell identifier: every run of characters an identifier cannot hold becomes one `_`, letters are lowercased (`dry-run` is `dry_run`, `TOOL@VERSION` is `tool_version`), and a leading digit gets one in front. usage's own `snake_case` does the same for its SDKs; it is a copy, since usage keeps it private.
 fn snake(name: &str) -> String {
     let mut out = String::new();
     let mut gap = false;
@@ -618,8 +611,7 @@ fn variable(key: &str) -> String {
     }
 }
 
-/// How a usage name is spelled in Nushell: the `$usage` key and the variable, as
-/// [`Param::key`] and [`Param::var`] describe them.
+/// How a usage name is spelled in Nushell: the `$usage` key and the variable, as [`Param::key`] and [`Param::var`] describe them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier {
     pub key: String,
@@ -634,8 +626,7 @@ pub fn identifier(usage_name: &str) -> Identifier {
     }
 }
 
-/// usage's conventions: `<file>` and `<dir>` complete as paths, as does an argument whose
-/// `complete type=` says so.
+/// usage's conventions: `<file>` and `<dir>` complete as paths, as does an argument whose `complete type=` says so.
 fn conventional_type(arg: &SpecArg, found: &Found) -> String {
     let typed = found
         .as_ref()
@@ -691,9 +682,8 @@ fn default_output(outputs: &[SpecOutput]) -> Option<&SpecOutput> {
         .or_else(|| (outputs.len() == 1).then(|| &outputs[0]))
 }
 
-/// The declaration of the named output in effect: the deepest command in the chain that
-/// declares an output by that name, else the root, whose declaration holds the spec's
-/// top-level outputs. A declaration usage expanded from another file has no node.
+/// The declaration of the named output in effect: the deepest command in the chain that declares an output by that name, else the root, whose declaration holds the spec's top-level outputs.
+/// A declaration usage expanded from another file has no node.
 fn output_node<'a>(chain: &[Level<'a>], name: &str) -> Option<&'a HeaderNode> {
     let declaring = chain
         .iter()
@@ -707,16 +697,14 @@ fn output_node<'a>(chain: &[Level<'a>], name: &str) -> Option<&'a HeaderNode> {
         .find(|node| node.name == "output" && node.first.as_deref() == Some(name))
 }
 
-/// The annotation on the declaration of the named output in effect, which is nusage's own and
-/// usage ignores.
+/// The annotation on the declaration of the named output in effect, which is nusage's own and usage ignores.
 fn output_annotation(chain: &[Level<'_>], name: &str) -> Option<NuType> {
     output_node(chain, name)
         .and_then(|node| node.value_type())
         .map(|ty| NuType(ty.to_string()))
 }
 
-/// How the output is decoded, when it is: the `nusage-decode` pipeline its declaration states, else
-/// Nushell's reader for its media type, else `from json` for the JSON framings.
+/// How the output is decoded, when it is: the `nusage-decode` pipeline its declaration states, else Nushell's reader for its media type, else `from json` for the JSON framings.
 fn decoder_of(output: &SpecOutput, chain: &[Level<'_>]) -> Option<Decoder> {
     if let Some(pipeline) = output_node(chain, &output.name).and_then(|node| node.decode.clone()) {
         return Some(Decoder::Pipeline(pipeline));
@@ -740,11 +728,8 @@ fn flag_named(flag: &Param, selector: &str) -> bool {
         || (name.chars().count() == 1 && flag.short == name.chars().next())
 }
 
-/// The structured output a wrapper asks for, among those that have a decoder: the default
-/// output, else the first `json` output that is selectable, else the first selectable one;
-/// `None` for a text command. An output is selectable when its `nusage-args` say how to ask
-/// for it, it is the default, has its own `select` switch, or the command has a `select` flag
-/// whose value names it.
+/// The structured output a wrapper asks for, among those that have a decoder: the default output, else the first `json` output that is selectable, else the first selectable one; `None` for a text command.
+/// An output is selectable when its `nusage-args` say how to ask for it, it is the default, has its own `select` switch, or the command has a `select` flag whose value names it.
 fn structured_output<'a>(
     outputs: &[SpecOutput],
     command_select: Option<&str>,
@@ -828,9 +813,8 @@ fn structured_output<'a>(
     }))
 }
 
-/// What the annotation declares that JSON cannot carry: datetimes, durations, filesizes and
-/// binary, each at the cell path where it sits, converted after decoding. Inside a list there
-/// is no cell path to convert at, so such an annotation is an error, not a silent string.
+/// What the annotation declares that JSON cannot carry: datetimes, durations, filesizes and binary, each at the cell path where it sits, converted after decoding.
+/// Inside a list there is no cell path to convert at, so such an annotation is an error, not a silent string.
 fn conversions_for(ty: &NuType) -> Result<Vec<Conversion>, String> {
     let parsed =
         parse_type(ty).map_err(|err| format!("`{}` is not a Nushell type: {err}", ty.as_str()))?;
@@ -899,13 +883,12 @@ fn needs_conversion(ty: &Type) -> bool {
     }
 }
 
-/// Nushell's parser with its keywords, for reading a type annotation the way a signature
-/// does.
+/// Nushell's parser with its keywords, for reading a type annotation the way a signature does.
 static ENGINE: LazyLock<EngineState> = LazyLock::new(nu_cmd_lang::create_default_context);
 
-/// usage keeps every default as text; the parameter's type says how Nushell reads it. A
-/// `string` or path type takes the text itself; any other type reads the text as NUON. Then
-/// Nushell's parser judges the pair, as it would the signature the default is written into.
+/// usage keeps every default as text; the parameter's type says how Nushell reads it.
+/// A `string` or path type takes the text itself; any other type reads the text as NUON.
+/// Then Nushell's parser judges the pair, as it would the signature the default is written into.
 fn typed_default(
     text: &str,
     ty: &NuType,
@@ -925,8 +908,7 @@ fn typed_default(
     Ok(value)
 }
 
-/// A value of the parameter's type from the text usage holds for it, a default or a word of
-/// argv: the text itself for a string type, else the text read as NUON.
+/// A value of the parameter's type from the text usage holds for it, a default or a word of argv: the text itself for a string type, else the text read as NUON.
 pub fn value_from_text(text: &str, ty: &NuType) -> Result<Value, String> {
     let span = Span::unknown();
     if matches!(ty.as_str(), "string" | "path" | "glob" | "directory") {
@@ -936,12 +918,9 @@ pub fn value_from_text(text: &str, ty: &NuType) -> Result<Value, String> {
         .map_err(|err| format!("{text:?} does not read as a `{}`: {err}", ty.as_str()))
 }
 
-/// The type a signature reads from the annotation: nu-parser keeps its type parser private,
-/// so the annotation is parsed as the type of a parameter.
-/// The type with the optional columns of its record, or of its table's rows, left out: what
-/// a schema requires of an input. Nushell holds a record to every field its type names and
-/// lets it carry more, so a caller passes the optional properties it has and none it does
-/// not; the fields a schema does not require are `oneof<T, nothing>` in the shape.
+/// The type a signature reads from the annotation: nu-parser keeps its type parser private, so the annotation is parsed as the type of a parameter.
+/// The type with the optional columns of its record, or of its table's rows, left out: what a schema requires of an input.
+/// Nushell holds a record to every field its type names and lets it carry more, so a caller passes the optional properties it has and none it does not; the fields a schema does not require are `oneof<T, nothing>` in the shape.
 fn required_columns(ty: &NuType) -> Result<NuType, String> {
     let parsed = parse_type(ty)?;
     let optional = |column: &Type| match column {
@@ -967,9 +946,8 @@ fn parse_type(ty: &NuType) -> Result<Type, String> {
     nu_shape(ty).map(|shape| shape.to_type())
 }
 
-/// The type as Nushell's parser reads it where a parameter declares it: the syntax shape of
-/// `p: <ty>`, which is what a signature built outside Nushell, a plugin's, declares. A `path`
-/// keeps its shape here, where [`nu_type`] reads it as the `string` it carries.
+/// The type as Nushell's parser reads it where a parameter declares it: the syntax shape of `p: <ty>`, which is what a signature built outside Nushell, a plugin's, declares.
+/// A `path` keeps its shape here, where [`nu_type`] reads it as the `string` it carries.
 pub fn nu_shape(ty: &NuType) -> Result<nu_protocol::SyntaxShape, String> {
     let mut working_set = StateWorkingSet::new(&ENGINE);
     let source = format!("def __nusage_type [p: {}] {{}}", ty.as_str());

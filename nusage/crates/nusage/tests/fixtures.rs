@@ -1,8 +1,7 @@
 //! Every fixture under `fixtures/` generates byte for byte what its `expected/<bin>.nu` says.
 //!
-//! The fixtures are the design: a hand-written target module per script or tree, with the
-//! cases `fixtures/verify.nu` runs against the pinned Nushell. This test keeps the generator
-//! honest to them; `mise run //nusage:verify-fixtures` keeps them honest to Nushell.
+//! The fixtures are the design: a hand-written target module per script or tree, with the cases `fixtures/verify.nu` runs against the pinned Nushell.
+//! This test keeps the generator honest to them; `mise run //nusage:verify-fixtures` keeps them honest to Nushell.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -11,8 +10,7 @@ fn fixtures_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
 }
 
-/// The source of a fixture: its single `script.nu`, its `<bin>.usage.kdl` spec, or its
-/// `<bin>/` tree, where `<bin>` is the module's name.
+/// The source of a fixture: its single `script.nu`, its `<bin>.usage.kdl` spec, or its `<bin>/` tree, where `<bin>` is the module's name.
 fn source_of(fixture: &Path, bin: &str) -> PathBuf {
     let single = fixture.join("script.nu");
     let spec = fixture.join(format!("{bin}.usage.kdl"));
@@ -68,9 +66,8 @@ fn fixtures_generate_their_expected_modules() {
     );
 }
 
-/// Every fixture module parses with Nushell's own parser, and defines every command its
-/// signature snapshot names. The parse runs in-process; the harness in `fixtures/verify.nu`
-/// still covers behaviour against the pinned binary.
+/// Every fixture module parses with Nushell's own parser, and defines every command its signature snapshot names.
+/// The parse runs in-process; the harness in `fixtures/verify.nu` still covers behaviour against the pinned binary.
 #[test]
 fn fixtures_parse_with_nu_parser() {
     use nu_protocol::engine::StateWorkingSet;
@@ -156,8 +153,7 @@ fn fixtures_parse_with_nu_parser() {
     );
 }
 
-/// Every single-script case parses through `nus parse` into the record it expects: the
-/// interpreter's half of the contract, without a Nushell.
+/// Every single-script case parses through `nus parse` into the record it expects: the interpreter's half of the contract, without a Nushell.
 #[test]
 fn script_cases_parse_through_the_interpreter() {
     use nu_protocol::Span;
@@ -218,8 +214,7 @@ fn script_cases_parse_through_the_interpreter() {
     );
 }
 
-/// A module of scripts stands on its own in any Nushell: a called script runs in the
-/// caller's, by `run`, so the module calls no `nus` and carries no helper to reach one.
+/// A module of scripts stands on its own in any Nushell: a called script runs in the caller's, by `run`, so the module calls no `nus` and carries no helper to reach one.
 #[test]
 fn a_module_of_scripts_runs_them_in_its_own_nushell() {
     let fixture = fixtures_dir().join("script-calls");

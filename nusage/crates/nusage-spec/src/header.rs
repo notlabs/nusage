@@ -6,15 +6,13 @@ use usage::kdl::{KdlDocument, KdlNode};
 
 use crate::Diagnostic;
 
-/// What one command declares, beyond what usage's parse of it keeps: its nodes as written,
-/// their type annotations, and its description.
+/// What one command declares, beyond what usage's parse of it keeps: its nodes as written, their type annotations, and its description.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Header {
     /// The file the declaration came from: the script, or the spec file.
     pub path: PathBuf,
-    /// The command's own nodes, in order, with their verbatim text and annotations. For a
-    /// script this is the whole header; for a `cmd` node of a spec file, its children other
-    /// than nested `cmd`s.
+    /// The command's own nodes, in order, with their verbatim text and annotations.
+    /// For a script this is the whole header; for a `cmd` node of a spec file, its children other than nested `cmd`s.
     pub nodes: Vec<HeaderNode>,
     /// usage `about` or a `cmd`'s `help`: the description.
     pub about: Option<String>,
@@ -35,18 +33,14 @@ pub struct HeaderNode {
     pub ty: Option<String>,
     /// The annotation on a nested `arg` child's first argument, for `flag "--x" { arg (int)"<n>" }`.
     pub nested_arg_ty: Option<String>,
-    /// An `output`'s `nusage-decode` child: the Nushell pipeline that turns the output's text
-    /// into a value, as written, for an output no `from` reader decodes. nusage's own node,
-    /// named as `nusage-args` is so that usage's grammar can grow without a collision, taken
-    /// out before usage reads the spec.
+    /// An `output`'s `nusage-decode` child: the Nushell pipeline that turns the output's text into a value, as written, for an output no `from` reader decodes. nusage's own node, named as `nusage-args` is so that usage's grammar can grow without a collision, taken out before usage reads the spec.
     pub decode: Option<String>,
     /// 1-based line of the file where the node starts.
     pub line: usize,
 }
 
 impl HeaderNode {
-    /// The annotation that types this node's value: a flag's nested `arg` wins over the flag
-    /// itself, so both `flag (int)"--n <n>"` and `flag "--n" { arg (int)"<n>" }` work.
+    /// The annotation that types this node's value: a flag's nested `arg` wins over the flag itself, so both `flag (int)"--n <n>"` and `flag "--n" { arg (int)"<n>" }` work.
     pub fn value_type(&self) -> Option<&str> {
         self.nested_arg_ty.as_deref().or(self.ty.as_deref())
     }
@@ -58,14 +52,11 @@ pub struct ScriptHeader {
     pub header: Header,
     /// The header's KDL, the `#USAGE` lines joined.
     pub kdl: String,
-    /// usage's parse: the whole spec for a root script; for a subcommand's, the spec that
-    /// wraps its header in a `cmd`, which [`ScriptHeader::cmd`] is taken from.
+    /// usage's parse: the whole spec for a root script; for a subcommand's, the spec that wraps its header in a `cmd`, which [`ScriptHeader::cmd`] is taken from.
     pub spec: usage::Spec,
-    /// The command this file declares: its args, flags, outputs, and for a subcommand its
-    /// `alias` and `hide` too.
+    /// The command this file declares: its args, flags, outputs, and for a subcommand its `alias` and `hide` too.
     pub cmd: usage::SpecCommand,
-    /// The declarations of the commands the spec's own `cmd` nodes declare below this one,
-    /// by their path under it.
+    /// The declarations of the commands the spec's own `cmd` nodes declare below this one, by their path under it.
     pub nested: BTreeMap<crate::CommandPath, Header>,
 }
 
@@ -82,10 +73,8 @@ fn blank_comment(line: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// The header lines of a script, each with its 1-based line number, as usage reads them: a
-/// shebang first, then `#USAGE` lines, blank comment lines allowed between them, stopping at
-/// the first other line. Another tool's directives belong before the first `#USAGE` line,
-/// where usage passes over them too.
+/// The header lines of a script, each with its 1-based line number, as usage reads them: a shebang first, then `#USAGE` lines, blank comment lines allowed between them, stopping at the first other line.
+/// Another tool's directives belong before the first `#USAGE` line, where usage passes over them too.
 fn extract(path: &Path, source: &str) -> Result<Vec<(usize, String)>, Diagnostic> {
     if !source.starts_with("#!") {
         return Err(Diagnostic::new(
@@ -148,8 +137,8 @@ fn decode_of(node: &KdlNode) -> Option<String> {
         .and_then(|child| string_arg(child, 0))
 }
 
-/// Take every output's `nusage-decode` child out of the document, so that usage, which knows no
-/// such node, reads the rest. Whether any was there.
+/// Take every output's `nusage-decode` child out of the document, so that usage, which knows no such node, reads the rest.
+/// Whether any was there.
 pub(crate) fn strip_decodes(doc: &mut KdlDocument) -> bool {
     let mut stripped = false;
     for node in doc.nodes_mut() {
@@ -169,8 +158,7 @@ pub(crate) fn strip_decodes(doc: &mut KdlDocument) -> bool {
     stripped
 }
 
-/// The [`HeaderNode`] of a parsed node, with `text` sliced from the source it was parsed
-/// from and `line` looked up through `line_of`.
+/// The [`HeaderNode`] of a parsed node, with `text` sliced from the source it was parsed from and `line` looked up through `line_of`.
 pub(crate) fn header_node(
     node: &KdlNode,
     source: &str,
@@ -190,8 +178,7 @@ pub(crate) fn header_node(
     }
 }
 
-/// Text to read in place of what a file holds on disk, by the file's path: what an editor
-/// has open and not yet saved.
+/// Text to read in place of what a file holds on disk, by the file's path: what an editor has open and not yet saved.
 pub type Texts = BTreeMap<PathBuf, String>;
 
 /// Read a root script's header: a usage spec, as its `#USAGE` lines spell it.
@@ -204,10 +191,7 @@ pub fn read_header_in(path: &Path, texts: &Texts) -> Result<ScriptHeader, Diagno
     read(path, None, texts)
 }
 
-/// Read a subcommand script's header: what a `cmd "<name>" { }` holds, as its `#USAGE`
-/// lines spell it, `about` and `long_about` standing for the command's `help` and
-/// `long_help`, so a subcommand declares what usage lets a command declare, an `alias` or
-/// `hide` included.
+/// Read a subcommand script's header: what a `cmd "<name>" { }` holds, as its `#USAGE` lines spell it, `about` and `long_about` standing for the command's `help` and `long_help`, so a subcommand declares what usage lets a command declare, an `alias` or `hide` included.
 pub fn read_subcommand_header(path: &Path, name: &str) -> Result<ScriptHeader, Diagnostic> {
     read(path, Some(name), &Texts::new())
 }
@@ -220,8 +204,7 @@ pub(crate) fn read_subcommand_header_in(
     read(path, Some(name), texts)
 }
 
-/// usage's spec beside a script, `.<file name>.usage.kdl`, which usage reads in place of the
-/// script's header; with its text, as `texts` holds it or as it is on disk.
+/// usage's spec beside a script, `.<file name>.usage.kdl`, which usage reads in place of the script's header; with its text, as `texts` holds it or as it is on disk.
 pub fn sidecar(script: &Path, texts: &Texts) -> Option<(PathBuf, String)> {
     let name = script.file_name()?.to_str()?;
     let file = script.with_file_name(format!(".{name}.usage.kdl"));
@@ -350,8 +333,7 @@ mod tests {
         dir
     }
 
-    /// As usage reads a script: the hidden spec beside it, in place of its header, which
-    /// declarations then name; and a relative `include` in either, from the file it is in.
+    /// As usage reads a script: the hidden spec beside it, in place of its header, which declarations then name; and a relative `include` in either, from the file it is in.
     #[test]
     fn a_sidecar_stands_in_for_the_header_and_includes_are_relative() {
         let dir = dir_of("sidecar");

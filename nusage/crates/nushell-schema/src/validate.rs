@@ -1,9 +1,6 @@
 //! Documents held to a schema, and a schema to the dialect.
 //!
-//! A `format` is asserted, not only annotated as draft 2020-12 has it by default: a reader
-//! converts a `date-time` string to a datetime after decoding, so a string that is not one
-//! would fail the conversion, and a check that let it through would hold the document to
-//! less than the reader relies on.
+//! A `format` is asserted, not only annotated as draft 2020-12 has it by default: a reader converts a `date-time` string to a datetime after decoding, so a string that is not one would fail the conversion, and a check that let it through would hold the document to less than the reader relies on.
 
 use std::sync::LazyLock;
 
@@ -16,8 +13,7 @@ use crate::dialect::{DIALECT_SCHEMA, VOCABULARY_META_ID, VOCABULARY_SCHEMA};
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum SchemaError {
-    /// The schema is not written in the dialect: what its meta-schema found, at the path in
-    /// the schema.
+    /// The schema is not written in the dialect: what its meta-schema found, at the path in the schema.
     #[error("not in the dialect: {path}: {what}")]
     Dialect {
         /// A JSON pointer into the schema.
@@ -55,8 +51,8 @@ static DIALECT: LazyLock<Validator> = LazyLock::new(|| {
         .expect("the dialect is a schema")
 });
 
-/// Whether the schema is written in the dialect: draft 2020-12, with `x-nu` where and as
-/// the vocabulary allows. The first thing wrong with it when not.
+/// Whether the schema is written in the dialect: draft 2020-12, with `x-nu` where and as the vocabulary allows.
+/// The first thing wrong with it when not.
 pub fn conforms(schema: &Value) -> Result<(), SchemaError> {
     DIALECT
         .validate(schema)

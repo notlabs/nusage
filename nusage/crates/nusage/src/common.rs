@@ -1,5 +1,4 @@
-//! What both targets share: the attribute alias, doc comments, parameters, the `$usage` a
-//! script's definition builds, relative paths.
+//! What both targets share: the attribute alias, doc comments, parameters, the `$usage` a script's definition builds, relative paths.
 
 use std::path::{Component, Path, PathBuf};
 
@@ -12,19 +11,15 @@ use nusage_nu::{
 /// The binary module's completer, which runs usage's against the spec.
 pub const SPEC_COMPLETER: &str = "nus complete";
 
-/// Which module a parameter is written for. In both, a counted flag is an `int` and a
-/// repeatable one a `list`, since a `def`'s flags cannot repeat.
+/// Which module a parameter is written for.
+/// In both, a counted flag is an `int` and a repeatable one a `list`, since a `def`'s flags cannot repeat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Target {
     /// A `def` that hands the script `$usage`: declared defaults apply.
     Script,
-    /// A `def` that runs a binary: no defaults, since the binary applies its own, and the
-    /// wrapper passes only what the call gave.
+    /// A `def` that runs a binary: no defaults, since the binary applies its own, and the wrapper passes only what the call gave.
     Binary,
-    /// A `def` that runs another script, named as a call writes it: it hands the script
-    /// `$usage` as a module's does, so declared defaults apply, and only static choices
-    /// complete, since that script's providers and usage's completer are not where the call
-    /// is.
+    /// A `def` that runs another script, named as a call writes it: it hands the script `$usage` as a module's does, so declared defaults apply, and only static choices complete, since that script's providers and usage's completer are not where the call is.
     Call,
 }
 
@@ -35,9 +30,8 @@ pub fn attr_usage_alias() -> Result<Stmt, SyntaxError> {
     })
 }
 
-/// `about` as the description paragraph, `long_about` as the extra ones. A `long_about` whose
-/// first paragraph says `about` again, as usage's `help` and `long_help` conventionally do,
-/// gives only the rest.
+/// `about` as the description paragraph, `long_about` as the extra ones.
+/// A `long_about` whose first paragraph says `about` again, as usage's `help` and `long_help` conventionally do, gives only the rest.
 pub fn doc_of(command: &Command) -> Vec<Vec<String>> {
     let mut doc = Vec::new();
     if let Some(about) = &command.about {
@@ -55,8 +49,7 @@ pub fn doc_of(command: &Command) -> Vec<Vec<String>> {
     doc
 }
 
-/// Whether a paragraph says `about` again: word for word, or with the period clap takes off
-/// a doc comment's first paragraph to make `about` and keeps in `long_about`.
+/// Whether a paragraph says `about` again: word for word, or with the period clap takes off a doc comment's first paragraph to make `about` and keeps in `long_about`.
 pub fn restates(paragraph: &str, about: &str) -> bool {
     let (paragraph, about) = (paragraph.trim(), about.trim());
     paragraph == about || paragraph.strip_suffix('.') == Some(about)
@@ -76,8 +69,7 @@ pub fn usage_attrs(command: &Command) -> Result<Vec<Attr>, SyntaxError> {
         .collect()
 }
 
-/// A model parameter as Nushell parameters: the parameter itself, then the switch that
-/// negates it when usage declares one.
+/// A model parameter as Nushell parameters: the parameter itself, then the switch that negates it when usage declares one.
 pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxError> {
     let completer = match &param.completer {
         Some(Completer::Inline(items)) => Some(NuCompleter::List(items.clone())),
@@ -152,8 +144,7 @@ pub fn nu_params(param: &Param, target: Target) -> Result<Vec<NuParam>, SyntaxEr
     Ok(params)
 }
 
-/// The `$usage` record a script's definition builds from its parameters, as usage would bind
-/// them: `{cmd, args, flags}`, every declared name present, keyed as the script reads it.
+/// The `$usage` record a script's definition builds from its parameters, as usage would bind them: `{cmd, args, flags}`, every declared name present, keyed as the script reads it.
 pub fn usage_record(command: &Command) -> Result<Expr, SyntaxError> {
     let cmd = Expr::Literal(Value::test_list(
         command
@@ -183,9 +174,8 @@ pub fn usage_record(command: &Command) -> Result<Expr, SyntaxError> {
     ]))
 }
 
-/// What a parameter contributes to `$usage`: its variable, except for a switch usage declares
-/// on by default, which stays on unless its `negate` flag is given, as usage's own parsers
-/// read it. A switch with a `negate` flag and no default is on when given and not negated.
+/// What a parameter contributes to `$usage`: its variable, except for a switch usage declares on by default, which stays on unless its `negate` flag is given, as usage's own parsers read it.
+/// A switch with a `negate` flag and no default is on when given and not negated.
 fn param_value(param: &Param) -> Result<Expr, SyntaxError> {
     let var = Expr::Var(Ident::new(&param.var)?);
     if param.kind != ParamKind::Switch {
@@ -225,8 +215,7 @@ fn flag_name(param: &Param) -> Result<FlagName, SyntaxError> {
     )
 }
 
-/// `target` relative to the directory `base`, with forward slashes, without touching the
-/// filesystem: both are made absolute against the current directory and folded first.
+/// `target` relative to the directory `base`, with forward slashes, without touching the filesystem: both are made absolute against the current directory and folded first.
 pub fn relative(base: &Path, target: &Path) -> String {
     let base = fold(&absolute(base));
     let target = fold(&absolute(target));
@@ -251,11 +240,8 @@ pub fn relative(base: &Path, target: &Path) -> String {
     }
 }
 
-/// The path absolute and as the filesystem has it, symlinks resolved: Nushell resolves a
-/// module's directory before it follows a relative `run` or `path self` from it, so a chain
-/// of `..` counted on a path with a symlink in it, `/var` for `/private/var` on macOS or a
-/// temporary directory elsewhere, would land one level off. What does not exist yet, the
-/// module about to be written, is resolved as far as it exists and kept as named below that.
+/// The path absolute and as the filesystem has it, symlinks resolved: Nushell resolves a module's directory before it follows a relative `run` or `path self` from it, so a chain of `..` counted on a path with a symlink in it, `/var` for `/private/var` on macOS or a temporary directory elsewhere, would land one level off.
+/// What does not exist yet, the module about to be written, is resolved as far as it exists and kept as named below that.
 fn absolute(path: &Path) -> PathBuf {
     let path = if path.is_absolute() {
         path.to_path_buf()
@@ -296,9 +282,7 @@ fn fold(path: &Path) -> PathBuf {
     out
 }
 
-/// The user's cache directory, as each platform has one: `XDG_CACHE_HOME` when it is set,
-/// on macOS too, as mise reads it, else `~/Library/Caches` there and `~/.cache` elsewhere;
-/// `LOCALAPPDATA` on Windows.
+/// The user's cache directory, as each platform has one: `XDG_CACHE_HOME` when it is set, on macOS too, as mise reads it, else `~/Library/Caches` there and `~/.cache` elsewhere; `LOCALAPPDATA` on Windows.
 pub fn cache_dir() -> PathBuf {
     let var = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
     if cfg!(windows) {
@@ -317,8 +301,7 @@ pub fn cache_dir() -> PathBuf {
     std::env::temp_dir()
 }
 
-/// FNV-1a over `bytes`, in hexadecimal: a name for contents that is the same from one build
-/// of nusage to the next.
+/// FNV-1a over `bytes`, in hexadecimal: a name for contents that is the same from one build of nusage to the next.
 pub fn fnv1a(bytes: impl IntoIterator<Item = u8>) -> String {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in bytes {
@@ -333,8 +316,7 @@ mod tests {
     use nusage_model::{Command, CommandPath, Execution};
     use std::path::Path;
 
-    /// A module written under a symlink runs its scripts by the real directory's depth, as
-    /// Nushell resolves the directory before it follows the path.
+    /// A module written under a symlink runs its scripts by the real directory's depth, as Nushell resolves the directory before it follows the path.
     #[cfg(unix)]
     #[test]
     fn relative_paths_count_from_the_real_directory() {

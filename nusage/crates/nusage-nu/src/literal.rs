@@ -5,19 +5,16 @@ use nu_protocol::engine::{EngineState, StateWorkingSet};
 
 use crate::{SyntaxError, Type};
 
-/// `to_nuon` wants an engine state only for closures and custom values, which a signature
-/// default never holds; the parser's engine, with Nushell's keywords, serves both uses.
+/// `to_nuon` wants an engine state only for closures and custom values, which a signature default never holds; the parser's engine, with Nushell's keywords, serves both uses.
 static ENGINE: LazyLock<EngineState> = LazyLock::new(nu_cmd_lang::create_default_context);
 
-/// A value as NUON, on one line, written by Nushell's own `nuon` crate: bare where Nushell
-/// reads a bare word as that value, quoted otherwise.
+/// A value as NUON, on one line, written by Nushell's own `nuon` crate: bare where Nushell reads a bare word as that value, quoted otherwise.
 pub fn nuon(value: &Value) -> String {
     nuon::to_nuon(&ENGINE, value, nuon::ToNuonConfig::default())
         .expect("a signature default has no closures or custom values")
 }
 
-/// A value as a signature's default: its NUON, in parentheses for a datetime, which a
-/// signature reads bare as something else.
+/// A value as a signature's default: its NUON, in parentheses for a datetime, which a signature reads bare as something else.
 pub fn default_text(value: &Value) -> String {
     match value {
         Value::Date { .. } => format!("({})", nuon(value)),
@@ -25,9 +22,8 @@ pub fn default_text(value: &Value) -> String {
     }
 }
 
-/// Whether Nushell's parser accepts the value as a default for a parameter of the type: the
-/// signature `[p: <ty> = <default>]` is parsed, and its error, if any, is the answer. This is
-/// the parser's own compatibility rule, coercions included, not a second one.
+/// Whether Nushell's parser accepts the value as a default for a parameter of the type: the signature `[p: <ty> = <default>]` is parsed, and its error, if any, is the answer.
+/// This is the parser's own compatibility rule, coercions included, not a second one.
 pub fn check_default(ty: &Type, value: &Value) -> Result<(), SyntaxError> {
     let source = format!(
         "def __nusage_probe [p: {} = {}] {{}}",

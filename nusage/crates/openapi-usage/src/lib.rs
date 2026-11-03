@@ -1,21 +1,13 @@
 //! An OpenAPI document as a usage spec, with the HTTP mapping beside it.
 //!
-//! usage describes a CLI: commands, their arguments and flags, and what they return. An API
-//! described by OpenAPI is the same shape once each operation is a command: a path
-//! parameter is a positional, a query or header parameter a flag, a JSON response an
-//! output with its schema. [`transform`] writes that spec, which usage's own tools then
-//! complete, document and check. What usage has no words for, the method, the path
-//! template, where each parameter goes on the wire, the request body and how the API is
-//! authenticated, goes in a second KDL document beside the spec, the [HTTP
-//! mapping](Transformed::http), for whatever runs the commands. Each output's schema is
-//! bundled into a file of its own, every `#/components/schemas/...` it reaches in its
-//! `$defs`, read as draft 2020-12 whatever version the document is.
+//! usage describes a CLI: commands, their arguments and flags, and what they return.
+//! An API described by OpenAPI is the same shape once each operation is a command: a path parameter is a positional, a query or header parameter a flag, a JSON response an output with its schema. [`transform`] writes that spec, which usage's own tools then complete, document and check.
+//! What usage has no words for, the method, the path template, where each parameter goes on the wire, the request body and how the API is authenticated, goes in a second KDL document beside the spec, the [HTTP mapping](Transformed::http), for whatever runs the commands.
+//! Each output's schema is bundled into a file of its own, every `#/components/schemas/...` it reaches in its `$defs`, read as draft 2020-12 whatever version the document is.
 //!
-//! OpenAPI 3.0 and 3.1 are read, from the document as a JSON value, which the `openapi-usage`
-//! binary reads from JSON or YAML. What is not read: cookie parameters, parameters with a
-//! `content` rather than a `schema`, per-operation security, and callbacks, links and
-//! webhooks. A boolean query or header parameter is a switch, sent as `true` when given, since
-//! a Nushell flag takes no boolean value.
+//! OpenAPI 3.0 and 3.1 are read, from the document as a JSON value, which the `openapi-usage` binary reads from JSON or YAML.
+//! What is not read: cookie parameters, parameters with a `content` rather than a `schema`, per-operation security, and callbacks, links and webhooks.
+//! A boolean query or header parameter is a switch, sent as `true` when given, since a Nushell flag takes no boolean value.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -39,12 +31,9 @@ pub struct Options {
 pub struct Transformed {
     /// The usage spec, as KDL.
     pub spec: String,
-    /// The HTTP mapping, as KDL: `base`, `auth`, and a `cmd` per command with its method,
-    /// path template, where each parameter goes and its body.
+    /// The HTTP mapping, as KDL: `base`, `auth`, and a `cmd` per command with its method, path template, where each parameter goes and its body.
     pub http: String,
-    /// Each schema the spec and the mapping name, by the path they name it with, relative
-    /// to the spec: `schemas/<cmd>.schema.json` for a command's output,
-    /// `schemas/<cmd>.body.schema.json` for its request body.
+    /// Each schema the spec and the mapping name, by the path they name it with, relative to the spec: `schemas/<cmd>.schema.json` for a command's output, `schemas/<cmd>.body.schema.json` for its request body.
     pub schemas: BTreeMap<String, Value>,
 }
 
@@ -579,8 +568,7 @@ fn resolve(doc: &Document, at: &str, value: &Value, kind: &str) -> Result<Value,
         })
 }
 
-/// The schema on its own: every `#/components/schemas/<name>` it reaches in its `$defs`,
-/// and the references rewritten to them.
+/// The schema on its own: every `#/components/schemas/<name>` it reaches in its `$defs`, and the references rewritten to them.
 fn bundle(doc: &Document, at: &str, schema: &Value) -> Result<Value, Error> {
     let mut defs = Map::new();
     let mut pending: Vec<String> = Vec::new();
@@ -647,9 +635,7 @@ fn rewrite(schema: &mut Value, at: &str, pending: &mut Vec<String>) -> Result<()
     Ok(())
 }
 
-/// How the API is authenticated, from the document's `security` and the schemes it names:
-/// an `auth` node per scheme, `"bearer"`, `"basic"`, `"header"` or `"query"` with the
-/// `name` of the key, or the scheme's type as written for the rest.
+/// How the API is authenticated, from the document's `security` and the schemes it names: an `auth` node per scheme, `"bearer"`, `"basic"`, `"header"` or `"query"` with the `name` of the key, or the scheme's type as written for the rest.
 fn auths(doc: &Document) -> Vec<Node> {
     let Some(requirement) = doc.security.first() else {
         return Vec::new();
@@ -692,8 +678,7 @@ fn command_name(operation: &Operation, method: &str, path: &str) -> String {
     word(&format!("{method} {}", words.join(" ")))
 }
 
-/// Text as a word of a spec: lower case, the words joined by `-`, a camel-case boundary a
-/// word boundary too.
+/// Text as a word of a spec: lower case, the words joined by `-`, a camel-case boundary a word boundary too.
 fn word(text: &str) -> String {
     let mut out = String::new();
     let mut previous_lower = false;
@@ -725,8 +710,7 @@ fn line(text: &str) -> String {
         .join(" ")
 }
 
-/// A KDL node as a spec is written by hand: `name "arg" key="value" { children }`, every
-/// string quoted, so a KDL reader of either version takes it.
+/// A KDL node as a spec is written by hand: `name "arg" key="value" { children }`, every string quoted, so a KDL reader of either version takes it.
 struct Node {
     name: String,
     args: Vec<Entry>,

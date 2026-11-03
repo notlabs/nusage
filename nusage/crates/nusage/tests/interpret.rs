@@ -1,7 +1,5 @@
-//! `nus <script>` runs the script in the `nu` on PATH, as Nushell runs any script, with the
-//! definitions of the scripts it calls before it: a call returns the called script's value,
-//! typed, in the caller's own Nushell, and what the script prints, reads and exits with are
-//! Nushell's. Without `nu` on PATH the runs are skipped, except in CI, where they fail.
+//! `nus <script>` runs the script in the `nu` on PATH, as Nushell runs any script, with the definitions of the scripts it calls before it: a call returns the called script's value, typed, in the caller's own Nushell, and what the script prints, reads and exits with are Nushell's.
+//! Without `nu` on PATH the runs are skipped, except in CI, where they fail.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -30,8 +28,7 @@ fn scripts(files: &[(&str, &str)]) -> PathBuf {
     dir
 }
 
-/// `nus <script> <args>` in `dir`, with `input` on standard input when given, and the cache
-/// in `dir`; `None` when there is no `nu` to run it.
+/// `nus <script> <args>` in `dir`, with `input` on standard input when given, and the cache in `dir`; `None` when there is no `nu` to run it.
 fn nus(dir: &Path, script: &str, args: &[&str], input: Option<&str>) -> Option<Output> {
     nus_with(dir, script, args, input, &[])
 }
@@ -173,8 +170,7 @@ fn definitions_are_kept_once_for_their_contents() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
-/// A script's spec may mount commands, which it then runs: usage reads the arguments by the
-/// mounted spec, `$usage.cmd` names the command, and a call of it is typed by it too.
+/// A script's spec may mount commands, which it then runs: usage reads the arguments by the mounted spec, `$usage.cmd` names the command, and a call of it is typed by it too.
 #[cfg(unix)]
 #[test]
 fn a_script_runs_the_commands_its_spec_mounts() {
@@ -212,9 +208,8 @@ fn a_script_runs_the_commands_its_spec_mounts() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
-/// A script gets a module by calling it: a call nothing defines whose word `NUS_MODULES`
-/// names is the module's, imported by its absolute path. The project's version of the tool
-/// the package wraps must be the one it was generated from.
+/// A script gets a module by calling it: a call nothing defines whose word `NUS_MODULES` names is the module's, imported by its absolute path.
+/// The project's version of the tool the package wraps must be the one it was generated from.
 #[test]
 fn a_call_gets_the_module_its_word_names() {
     let package = scripts(&[

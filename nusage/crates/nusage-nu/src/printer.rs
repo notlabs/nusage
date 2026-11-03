@@ -1,10 +1,7 @@
 //! The printer: one genco template per shape of output.
 //!
-//! Layout lives in the templates, where it reads as the Nushell it produces. The only rules
-//! outside them are a record's breaking (a statement's value, or more than three fields, goes
-//! one field per line), the alignment of parameter comments, and that documentation is
-//! commented line by line: a description's lines each get a `#`, and a parameter's lines are
-//! joined, since Nushell reads only the comment on the parameter's own line.
+//! Layout lives in the templates, where it reads as the Nushell it produces.
+//! The only rules outside them are a record's breaking (a statement's value, or more than three fields, goes one field per line), the alignment of parameter comments, and that documentation is commented line by line: a description's lines each get a `#`, and a parameter's lines are joined, since Nushell reads only the comment on the parameter's own line.
 
 use genco::quote;
 
@@ -12,8 +9,8 @@ use crate::literal::{Value, nuon};
 use crate::syntax::*;
 
 genco::impl_lang! {
-    /// Nushell for genco: the default four-space indentation and nothing else. Quoting is not
-    /// genco's; words go through [`word`] and values through [`nuon`].
+    /// Nushell for genco: the default four-space indentation and nothing else.
+    /// Quoting is not genco's; words go through [`word`] and values through [`nuon`].
     pub Nu {
         type Config = ();
         type Format = ();
@@ -38,9 +35,7 @@ pub fn print(module: &Module) -> String {
         .expect("formatting into a String cannot fail")
 }
 
-/// A definition on one line, for Nushell that must fit where one line stood: no comments,
-/// no attributes, the parameters separated by commas, the statements by semicolons, and what
-/// the printer would break over lines, such as a long record, on one with spaces between.
+/// A definition on one line, for Nushell that must fit where one line stood: no comments, no attributes, the parameters separated by commas, the statements by semicolons, and what the printer would break over lines, such as a long record, on one with spaces between.
 pub fn print_line(def: &Def) -> String {
     let params: Vec<String> = def.params.iter().map(param_text).collect();
     let io = match &def.io {
@@ -105,14 +100,12 @@ fn def_tokens(def: &Def) -> Tokens {
     }
 }
 
-/// A verbatim block, line by line, so genco's indentation cannot touch it; a blank line in
-/// it stays one blank line.
+/// A verbatim block, line by line, so genco's indentation cannot touch it; a blank line in it stays one blank line.
 fn verbatim_tokens(source: &str) -> Tokens {
     quote!($(for line in source.trim_end().lines() => $(if line.is_empty() { $['\n'] } else { $(line.to_string())$['\r'] })))
 }
 
-/// `[` one parameter per line `]`, trailing comments aligned two columns past the longest
-/// parameter, then `: input -> output` when declared.
+/// `[` one parameter per line `]`, trailing comments aligned two columns past the longest parameter, then `: input -> output` when declared.
 fn signature(params: &Params, io: &Option<(Type, Type)>) -> Tokens {
     let texts: Vec<String> = params.iter().map(|param| param_text(param) + ",").collect();
     let width = texts.iter().map(String::len).max().unwrap_or(0);
@@ -136,8 +129,7 @@ fn signature(params: &Params, io: &Option<(Type, Type)>) -> Tokens {
     }
 }
 
-/// An attribute argument: single-quoted so it reads as written, or a raw string when it
-/// contains `'`.
+/// An attribute argument: single-quoted so it reads as written, or a raw string when it contains `'`.
 fn attr_arg(text: &str) -> String {
     if !text.contains('\'') {
         return format!("'{text}'");
@@ -251,9 +243,8 @@ fn stmt_tokens(stmt: &Stmt) -> Tokens {
     }
 }
 
-/// An expression; `statement_value` is a record that is the whole right side of a `let`. A
-/// record goes one field per line when it is that, has more than three fields, or holds a
-/// closure.
+/// An expression; `statement_value` is a record that is the whole right side of a `let`.
+/// A record goes one field per line when it is that, has more than three fields, or holds a closure.
 fn expr_tokens(expr: &Expr, statement_value: bool) -> Tokens {
     match expr {
         Expr::Var(name) => quote!($(format!("${}", name.as_str()))),
