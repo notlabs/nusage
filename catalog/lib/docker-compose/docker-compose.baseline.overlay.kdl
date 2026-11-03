@@ -1,4 +1,4 @@
-// Keep this first integration baseline to the two output paths described in README.md.
+// Keep this integration baseline to the three output paths described in README.md.
 // The complete adapter export remains in docker-compose.usage.kdl.
 cmd "alpha" hide=#true
 cmd "attach" hide=#true
@@ -18,7 +18,6 @@ cmd "kill" hide=#true
 cmd "logs" hide=#true
 cmd "pause" hide=#true
 cmd "port" hide=#true
-cmd "ps" hide=#true
 cmd "publish" hide=#true
 cmd "pull" hide=#true
 cmd "push" hide=#true

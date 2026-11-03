@@ -36,3 +36,15 @@ cmd "ls" {
 """#
     }
 }
+
+cmd "ps" {
+    // The schema suite owns --format json --no-trunc. Other stdout modes are external-only.
+    flag "--format" hide=#true
+    flag "--no-trunc" hide=#true
+    flag "-q --quiet" hide=#true
+    flag "--services" hide=#true
+    // Preserve Compose's default (true); a plain switch cannot express --orphans=false.
+    flag "--orphans" hide=#true
+    // The Cobra adapter loses pflag's StringArray type.
+    flag "--status" var=#true
+}

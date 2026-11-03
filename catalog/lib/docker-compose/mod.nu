@@ -179,6 +179,39 @@ export def "docker-compose ls" [
     nus decoded $text "{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"Name\",\"Status\",\"ConfigFiles\"],\"properties\":{\"Name\":{\"type\":\"string\"},\"Status\":{\"type\":\"string\"},\"ConfigFiles\":{\"type\":\"string\"}}}}" { from json }
 }
 
+# List containers
+@usage 'flag "-a --all" help="Show all stopped containers (including those created by the run command)"'
+@usage 'flag --filter help="Filter services by a property (supported filters: status)" {
+        arg <FILTER>
+    }'
+@usage r#'flag "--format" help="Format output using a custom template:\n'table':            Print output in table format with column headers (default)\n'table TEMPLATE':   Print output in table format using the given Go template\n'json':             Print in JSON format\n'TEMPLATE':         Print output using the given Go template.\nRefer to https://docs.docker.com/go/formatting/ for more information about formatting output with templates" hide=#true {
+        arg <FORMAT>
+    }'#
+@usage r#'flag "--no-trunc" help="Don't truncate output" hide=#true'#
+@usage 'flag "--orphans" help="Include orphaned services (not declared by project)" default="true" hide=#true'
+@usage 'flag "-q --quiet" help="Only display IDs" hide=#true'
+@usage 'flag "--services" help="Display services" hide=#true'
+@usage 'flag "--status" help="Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]" var=#true {
+        arg <STATUS>
+    }'
+@usage 'arg "[SERVICE...]" required=#false'
+@usage 'output "json" framing="jsonl" { schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"Docker Compose v5.6.1 ps JSON line\",\n  \"description\": \"ContainerContext accessors, with --format json --no-trunc. Display strings are retained as strings; Publishers may be null.\",\n  \"type\": \"object\",\n  \"required\": [\n    \"Command\",\n    \"CreatedAt\",\n    \"Engine\",\n    \"ExitCode\",\n    \"Health\",\n    \"ID\",\n    \"Image\",\n    \"Labels\",\n    \"LocalVolumes\",\n    \"Mounts\",\n    \"Name\",\n    \"Names\",\n    \"Networks\",\n    \"Ports\",\n    \"Project\",\n    \"Publishers\",\n    \"RunningFor\",\n    \"Service\",\n    \"Size\",\n    \"State\",\n    \"Status\"\n  ],\n  \"properties\": {\n    \"Command\": {\n      \"type\": \"string\"\n    },\n    \"CreatedAt\": {\n      \"type\": \"string\"\n    },\n    \"Engine\": {\n      \"type\": \"string\"\n    },\n    \"ExitCode\": {\n      \"type\": \"integer\"\n    },\n    \"Health\": {\n      \"type\": \"string\"\n    },\n    \"ID\": {\n      \"type\": \"string\"\n    },\n    \"Image\": {\n      \"type\": \"string\"\n    },\n    \"Labels\": {\n      \"type\": \"string\"\n    },\n    \"LocalVolumes\": {\n      \"type\": \"string\"\n    },\n    \"Mounts\": {\n      \"type\": \"string\"\n    },\n    \"Name\": {\n      \"type\": \"string\"\n    },\n    \"Names\": {\n      \"type\": \"string\"\n    },\n    \"Networks\": {\n      \"type\": \"string\"\n    },\n    \"Ports\": {\n      \"type\": \"string\"\n    },\n    \"Project\": {\n      \"type\": \"string\"\n    },\n    \"Publishers\": {\n      \"type\": [\n        \"array\",\n        \"null\"\n      ],\n      \"items\": {\n        \"type\": \"object\",\n        \"required\": [\n          \"URL\",\n          \"TargetPort\",\n          \"PublishedPort\",\n          \"Protocol\"\n        ],\n        \"properties\": {\n          \"URL\": {\n            \"type\": \"string\"\n          },\n          \"TargetPort\": {\n            \"type\": \"integer\"\n          },\n          \"PublishedPort\": {\n            \"type\": \"integer\"\n          },\n          \"Protocol\": {\n            \"type\": \"string\"\n          }\n        }\n      }\n    },\n    \"RunningFor\": {\n      \"type\": \"string\"\n    },\n    \"Service\": {\n      \"type\": \"string\"\n    },\n    \"Size\": {\n      \"type\": \"string\"\n    },\n    \"State\": {\n      \"type\": \"string\"\n    },\n    \"Status\": {\n      \"type\": \"string\"\n    }\n  }\n}\n" }'
+export def "docker-compose ps" [
+    ...service: string,
+    --dry-run,               # Execute command in dry run mode
+    --all (-a),              # Show all stopped containers (including those created by the run command)
+    --filter: string,        # Filter services by a property (supported filters: status)
+    --status: list<string>,  # Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]
+]: nothing -> table<Command: string, CreatedAt: string, Engine: string, ExitCode: int, Health: string, ID: string, Image: string, Labels: string, LocalVolumes: string, Mounts: string, Name: string, Names: string, Networks: string, Ports: string, Project: string, Publishers: oneof<table<URL: string, TargetPort: int, PublishedPort: int, Protocol: string>, nothing>, RunningFor: string, Service: string, Size: string, State: string, Status: string> {
+    let text = ^docker-compose ps --format json --no-trunc ...(nus argv [...$service] {
+        --dry-run: $dry_run
+        --all: $all
+        --filter: $filter
+        --status: $status
+    })
+    nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"Docker Compose v5.6.1 ps JSON line\",\"description\":\"ContainerContext accessors, with --format json --no-trunc. Display strings are retained as strings; Publishers may be null.\",\"type\":\"object\",\"required\":[\"Command\",\"CreatedAt\",\"Engine\",\"ExitCode\",\"Health\",\"ID\",\"Image\",\"Labels\",\"LocalVolumes\",\"Mounts\",\"Name\",\"Names\",\"Networks\",\"Ports\",\"Project\",\"Publishers\",\"RunningFor\",\"Service\",\"Size\",\"State\",\"Status\"],\"properties\":{\"Command\":{\"type\":\"string\"},\"CreatedAt\":{\"type\":\"string\"},\"Engine\":{\"type\":\"string\"},\"ExitCode\":{\"type\":\"integer\"},\"Health\":{\"type\":\"string\"},\"ID\":{\"type\":\"string\"},\"Image\":{\"type\":\"string\"},\"Labels\":{\"type\":\"string\"},\"LocalVolumes\":{\"type\":\"string\"},\"Mounts\":{\"type\":\"string\"},\"Name\":{\"type\":\"string\"},\"Names\":{\"type\":\"string\"},\"Networks\":{\"type\":\"string\"},\"Ports\":{\"type\":\"string\"},\"Project\":{\"type\":\"string\"},\"Publishers\":{\"type\":[\"array\",\"null\"],\"items\":{\"type\":\"object\",\"required\":[\"URL\",\"TargetPort\",\"PublishedPort\",\"Protocol\"],\"properties\":{\"URL\":{\"type\":\"string\"},\"TargetPort\":{\"type\":\"integer\"},\"PublishedPort\":{\"type\":\"integer\"},\"Protocol\":{\"type\":\"string\"}}}},\"RunningFor\":{\"type\":\"string\"},\"Service\":{\"type\":\"string\"},\"Size\":{\"type\":\"string\"},\"State\":{\"type\":\"string\"},\"Status\":{\"type\":\"string\"}}}" { from json --objects } --lines
+}
+
 # Show the Docker Compose version information
 @usage 'flag "-f --format" help="Format the output. Values: [pretty | json]. (Default: pretty)" {
         arg <FORMAT>
