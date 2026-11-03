@@ -9,6 +9,25 @@
 "~/.config/mise/conf.d/nusage/mise.nus-lsp.toml" = { source = "conf.d/nusage/mise.nus-lsp.toml", mode = "symlink" }
 "~/.config/mise/conf.d/nusage/mise.nus-kakehashi.toml" = { source = "conf.d/nusage/mise.nus-kakehashi.toml", mode = "symlink" }
 
+# nusage's activation for Nushell, in place of `mise activate nu`, beside Nushell's
+# configuration on each system, and an autoloaded file that uses it as `config.nu` would, so
+# that `config.nu` itself is left alone.
+[dotfiles.nus-activate]
+source = "crates/nusage/src/activate.nu"
+mode = "symlink"
+variants = [
+  { os = "linux", target = "~/.config/nushell/nus.nu" },
+  { os = "macos", target = "~/Library/Application Support/nushell/nus.nu" },
+]
+
+[dotfiles.nus-activate-use]
+source = "conf.d/nushell/autoload/nus.nu"
+mode = "symlink"
+variants = [
+  { os = "linux", target = "~/.config/nushell/autoload/nus.nu" },
+  { os = "macos", target = "~/Library/Application Support/nushell/autoload/nus.nu" },
+]
+
 [task_config]
 shell = "nu -c"
 # A cached result is also keyed by the variables that change what Cargo builds.

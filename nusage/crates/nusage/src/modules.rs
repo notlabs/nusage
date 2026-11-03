@@ -72,9 +72,18 @@ pub fn every() -> (Vec<PathBuf>, Vec<String>) {
 
 /// The lines that give a script its modules: `use <module> *`, by absolute path.
 pub fn uses(modules: &[PathBuf]) -> Vec<String> {
+    lines("use", modules)
+}
+
+/// The lines of a module that exports the modules' commands, for `overlay use`: `export use <module> *`, by absolute path.
+pub fn exports(modules: &[PathBuf]) -> Vec<String> {
+    lines("export use", modules)
+}
+
+fn lines(keyword: &str, modules: &[PathBuf]) -> Vec<String> {
     modules
         .iter()
-        .map(|dir| format!("use {} *", nusage_nu::word(&dir.to_string_lossy())))
+        .map(|dir| format!("{keyword} {} *", nusage_nu::word(&dir.to_string_lossy())))
         .collect()
 }
 
@@ -249,6 +258,13 @@ mod tests {
             uses(&found),
             [format!(
                 "use {} *",
+                nusage_nu::word(&module.to_string_lossy())
+            )]
+        );
+        assert_eq!(
+            exports(&found),
+            [format!(
+                "export use {} *",
                 nusage_nu::word(&module.to_string_lossy())
             )]
         );

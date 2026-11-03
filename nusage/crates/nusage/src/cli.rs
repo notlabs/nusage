@@ -30,6 +30,8 @@ pub enum Commands {
     Overlay(Overlay),
     Lsp(Lsp),
     Nu(Nu),
+    Activate(Activate),
+    Modules(Modules),
     Parse(Parse),
     Prelude(Prelude),
     Inspect(Inspect),
@@ -364,5 +366,49 @@ impl Run for Nu {
     fn run(self) -> Self::Output {
         let code = crate::nu(&self.args).map_err(|err| err.to_string())?;
         std::process::exit(code)
+    }
+}
+
+/// Print what activates mise and nusage in a shell, in place of `mise activate`
+///
+/// For Nushell, `nu`, save it beside Nushell's configuration, `nus activate nu | save --force ($nu.default-config-dir | path join nus.nu)`, and use it from `config.nu` instead of `mise activate nu`'s: `use ($nu.default-config-dir | path join nus.nu)`.
+/// It is one file for every nusage and machine, so it is saved once, or linked into place.
+/// The environment mise resolves for the working directory and `MISE_ENV` is then an overlay, and the typed commands of the packages it names, as `nus modules` writes them, another.
+/// Before each prompt a hook asks mise for the environment and, when it changed, hides the last environment's overlays and uses this one's, so the line after a `cd` has them and leaving takes away all they set.
+/// What is set at the prompt lands in the overlay `prompt` above them, and stays; it has `mise shell`.
+/// Only an interactive shell is activated.
+#[derive(Args)]
+pub struct Activate {
+    /// The shell: `nu`
+    shell: String,
+}
+
+impl Run for Activate {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        print!("{}", crate::activate::script(&self.shell)?);
+        Ok(())
+    }
+}
+
+/// Print a module that exports every package `NUS_MODULES` names, for `overlay use`
+///
+/// A package whose tool `NUS_TOOLS` gives at another version than the package was generated from is left out, and why is said on standard error, so a session has the rest.
+#[derive(Args)]
+pub struct Modules;
+
+impl Run for Modules {
+    type Output = Result<(), String>;
+
+    fn run(self) -> Self::Output {
+        let (modules, left) = crate::modules::every();
+        for why in &left {
+            eprintln!("nus: {why}");
+        }
+        for line in crate::modules::exports(&modules) {
+            println!("{line}");
+        }
+        Ok(())
     }
 }

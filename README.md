@@ -33,6 +33,22 @@ In a project that includes `nusage/conf.d/nus.toml`, `nu` is `nus nu`, which ser
 Elsewhere, after `mise dot apply`, `MISE_ENV=nus-lsp` in the editor's environment does the same, and `MISE_ENV=nus-lsp,nus-kakehashi` adds [kakehashi](https://github.com/atusy/kakehashi), which highlights a script's header as KDL.
 A project with its own `[wrappers.nu]` keeps nusage's server with `command = "nus"` and `args = ["nu"]`.
 
+## Interactive Nushell
+
+`nus activate nu` takes the place of `mise activate nu`:
+
+```nu
+nus activate nu | save --force ($nu.default-config-dir | path join nus.nu)
+# in config.nu:
+use ($nu.default-config-dir | path join nus.nu)
+```
+
+The file is the same for every nusage and every machine; in a checkout of this repository, `mise dot apply` links it into place with an autoloaded file that uses it, leaving `config.nu` alone.
+Before each prompt, the environment mise resolves for the directory and `MISE_ENV` becomes an overlay, and the typed commands of its packages another, so leaving a project takes away everything they set; `$env.MISE_ENV = null` leaves an environment.
+What is set at the prompt stays across directories, though a `PATH` set there hides mise's for the rest of the session, and `mise shell` works as it does with mise's own activation.
+Take a variable away with `$env.NAME = null`, not `hide-env`, which Nushell undoes at the next change of environment.
+A shell that starts with mise's environment already set has it taken out first; a script and `nu --mcp` keep the environment they started with.
+
 ## Development
 
 The tools install with `mise install --monorepo`.

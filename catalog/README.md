@@ -25,7 +25,7 @@ jj log --revision ["@"] | first | get change_id
 
 A call whose first word is a package's gets `use <module> *` before the script; a package whose tool the project has at another version than it was generated from is refused, and `^jj` is still the binary.
 The include also makes `nu` the `nus nu` wrapper; run `mise reshim` after adding it.
-An interactive session imports a package itself, by the path `mise where` gives.
+An interactive Nushell gets the packages from `nus activate nu`, as the root README describes.
 
 The tasks are also published as the OCI task catalog `ghcr.io/notlabs/nusage-tasks`, for a project with its own `[_.nusage.catalog]` entries: `[task_config] includes = ["oci::ghcr.io/notlabs/nusage-tasks:<version>"]`.
 They need `nus`, `nu` and `usage` on PATH; a `clap` entry also Cargo and rustfmt, an `openapi` entry `openapi-usage`.

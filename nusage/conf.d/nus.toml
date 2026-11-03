@@ -1,9 +1,10 @@
 # nusage for a project that includes this file beside its own tools: nusage, the catalog's
 # packages it uses, and the tools those wrap, at the versions the packages were generated
-# from. nus reads both variables; `nu` is `nus nu`.
+# from. nus reads both variables; `nu` is `nus nu`. mise hands the templates its tools in no
+# fixed order, so each sorts its entries, and the same tools give the same value.
 [env]
-NUS_MODULES = { value = "{ {%- for name, tool in tools -%}{%- if 'packslip:github.com/notlabs/nusage/catalog/' in name -%}{%- set module = name | split(pat='/') | last -%}'{{ module }}': '{{ tool.path }}/{{ module }}', {% endif -%}{%- endfor -%} }", tools = true }
-NUS_TOOLS = { value = "{ {%- for name, tool in tools -%}'{{ name }}': '{{ tool.version }}', {% endfor -%} }", tools = true }
+NUS_MODULES = { value = '''{%- set_global entries = [] -%}{%- for name, tool in tools -%}{%- if 'packslip:github.com/notlabs/nusage/catalog/' in name -%}{%- set module = name | split(pat='/') | last -%}{%- set_global entries = entries | concat(with="'" ~ module ~ "': '" ~ tool.path ~ "/" ~ module ~ "'") -%}{%- endif -%}{%- endfor -%}{ {{ entries | sort | join(sep=", ") }} }''', tools = true }
+NUS_TOOLS = { value = '''{%- set_global entries = [] -%}{%- for name, tool in tools -%}{%- set_global entries = entries | concat(with="'" ~ name ~ "': '" ~ tool.version ~ "'") -%}{%- endfor -%}{ {{ entries | sort | join(sep=", ") }} }''', tools = true }
 
 [wrappers.nu]
 command = "nus"
