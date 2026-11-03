@@ -1,6 +1,5 @@
-# Markdown as `jj fix` formats it and the lint checks it: prose wrapped at 95 columns, as the
-# repository writes it, and a paragraph that runs past them rewrapped; tables and code keep
-# their width. release-plz writes the changelog.
+# Prose takes semantic line breaks, a line per sentence or clause, within 95 columns; tables and
+# code keep their width. release-plz writes the changelog.
 [global]
 exclude = ["CHANGELOG.md"]
 
@@ -9,3 +8,4 @@ line-length = 95
 tables = false
 code-blocks = false
 reflow = true
+reflow-mode = "semantic-line-breaks"
