@@ -1,23 +1,10 @@
 name: release
 
-# After CI succeeds for the current main commit, release-plz tags the version Cargo.toml
-# declares at that exact checked commit when no tag exists. The version and changelog are
-# committed beforehand (`mise run release`); validation is CI's, so release assembly need not
-# repeat it. A checked commit that is not a release is a prerelease instead: the next patch
-# version after the last release, with the number of commits since it, `v0.1.2-dev.37`, which
-# CI sets in its own checkout before building, so the binary reports it. Either way the
-# binaries `plan` names are attached to a draft release, and the release published.
-# The workflow's own token is enough: a tag it pushes runs no other workflow.
-#
-# The catalog's tasks release apart, by the same rule: a checked main commit whose
-# `catalog_version` has no release yet pushes the tasks `//catalog:assemble` writes to GHCR
-# as the OCI task catalog `ghcr.io/<repository>-tasks:<version>`, and is tagged
-# `catalog/v<version>`.
-#
-# Each catalog entry with a `version` is a package of its own, the packslip project
-# `github.com/<repository>/catalog/<tool>`: publish the archive `//catalog:pack` writes and
-# sign it with this workflow's identity, by a job that cannot change the release. Retry
-# releases missing an archive or bundle, preserving any archive already uploaded.
+# After CI succeeds for a main commit, that exact commit is released: nusage's version or a
+# prerelease of it, the task catalog's version, and each catalog package's, each when it has
+# no release yet. Validation is CI's, so nothing here repeats it, and what is published is
+# built from the checkout alone, with no cache. The workflow's own token is enough: a tag it
+# pushes runs no other workflow.
 on:
   # Jobs accept only successful same-repository pushes whose checked SHA is still main's
   # event SHA, matching the attestation's OIDC source. Superseded completions are skipped.
@@ -154,7 +141,6 @@ jobs:
         with:
           ref: refs/tags/${{ needs.plan.outputs.tag }}
           persist-credentials: false
-      # No cache: what is published is built from the checkout alone.
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
@@ -219,7 +205,6 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       MBX_DISABLE: "1"
-      # Nor mise's task results: what is published is built from the checkout alone.
       MISE_TASK_CACHE: "off"
     outputs:
       released: ${{ steps.release.outputs.released }}
@@ -228,7 +213,6 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
-      # Published packages are built from the checkout alone.
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
@@ -299,6 +283,8 @@ jobs:
           test -f "$BUNDLE"
           gh release upload "$TAG" "$BUNDLE" --repo "$GITHUB_REPOSITORY" --clobber
 
+  # The task catalog, pushed to GHCR as `ghcr.io/<repository>-tasks:<version>` and tagged
+  # `catalog/v<version>`.
   catalog:
     if: >-
       github.event_name == 'workflow_run' &&
@@ -315,7 +301,6 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       MBX_DISABLE: "1"
-      # Nor mise's task results: a task the assembly depends on runs here.
       MISE_TASK_CACHE: "off"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -343,8 +328,6 @@ jobs:
             echo "tag=$tag"
             echo "released=$released"
           } >> "$GITHUB_OUTPUT"
-      # This exact commit passed CI. Build its interpreter and assemble its committed
-      # catalog without repeating validation. Published builds still use no cache.
       - if: steps.version.outputs.released == 'false'
         run: mise install --monorepo --locked
       - if: steps.version.outputs.released == 'false'
