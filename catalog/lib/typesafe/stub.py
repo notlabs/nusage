@@ -8,6 +8,7 @@ validation detail, and a request without the bearer token `test` a 401.
 """
 
 import json
+import os
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -124,8 +125,12 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     port_file = sys.argv[1]
     server = HTTPServer(("127.0.0.1", 0), Handler)
-    with open(port_file, "w") as out:
+    # The check waits for the file to exist and then reads it, so it must appear whole:
+    # written beside it and renamed into place, never seen empty.
+    written = port_file + ".part"
+    with open(written, "w") as out:
         out.write(str(server.server_address[1]))
+    os.replace(written, port_file)
     server.serve_forever()
 
 
