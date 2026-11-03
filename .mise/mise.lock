@@ -305,6 +305,47 @@ url = "https://github.com/jdx/mr-boxington/releases/download/v1.27.0/mbx-x86_64-
 signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
 repository_ids = { repository = "1340721957" }
 
+[[tools.release-plz]]
+version = "0.4.2"
+backend = "aqua:release-plz/release-plz"
+specifiers = ["0.4.2"]
+
+[tools.release-plz."platforms.linux-arm64"]
+checksum = "sha256:21fe301c6eff58ff1ef592aec5360cf680e3b4662dc1da3d6382fd9100a7fb04"
+checksum_source = "mise-versions"
+url = "https://github.com/release-plz/release-plz/releases/download/release-plz-v0.4.2/release-plz-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/release-plz/release-plz/releases/assets/680891498"
+
+[tools.release-plz."platforms.linux-arm64-musl"]
+checksum = "sha256:b097b7a8c6f7f656b56e6a5cf0d9dafc103c59247332885b1e23491a976c2be5"
+checksum_source = "mise-versions"
+url = "https://github.com/release-plz/release-plz/releases/download/release-plz-v0.4.2/release-plz-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/release-plz/release-plz/releases/assets/680889711"
+
+[tools.release-plz."platforms.linux-x64"]
+checksum = "sha256:bd7c3adc1a4ed3831e6bfde51b92b168f32ab6d15cd210ed88044e7f858f0cae"
+checksum_source = "mise-versions"
+url = "https://github.com/release-plz/release-plz/releases/download/release-plz-v0.4.2/release-plz-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/release-plz/release-plz/releases/assets/680882831"
+
+[tools.release-plz."platforms.linux-x64-musl"]
+checksum = "sha256:b13410802d13fc8ecc73120ec370447b21b4ec093c6a722d5a4109bec9ea4920"
+checksum_source = "mise-versions"
+url = "https://github.com/release-plz/release-plz/releases/download/release-plz-v0.4.2/release-plz-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/release-plz/release-plz/releases/assets/680884249"
+
+[tools.release-plz."platforms.macos-arm64"]
+checksum = "sha256:305e672300b418b091c5df356fddd785d211847c9bec7cf4f0e34caa9413517b"
+checksum_source = "mise-versions"
+url = "https://github.com/release-plz/release-plz/releases/download/release-plz-v0.4.2/release-plz-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/release-plz/release-plz/releases/assets/680893141"
+
+[tools.release-plz."platforms.windows-x64"]
+checksum = "sha256:d4b283db2d3729de8cd510fb62f715fa8cb08f0a48468dc016d11b8e7a2ce1c8"
+checksum_source = "mise-versions"
+url = "https://github.com/release-plz/release-plz/releases/download/release-plz-v0.4.2/release-plz-x86_64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/release-plz/release-plz/releases/assets/680897397"
+
 [[tools.rumdl]]
 version = "0.3.2"
 backend = "aqua:rvben/rumdl"

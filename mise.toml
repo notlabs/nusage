@@ -61,7 +61,6 @@ cache = { enabled = true }
 [tools]
 nu = "0.116.1"
 usage = "7.1.3"
-release-plz = "0.4.2"
 
 # The repository's tasks run through the nus `//nusage:build` copies into `.bin`, not through
 # a release.
@@ -71,8 +70,3 @@ _.path = ["{{config_root}}/.bin"]
 [tasks.check]
 description = "The root's own checks"
 depends = [":lint", ":check-affected", ":check-pr-status"]
-
-# The release is the commit this leaves to make: pushed to main, release.yml tags it.
-[tasks.release]
-description = "Bump the versions and write the changelog from the commits since the last tag"
-run = "release-plz update"
