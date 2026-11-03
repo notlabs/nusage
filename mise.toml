@@ -61,15 +61,6 @@ cache = { enabled = true }
 [tools]
 nu = "0.116.1"
 usage = "7.1.3"
-# nufmt tracks the Nushell above.
-"github:nushell/nufmt" = "0.1.6"
-taplo = "0.10.0"
-rumdl = "0.3.2"
-"github:owenlamont/ryl" = "0.28.0"
-go = "1.27.3"
-jactionlint = "2.3.0"
-# jactionlint checks the workflows' `run` scripts with it.
-shellcheck = "0.11.0"
 release-plz = "0.4.2"
 
 # The repository's tasks run through the nus `//nusage:build` copies into `.bin`, not through
