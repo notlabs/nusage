@@ -2,38 +2,43 @@
 #MISE description="Hold the tree to what `jj fix` writes for it and to what its linters accept"
 #MISE depends=["//nusage:build"]
 #MISE output="interleave"
-# A formatter's own check names a file and no more; a lint has to say what is wrong where. So
-# each formatter `jj.toml` gives `jj fix` formats again the files its patterns name, as jj
-# reads them, and holds each file to the difference.
 use ../lib/actions.nu *
 
-# Whether a file is what its formatter writes for it; the difference printed when not.
-def formatted [file: string, formatter: string, format: closure] {
-    # A formatter reading standard input ends without the newline it writes to a file.
-    let content = open --raw $file | str trim --right --char (char nl)
-    let wanted = $content | do $format | str trim --right --char (char nl)
-    if $wanted == $content {
-        return true
+# A Git diff as each file's path and its own part of the diff.
+def files-of []: string -> table<path: string, diff: string> {
+    $in
+    | split row --regex '(?m)^diff --git '
+    | where $it != ""
+    | each {|part|
+        {
+            path: ($part | parse --regex '(?m)^\+\+\+ b/(?<path>.+)$' | get path.0)
+            diff: ($"diff --git ($part)" | str trim --right --char (char nl))
+        }
     }
-    let diff = $wanted + (char nl)
-    | ^diff --unified --label $file --label $"($file) as ($formatter) wants" $file -
-    | complete
-    print --no-newline $diff.stdout
-    annotate-diff $file $"($formatter): not formatted, `jj fix` writes it" $diff.stdout
-    false
 }
 
 mut failed = []
 
+# `jj fix` formats every file of the working copy with the formatters `jj.toml` gives it, and
+# the working copy keeps what it writes: what that changes was not formatted, and a formatter
+# that fails names the file it could not read.
 group-start formatting
-for tool in (open jj.toml | get fix.tools | transpose name fix) {
-    for file in (^jj file list --no-pager ...$tool.fix.patterns | lines) {
-        let command = $tool.fix.command | each { str replace --all '$path' $file }
-        let format = {|| run-external $command.0 ...($command | skip 1) }
-        if not (formatted $file $tool.name $format) {
-            $failed = $failed | append $"($tool.name): ($file)"
-        }
-    }
+let before = ^jj log --no-pager --no-graph --revisions @ --template commit_id
+let fixed = ^jj fix --no-pager --quiet --include-unchanged-files --source @ | complete
+print --no-newline $fixed.stderr
+let refused = $fixed.stderr
+| parse --regex 'Fix tool `(?<tool>[^`]+)` exited with non-zero exit code for `(?<file>[^`]+)`'
+for file in $refused {
+    annotate error $"($file.tool) could not format it" --file $file.file
+    $failed = $failed | append $"($file.tool): ($file.file)"
+}
+if $fixed.exit_code != 0 {
+    $failed = $failed | append "jj fix"
+}
+for file in (^jj diff --no-pager --git --from $before --to @ | files-of) {
+    print $file.diff
+    annotate-diff $file.path "not formatted: `jj fix` writes this" $file.diff
+    $failed = $failed | append $"formatting: ($file.path)"
 }
 group-end
 
@@ -67,6 +72,34 @@ if $findings == null {
         annotate error $"rumdl ($finding.rule): ($finding.message)" --file $finding.file --line $finding.line
         $failed = $failed | append $"rumdl: ($finding.file):($finding.line)"
     }
+}
+group-end
+
+# What formatting cannot settle in the YAML.
+group-start ryl
+let yaml = if (in-actions) {
+    ^ryl check --output-format github . | complete
+} else {
+    ^ryl check . | complete
+}
+print --no-newline $yaml.stdout $yaml.stderr
+if $yaml.exit_code != 0 {
+    $failed = $failed | append "ryl"
+}
+group-end
+
+# Each TOML file against the schema `.taplo.toml` gives it.
+group-start taplo
+let toml = with-env {RUST_LOG: warn} { ^taplo check | complete }
+print --no-newline $toml.stderr
+for file in (
+    $toml.stderr
+    | parse --regex 'invalid file error=(?<why>.+?) path="(?<path>[^"]+)"'
+) {
+    annotate error $"taplo: ($file.why)" --file ($file.path | path relative-to (pwd))
+}
+if $toml.exit_code != 0 {
+    $failed = $failed | append "taplo"
 }
 group-end
 

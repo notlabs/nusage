@@ -1,0 +1,10 @@
+# YAML is formatted as the workflows and the OpenAPI document are written, and linted for
+# what formatting cannot settle.
+[format]
+quote-style = "double"
+comment-spacing = 1
+
+[lint.rules]
+key-duplicates = "enable"
+anchors = "enable"
+octal-values = "enable"
