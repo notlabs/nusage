@@ -13,7 +13,7 @@
 # `nus-<digest>`, each named by what it holds. Before each prompt a hook asks mise for the
 # environment and, when it changed, hides the overlays of the last one and uses those of this
 # one, so the line after a `cd` has the directory's tools and commands, and leaving takes
-# them away with all they set. An environment met again has its overlays back as they were.
+# them away with all they set. An environment met again has the same overlays again.
 # Above them is `prompt`, where what is set at the prompt lands, so it stays from one
 # directory to the next. Only an interactive shell is activated: a script, or `nu --mcp`,
 # keeps the environment it started with.
@@ -125,10 +125,15 @@ def nus-overlays [dir: path]: nothing -> bool {
     let used = overlay list
     | where active and (($it.name starts-with "mise-") or ($it.name starts-with "nus-"))
     | get name
+    # An environment met again has its overlays loaded again: Nushell brings back the commands
+    # of an overlay used again only when it was first made before the first prompt, and the
+    # same module makes the same overlay. `prompt` is used again as it was, to keep what is in
+    # it.
     [
         "# How this shell's overlays change, as `nus-overlays` writes it."
         ...($used | each {|name| $"overlay hide ($name | to nuon)" })
-        ...($modules | append $prompt | each {|file| $"overlay use ($file | to nuon)" })
+        ...($modules | each {|file| $"overlay use --reload ($file | to nuon)" })
+        $"overlay use ($prompt | to nuon)"
     ]
     | str join "\n"
     | save --force ($dir | path join switch.nu)

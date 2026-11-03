@@ -273,21 +273,6 @@ esac
         json!("absent absent")
     );
 
-    // `mise shell` sets a tool's version in the shell, as mise's own activation has it, and
-    // takes it away again; any other command is mise's.
-    assert_eq!(
-        nu.eval("mise shell jujutsu@0.45.1; $env.MISE_JUJUTSU_VERSION"),
-        json!("0.45.1")
-    );
-    assert_eq!(
-        nu.eval(r#"mise shell --unset jujutsu; [($env.MISE_JUJUTSU_VERSION? | default unset) (^sh -c 'echo ${MISE_JUJUTSU_VERSION-absent}' | str trim)]"#),
-        json!(["unset", "absent"])
-    );
-    assert_eq!(
-        nu.eval("mise --version | str trim"),
-        json!("mise, standing in")
-    );
-
     // An environment met again has its overlays back.
     nu.eval("cd proj");
     assert!(prompt(&mut nu));
@@ -302,6 +287,23 @@ esac
             ["zero", "mise", "nus", "prompt"]
         ])
     );
+    // `mise shell` sets a tool's version in the shell, as mise's own activation has it, and
+    // takes it away again; any other command is mise's. Last, as this session merges no
+    // environment between steps as a prompt does, so that a command that changes it, as
+    // `mise` does, leaves the whole of it in the top overlay.
+    assert_eq!(
+        nu.eval("mise shell jujutsu@0.45.1; $env.MISE_JUJUTSU_VERSION"),
+        json!("0.45.1")
+    );
+    assert_eq!(
+        nu.eval(r#"mise shell --unset jujutsu; [($env.MISE_JUJUTSU_VERSION? | default unset) (^sh -c 'echo ${MISE_JUJUTSU_VERSION-absent}' | str trim)]"#),
+        json!(["unset", "absent"])
+    );
+    assert_eq!(
+        nu.eval("mise --version | str trim"),
+        json!("mise, standing in")
+    );
+
     std::fs::remove_dir_all(&dir).unwrap();
 }
 

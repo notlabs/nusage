@@ -77,11 +77,13 @@ The environment mise resolves for the working directory and `MISE_ENV` is then a
 them, another, `nus-<digest>`, each named by what it holds. Before each prompt a hook runs
 `mise env --json` and, when the result changed, hides the overlays of the last environment
 and uses those of this one, so the line after a `cd` has the directory's tools and commands,
-and leaving takes away everything they set; an environment met again has its overlays back
-as they were. `$env.MISE_ENV = "…"` switches environments the same way. Above them is the
-overlay `prompt`, where what is set at the prompt lands, so it stays from one directory to
-the next; a `PATH` set there hides mise's for the rest of the session. `overlay list` shows
-them all. A shell that starts with mise's environment already set, as mise's `nu` wrapper,
+and leaving takes away everything they set; an environment met again has the same overlays
+again. `$env.MISE_ENV = "…"` switches environments the same way, and `$env.MISE_ENV = null`
+leaves them. Above them is the overlay `prompt`, where what is set at the prompt lands, so it
+stays from one directory to the next; a `PATH` set there hides mise's for the rest of the
+session. Take a variable away with `$env.NAME = null` rather than `hide-env`: Nushell brings
+back what is hidden whenever an overlay is hidden, and so at the next change of environment.
+`overlay list` shows them all. A shell that starts with mise's environment already set, as mise's `nu` wrapper,
 an editor or an activated parent shell starts it, has it taken out first. A script, and
 `nu --mcp`, keep the environment they started with.
 
