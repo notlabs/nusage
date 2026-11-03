@@ -1,0 +1,23 @@
+{
+    format: 1
+    tool: docker-compose
+    baseline: {
+        version: "5.6.1"
+        repository: "https://github.com/docker/compose"
+        revision: "v5.6.1"
+    }
+    outputs: [
+        {
+            id: ps
+            command: [ps]
+            name: json
+            select: [--format json --no-trunc]
+            framing: jsonl
+            schema: ps.schema.json
+            source: ["cmd/compose/ps.go" "cmd/formatter/container.go"]
+        }
+    ]
+    # Offline fixtures are rendered by the pinned formatter in spec/ps_test.go.
+    # A live case would require the caller's Docker daemon and Compose project.
+    cases: []
+}

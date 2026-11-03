@@ -23,13 +23,14 @@ run = "nusage {{ config_root }}/gh.nu --json-fields | save --force {{ config_roo
 shell = "nu -c"
 
 [tasks.check]
-description = "Check Go formatting and reproduce the Compose spec despite environment overrides"
+description = "Check Go formatting, Compose spec isolation and ps formatter fixtures"
 dir = "../lib/docker-compose/spec"
 run = '''
-let unformatted = ^gofmt -l main.go ../../gh/spec/main.go
+let unformatted = ^gofmt -l main.go ps_test.go ../../gh/spec/main.go
 if ($unformatted | str trim | is-not-empty) {
     error make {msg: $"gofmt: ($unformatted)"}
 }
+^go test -mod=readonly .
 let exported = with-env {
     COMPOSE_ENV_FILES: "/tmp/catalog-example.env"
     COMPOSE_PROGRESS: "plain"

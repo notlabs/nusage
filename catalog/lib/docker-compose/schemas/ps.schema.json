@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Docker Compose v5.6.1 ps JSON line",
+  "description": "ContainerContext accessors, with --format json --no-trunc. Display strings are retained as strings; Publishers may be null.",
+  "type": "object",
+  "required": [
+    "Command",
+    "CreatedAt",
+    "Engine",
+    "ExitCode",
+    "Health",
+    "ID",
+    "Image",
+    "Labels",
+    "LocalVolumes",
+    "Mounts",
+    "Name",
+    "Names",
+    "Networks",
+    "Ports",
+    "Project",
+    "Publishers",
+    "RunningFor",
+    "Service",
+    "Size",
+    "State",
+    "Status"
+  ],
+  "properties": {
+    "Command": {
+      "type": "string"
+    },
+    "CreatedAt": {
+      "type": "string"
+    },
+    "Engine": {
+      "type": "string"
+    },
+    "ExitCode": {
+      "type": "integer"
+    },
+    "Health": {
+      "type": "string"
+    },
+    "ID": {
+      "type": "string"
+    },
+    "Image": {
+      "type": "string"
+    },
+    "Labels": {
+      "type": "string"
+    },
+    "LocalVolumes": {
+      "type": "string"
+    },
+    "Mounts": {
+      "type": "string"
+    },
+    "Name": {
+      "type": "string"
+    },
+    "Names": {
+      "type": "string"
+    },
+    "Networks": {
+      "type": "string"
+    },
+    "Ports": {
+      "type": "string"
+    },
+    "Project": {
+      "type": "string"
+    },
+    "Publishers": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "required": [
+          "URL",
+          "TargetPort",
+          "PublishedPort",
+          "Protocol"
+        ],
+        "properties": {
+          "URL": {
+            "type": "string"
+          },
+          "TargetPort": {
+            "type": "integer"
+          },
+          "PublishedPort": {
+            "type": "integer"
+          },
+          "Protocol": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "RunningFor": {
+      "type": "string"
+    },
+    "Service": {
+      "type": "string"
+    },
+    "Size": {
+      "type": "string"
+    },
+    "State": {
+      "type": "string"
+    },
+    "Status": {
+      "type": "string"
+    }
+  }
+}

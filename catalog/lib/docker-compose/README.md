@@ -1,8 +1,8 @@
 # Docker Compose baseline
 
 The command tree of Compose **v5.6.1**, exported through Usage's Cobra adapter, with typed
-`version` and `ls` wrappers. The full exported spec is committed for inspection.
-`docker-compose.baseline.overlay.kdl` limits the generated package to those two commands;
+`version`, `ls` and `ps` wrappers. The full exported spec is committed for inspection.
+`docker-compose.baseline.overlay.kdl` limits the generated package to those three commands;
 the other commands remain available through the original CLI.
 
 ```nu
@@ -10,6 +10,8 @@ use docker-compose *
 
 docker-compose version | get version
 docker-compose ls | select Name Status ConfigFiles  # requires a Docker daemon
+docker-compose ps --all | select Name State ExitCode Publishers
+docker-compose ps web --status [running exited]
 ```
 
 The package calls the official standalone `docker-compose` binary on PATH. A Docker CLI
@@ -32,9 +34,28 @@ mise run //catalog/cobra:check
 The first command builds the pinned upstream Go packages; subsequent runs use Go's build
 cache. The catalog's ordinary freshness and signature checks apply. Its version probe compares
 the spec with the installed binary; the full Go export belongs to `//catalog/cobra:check`.
-The small `check.nu` runs only `version`, offline. It does not start containers or connect to a daemon. The
-`ls` declaration is based on its serializer; its live Docker behavior has not been exercised
-here. A conformance suite and wider command coverage are later work.
+The offline `check.nu` runs the real `version` command, validates `ps` fixture records and
+negative examples against their schema, and drives the generated wrapper with a fixture
+executable to check argument forwarding, decoding, empty output and failures.
+`//catalog/cobra:check` also renders those fixtures with the pinned upstream formatter
+(`spec/ps_test.go`); only the relative `RunningFor` value is normalized. These checks do not
+start containers or connect to a daemon. Live `ls` and `ps` behavior against a Docker engine
+has not been exercised here.
+
+## Container status
+
+`ps` runs in the current Compose project and always asks for `--format json --no-trunc`.
+Its JSONL records become a Nushell table; no containers produces an empty table. IDs,
+commands and mount names retain their full values. `ExitCode` and publisher ports are
+integers; `Publishers` is a table or null. The formatter's display fields remain strings,
+including `CreatedAt`, `RunningFor`, `LocalVolumes` and `Size`.
+
+Service names, `--all`, `--filter`, and repeated statuses (`--status [running exited]`)
+are supported. The wrapper owns formatting and truncation, and omits `--quiet` and
+`--services`, which replace the records with other output. It keeps Compose's default of
+including orphans; use `^docker-compose ps --orphans=false` for that CLI mode. Root project
+options are not inherited by this baseline; run from the project directory or use the
+original CLI when those options are needed.
 
 ## Extraction boundary
 
@@ -73,13 +94,14 @@ There is no single safe “all commands with --format” overlay.
 | --- | --- | --- |
 | `version` | [version.go](https://github.com/docker/compose/blob/v5.6.1/cmd/compose/version.go) writes a literal JSON object | Implemented: `--format json`, one `{version: string}` record. Hide `--short`, which overrides that format. |
 | `ls` | [list.go](https://github.com/docker/compose/blob/v5.6.1/cmd/compose/list.go) builds `[]stackView`; [formatter.go](https://github.com/docker/compose/blob/v5.6.1/cmd/formatter/formatter.go) serializes it as one array | Implemented: a table of `Name`, `Status`, `ConfigFiles` strings. Hide `--quiet`, which emits names instead. The empty result is an empty array. |
-| `ps` | [ps.go](https://github.com/docker/compose/blob/v5.6.1/cmd/compose/ps.go) uses the Docker formatter and [ContainerContext](https://github.com/docker/compose/blob/v5.6.1/cmd/formatter/container.go)'s custom marshaler | Candidate JSONL output, one object per container. The schema must describe the formatter's accessors, not `api.ContainerSummary`. Account for `--quiet`, `--services`, truncation and custom templates. |
+| `ps` | [ps.go](https://github.com/docker/compose/blob/v5.6.1/cmd/compose/ps.go) uses the Docker formatter and [ContainerContext](https://github.com/docker/compose/blob/v5.6.1/cmd/formatter/container.go)'s custom marshaler | Implemented: JSONL, one object per container, with full values. The schema follows the formatter's accessors, including nullable `Publishers`. Hide alternate output modes and force `--no-trunc`. |
 | `events` | [events.go](https://github.com/docker/compose/blob/v5.6.1/cmd/compose/events.go) marshals an explicit map and writes a newline per event | Candidate JSONL stream selected by boolean `--json`. Its fields come from that map; streaming behavior and event-dependent values need their own follow-up. |
 | `config` | [config.go](https://github.com/docker/compose/blob/v5.6.1/cmd/compose/config.go) calls project JSON/YAML serializers or several alternate handlers | Candidate JSON record or YAML decoder. `--services`, `--images`, `--environment`, `--quiet`, `--output` and others replace or redirect stdout. The Compose input schema is not automatically a schema for normalized output. |
 
-The two implemented output declarations use the existing value-taking `select "--format"`
-and inline JSON Schemas. No schema extraction framework is introduced. The `ls` schema can
-eventually be generated by inspecting the private `stackView` type in the pinned source;
+The `version` and `ls` declarations use the existing value-taking `select "--format"`
+and inline JSON Schemas. The `ps` schema suite uses existing `nusage-args` to select JSON
+and disable truncation together; its embedded overlay and module are generated normally.
+The `ls` schema can eventually be generated by inspecting the private `stackView` type in the pinned source;
 a Go type/AST analysis can see it without exporting that type. In contrast, `ps` has a
 custom marshaler, `events` builds a map, and `config` branches between serializers. A generic
 reflection pass over Go structs would miss those distinctions.
