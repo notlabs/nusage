@@ -1,9 +1,9 @@
 #!/usr/bin/env nus
-#USAGE about "The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
-#MISE description="The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
+#USAGE about "The workflows by jactionlint, and the handwritten Nushell, the TOML and the Markdown as the formatters want them, with what they would change shown"
+#MISE description="The workflows by jactionlint, and the handwritten Nushell, the TOML and the Markdown as the formatters want them, with what they would change shown"
 #MISE depends=["//nusage:build"]
 #MISE output="interleave"
-#MISE sources=[".github/**/*", "**/*.nu", "**/*.toml", "!target/**", "!.jj/**"]
+#MISE sources=[".github/**/*", "**/*.nu", "**/*.toml", "**/*.md", ".rumdl.toml", "!target/**", "!.jj/**"]
 #MISE outputs=[]
 # Unlabelled lines: GitHub reads an annotation only at the start of a line.
 # The formatters' own checks name a file and no more; a lint has to say what is wrong where,
@@ -58,6 +58,32 @@ group-start taplo
 for file in (^git ls-files "*.toml" | lines) {
     if not (formatted $file taplo { ^taplo fmt - }) {
         $failed = $failed | append $"taplo: ($file)"
+    }
+}
+group-end
+
+group-start rumdl
+for file in (^git ls-files "*.md" | lines) {
+    if not (formatted $file rumdl { ^rumdl fmt --silent --stdin-filename $file - }) {
+        $failed = $failed | append $"rumdl: ($file)"
+    }
+}
+# What formatting cannot fix, named where it is.
+let markdown = ^rumdl check . --output-format json | complete
+
+let findings = try {
+    $markdown.stdout | from json
+} catch {
+    null
+}
+if $findings == null {
+    print --no-newline $markdown.stderr
+    $failed = $failed | append "rumdl"
+} else {
+    for finding in ($findings | where {|it| not ($it.fixable? | default false) }) {
+        print $"($finding.file):($finding.line):($finding.column): ($finding.rule) ($finding.message)"
+        annotate error $"rumdl ($finding.rule): ($finding.message)" --file $finding.file --line $finding.line
+        $failed = $failed | append $"rumdl: ($finding.file):($finding.line)"
     }
 }
 group-end

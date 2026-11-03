@@ -66,6 +66,7 @@ jujutsu = "0.46.0"
 # The formatters `jj fix` runs and CI checks with: nufmt tracks the Nushell above.
 "github:nushell/nufmt" = "0.1.6"
 taplo = "0.10.0"
+rumdl = "0.3.2"
 jactionlint = "2.3.0"
 # jactionlint checks the workflows' `run` scripts with it.
 shellcheck = "0.11.0"
