@@ -1,6 +1,3 @@
-[tools]
-go = "1.27.3"
-
 [tasks.compose]
 description = "Export the pinned Compose command tree through Usage's Cobra adapter"
 dir = "../lib/docker-compose/spec"
@@ -23,13 +20,9 @@ run = "nusage {{ config_root }}/gh.nu --json-fields | save --force {{ config_roo
 shell = "nu -c"
 
 [tasks.check]
-description = "Check Go formatting and reproduce the Compose spec despite environment overrides"
+description = "Reproduce the Compose spec despite environment overrides"
 dir = "../lib/docker-compose/spec"
 run = '''
-let unformatted = ^gofmt -l main.go ../../gh/spec/main.go
-if ($unformatted | str trim | is-not-empty) {
-    error make {msg: $"gofmt: ($unformatted)"}
-}
 let exported = with-env {
     COMPOSE_ENV_FILES: "/tmp/catalog-example.env"
     COMPOSE_PROGRESS: "plain"

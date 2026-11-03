@@ -63,10 +63,13 @@ mr-boxington = "1.27.0"
 nu = "0.116.1"
 usage = "7.1.3"
 jujutsu = "0.46.0"
-# The formatters `jj fix` runs and CI checks with: nufmt tracks the Nushell above.
+# The formatters `jj fix` runs and CI checks with: nufmt tracks the Nushell above, and gofmt
+# is the Go toolchain's, which the Cobra extractors build with.
 "github:nushell/nufmt" = "0.1.6"
 taplo = "0.10.0"
 rumdl = "0.3.2"
+"github:owenlamont/ryl" = "0.28.0"
+go = "1.27.3"
 jactionlint = "2.3.0"
 # jactionlint checks the workflows' `run` scripts with it.
 shellcheck = "0.11.0"
