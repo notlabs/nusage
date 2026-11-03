@@ -1,6 +1,3 @@
-# The crate every extractor links, in its own Cargo workspace; `spec.nu` builds and runs an
-# extractor for the binary on PATH. A package under `../lib/` holds its extractor, and the
-# catalog's `spec` task calls `spec.nu` for an entry whose `spec` names it, as jj's does.
 [tasks.test]
 description = "The crate's tests"
 run = "cargo test --locked"

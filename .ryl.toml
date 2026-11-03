@@ -1,5 +1,5 @@
-# YAML is formatted as the workflows and the OpenAPI document are written, and linted for
-# what formatting cannot settle.
+# YAML is formatted as it is already written here, and linted for what formatting cannot
+# settle.
 [format]
 quote-style = "double"
 comment-spacing = 1
