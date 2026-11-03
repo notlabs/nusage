@@ -64,7 +64,7 @@ func main() {
 	cmd.Use = "gh"
 	cmd.Version = version
 	normalize(cmd)
-	// Usage 7.1.3 leaves reserved words and signed numeric defaults unquoted, and requires
+	// The adapter leaves reserved words and signed numeric defaults unquoted, and usage requires
 	// defaults to be strings; the adapter escapes newlines in help, so this suffix cannot match
 	// inside a quoted description. Remove this shim when the adapter quotes these defaults
 	// itself: https://github.com/jdx/usage/issues/1594
