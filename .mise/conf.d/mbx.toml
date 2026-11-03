@@ -1,0 +1,33 @@
+# Mr Boxington, which caches what Cargo compiles and shares it between checkouts: the root's
+# `rust` runs Cargo through it with `mr_boxington`.
+[tools]
+mr-boxington = "1.27.0"
+
+[doctor.checks.mbx]
+description = "Mr Boxington finds nothing wrong with its installation and cache"
+shell = "nu -c"
+run = '''
+let report = ^mbx doctor --json | from json
+for check in ($report.checks | where severity != pass) {
+    print $"($check.severity) ($check.name): ($check.detail)"
+}
+if ($report.checks | where severity == fail | is-not-empty) {
+    exit 1
+}
+'''
+hint = "`mbx doctor` says what each finding means"
+
+# A build directory apart from the target directory is one Mr Boxington cannot read
+# build-script declarations from, so it caches nothing, and one its budget does not prune.
+[doctor.checks.cargo-build-dir]
+description = "Cargo builds in its target directory, where Mr Boxington caches and prunes"
+depends = ["mbx"]
+shell = "nu -c"
+run = '''
+let cargo = ^cargo metadata --format-version 1 --no-deps | from json
+if $cargo.build_directory != $cargo.target_directory {
+    print $"Cargo builds in ($cargo.build_directory), apart from its target directory ($cargo.target_directory)"
+    exit 1
+}
+'''
+hint = "Remove `build.build-dir` from the Cargo configuration that sets it"

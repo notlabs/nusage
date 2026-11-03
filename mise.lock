@@ -264,47 +264,6 @@ checksum_source = "mise-versions"
 url = "https://github.com/jj-vcs/jj/releases/download/v0.46.0/jj-v0.46.0-x86_64-pc-windows-msvc.zip"
 url_api = "https://api.github.com/repos/jj-vcs/jj/releases/assets/619879226"
 
-[[tools.mr-boxington]]
-version = "1.27.0"
-backend = "packslip:github.com/jdx/mr-boxington"
-specifiers = ["1.27.0"]
-
-[tools.mr-boxington."platforms.linux-arm64"]
-checksum = "sha256:8a1aaf0a495e455d2ea09430c92c59169eef6a29a140c6b21a6d1581fe252f86"
-url = "https://github.com/jdx/mr-boxington/releases/download/v1.27.0/mbx-aarch64-unknown-linux-gnu.tar.gz"
-signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
-repository_ids = { repository = "1340721957" }
-
-[tools.mr-boxington."platforms.linux-arm64-musl"]
-checksum = "sha256:b4a37a480809374755e6618943d15bfa10fc0658a21e1ec0b6765f64377e7621"
-url = "https://github.com/jdx/mr-boxington/releases/download/v1.27.0/mbx-aarch64-unknown-linux-musl.tar.gz"
-signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
-repository_ids = { repository = "1340721957" }
-
-[tools.mr-boxington."platforms.linux-x64"]
-checksum = "sha256:f530d0870efcf15c845314ffccd049f53eaec9a35e9f42c0dec0e16b3135e31c"
-url = "https://github.com/jdx/mr-boxington/releases/download/v1.27.0/mbx-x86_64-unknown-linux-gnu.tar.gz"
-signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
-repository_ids = { repository = "1340721957" }
-
-[tools.mr-boxington."platforms.linux-x64-musl"]
-checksum = "sha256:55e850202658056a14fdfcf3c9b9a82f2d5f6c6bdd861bf39c999bd1bc2601dc"
-url = "https://github.com/jdx/mr-boxington/releases/download/v1.27.0/mbx-x86_64-unknown-linux-musl.tar.gz"
-signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
-repository_ids = { repository = "1340721957" }
-
-[tools.mr-boxington."platforms.macos-arm64"]
-checksum = "sha256:b23a6f67c4fe8c5ef5c3f5b7a747de69d5c9ffe4d00c642eb6e835736cd8dc22"
-url = "https://github.com/jdx/mr-boxington/releases/download/v1.27.0/mbx-aarch64-apple-darwin.tar.gz"
-signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
-repository_ids = { repository = "1340721957" }
-
-[tools.mr-boxington."platforms.windows-x64"]
-checksum = "sha256:7f893b43a8c47cac593dc9683f05c9564a8043f797ae4877059bab7c344b9199"
-url = "https://github.com/jdx/mr-boxington/releases/download/v1.27.0/mbx-x86_64-pc-windows-msvc.zip"
-signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
-repository_ids = { repository = "1340721957" }
-
 [[tools.nu]]
 version = "0.116.1"
 backend = "aqua:nushell/nushell"
