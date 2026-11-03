@@ -408,15 +408,14 @@ impl Run for Nu {
 ///
 /// For Nushell, `nu`, save it beside Nushell's configuration, `nus activate nu | save --force
 /// ($nu.default-config-dir | path join nus.nu)`, and use it from `config.nu` instead of `mise
-/// activate nu`'s: `use ($nu.default-config-dir | path join nus.nu) *`. It is one file for
+/// activate nu`'s: `use ($nu.default-config-dir | path join nus.nu)`. It is one file for
 /// every nusage and machine, so it is saved once, or linked into place. The environment mise
-/// resolves for the working directory and `MISE_ENV` is then an overlay,
-/// `mise-<digest>`, and the typed commands of the packages it names, as `nus modules` writes
-/// them, another, `nus-<digest>`, each named by what it holds. Before each prompt a hook asks
-/// mise for the environment and, when it changed, hides the last environment's overlays and
-/// uses this one's, so the line after a `cd` has them and leaving takes away all they set.
-/// What is set at the prompt lands in the overlay `prompt` above them, and stays. Only an
-/// interactive shell is activated.
+/// resolves for the working directory and `MISE_ENV` is then an overlay, and the typed
+/// commands of the packages it names, as `nus modules` writes them, another. Before each prompt
+/// a hook asks mise for the environment and, when it changed, hides the last environment's
+/// overlays and uses this one's, so the line after a `cd` has them and leaving takes away all
+/// they set. What is set at the prompt lands in the overlay `prompt` above them, and stays;
+/// it has `mise shell`. Only an interactive shell is activated.
 #[derive(Args)]
 pub struct Activate {
     /// The shell: `nu`

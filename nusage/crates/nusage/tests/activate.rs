@@ -220,10 +220,10 @@ esac
         }
         changed == json!(true)
     };
-    // The overlays in use, each named by what it holds, the digest left out.
+    // The overlays in use, their numbers left out.
     let state = r#"[($env.FOO? | default gone) ($env.LEVEL? | default none) ($env.PATH.0 == $env.__NUS_PATH.0)
         ($env.MINE? | default lost) (scope commands | where name == "greet hello" | length)
-        (overlay list | where active | get name | each { str replace --regex '-[0-9a-f]{8}$' '' })]"#;
+        (overlay list | where active | get name | each { str replace --regex '-[0-9]+$' '' })]"#;
 
     assert!(prompt(&mut nu));
     assert_eq!(nu.eval("greet hello"), json!("typed hello"));
@@ -288,9 +288,9 @@ esac
         ])
     );
     // `mise shell` sets a tool's version in the shell, as mise's own activation has it, and
-    // takes it away again; any other command is mise's. Last, as this session merges no
+    // takes it away again; `mise` is otherwise mise's own. Last, as this session merges no
     // environment between steps as a prompt does, so that a command that changes it, as
-    // `mise` does, leaves the whole of it in the top overlay.
+    // `mise shell` does, leaves the whole of it in the top overlay.
     assert_eq!(
         nu.eval("mise shell jujutsu@0.45.1; $env.MISE_JUJUTSU_VERSION"),
         json!("0.45.1")

@@ -2,21 +2,20 @@
 # nu`. Save it beside Nushell's configuration, and use it from `config.nu`:
 #
 #     nus activate nu | save --force ($nu.default-config-dir | path join nus.nu)
-#     use ($nu.default-config-dir | path join nus.nu) *    # in config.nu
+#     use ($nu.default-config-dir | path join nus.nu)    # in config.nu
 #
 # The file is the same for every nusage and every machine, so it is saved once, or linked: a
 # checkout of nusage's repository links it into place with `mise dot apply`, as `mise
-# bootstrap` does. The `*` brings in `mise`, for `mise shell`; the rest stays in the module.
+# bootstrap` does. Its own commands stay in the module.
 #
 # The environment mise resolves for the working directory and `MISE_ENV` is an overlay,
-# `mise-<digest>`, and the typed commands of the packages it names, `NUS_MODULES`, another,
-# `nus-<digest>`, each named by what it holds. Before each prompt a hook asks mise for the
-# environment and, when it changed, hides the overlays of the last one and uses those of this
-# one, so the line after a `cd` has the directory's tools and commands, and leaving takes
-# them away with all they set. An environment met again has the same overlays again.
-# Above them is `prompt`, where what is set at the prompt lands, so it stays from one
-# directory to the next. Only an interactive shell is activated: a script, or `nu --mcp`,
-# keeps the environment it started with.
+# `mise-<n>`, and the typed commands of the packages it names, `NUS_MODULES`, another,
+# `nus-<n>`. Before each prompt a hook asks mise for the environment and, when it changed,
+# hides the overlays of the last one and uses those of this one, so the line after a `cd` has
+# the directory's tools and commands, and leaving takes them away with all they set. Above
+# them is `prompt`, where what is set at the prompt lands, so it stays from one directory to
+# the next, with `mise shell`. Only an interactive shell is activated: a script, or `nu
+# --mcp`, keeps the environment it started with.
 
 # Make this shell's own environment the one from before mise, and keep its PATH as the one
 # mise resolves from. A shell can start with mise's environment for its directory already
@@ -58,6 +57,34 @@ def --env nus-revert []: nothing -> nothing {
 def --env nus-unset [...names: string]: nothing -> nothing {
     load-env ($names | reduce --fold {} {|name, vars| $vars | insert $name null })
 }
+
+# The overlay above an environment's, where what is set at the prompt lands, so that it stays
+# from one environment to the next. It is made at the first prompt and used again at every
+# change, keeping what is in it, and it has `mise shell`, which mise's own activation has,
+# above the commands of any package of mise's: mise prints the variables for the shell to
+# set, and takes a `__MISE_DIFF` as the sign of an activated shell, which is asked of mise's
+# hook for that call alone. A variable it takes away is set to null, as `nus-unset` does.
+const PROMPT = r##'# What is set at this shell's prompt, and `mise shell`, as `nus-overlays` writes it.
+export def --env --wrapped "mise shell" [...args: string] {
+    let diff = with-env {MISE_SHELL: nu} { ^mise hook-env -s nu }
+    | lines
+    | where $it starts-with "set,__MISE_DIFF,"
+    | each { str substring ("set,__MISE_DIFF," | str length).. }
+    | get -o 0
+    | default ""
+    let rows = with-env {MISE_SHELL: nu, __MISE_DIFF: $diff} { ^mise shell ...$args }
+    | lines
+    | where $it != ""
+    | each {|line| $line | split row --number 3 "," }
+    load-env ($rows | reduce --fold {} {|row, vars|
+        $vars | insert $row.1 (if $row.0 == "set" { $row.2? | default "" } else { null })
+    })
+}
+
+export def --env --wrapped "mise sh" [...args: string] {
+    mise shell ...$args
+}
+'##
 
 # Write what changes this shell's overlays into `dir`, and whether the environment changed:
 # the module of the environment mise resolves from the PATH from before mise, the module
@@ -107,32 +134,32 @@ def nus-overlays [dir: path]: nothing -> bool {
     } else {
         ""
     }
-    # A module's file is named by what it holds, and so is the overlay `overlay use` makes of
-    # it: one met again is the same overlay.
-    let named = {|kind: string, text: string|
-        let file = $dir | path join $"($kind)-($text | hash sha256 | str substring 0..<8).nu"
+    # Each change uses the environment's overlays under names they have not had: Nushell does
+    # not bring back the commands of an overlay that is used again after it was hidden, unless
+    # it was first made before the first prompt. A module's file is named by what it holds, so
+    # that one met again is the same file.
+    let count = (try { open --raw ($dir | path join count) | into int } catch { 0 }) + 1
+    $count | into string | save --force ($dir | path join count)
+    let modules = [[kind text]; [mise $environment] [nus $packages]]
+    | where ($it.text | str trim | is-not-empty)
+    | each {|module|
+        let file = $dir | path join $"($module.kind)-($module.text | hash sha256 | str substring 0..<8).nu"
         if not ($file | path exists) {
-            $text | save $file
+            $module.text | save $file
         }
-        $file
+        {file: $file, name: $"($module.kind)-($count)"}
     }
-    let modules = [(do $named mise $environment)]
-    | append (if ($packages | str trim | is-empty) { [] } else { [(do $named nus $packages)] })
     let prompt = $dir | path join prompt.nu
     if not ($prompt | path exists) {
-        "" | save $prompt
+        $PROMPT | save $prompt
     }
     let used = overlay list
     | where active and (($it.name starts-with "mise-") or ($it.name starts-with "nus-"))
     | get name
-    # An environment met again has its overlays loaded again: Nushell brings back the commands
-    # of an overlay used again only when it was first made before the first prompt, and the
-    # same module makes the same overlay. `prompt` is used again as it was, to keep what is in
-    # it.
     [
         "# How this shell's overlays change, as `nus-overlays` writes it."
         ...($used | each {|name| $"overlay hide ($name | to nuon)" })
-        ...($modules | each {|file| $"overlay use --reload ($file | to nuon)" })
+        ...($modules | each {|module| $"overlay use ($module.file | to nuon) as ($module.name | to nuon)" })
         $"overlay use ($prompt | to nuon)"
     ]
     | str join "\n"
@@ -144,28 +171,6 @@ def nus-overlays [dir: path]: nothing -> bool {
 # The hook's code: change the overlays as `nus-overlays` wrote into `dir`.
 def nus-overlays-code [dir: path]: nothing -> string {
     $"source (($dir | path join switch.nu) | to nuon)"
-}
-
-# `mise`, as mise's own activation has it, so that `mise shell` sets a tool's version in this
-# shell, which the next prompt's environment then has. mise prints the variables for the
-# shell to set, and takes a `__MISE_DIFF` as the sign of an activated shell: the one its hook
-# would have set is asked of it, for that call alone. Any other command is mise's as it is.
-export def --env --wrapped mise [...args: string] {
-    if ($args | get 0? | default "") in [shell sh] {
-        let diff = with-env {MISE_SHELL: nu} { ^mise hook-env -s nu }
-        | lines
-        | where $it starts-with "set,__MISE_DIFF,"
-        | each { str substring ("set,__MISE_DIFF," | str length).. }
-        | last
-        | default ""
-        let rows = with-env {MISE_SHELL: nu, __MISE_DIFF: $diff} { ^mise ...$args }
-        | from csv --noheaders --no-infer
-        | rename op name value
-        load-env ($rows | where op == set | reduce --fold {} {|row, vars| $vars | insert $row.name $row.value })
-        nus-unset ...($rows | where op == hide | get name)
-    } else {
-        ^mise ...$args
-    }
 }
 
 export-env {

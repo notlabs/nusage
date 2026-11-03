@@ -63,29 +63,29 @@ nu`:
 ```nu
 nus activate nu | save --force ($nu.default-config-dir | path join nus.nu)
 # in config.nu:
-use ($nu.default-config-dir | path join nus.nu) *
+use ($nu.default-config-dir | path join nus.nu)
 ```
 
 The file is the same for every nusage and every machine, so it is saved once. In a checkout
 of this repository `mise dot apply`, and so `mise bootstrap`, links it into place and adds the
-line to `config.nu`, where Nushell keeps its configuration on Linux and macOS. The `*` brings
-in its `mise`, so that `mise shell` sets a tool's version for the session as it does with
-mise's own activation; the rest stays inside the module.
+same line in an autoloaded file, where Nushell keeps its configuration on Linux and macOS,
+leaving `config.nu` alone. The activation's own commands stay inside the module.
 
 The environment mise resolves for the working directory and `MISE_ENV` is then an overlay,
-`mise-<digest>`, and the typed commands of the packages it names, as `nus modules` writes
-them, another, `nus-<digest>`, each named by what it holds. Before each prompt a hook runs
-`mise env --json` and, when the result changed, hides the overlays of the last environment
-and uses those of this one, so the line after a `cd` has the directory's tools and commands,
-and leaving takes away everything they set; an environment met again has the same overlays
-again. `$env.MISE_ENV = "…"` switches environments the same way, and `$env.MISE_ENV = null`
+`mise-<n>`, and the typed commands of the packages it names, as `nus modules` writes them,
+another, `nus-<n>`. Before each prompt a hook runs `mise env --json` and, when the result
+changed, hides the overlays of the last environment and uses those of this one, so the line
+after a `cd` has the directory's tools and commands, and leaving takes away everything they
+set. `$env.MISE_ENV = "…"` switches environments the same way, and `$env.MISE_ENV = null`
 leaves them. Above them is the overlay `prompt`, where what is set at the prompt lands, so it
 stays from one directory to the next; a `PATH` set there hides mise's for the rest of the
-session. Take a variable away with `$env.NAME = null` rather than `hide-env`: Nushell brings
-back what is hidden whenever an overlay is hidden, and so at the next change of environment.
-`overlay list` shows them all. A shell that starts with mise's environment already set, as mise's `nu` wrapper,
-an editor or an activated parent shell starts it, has it taken out first. A script, and
-`nu --mcp`, keep the environment they started with.
+session. It has `mise shell`, as mise's own activation does, above any package's `mise`
+commands: the tool's version it sets stays until `mise shell --unset`. Take a variable away
+with `$env.NAME = null` rather than `hide-env`: Nushell brings back what is hidden whenever
+an overlay is hidden, and so at the next change of environment. `overlay list` shows them
+all. A shell that starts with mise's environment already set, as mise's `nu` wrapper, an
+editor or an activated parent shell starts it, has it taken out first. A script, and `nu
+--mcp`, keep the environment they started with.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nus built here. `mise run //:link <project>` installs this
