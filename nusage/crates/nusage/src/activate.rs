@@ -2,34 +2,19 @@
 //! in mise's place. For Nushell the environment mise resolves for the working directory and
 //! `MISE_ENV` is an overlay, and the typed commands of the packages it names another, each
 //! named by what it holds, so that a hook before each prompt changes environments by hiding
-//! one's overlays and using another's. The script, `activate.nu`, says how; this fills in the
-//! paths it is written with.
+//! one's overlays and using another's. The script, `activate.nu`, says how. It names no path
+//! of this nus or of this machine, so it is one file for every nusage and every machine: saved
+//! once, or linked into place.
 
-use std::path::Path;
-
-/// The script for Nushell, with the paths of this `nus` and its cache in it.
+/// The script for Nushell.
 const NU: &str = include_str!("activate.nu");
 
 /// What activates nusage in `shell`: the shells are `nu`.
-pub fn script(shell: &str) -> Result<String, String> {
+pub fn script(shell: &str) -> Result<&'static str, String> {
     match shell {
-        "nu" => {
-            let nus = std::env::current_exe()
-                .map_err(|err| format!("cannot find this nus to write into the script: {err}"))?;
-            let root = crate::common::cache_dir().join("nusage").join("activate");
-            Ok(nu(&nus, &root))
-        }
+        "nu" => Ok(NU),
         other => Err(format!("cannot activate `{other}`: the shells are `nu`")),
     }
-}
-
-/// The script for Nushell: `nus` runs the packages' module where the environment has no `nus`
-/// of its own, and each shell writes its modules in a directory of `root`.
-fn nu(nus: &Path, root: &Path) -> String {
-    // A JSON string is a Nushell string, escapes and all.
-    let quoted = |path: &Path| serde_json::to_string(&path.to_string_lossy()).expect("a string");
-    NU.replace("\"@nus@\"", &quoted(nus))
-        .replace("\"@root@\"", &quoted(root))
 }
 
 #[cfg(test)]
@@ -37,19 +22,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_script_has_this_nus_and_its_cache_written_in() {
-        let script = nu(
-            Path::new("/opt/a \"b\"/nus"),
-            Path::new("/c/nusage/activate"),
-        );
-        assert!(script.contains(r#""/opt/a \"b\"/nus""#), "{script}");
-        assert!(script.contains(r#""/c/nusage/activate""#), "{script}");
-        assert!(!script.contains('@'), "{script}");
-    }
-
-    #[test]
     fn only_nushell_is_a_shell_to_activate() {
-        assert!(script("nu").is_ok());
+        assert_eq!(script("nu"), Ok(NU));
         assert!(script("bash").unwrap_err().contains("`bash`"));
     }
 }

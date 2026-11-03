@@ -57,11 +57,20 @@ for its environment, names nusage the same way, `command = "nus"` and `args = ["
 beside its `env`, and keeps nusage's server, which is Nushell for anything but `--lsp`.
 
 An interactive Nushell gets the project's environment and packages from `nus activate nu`,
-saved where Nushell autoloads in place of `mise activate nu`:
+saved beside Nushell's configuration and used from `config.nu` in place of `mise activate
+nu`:
 
 ```nu
-nus activate nu | save --force ($nu.user-autoload-dirs | first | path join nus.nu)
+nus activate nu | save --force ($nu.default-config-dir | path join nus.nu)
+# in config.nu:
+use ($nu.default-config-dir | path join nus.nu) *
 ```
+
+The file is the same for every nusage and every machine, so it is saved once. In a checkout
+of this repository `mise dot apply`, and so `mise bootstrap`, links it into place and adds the
+line to `config.nu`, where Nushell keeps its configuration on Linux and macOS. The `*` brings
+in its `mise`, so that `mise shell` sets a tool's version for the session as it does with
+mise's own activation; the rest stays inside the module.
 
 The environment mise resolves for the working directory and `MISE_ENV` is then an overlay,
 `mise-<digest>`, and the typed commands of the packages it names, as `nus modules` writes
@@ -74,7 +83,7 @@ overlay `prompt`, where what is set at the prompt lands, so it stays from one di
 the next; a `PATH` set there hides mise's for the rest of the session. `overlay list` shows
 them all. A shell that starts with mise's environment already set, as mise's `nu` wrapper,
 an editor or an activated parent shell starts it, has it taken out first. A script, and
-`nu --mcp`, keep the environment they started with. `mise shell` needs mise's own activation: `$env.MISE_<TOOL>_VERSION` does the same here.
+`nu --mcp`, keep the environment they started with.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
 tasks, which run through the nus built here. `mise run //:link <project>` installs this

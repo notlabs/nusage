@@ -406,9 +406,11 @@ impl Run for Nu {
 
 /// Print what activates mise and nusage in a shell, in place of `mise activate`
 ///
-/// For Nushell, `nu`, save it where Nushell autoloads instead of `mise activate nu`: `nus
-/// activate nu | save --force ($nu.user-autoload-dirs | first | path join nus.nu)`. The
-/// environment mise resolves for the working directory and `MISE_ENV` is then an overlay,
+/// For Nushell, `nu`, save it beside Nushell's configuration, `nus activate nu | save --force
+/// ($nu.default-config-dir | path join nus.nu)`, and use it from `config.nu` instead of `mise
+/// activate nu`'s: `use ($nu.default-config-dir | path join nus.nu) *`. It is one file for
+/// every nusage and machine, so it is saved once, or linked into place. The environment mise
+/// resolves for the working directory and `MISE_ENV` is then an overlay,
 /// `mise-<digest>`, and the typed commands of the packages it names, as `nus modules` writes
 /// them, another, `nus-<digest>`, each named by what it holds. Before each prompt a hook asks
 /// mise for the environment and, when it changed, hides the last environment's overlays and

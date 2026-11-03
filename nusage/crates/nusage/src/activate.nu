@@ -1,7 +1,12 @@
-# nusage's activation for Nushell, as `nus activate nu` prints it. Save it where Nushell
-# autoloads, in place of `mise activate nu`:
+# nusage's activation for Nushell, as `nus activate nu` prints it, in place of `mise activate
+# nu`. Save it beside Nushell's configuration, and use it from `config.nu`:
 #
-#     nus activate nu | save --force ($nu.user-autoload-dirs | first | path join nus.nu)
+#     nus activate nu | save --force ($nu.default-config-dir | path join nus.nu)
+#     use ($nu.default-config-dir | path join nus.nu) *    # in config.nu
+#
+# The file is the same for every nusage and every machine, so it is saved once, or linked: a
+# checkout of nusage's repository links it into place with `mise dot apply`, as `mise
+# bootstrap` does. The `*` brings in `mise`, for `mise shell`; the rest stays in the module.
 #
 # The environment mise resolves for the working directory and `MISE_ENV` is an overlay,
 # `mise-<digest>`, and the typed commands of the packages it names, `NUS_MODULES`, another,
@@ -83,14 +88,20 @@ def nus-overlays [dir: path]: nothing -> bool {
     ]
     | str join "\n"
     let packages = if "NUS_MODULES" in $vars {
-        # The nus the environment has, as the packages are its; else the one that wrote this.
-        let nus = with-env {PATH: ($vars.PATH? | default $env.__NUS_PATH)} { which nus | get path.0? }
-        | default "@nus@"
-        try {
-            with-env $vars { ^$nus modules }
-        } catch {|err|
-            print --stderr $err.msg
+        # The nus the environment has, as the packages are its; else the one outside it.
+        let nus = with-env {PATH: ($vars.PATH? | default [] | append $env.__NUS_PATH)} {
+            which nus | get path.0?
+        }
+        if $nus == null {
+            print --stderr "nus: the environment names packages, and nus is not on its PATH"
             ""
+        } else {
+            try {
+                with-env $vars { ^$nus modules }
+            } catch {|err|
+                print --stderr $err.msg
+                ""
+            }
         }
     } else {
         ""
@@ -129,12 +140,35 @@ def nus-overlays-code [dir: path]: nothing -> string {
     $"source (($dir | path join switch.nu) | to nuon)"
 }
 
+# `mise`, as mise's own activation has it, so that `mise shell` sets a tool's version in this
+# shell, which the next prompt's environment then has. mise prints the variables for the
+# shell to set, and takes a `__MISE_DIFF` as the sign of an activated shell: the one its hook
+# would have set is asked of it, for that call alone. Any other command is mise's as it is.
+export def --env --wrapped mise [...args: string] {
+    if ($args | get 0? | default "") in [shell sh] {
+        let diff = with-env {MISE_SHELL: nu} { ^mise hook-env -s nu }
+        | lines
+        | where $it starts-with "set,__MISE_DIFF,"
+        | each { str substring ("set,__MISE_DIFF," | str length).. }
+        | last
+        | default ""
+        let rows = with-env {MISE_SHELL: nu, __MISE_DIFF: $diff} { ^mise ...$args }
+        | from csv --noheaders --no-infer
+        | rename op name value
+        load-env ($rows | where op == set | reduce --fold {} {|row, vars| $vars | insert $row.name $row.value })
+        nus-unset ...($rows | where op == hide | get name)
+    } else {
+        ^mise ...$args
+    }
+}
+
 export-env {
     # `nu --mcp` and `nu --lsp` count as interactive too, and have no prompt.
     let served = ($nu.is-mcp? | default false) or ($nu.is-lsp? | default false)
     if $nu.is-interactive and not $served {
         nus-revert
-        let root = "@root@"
+        # Beside Nushell's own cache, as nus keeps its.
+        let root = $nu.cache-dir | path dirname | path join nusage activate
         # A shell's files are written again whenever its environment changes, so the
         # directories that have not changed for a week can go, whether their shell has ended
         # or not.

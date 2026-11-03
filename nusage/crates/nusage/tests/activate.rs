@@ -143,7 +143,8 @@ fn the_overlays_follow_the_directory_and_leave_what_was_set_at_the_prompt() {
     std::fs::create_dir_all(dir.join("proj")).unwrap();
     let tools = dir.join("tools");
     // mise, as far as the activation asks it: `env --json` for the working directory, with
-    // `LEVEL` from `MISE_ENV` in the project, and what it adds before the PATH it is given.
+    // `LEVEL` from `MISE_ENV` in the project, and what it adds before the PATH it is given;
+    // and as its `mise` asks it, the variables `mise shell` sets, in an activated shell.
     executable(
         &dir.join("bin/mise"),
         &format!(
@@ -156,6 +157,11 @@ case "$1 $2" in
   */proj) printf '{{"FOO": "proj", "LEVEL": "%s", "NUS_MODULES": "{{greet: %s}}", "PATH": "%s:%s"}}\n' "${{MISE_ENV:-read}}" "'{module}'" "{tools}" "$PATH" ;;
   *) printf '{{"PATH": "%s"}}\n' "$PATH" ;;
   esac ;;
+"hook-env -s") printf 'set,PATH,/elsewhere\nset,__MISE_DIFF,hooked\n' ;;
+"shell jujutsu@0.45.1")
+  [ "$MISE_SHELL" = nu ] && [ "$__MISE_DIFF" = hooked ] && printf 'set,MISE_JUJUTSU_VERSION,0.45.1\n' ;;
+"shell --unset") printf 'hide,MISE_JUJUTSU_VERSION,\n' ;;
+"--version ") echo "mise, standing in" ;;
 esac
 "#,
             module = module.display(),
@@ -166,7 +172,6 @@ esac
     std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_nus"), dir.join("bin/nus")).unwrap();
     let script = Command::new(env!("CARGO_BIN_EXE_nus"))
         .args(["activate", "nu"])
-        .env("XDG_CACHE_HOME", dir.join("cache"))
         .output()
         .unwrap();
     assert!(script.status.success(), "{script:?}");
@@ -266,6 +271,21 @@ esac
     assert_eq!(
         nu.eval(r#"^sh -c 'echo ${FOO-absent} ${NUS_MODULES-absent}' | str trim"#),
         json!("absent absent")
+    );
+
+    // `mise shell` sets a tool's version in the shell, as mise's own activation has it, and
+    // takes it away again; any other command is mise's.
+    assert_eq!(
+        nu.eval("mise shell jujutsu@0.45.1; $env.MISE_JUJUTSU_VERSION"),
+        json!("0.45.1")
+    );
+    assert_eq!(
+        nu.eval(r#"mise shell --unset jujutsu; [($env.MISE_JUJUTSU_VERSION? | default unset) (^sh -c 'echo ${MISE_JUJUTSU_VERSION-absent}' | str trim)]"#),
+        json!(["unset", "absent"])
+    );
+    assert_eq!(
+        nu.eval("mise --version | str trim"),
+        json!("mise, standing in")
     );
 
     // An environment met again has its overlays back.
