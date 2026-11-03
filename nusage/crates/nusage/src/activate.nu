@@ -138,9 +138,15 @@ def nus-overlays [dir: path]: nothing -> bool {
     # not bring back the commands of an overlay that is used again after it was hidden, unless
     # it was first made before the first prompt. A module's file is named by what it holds, so
     # that one met again is the same file.
-    let count = (try { open --raw ($dir | path join count) | into int } catch { 0 }) + 1
+    let count = (
+        try {
+            open --raw ($dir | path join count) | into int
+        } catch {
+            0
+        }
+    ) + 1
     $count | into string | save --force ($dir | path join count)
-    let modules = [[kind text]; [mise $environment] [nus $packages]]
+    let modules = [[kind, text]; [mise, $environment] [nus, $packages]]
     | where ($it.text | str trim | is-not-empty)
     | each {|module|
         let file = $dir | path join $"($module.kind)-($module.text | hash sha256 | str substring 0..<8).nu"
@@ -159,7 +165,10 @@ def nus-overlays [dir: path]: nothing -> bool {
     [
         "# How this shell's overlays change, as `nus-overlays` writes it."
         ...($used | each {|name| $"overlay hide ($name | to nuon)" })
-        ...($modules | each {|module| $"overlay use ($module.file | to nuon) as ($module.name | to nuon)" })
+        ...(
+            $modules
+            | each {|module| $"overlay use ($module.file | to nuon) as ($module.name | to nuon)" }
+        )
         $"overlay use ($prompt | to nuon)"
     ]
     | str join "\n"
@@ -174,6 +183,7 @@ def nus-overlays-code [dir: path]: nothing -> string {
 }
 
 export-env {
+
     # `nu --mcp` and `nu --lsp` count as interactive too, and have no prompt.
     let served = ($nu.is-mcp? | default false) or ($nu.is-lsp? | default false)
     if $nu.is-interactive and not $served {
