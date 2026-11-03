@@ -4,7 +4,8 @@
 commit_trailers = 'if(!trailers.contains_key("Change-Id"), "Change-Id: " ++ change_id ++ "\n")'
 
 # The formatters, as `jj fix` runs them on the changes themselves: each reads a file on
-# standard input and writes it formatted. The same formatters check the tree in CI.
+# standard input and writes it formatted. The lint runs `jj fix` over every file, and what it
+# changes was not formatted.
 [fix.tools.rustfmt]
 command = ["rustfmt", "--edition", "2024"]
 patterns = ["glob:'**/*.rs'"]
@@ -17,17 +18,25 @@ patterns = [
 ]
 
 [fix.tools.taplo]
-command = ["taplo", "fmt", "-"]
+# Not `.taplo.toml`, which holds only the schemas `taplo check` validates against.
+command = ["taplo", "fmt", "--no-auto-config", "-"]
 patterns = ["glob:'**/*.toml'"]
+
+[fix.tools.gofmt]
+command = ["gofmt"]
+patterns = ["glob:'**/*.go'"]
+
+[fix.tools.ryl]
+command = ["ryl", "format", "--stdin-filename", "$path", "-"]
+patterns = ["glob:'**/*.yml'", "glob:'**/*.yaml'"]
 
 # As `.rumdl.toml` has it, which also names what is not formatted.
 [fix.tools.rumdl]
 command = ["rumdl", "fmt", "--silent", "--stdin-filename", "$path", "-"]
 patterns = ["glob:'**/*.md'", "glob:'**/*.rs'"]
 
-# Conflicts: `jj resolve` runs Mergiraf, the structural merge tool, which
-# `mise run //mergiraf:build` builds with Nushell support into `.bin`. jj's own configuration
-# of the tool applies. What it cannot merge keeps its markers, for `jj resolve --tool :builtin`
-# or an editor; a generated module under catalog/lib is regenerated, not merged.
+# Conflicts: `jj resolve` runs the Mergiraf `mergiraf/` builds, by jj's own configuration of
+# the tool. What it cannot merge keeps its markers, for `jj resolve --tool :builtin` or an
+# editor; a generated module under catalog/lib is regenerated, not merged.
 [ui]
 merge-editor = "mergiraf"

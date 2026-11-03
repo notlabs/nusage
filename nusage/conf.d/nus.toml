@@ -1,17 +1,6 @@
-# nusage for a project, which includes this file:
-#
-#   include = ["git::https://github.com/notlabs/nusage.git//nusage/conf.d/nus.toml?ref=v<version>"]
-#
-# beside its own tools: nusage, the packages of typed commands it uses
-# (`packslip:github.com/notlabs/nusage/catalog/<tool>`), and the tools those wrap, at the
-# versions the packages were generated from.
-#
-# NUS_MODULES maps each package's commands, by their first word, to its module in mise's
-# install of it: a script that calls `jj log ...` gets `use <that module> *` from nus, by its
-# absolute path. NUS_TOOLS gives the version of every tool the project has; nus refuses a
-# package whose wrapped tool the project has at another version than the package was
-# generated from. `nu` is `nus nu`: an editor's `nu --lsp` is nusage's language server, which
-# checks a script as nus runs it, and any other `nu` is Nushell itself.
+# nusage for a project that includes this file beside its own tools: nusage, the catalog's
+# packages it uses, and the tools those wrap, at the versions the packages were generated
+# from. nus reads both variables; `nu` is `nus nu`.
 [env]
 NUS_MODULES = { value = "{ {%- for name, tool in tools -%}{%- if 'packslip:github.com/notlabs/nusage/catalog/' in name -%}{%- set module = name | split(pat='/') | last -%}'{{ module }}': '{{ tool.path }}/{{ module }}', {% endif -%}{%- endfor -%} }", tools = true }
 NUS_TOOLS = { value = "{ {%- for name, tool in tools -%}'{{ name }}': '{{ tool.version }}', {% endfor -%} }", tools = true }

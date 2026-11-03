@@ -6,7 +6,6 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-# Not on crates.io yet; the version is the workspace's.
 publish = false
 
 [[bin]]

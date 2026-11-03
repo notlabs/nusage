@@ -1,8 +1,5 @@
 name: ci
 
-# Pull requests check affected projects; main checks all projects before release assembly.
-# Main supplies the shared build cache, while same-repository PR revisions can also reuse
-# their own scoped cache. Both platform checks remain required.
 on:
   pull_request:
   push:
@@ -40,8 +37,7 @@ jobs:
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
-      # The lint asks jj which files each of `jj fix`'s formatters takes, so the checkout is a
-      # jj repository too.
+      # The lint runs `jj fix`, so the checkout is a jj repository too.
       - run: jj git init --colocate
       # mise's task results, under the runner's temporary directory, from the Actions cache
       # as main last saved them.
@@ -64,8 +60,8 @@ jobs:
           clean-target-before-export: true
       # rustc's and clippy's findings as annotations, through mise's task prefix.
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      # Check Mergiraf when its implementation, runner or toolchain changes. Main also
-      # applies every patch as part of its full check, even when semantic cases are unchanged.
+      # The base a pull request's affected projects are selected against, and whether Mergiraf's
+      # merge cases run: when its implementation, runner or toolchain changed.
       - id: mergiraf-changes
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
