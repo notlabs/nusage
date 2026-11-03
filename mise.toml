@@ -48,7 +48,12 @@ root = "mergiraf"
 # future plugin crates. Shared configuration can change inherited tools and task behavior.
 # Other unowned paths (root files and .mise/) also affect every project. Root checks run
 # unconditionally in CI, so no catch-all root project hides that conservative fallback.
-global_inputs = ["nusage/crates/**", "**/mise*.toml", "**/mise.lock"]
+global_inputs = [
+  "nusage/crates/**",
+  "**/mise*.toml",
+  "**/mise.lock",
+  ".mise/conf.d/*.toml",
+]
 # A task that declares what it reads, and what it writes or that it writes nothing, keeps
 # its result in mise's task cache.
 cache = { enabled = true }
