@@ -14,6 +14,11 @@
 # `run` script sees only the root's from `//`, so the source comes in as variables.
 [task_config]
 shell = "nu -c"
+# Every task here that declares what it reads and that it writes nothing keeps its result
+# in mise's task cache: the checks. The preparation and the build write under `target/`,
+# which Mr Boxington may make a link to its own directory, and mise stores no output that
+# lies past a link; Cargo and Mr Boxington judge their reuse.
+cache = { enabled = true }
 
 # Prepare the patched source once, even when release and test builds run together.
 # The empty workspace table keeps this disposable copy out of the root Cargo workspace.
@@ -83,6 +88,8 @@ description = "Merge each case of the Nushell patch with the Mergiraf built and 
 depends = [[":compile", "dev", "target/mergiraf-test"]]
 output = "interleave"
 quiet = true
+sources = ["patches/*.patch", "../.mise/lib/actions.nu"]
+outputs = []
 run = '''
 use "{{ config_root }}/../.mise/lib/actions.nu" *
 let patch = "{{ config_root }}/patches/0001-Add-Nushell-support.patch"
@@ -120,6 +127,8 @@ if ($failed | is-not-empty) {
 description = "Hold the patches to the pinned Mergiraf source: each applies"
 output = "interleave"
 quiet = true
+sources = ["patches/*.patch", "../.mise/lib/actions.nu"]
+outputs = []
 env = { MERGIRAF_SOURCE = "{{ tools['mergiraf-source'].path }}", MERGIRAF_VERSION = "{{ tools['mergiraf-source'].version }}" }
 run = '''
 use "{{ config_root }}/../.mise/lib/actions.nu" *

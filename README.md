@@ -10,26 +10,54 @@ Early development.
   --no-deps` for the crates. Two of them stand on their own: `nushell-schema`, the Nushell
   dialect of JSON Schema, and `openapi-usage`, an OpenAPI document as a usage spec with the
   HTTP mapping beside it, which `nus generate --http` turns into a module that calls the
-  service as another calls a binary. `nu_plugin_nus` is nusage inside Nushell: the
-  commands a module calls on its hot path, with the CLI's own signatures, served by one
-  process across calls; `nus call` runs a called script in an engine inside that process,
-  where a script calling a script never leaves it, and `nus validate` holds documents to a
-  schema. `mise run //nusage:plugins` registers it.
+  service as another calls a binary. `nus <script>` runs a script in the `nu` on PATH,
+  as Nushell runs any script, with the typed commands of the scripts it calls defined
+  before it: each binds the called script's `$usage` from its parameters and `run`s it, so
+  a script calling a script stays in the same Nushell and gets the value back typed.
+  `nu_plugin_nus` is nusage inside Nushell: the commands a module calls on its hot path,
+  with the CLI's own signatures, served by one process across calls; `nus validate` holds
+  documents to a schema. `mise run //nusage:plugins` registers it.
   A plugin is for what needs Rust in the interpreter, as a library only Rust reaches; a
   service or a binary is a module.
 - `catalog/`: the wrappers for other tools, a Nushell module package per tool under
   `catalog/lib/`, generated from each tool's spec, the schemas of its outputs and the
-  overlays beside it. With `catalog/lib` on `$NU_LIB_DIRS`, `use mise *` names mise's
-  commands as mise does, and `use jj *` jj's. `catalog/mise.toml` declares the entries and
+  overlays beside it, and each released as the packslip package
+  `packslip:github.com/notlabs/nusage/catalog/<tool>`. A project that installs one and
+  includes `nusage/conf.d/nus.toml` calls its commands from a script without importing them:
+  `jj log` there is the typed one. `catalog/mise.toml` declares the entries and
   `catalog/tasks/catalog.nu` the layout; `catalog/clap/` reads the spec of a binary whose
   crate builds its clap command, as jj's is, and `catalog/schemas/` runs an output-schema
-  suite, as both packages keep one.
+  suite, as both packages keep one. `catalog/README.md` says how a project uses them.
 - `intent/`: the direction, as claims that are checked where they can be; nothing there is
   settled.
 - `mergiraf/`: Mergiraf, the structural merge tool `jj resolve` runs here, built from its
   published source with the patches beside it, which teach it Nushell and are written to be
   proposed upstream: `mise run //mergiraf:build`, and `//mergiraf:test` holds the build to
   the cases the patches carry.
+
+`nus script.nu ...` parses command-line arguments with Usage. A call such as
+`./script.nu ...` from another nusage script is a native Nushell definition, so its
+parameters follow Nushell's rules:
+
+| Declaration | Direct `nus script.nu ...` | Call from another script |
+| --- | --- | --- |
+| Required flag, such as `--token` | Omission is rejected | Omission gives `null` unless a default applies |
+| `choices` | Values outside the choices are rejected | Choices are completion suggestions |
+| Flag `env` fallback | An omitted flag reads the named environment variable | No environment fallback is generated |
+
+Required positional parameters, declared Nushell types and literal defaults are retained
+in the generated definition. Scripts that need the additional constraints on internal
+calls can check them in their body.
+
+A script's specification comes from its `#USAGE` header or, when present, the hidden
+`.<filename>.usage.kdl` sidecar beside it. Relative `include` paths resolve against
+that source file, and `mount` adds the specification printed by its command.
+
+Nusage-specific type annotations, such as `arg (int)"<n>"`, are preserved in the
+header, a directly loaded sidecar, and their inline `cmd` declarations. Annotations
+from included files or mounted output are currently not preserved. Moving that integer
+argument into an included file therefore makes its value a string; keep typed
+declarations inline or in the sidecar when their Nushell types are required.
 
 Run `nus inspect script.nu | from json` to read the analyzer's resolved calls and
 findings as values, without running the script. The output's contract is
@@ -38,11 +66,13 @@ prints. It reports the calls the analyzer resolves, not a complete dependency gr
 
 An editor that runs `nus lsp` where it would run `nu --lsp` checks a script nusage runs as
 nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to
-that script's header, and each `mise run` of a task whose file is one. Or leave the editor as it is and opt in through mise: after `mise dot
-apply`, with `MISE_ENV=nus-lsp` in the environment the editor starts from, every `nu`
-mise starts is `nus nu`, which serves `nus lsp` when asked for `nu --lsp` and is
-Nushell for anything else. That `nus` is the released one, so the environment wants a
-release that has `nus nu`: an older one refuses it for every `nu` mise starts.
+that script's header. Or leave the editor as it is: in a project that includes
+`nusage/conf.d/nus.toml`, every `nu` mise starts is `nus nu`, which serves `nus lsp` when
+asked for `nu --lsp` and is Nushell for anything else, so an editor that starts `nu` through
+mise's shims gets nusage's server with the project's packages. Outside such a project, after
+`mise dot apply`, `MISE_ENV=nus-lsp` in the environment the editor starts from does the same.
+That `nus` is the one mise installs, so it must be a release that has `nus nu`: an older one
+refuses it for every `nu` mise starts.
 `MISE_ENV=nus-lsp,nus-kakehashi` installs
 [kakehashi](https://github.com/atusy/kakehashi) too, and `nu --lsp` then also highlights a
 script's header as usage KDL and the scripts its `run=` names as Nushell or sh. A project's
@@ -51,8 +81,9 @@ for its environment, names nusage the same way, `command = "nus"` and `args = ["
 beside its `env`, and keeps nusage's server, which is Nushell for anything but `--lsp`.
 
 Install the development tools with `mise install --monorepo`; `mise tasks --all` lists the
-tasks, which run through the nus built here. `mise run //catalog:install` has every new
-interactive Nushell session load the catalog's modules. `mise dot apply` links the global
+tasks, which run through the nus built here. `mise run //:link <project>` installs this
+checkout's builds into mise as the nusage versions another project names, so that project
+runs them as it would the releases. `mise dot apply` links the global
 fragment that installs the released nusage for the user, with the `nu` it runs scripts in and
 the `usage` its completions run. The repository uses a single `main` bookmark with a colocated
 Git/Jujutsu checkout.

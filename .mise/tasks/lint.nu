@@ -3,6 +3,8 @@
 #MISE description="The workflows by jactionlint, and the handwritten Nushell and the TOML as the formatters want them, with what they would change shown"
 #MISE depends=["//nusage:build"]
 #MISE output="interleave"
+#MISE sources=[".github/**/*", "**/*.nu", "**/*.toml", "!target/**", "!.jj/**"]
+#MISE outputs=[]
 # Unlabelled lines: GitHub reads an annotation only at the start of a line.
 # The formatters' own checks name a file and no more; a lint has to say what is wrong where,
 # so each file is formatted again and the difference printed, and in GitHub Actions each

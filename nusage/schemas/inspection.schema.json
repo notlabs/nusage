@@ -7,7 +7,8 @@
     "script",
     "calls",
     "findings",
-    "header"
+    "header",
+    "module_error"
   ],
   "additionalProperties": false,
   "properties": {
@@ -22,7 +23,6 @@
         "required": [
           "name",
           "target",
-          "through",
           "command"
         ],
         "additionalProperties": false,
@@ -36,42 +36,6 @@
           "command": {
             "type": "object",
             "description": "The command model serialized by nus model."
-          },
-          "through": {
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "const": "nus"
-                  }
-                },
-                "required": [
-                  "kind"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "const": "mise"
-                  },
-                  "dir": {
-                    "type": "string"
-                  },
-                  "task": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "dir",
-                  "task"
-                ],
-                "additionalProperties": false
-              }
-            ]
           }
         }
       }
@@ -137,6 +101,13 @@
           "type": "string"
         }
       }
+    },
+    "module_error": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Package or module resolution failure, including tool version mismatches in nested callees. Null when preparation succeeds."
     }
   }
 }

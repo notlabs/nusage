@@ -31,20 +31,56 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+      # A push to main writes to the cache server as itself, by OIDC; GitHub withholds
+      # the token from forks' pull requests, and the server grants writes to main alone.
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Native affected-project selection needs the merge base, including on restacks.
           fetch-depth: 0
           persist-credentials: false
+      # Also exports mise.toml's `[env]`, the cache server's `MBX_REMOTE_*` among it.
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
-      # Mr Boxington's store, which every Cargo workspace here shares, from the Actions
-      # cache; the mbx mise installed is the one on PATH. The store is kept apart under
-      # the runner's temporary directory, and the target directory goes before the store
-      # is exported: a hosted runner's disk holds the debug build or the export, not both.
-      - uses: jdx/mr-boxington-action@88acf2bb50552c7c508cbac13e5f8c576b95b1de # v1.7.3
+      # mise's task results are kept apart under the runner's temporary directory. When
+      # mise.toml names a cache server, it names it twice, for mise and for mbx, and the two
+      # must agree. Anyone reads it; a push to main also writes, mbx's builds and mise's task
+      # results.
+      - run: |
+          echo "MISE_TASK_CACHE_DIR=$RUNNER_TEMP/mise-task-cache" >> "$GITHUB_ENV"
+          if [ -z "$MBX_REMOTE_URL" ]; then
+            exit 0
+          fi
+          if [ "$(mise settings get task.cache.remote_url 2>/dev/null)" != "$MBX_REMOTE_URL" ]; then
+            echo "::error file=mise.toml::task.cache.remote_url and MBX_REMOTE_URL name different servers"
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+            echo "MBX_REMOTE_OIDC_AUDIENCE=$MBX_REMOTE_URL" >> "$GITHUB_ENV"
+            echo "MISE_TASK_CACHE_REMOTE_OIDC_AUDIENCE=$MBX_REMOTE_URL" >> "$GITHUB_ENV"
+          fi
+      # Without a server, mise's task results from the Actions cache, as main last saved them.
+      - if: env.MBX_REMOTE_URL == ''
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ env.MISE_TASK_CACHE_DIR }}
+          key: mise-tasks-${{ runner.os }}-${{ github.sha }}
+          restore-keys: mise-tasks-${{ runner.os }}-
+      # Mr Boxington's store from the cache server mise.toml names, keeping the
+      # `MBX_REMOTE_*` exported above.
+      - if: env.MBX_REMOTE_URL != ''
+        uses: jdx/mr-boxington-action@88acf2bb50552c7c508cbac13e5f8c576b95b1de # v1.7.3
+        with:
+          backend: remote
+      # Without a server, Mr Boxington's store, which every Cargo workspace here shares,
+      # from the Actions cache; the mbx mise installed is the one on PATH. The store is
+      # kept apart under the runner's temporary directory, and the target directory goes
+      # before the store is exported: a hosted runner's disk holds the debug build or the
+      # export, not both.
+      - if: env.MBX_REMOTE_URL == ''
+        uses: jdx/mr-boxington-action@88acf2bb50552c7c508cbac13e5f8c576b95b1de # v1.7.3
         with:
           github-cache-mode: objects
           isolate-objects-cache: true
@@ -92,3 +128,10 @@ jobs:
           NUS_CHECK_TASK: ${{ runner.os == 'Linux' && '//...:check' || '//...:check:platform' }}
       - if: steps.mergiraf-changes.outputs.run == 'true'
         run: mise run //mergiraf:test
+      # Without a server, a push to main saves mise's task results for later runs, as only
+      # it would write to a server. mise stores a task's result only when it succeeded.
+      - if: ${{ !cancelled() && env.MBX_REMOTE_URL == '' && github.event_name == 'push' }}
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ env.MISE_TASK_CACHE_DIR }}
+          key: mise-tasks-${{ runner.os }}-${{ github.sha }}

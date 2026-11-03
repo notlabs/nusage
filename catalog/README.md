@@ -10,58 +10,35 @@ an output-schema suite.
 
 ## Use it
 
-The catalog is released as the `nusage-catalog` tool, from this repository's `catalog/v*`
-tags. The conf.d fragment `nusage/conf.d/nusage.toml` installs it with nusage and puts its
-`lib` on `$NU_LIB_DIRS`, so every Nushell that starts under mise's environment finds the
-modules:
-
-```nu
-use mise *
-mise tasks ls | where name =~ check
-use jj *
-jj log --revision ["@"]
-```
-
-A project pins it the same way, with `tools = true` on the variable because its value needs
-the tool installed:
+Each entry with a `version` in `mise.toml` is released as a package of its own, the packslip
+project `github.com/notlabs/nusage/catalog/<tool>`, whose `package.nuon` records the mise tool
+and version the entry's spec was read from. A project installs the packages it uses, pins the
+tools they wrap at those versions, and includes nusage's fragment:
 
 ```toml
-[tool_alias]
-nusage-catalog = "github:notlabs/nusage"
+include = ["git::https://github.com/notlabs/nusage.git//nusage/conf.d/nus.toml?ref=v0.2.0"]
 
 [tools]
-nusage-catalog = { version = "0.1.0", version_prefix = "catalog/v", bin_path = "bin" }
-
-[env]
-NU_LIB_DIRS = { value = "{{ tools['nusage-catalog'].path }}/lib", tools = true }
+"github:notlabs/nusage" = { version = "0.2.0", version_prefix = "v" }
+"packslip:github.com/notlabs/nusage/catalog/jj" = "0.2.0"
+jujutsu = "0.46.0"
 ```
 
-Nushell reads `NU_LIB_DIRS` when it starts, and `mise activate` sets the environment at the
-prompt, after the shell started: a script, `mise run`, `mise exec` and a new shell see it,
-the shell you activated in does from its next start. For a new interactive session to load
-the modules unasked, `mise run //catalog:install` here writes one `use` line per entry into
-Nushell's user autoload directory, and the release's `autoload/` directory holds the same
-lines for a vendor autoload directory.
+A script then calls the commands without importing them:
 
-### Editors
-
-An editor starts `nu --lsp` itself, before any shell. A mise command wrapper gives it the
-project's environment: it keeps the name `nu`, so the editor's configuration does not change,
-and delegates to `nus nu`, which serves nusage's language server for `--lsp` and runs the
-real `nu` for anything else, so a project wrapper and the global one nusage's conf.d fragment
-offers behave alike. `mise reshim` after adding it, and put mise's `command-wrappers/bin`
-directory, which `mise activate` adds to `PATH`, on the editor's `PATH`:
-
-```toml
-[wrappers.nu]
-command = "nus"
-args = ["nu"]
-env = { NU_LIB_DIRS = "{{ [config_root, '.nusage', 'lib'] | join_path }}" }
+```nu
+#!/usr/bin/env nus
+jj log --revision ["@"] | first | get change_id
 ```
 
-A wrapper's values see `config_root`, `vars` and the environment, not the installed tools,
-so point it at a directory the project owns. The wrapper needs a nusage release that has
-`nus nu`; an older one rejects the subcommand, and with it every `nu` the wrapper starts.
+The fragment gives `nus` the packages' modules, `NUS_MODULES`, and the project's tool
+versions, `NUS_TOOLS`. A call nothing defines whose first word is a package's gets
+`use <module> *` before the script, by the module's absolute path; a package whose tool the
+project has at another version than the package was generated from is refused. `^jj` is still
+the binary. The fragment also makes `nu` the `nus nu` wrapper: an editor that starts `nu --lsp`
+through mise's shims in the project gets nusage's language server, which checks a script with
+the same imports. `mise reshim` after adding the include. An interactive session imports a
+package itself, by the path `mise where` gives.
 
 ### The tasks elsewhere
 
@@ -74,8 +51,8 @@ this repository:
 includes = ["oci::ghcr.io/notlabs/nusage-tasks:0.1.0"]
 ```
 
-They run as `catalog:spec`, `catalog:generate`, `catalog:check` and `catalog:install`, and
-need `nus`, `nu` and `usage` on `PATH`, as the conf.d fragment installs them. They carry
+They run as `catalog:spec`, `catalog:generate` and `catalog:check`, and need `nus`, `nu`
+and `usage` on `PATH`, as the conf.d fragment installs them. They carry
 their shared helpers; the entries and their inputs stay in the consuming project's
 `lib/<tool>/`. A `clap` entry also needs Cargo and rustfmt, with its extractor and its
 dependencies supplied by the project; an `openapi` entry needs `openapi-usage`. Pin a digest,
@@ -100,20 +77,34 @@ dependencies supplied by the project; an `openapi` entry needs `openapi-usage`. 
 4. `mise run //catalog:generate <tool>` writes `lib/<tool>/mod.nu`; commit it with the spec.
 5. Add `lib/<tool>/check.nu`, which `check` runs with `lib` included: `use <tool> *`, then
    drive the tool and assert on what comes back. Add `lib/<tool>/nupm.nuon`.
+6. Give the entry a `version`, and `tool`, the mise tool of its binary, to release it as a
+   package; the spec's own `version` is the tool's version the package records.
 
 `mise run //catalog:check` holds every entry's committed files to its inputs and its spec to
 the tool on `PATH`.
 
 ## Release
 
-Bump `catalog_version` under `[vars]` in `mise.toml` and merge. After CI succeeds for that
-push to main, `release.yml` checks out the validated commit and runs `//catalog:assemble`,
-pushes the tasks to `ghcr.io/notlabs/nusage-tasks:<version>`, and creates the
-`catalog/v<version>` release at that commit with `nusage-catalog-<version>.tar.gz` attached.
-Automatic releases skip CI completions superseded by a newer main commit, keeping the
-checked source aligned with attestation provenance. An already released version installs
-no build tools.
+A checked main commit releases two things. Each entry with a `version` is packed by
+`//catalog:pack` and published as `catalog/<tool>/v<version>`. A release is complete when its
+archive and `packslip.catalog-<tool>.sigstore.json` bundle are both uploaded. A job that
+cannot change the release signs the archive with the workflow's identity; a separate job
+attaches the bundle. Retries finish incomplete releases and reuse already uploaded archives.
+
+When a later main commit finds an unsigned archive, its signature records the original
+release tag's commit. That recovery creates no new build attestation: the newer workflow
+did not build those bytes. A missing or interrupted archive can be rebuilt only from its
+original revision and only before a signature has been attached; otherwise restore the
+original archive or recover from the original workflow revision. API errors stop release
+processing instead of being treated as absent releases. `//catalog:check-release` exercises
+partial publication, signing and bundle attachment retries without contacting GitHub.
+
+When `catalog_version` under `[vars]` has no `catalog/v<version>` release yet,
+`//catalog:assemble` writes the task catalog, which is pushed to
+`ghcr.io/notlabs/nusage-tasks:<version>`, and the release `catalog/v<version>` marks it.
+Automatic releases skip CI completions superseded by a newer main commit, keeping the checked
+source aligned with attestation provenance.
 
 `//catalog:package` checks before assembling for local use. `//catalog:assemble` runs the
-same packaging script and builds the interpreter it needs, using the validation already
-completed for a release revision.
+same script and builds the interpreter it needs, using the validation already completed for a
+release revision.

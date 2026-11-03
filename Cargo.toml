@@ -36,11 +36,8 @@ jsonschema = { version = "0.60", default-features = false }
 serde_json = { version = "1", features = ["preserve_order"] }
 nu-protocol = { version = "0.116.1", default-features = false }
 nu-parser = "0.116.1"
-nu-engine = "0.116.1"
 nu-cmd-lang = "0.116.1"
 nu-command = "0.116.1"
-# The standard library, `std` and `std-rfc`, as `nu` loads it into every engine it starts.
-nu-std = "0.116.1"
 nu-utils = { version = "0.116.1", default-features = false }
 # The plugins: the protocol, and the harness that runs a plugin in process for its tests.
 nu-plugin = "0.116.1"

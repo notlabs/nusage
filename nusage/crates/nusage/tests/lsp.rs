@@ -80,13 +80,29 @@ fn exchange_session(
     requests: &[(&str, Json)],
     timeout: Duration,
 ) -> io::Result<(Vec<Json>, Vec<Json>)> {
+    exchange_documents(server, vars, open, change, requests, &[], timeout)
+}
+
+/// A session with other open documents, whose unsaved text the caller's analysis sees.
+fn exchange_documents(
+    server: &[&str],
+    vars: &[(&str, String)],
+    open: &str,
+    change: Option<&str>,
+    requests: &[(&str, Json)],
+    documents: &[(&Path, &str)],
+    timeout: Duration,
+) -> io::Result<(Vec<Json>, Vec<Json>)> {
     let script = caller();
     let document = uri(&script);
     let mut messages = vec![
         json!({"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"processId": null, "rootUri": null, "capabilities": {}}}),
         json!({"jsonrpc": "2.0", "method": "initialized", "params": {}}),
-        json!({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {"textDocument": {"uri": document, "languageId": "nushell", "version": 1, "text": open}}}),
     ];
+    for (path, text) in documents {
+        messages.push(json!({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {"textDocument": {"uri": uri(path), "languageId": "nushell", "version": 1, "text": text}}}));
+    }
+    messages.push(json!({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {"textDocument": {"uri": document, "languageId": "nushell", "version": 1, "text": open}}}));
     for (id, (method, params)) in requests.iter().enumerate() {
         let mut params = params.clone();
         params["textDocument"] = json!({"uri": document});
@@ -572,4 +588,126 @@ fn a_nu_another_one_ran_runs() {
         .unwrap();
     assert!(output.status.success(), "{output:?}");
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "inner");
+}
+
+/// A package of its own for a test: the module `greet`, typed, and its record.
+fn package(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("nus-lsp-package-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("greet")).unwrap();
+    std::fs::write(
+        dir.join("greet/mod.nu"),
+        "export def \"greet twice\" [n: int]: nothing -> int { $n * 2 }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("package.nuon"),
+        "{name: greet, version: \"0.1.0\", module: greet, tool: {name: greeter, bin: greet, version: \"1.2.0\"}}\n",
+    )
+    .unwrap();
+    dir
+}
+
+/// The editor checks a script with the modules its calls get, as the interpreter runs it: a
+/// call that does not fit the module's signature is said, where without the module it is an
+/// external Nushell takes as it is. A tool of the wrong version is said on the first line.
+#[test]
+fn a_call_is_checked_against_the_module_its_word_names() {
+    let root = package("calls");
+    let text = "#!/usr/bin/env nus\ngreet twice abc\n";
+    let Some((_, diagnostics)) = session(text, None, &[]) else {
+        return;
+    };
+    let without = said(&diagnostics);
+    assert!(without.iter().all(|(line, _)| *line != 1), "{without:?}");
+    let modules = (
+        "NUS_MODULES",
+        format!("{{greet: '{}'}}", root.join("greet").display()),
+    );
+    let vars = [
+        modules.clone(),
+        ("NUS_TOOLS", "{greeter: '1.2.0'}".to_string()),
+    ];
+    let (_, diagnostics) = session_with(&["lsp"], &vars, text, None, &[]).unwrap();
+    let with = said(&diagnostics);
+    assert!(
+        with.iter()
+            .any(|(line, message)| *line == 1 && message.contains("int")),
+        "{with:?}"
+    );
+    let vars = [modules, ("NUS_TOOLS", "{greeter: '1.3.0'}".to_string())];
+    let (_, diagnostics) = session_with(&["lsp"], &vars, text, None, &[]).unwrap();
+    let other = said(&diagnostics);
+    assert!(
+        other
+            .iter()
+            .any(|(line, message)| *line == 0 && message.contains("greeter 1.3.0")),
+        "{other:?}"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn the_editor_checks_modules_used_only_by_a_called_script() {
+    let root = package("nested");
+    let helper = root.join("helper.nu");
+    std::fs::write(&helper, "#!/usr/bin/env nus\ngreet twice abc\n").unwrap();
+    let text = format!("#!/usr/bin/env nus\nnu {}\n", helper.display());
+    let Some((_, without)) = session(&text, None, &[]) else {
+        return;
+    };
+    assert!(said(&without).is_empty(), "{without:?}");
+    let vars = [
+        (
+            "NUS_MODULES",
+            format!("{{greet: '{}'}}", root.join("greet").display()),
+        ),
+        ("NUS_TOOLS", "{greeter: '1.2.0'}".to_string()),
+    ];
+    let (_, diagnostics) = session_with(&["lsp"], &vars, &text, None, &[]).unwrap();
+    let messages = said(&diagnostics);
+    assert!(
+        messages.iter().any(|(_, message)| message.contains("int")),
+        "{messages:?}"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn an_unsaved_callee_can_add_a_package_dependency() {
+    let root = package("unsaved");
+    let helper = root.join("helper.nu");
+    std::fs::write(&helper, "#!/usr/bin/env nus\n0\n").unwrap();
+    let text = format!("#!/usr/bin/env nus\nnu {}\n", helper.display());
+    let vars = [
+        (
+            "NUS_MODULES",
+            format!("{{greet: '{}'}}", root.join("greet").display()),
+        ),
+        ("NUS_TOOLS", "{greeter: '1.3.0'}".to_string()),
+    ];
+    let Some((_, saved)) = session_with(&["lsp"], &vars, &text, None, &[]) else {
+        return;
+    };
+    assert!(said(&saved).is_empty(), "{saved:?}");
+    let (_, diagnostics) = exchange_documents(
+        &["lsp"],
+        &vars,
+        &text,
+        None,
+        &[],
+        &[(&helper, "#!/usr/bin/env nus\ngreet twice 3\n")],
+        Duration::from_secs(30),
+    )
+    .unwrap();
+    let messages = said(&diagnostics);
+    assert!(
+        messages
+            .iter()
+            .any(|(_, message)| message.contains("helper.nu")
+                && message.contains("greeter 1.2.0")
+                && message.contains("greeter 1.3.0")),
+        "{messages:?}"
+    );
+    std::fs::remove_dir_all(root).unwrap();
 }
