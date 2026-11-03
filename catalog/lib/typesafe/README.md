@@ -16,8 +16,9 @@ $env.TYPESAFE_TOKEN = $env.TYPESAFE_API_KEY
 ```
 
 The token is `$env.TYPESAFE_TOKEN`, sent as a bearer token; `$env.TYPESAFE_URL` sends the
-requests elsewhere. The module sends JSON only, so an image goes as base64 in `assets`, with
-`--type-safe-danger-zone-images`.
+requests elsewhere. Unlike the SDKs, the module sends JSON only, so an image goes as base64 in
+`assets`, with `--type-safe-danger-zone-images`, and it neither compresses a request nor
+retries one.
 
 `openapi.yaml` was written by hand from the SDKs. The API publishes its own document at
 `https://api.typesafe.ai/openapi.json`, which is right where the two differ.
