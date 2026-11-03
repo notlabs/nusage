@@ -1,15 +1,10 @@
 #!/usr/bin/env nus
-#USAGE about "The workflows by jactionlint, and the handwritten Nushell, the TOML and the Markdown as the formatters want them, with what they would change shown"
-#MISE description="The workflows by jactionlint, and the handwritten Nushell, the TOML and the Markdown as the formatters want them, with what they would change shown"
+#MISE description="Hold the tree to what `jj fix` writes for it and to what its linters accept"
 #MISE depends=["//nusage:build"]
 #MISE output="interleave"
-#MISE sources=[".github/**/*", "**/*.nu", "**/*.toml", "**/*.md", ".rumdl.toml", "!target/**", "!.jj/**"]
-#MISE outputs=[]
-# Unlabelled lines: GitHub reads an annotation only at the start of a line.
-# The formatters' own checks name a file and no more; a lint has to say what is wrong where,
-# so each file is formatted again and the difference printed, and in GitHub Actions each
-# hunk is an annotation on its lines, which the pull request shows inline, through the
-# module every task shares.
+# A formatter's own check names a file and no more; a lint has to say what is wrong where. So
+# each formatter `jj.toml` gives `jj fix` formats again the files its patterns name, as jj
+# reads them, and holds each file to the difference.
 use ../lib/actions.nu *
 
 # Whether a file is what its formatter writes for it; the difference printed when not.
@@ -30,6 +25,18 @@ def formatted [file: string, formatter: string, format: closure] {
 
 mut failed = []
 
+group-start formatting
+for tool in (open jj.toml | get fix.tools | transpose name fix) {
+    for file in (^jj file list --no-pager ...$tool.fix.patterns | lines) {
+        let command = $tool.fix.command | each { str replace --all '$path' $file }
+        let format = {|| run-external $command.0 ...($command | skip 1) }
+        if not (formatted $file $tool.name $format) {
+            $failed = $failed | append $"($tool.name): ($file)"
+        }
+    }
+}
+group-end
+
 group-start jactionlint
 let workflows = if (in-actions) {
     ^jactionlint --format github | complete
@@ -42,33 +49,8 @@ if $workflows.exit_code != 0 {
 }
 group-end
 
-group-start nufmt
-for file in (
-    ^git ls-files "*.nu"
-    | lines
-    | where $it !~ "/expected/" and $it !~ '^catalog/lib/[^/]+/mod\.nu$'
-) {
-    if not (formatted $file nufmt { ^nufmt --stdin }) {
-        $failed = $failed | append $"nufmt: ($file)"
-    }
-}
-group-end
-
-group-start taplo
-for file in (^git ls-files "*.toml" | lines) {
-    if not (formatted $file taplo { ^taplo fmt - }) {
-        $failed = $failed | append $"taplo: ($file)"
-    }
-}
-group-end
-
+# What formatting cannot fix in the Markdown, named where it is.
 group-start rumdl
-for file in (^git ls-files "*.md" | lines) {
-    if not (formatted $file rumdl { ^rumdl fmt --silent --stdin-filename $file - }) {
-        $failed = $failed | append $"rumdl: ($file)"
-    }
-}
-# What formatting cannot fix, named where it is.
 let markdown = ^rumdl check . --output-format json | complete
 
 let findings = try {
