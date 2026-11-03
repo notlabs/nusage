@@ -23,7 +23,7 @@
 //! holds as long as each of those names the script the call names there; where one does
 //! not, the call is left the external it is, and a finding says why.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 use std::path::{Component, Path, PathBuf};
 
@@ -59,6 +59,36 @@ pub struct Finding {
 pub struct Calls {
     pub shadows: Vec<Shadow>,
     pub findings: Vec<Finding>,
+}
+
+/// Relationships encountered while preparing definitions, deduplicated by script.
+#[derive(Debug, Clone, Default)]
+pub struct Dependencies {
+    pub scripts: BTreeMap<PathBuf, ScriptDependencies>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScriptDependencies {
+    pub calls: BTreeSet<PathBuf>,
+    pub imports: BTreeSet<PathBuf>,
+    pub findings: Vec<Finding>,
+}
+
+impl Dependencies {
+    pub fn record(&mut self, script: &Path, calls: &Calls, imports: &[PathBuf]) {
+        self.scripts.insert(
+            script.to_path_buf(),
+            ScriptDependencies {
+                calls: calls
+                    .shadows
+                    .iter()
+                    .filter_map(|s| script_of(&s.command).ok())
+                    .collect(),
+                imports: imports.iter().cloned().collect(),
+                findings: calls.findings.clone(),
+            },
+        );
+    }
 }
 
 /// The calls of scripts in `source`, the text of the script at `path`, with each script it
@@ -323,8 +353,9 @@ pub fn definitions(
     paths: Paths,
     texts: &Texts,
     modules: &modules::Context,
+    dependencies: Option<&mut Dependencies>,
 ) -> Result<Vec<Def>, Diagnostic> {
-    let mut writer = Writer::new(paths, texts, Some(modules));
+    let mut writer = Writer::new(paths, texts, Some(modules), dependencies);
     writer.chain.push(script.to_path_buf());
     writer.scope.push(names(&calls.shadows));
     let mut defs = Vec::new();
@@ -351,7 +382,7 @@ pub fn definitions(
 /// definition's input.
 pub fn script_body(command: &Command, paths: Paths, texts: &Texts) -> Result<Vec<Stmt>, Unwritten> {
     // Exported modules are independent of the generating project's installed packages.
-    Writer::new(paths, texts, None).body(command)
+    Writer::new(paths, texts, None, None).body(command)
 }
 
 /// What the definitions are written with: the scripts the definition being written sits
@@ -360,16 +391,23 @@ struct Writer<'a> {
     paths: Paths<'a>,
     texts: &'a Texts,
     modules: Option<&'a modules::Context>,
+    dependencies: Option<&'a mut Dependencies>,
     chain: Vec<PathBuf>,
     scope: Vec<Vec<(String, PathBuf)>>,
 }
 
 impl<'a> Writer<'a> {
-    fn new(paths: Paths<'a>, texts: &'a Texts, modules: Option<&'a modules::Context>) -> Self {
+    fn new(
+        paths: Paths<'a>,
+        texts: &'a Texts,
+        modules: Option<&'a modules::Context>,
+        dependencies: Option<&'a mut Dependencies>,
+    ) -> Self {
         Writer {
             paths,
             texts,
             modules,
+            dependencies,
             chain: Vec::new(),
             scope: Vec::new(),
         }
@@ -399,13 +437,19 @@ impl<'a> Writer<'a> {
         let script = script_of(command)?;
         let source = self.source_of(&script)?;
         let mut body = Vec::new();
-        if let Some(context) = self.modules {
-            let imports = context
+        let imports = if let Some(context) = self.modules {
+            context
                 .implicit(&script, &source)
-                .map_err(|why| Unwritten::Modules(Diagnostic::new(&script, why)))?;
-            body.extend(modules::statements(&imports));
+                .map_err(|why| Unwritten::Modules(Diagnostic::new(&script, why)))?
+        } else {
+            Vec::new()
+        };
+        body.extend(modules::statements(&imports));
+        let calls = scan(&script, &source, self.texts);
+        if let Some(dependencies) = self.dependencies.as_deref_mut() {
+            dependencies.record(&script, &calls, &imports);
         }
-        let shadows = scan(&script, &source, self.texts).shadows;
+        let shadows = calls.shadows;
         if self.chain.contains(&script) {
             // Met again: Nushell finds its calls among the definitions around it.
             for shadow in &shadows {
@@ -561,6 +605,7 @@ mod tests {
             Paths::Absolute,
             &Texts::new(),
             &modules::Context::default(),
+            None,
         )
         .unwrap();
         (

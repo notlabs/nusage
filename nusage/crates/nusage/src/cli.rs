@@ -298,18 +298,23 @@ impl Run for Parse {
 ///
 /// The same analysis as the interpreter and language server. Calls are resolved command
 /// shadows, not a complete dependency graph; paths are absolute and finding spans are
-/// UTF-8 byte offsets. Header and call findings remain structured data in the result.
+/// UTF-8 byte offsets. Header, package and call findings remain structured data in the result.
 #[derive(Args)]
 pub struct Inspect {
     /// The script whose shebang names nusage
     script: PathBuf,
+    /// Include the known script calls and implicit package imports encountered recursively
+    /// during preparation, plus findings in nested scripts. This is not an execution trace
+    #[usage(long)]
+    recursive: bool,
 }
 
 impl Run for Inspect {
     type Output = Result<(), String>;
 
     fn run(self) -> Self::Output {
-        let inspection = crate::inspect(&self.script).map_err(|e| e.to_string())?;
+        let inspection = crate::inspect::inspect_with(&self.script, self.recursive)
+            .map_err(|e| e.to_string())?;
         println!(
             "{}",
             serde_json::to_string_pretty(&inspection).map_err(|e| e.to_string())?

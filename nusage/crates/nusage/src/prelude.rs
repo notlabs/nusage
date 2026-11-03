@@ -22,13 +22,28 @@ struct Prepared {
     definitions: Vec<Def>,
 }
 
-fn prepare(script: &Path, source: &str, texts: &Texts) -> Result<Prepared, Diagnostic> {
+fn prepare(
+    script: &Path,
+    source: &str,
+    texts: &Texts,
+    mut dependencies: Option<&mut calls::Dependencies>,
+) -> Result<Prepared, Diagnostic> {
     let context = modules::Context::from_env().map_err(|why| Diagnostic::new(script, why))?;
     let modules = context
         .implicit(script, source)
         .map_err(|why| Diagnostic::new(script, why))?;
     let mut calls = calls::scan(script, source, texts);
-    let definitions = calls::definitions(script, &mut calls, Paths::Absolute, texts, &context)?;
+    if let Some(dependencies) = dependencies.as_deref_mut() {
+        dependencies.record(script, &calls, &modules);
+    }
+    let definitions = calls::definitions(
+        script,
+        &mut calls,
+        Paths::Absolute,
+        texts,
+        &context,
+        dependencies,
+    )?;
     Ok(Prepared {
         modules,
         calls,
@@ -50,6 +65,8 @@ pub struct Analysis {
     /// Why the script cannot have a module its calls name ([`crate::modules`]), which the
     /// interpreter would refuse it for.
     pub modules: Option<String>,
+    /// Script calls and implicit imports encountered by preparation, with nested findings.
+    pub dependencies: calls::Dependencies,
 }
 
 /// The analysis of the script at `script` as `source` has it, with the other scripts it
@@ -69,23 +86,25 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
     // holds as NUON, so a harness can hold a record to the type, as the fixtures' does.
     let value = "($env.NUS_USAGE? | default \"{}\" | from nuon)";
     // The modules the script's calls get come first, as the interpreter gives them.
-    let (mut line, calls, defs, modules) = match prepare(script, source, &texts) {
-        Ok(prepared) => (
-            modules::uses(&prepared.modules)
-                .into_iter()
-                .map(|line| line + "; ")
-                .collect::<String>(),
-            prepared.calls,
-            prepared.definitions,
-            None,
-        ),
-        Err(why) => (
-            String::new(),
-            Calls::default(),
-            Vec::new(),
-            Some(why.to_string()),
-        ),
-    };
+    let mut dependencies = calls::Dependencies::default();
+    let (mut line, calls, defs, modules) =
+        match prepare(script, source, &texts, Some(&mut dependencies)) {
+            Ok(prepared) => (
+                modules::uses(&prepared.modules)
+                    .into_iter()
+                    .map(|line| line + "; ")
+                    .collect::<String>(),
+                prepared.calls,
+                prepared.definitions,
+                None,
+            ),
+            Err(why) => (
+                String::new(),
+                Calls::default(),
+                Vec::new(),
+                Some(why.to_string()),
+            ),
+        };
     let header = match command_of(script, &texts) {
         Ok((command, alone)) => {
             // A script that runs commands its spec declares below its own reads a different
@@ -117,6 +136,7 @@ pub fn analyze(script: &Path, source: &str, texts: &Texts) -> Result<Analysis, D
         calls,
         header,
         modules,
+        dependencies,
     })
 }
 
@@ -135,7 +155,7 @@ pub fn line(script: &Path) -> Result<(String, Calls), Diagnostic> {
 /// called script's dependencies in its own definition. Paths are absolute.
 pub fn runtime(script: &Path) -> Result<String, Diagnostic> {
     let source = read(script)?;
-    let prepared = prepare(script, &source, &Texts::new())?;
+    let prepared = prepare(script, &source, &Texts::new(), None)?;
     if prepared.modules.is_empty() && prepared.definitions.is_empty() {
         return Ok(String::new());
     }

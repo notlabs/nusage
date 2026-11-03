@@ -108,6 +108,110 @@
         "null"
       ],
       "description": "Package or module resolution failure, including tool version mismatches in nested callees. Null when preparation succeeds."
+    },
+    "graph": {
+      "type": "object",
+      "required": [
+        "nodes",
+        "edges",
+        "findings"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "kind",
+              "path"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "script",
+                  "module"
+                ]
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute script file or module directory."
+              }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "from",
+              "to",
+              "kind"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "calls",
+                  "imports"
+                ]
+              }
+            }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "script",
+              "span",
+              "message"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "span": {
+                "type": "object",
+                "description": "Zero-based, end-exclusive UTF-8 byte offsets in the caller.",
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "start": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "end": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "script": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "description": "Known recursive preparation dependencies. Present only with --recursive; a module_error can leave this graph partial."
     }
   }
 }
