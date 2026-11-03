@@ -399,15 +399,6 @@ url = "https://github.com/rvben/rumdl/releases/download/v0.3.2/rumdl-v0.3.2-x86_
 url_api = "https://api.github.com/repos/rvben/rumdl/releases/assets/685449367"
 provenance = "github-attestations"
 
-[[tools.rust]]
-version = "1.99.1"
-backend = "core:rust"
-specifiers = ["1.99.1"]
-
-[tools.rust.options]
-components = "clippy,rustfmt"
-profile = "minimal"
-
 [[tools.shellcheck]]
 version = "0.11.0"
 backend = "aqua:koalaman/shellcheck"
