@@ -9,9 +9,14 @@ fn inspected(script: &Path) -> Value {
 }
 
 fn inspected_env(script: &Path, env: &[(&str, &str)]) -> Value {
+    inspected_options(script, env, false)
+}
+
+fn inspected_options(script: &Path, env: &[(&str, &str)], recursive: bool) -> Value {
     let output = Command::new(env!("CARGO_BIN_EXE_nus"))
         .arg("inspect")
         .arg(script)
+        .args(recursive.then_some("--recursive"))
         .env_remove("NUS_MODULES")
         .env_remove("NUS_TOOLS")
         .envs(env.iter().copied())
@@ -51,6 +56,7 @@ fn resolved_calls_and_findings_are_data_without_executing() {
     assert_eq!(report["script"], caller.to_str().unwrap());
     assert!(report["header"].is_null());
     assert!(report["module_error"].is_null());
+    assert!(report.get("graph").is_none());
     assert_eq!(report["calls"].as_array().unwrap().len(), 1);
     let call = &report["calls"][0];
     assert_eq!(call["name"], "./callee.nu");
@@ -107,6 +113,15 @@ fn package_errors_are_data_for_direct_and_nested_calls() {
         let message = report["module_error"].as_str().unwrap();
         assert!(message.contains("greeter 1.2.0"), "{message}");
         assert!(message.contains("greeter 1.3.0"), "{message}");
+        let recursive = inspected_options(script, &wrong, true);
+        assert_eq!(recursive["module_error"], report["module_error"]);
+        assert!(
+            recursive["graph"]["nodes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|node| node["path"] == script.to_str().unwrap())
+        );
         let runtime = Command::new(env!("CARGO_BIN_EXE_nus"))
             .args(["prelude", "--run"])
             .arg(script)
@@ -133,5 +148,97 @@ fn package_errors_are_data_for_direct_and_nested_calls() {
             .unwrap()
             .contains("NUS_MODULES is not a record")
     );
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn recursive_inspection_records_diamonds_cycles_imports_and_nested_findings() {
+    let dir = std::env::temp_dir().join(format!("nusage-inspect-graph-{}", std::process::id()));
+    let module = dir.join("greet");
+    std::fs::create_dir_all(&module).unwrap();
+    std::fs::write(
+        module.join("mod.nu"),
+        "export def greet [] { error make {msg: 'must not run'} }\n",
+    )
+    .unwrap();
+    for (name, body) in [
+        ("main.nu", "./a.nu\n./b.nu\n./a.nu\n"),
+        ("a.nu", "./shared.nu\n"),
+        ("b.nu", "./shared.nu\n"),
+        ("shared.nu", "greet\n./a.nu\n./missing.nu\n^./ignored.nu\n"),
+        ("ignored.nu", "error make {msg: 'must not run'}\n"),
+    ] {
+        std::fs::write(dir.join(name), format!("#!/usr/bin/env nus\n{body}")).unwrap();
+    }
+    let root = dir.join("main.nu");
+    let modules = serde_json::json!({"greet": module}).to_string();
+    let env = [("NUS_MODULES", modules.as_str())];
+    let report = inspected_options(&root, &env, true);
+    assert!(report["module_error"].is_null(), "{report}");
+    assert_eq!(report, inspected_options(&root, &env, true));
+    let graph = &report["graph"];
+    assert_eq!(graph["nodes"].as_array().unwrap().len(), 5, "{graph}");
+    let id = |kind: &str, path: &str| format!("{kind}:{}", dir.join(path).display());
+    let expected = [
+        ("main.nu", "a.nu", "calls"),
+        ("main.nu", "b.nu", "calls"),
+        ("a.nu", "shared.nu", "calls"),
+        ("b.nu", "shared.nu", "calls"),
+        ("shared.nu", "a.nu", "calls"),
+        ("shared.nu", "greet", "imports"),
+    ];
+    let edges = graph["edges"].as_array().unwrap();
+    assert_eq!(edges.len(), expected.len(), "{graph}");
+    for (from, to, kind) in expected {
+        let target_kind = if kind == "imports" {
+            "module"
+        } else {
+            "script"
+        };
+        assert!(edges.contains(&serde_json::json!({"from": id("script", from), "to": id(target_kind, to), "kind": kind})), "{graph}");
+    }
+    let findings = graph["findings"].as_array().unwrap();
+    assert_eq!(findings.len(), 1, "{graph}");
+    assert_eq!(
+        findings[0]["script"],
+        dir.join("shared.nu").to_str().unwrap()
+    );
+    assert!(
+        findings[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("missing.nu")
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn recursive_inspection_resolves_each_callers_relative_paths() {
+    let dir = std::env::temp_dir().join(format!("nusage-inspect-relative-{}", std::process::id()));
+    for side in ["left", "right"] {
+        std::fs::create_dir_all(dir.join(side)).unwrap();
+        std::fs::write(
+            dir.join(side).join("caller.nu"),
+            "#!/usr/bin/env nus\n./helper.nu\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join(side).join("helper.nu"), "#!/usr/bin/env nus\n42\n").unwrap();
+    }
+    let root = dir.join("main.nu");
+    std::fs::write(
+        &root,
+        "#!/usr/bin/env nus\n./left/caller.nu\n./right/caller.nu\n",
+    )
+    .unwrap();
+    let report = inspected_options(&root, &[], true);
+    let edges = report["graph"]["edges"].as_array().unwrap();
+    assert_eq!(edges.len(), 4);
+    for side in ["left", "right"] {
+        assert!(edges.contains(&serde_json::json!({
+            "from": format!("script:{}", dir.join(side).join("caller.nu").display()),
+            "to": format!("script:{}", dir.join(side).join("helper.nu").display()),
+            "kind": "calls",
+        })));
+    }
     std::fs::remove_dir_all(dir).unwrap();
 }

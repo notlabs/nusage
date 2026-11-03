@@ -64,6 +64,14 @@ findings as values, without running the script. The output's contract is
 `nusage/schemas/inspection.schema.json`; its command models are the ones `nus model`
 prints. It reports the calls the analyzer resolves, not a complete dependency graph.
 
+`nus inspect --recursive script.nu` also returns `graph`: script and module nodes, `calls`
+and `imports` edges, and nested findings with the script and byte span they refer to.
+It records the existing preparation traversal, deduplicates shared dependencies and handles
+cycles. Imports are the implicit packages selected for each script. This describes prepared
+command definitions, including subcommands, rather than an execution trace; computed paths,
+ordinary externals and explicit Nushell imports are outside this graph. A `module_error`
+can leave a partial graph, and inspection never executes the script bodies.
+
 An editor that runs `nus lsp` where it would run `nu --lsp` checks a script nusage runs as
 nusage runs it: Nushell knows `$usage` and its type, and holds each call of another script to
 that script's header. Or leave the editor as it is: in a project that includes
