@@ -12,7 +12,9 @@
     # `nusage-args`: the wrapper owns `--json`, and `--jq` and `--template`, which transform
     # the selection, are hidden in `../gh.typed.overlay.kdl`. A source names a file of cli/cli
     # at the revision: the field list, the exporter that writes each field, and the type behind
-    # it.
+    # it. A schema refuses a field the selection does not name, so it says exactly what the
+    # wrapper returns. The times in `statusCheckRollup` stay strings, since its check-run and
+    # commit-status records differ.
     outputs: [
         {
             id: pr-list

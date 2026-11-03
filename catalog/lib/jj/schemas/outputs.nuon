@@ -7,8 +7,11 @@
         revision: "v0.46.0"
     }
     # Every output is JSON lines from a template, `json(self)` per line, so each is asked for
-    # with `--template`, and with `--no-graph` where a graph would frame the lines. A source
-    # names a crate's file at 0.46.0 on crates.io.
+    # with `--template`, and with `--no-graph` where a graph would frame the lines: the wrapper
+    # owns both flags, and `^jj` takes any other template. A source names a crate's file at the
+    # baseline's version on crates.io. A configuration value is any TOML value, so its type is
+    # `any`. `diff`, `show` and the `file` commands have no output here, since their template
+    # types do not serialize.
     outputs: [
         {
             id: log

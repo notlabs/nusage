@@ -1,5 +1,5 @@
-// Keep this first integration baseline to the two output paths described in README.md.
-// The complete adapter export remains in docker-compose.usage.kdl.
+// The baseline: the commands whose outputs are declared stay in the module, and those hidden
+// here stay in the spec, `docker-compose.usage.kdl`, and in the original CLI.
 cmd "alpha" hide=#true
 cmd "attach" hide=#true
 cmd "bridge" hide=#true

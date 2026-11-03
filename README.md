@@ -4,14 +4,10 @@ Typed Nushell commands from usage-annotated scripts, and typed wrappers from the
 of binaries and services. The command is `nus`, and so is the shebang, `#!/usr/bin/env nus`.
 Early development.
 
-- `nusage/`: `nus` and its crates. `nus --help` for the CLI, `cargo doc --workspace --no-deps`
-  for the crates. Two stand on their own: `openapi-usage`, an OpenAPI document as a usage
-  spec with the HTTP mapping beside it, and `nushell-schema`, the Nushell dialect of JSON
-  Schema. `nu_plugin_nus` serves the commands generated modules call, in one process across
-  calls; `mise run //nusage:plugins` registers it.
+- `nusage/`: `nus` and its crates; `nus --help` for the CLI, and each crate's documentation,
+  `cargo doc --workspace --no-deps`, for what it is.
 - `catalog/`: a generated module package per tool under `catalog/lib/`, each released as
-  `packslip:github.com/notlabs/nusage/catalog/<tool>`. `catalog/README.md` says how a project
-  uses them.
+  `packslip:github.com/notlabs/nusage/catalog/<tool>`.
 - `intent/`: where the project is going, as claims checked where they can be.
 - `mergiraf/`: Mergiraf, the structural merge tool `jj resolve` runs here, built with patches
   that teach it Nushell.
@@ -51,8 +47,5 @@ A project with its own `[wrappers.nu]` keeps nusage's server with `command = "nu
 
 ## Development
 
-`mise install --monorepo` installs the tools, `mise tasks --all` lists the tasks, which run
-through the `nus` built in the checkout, and `mise run '//...:check'` runs every check.
-`mise dot apply` links the user-level fragment that installs the released nusage, with the
-`nu` and `usage` it runs. `mise run //:pr-status` reports the open pull requests and their
-checks.
+The tools install with `mise install --monorepo`. The tasks run through the `nus` built in the
+checkout, not a release.
