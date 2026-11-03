@@ -73,7 +73,7 @@ jobs:
             # Checkout leaves no credential behind; supply its read-only token for this fetch.
             git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --no-tags --depth=1 origin "$BASE_SHA"
             echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
-            if git diff --quiet "$BASE_SHA" HEAD -- mergiraf jj.toml mise.toml mise.lock .mise/lib/actions.nu .github/workflows/ci.yml; then
+            if git diff --quiet "$BASE_SHA" HEAD -- mergiraf jj.toml mise.toml mise.lock .mise/conf.d .mise/mise.lock .mise/lib/actions.nu .github/workflows/ci.yml; then
               echo "run=false" >> "$GITHUB_OUTPUT"
             else
               echo "run=true" >> "$GITHUB_OUTPUT"

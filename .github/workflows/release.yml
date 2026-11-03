@@ -20,6 +20,10 @@ permissions: {}
 concurrency:
   group: release
 
+env:
+  MBX_DISABLE: "1"
+  MISE_TASK_CACHE: "off"
+
 jobs:
   tag:
     if: >-
@@ -145,8 +149,6 @@ jobs:
         with:
           version: 2026.10.21
           cache: false
-        env:
-          MBX_DISABLE: "1"
       # A prerelease's version is set in this checkout alone, so the binary reports it.
       - if: needs.plan.outputs.prerelease == 'true'
         env:
@@ -168,8 +170,6 @@ jobs:
           locked: true
           ref: refs/tags/${{ needs.plan.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          MBX_DISABLE: "1"
       # Attestations for a private repository need GitHub Enterprise Cloud.
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         if: ${{ !github.event.repository.private }}
@@ -204,8 +204,6 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MBX_DISABLE: "1"
-      MISE_TASK_CACHE: "off"
     outputs:
       released: ${{ steps.release.outputs.released }}
     steps:
@@ -300,8 +298,6 @@ jobs:
       packages: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MBX_DISABLE: "1"
-      MISE_TASK_CACHE: "off"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

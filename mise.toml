@@ -59,37 +59,14 @@ global_inputs = [
 cache = { enabled = true }
 
 [tools]
-# The Cargo workspace is at the root, so Rust is pinned here, for Cargo, the tasks and CI.
-rust = { version = "1.99.1", profile = "minimal", components = [
-  "rustfmt",
-  "clippy",
-], mr_boxington = true }
 nu = "0.116.1"
 usage = "7.1.3"
-jujutsu = "0.46.0"
-# nufmt tracks the Nushell above.
-"github:nushell/nufmt" = "0.1.6"
-taplo = "0.10.0"
-rumdl = "0.3.2"
-"github:owenlamont/ryl" = "0.28.0"
-go = "1.27.3"
-jactionlint = "2.3.0"
-# jactionlint checks the workflows' `run` scripts with it.
-shellcheck = "0.11.0"
-release-plz = "0.4.2"
 
 # The repository's tasks run through the nus `//nusage:build` copies into `.bin`, not through
-# a release. jj reads this repository's `jj.toml` after the user's own configuration, in the
-# order jj itself reads it; a path that does not exist is passed over.
+# a release.
 [env]
 _.path = ["{{config_root}}/.bin"]
-JJ_CONFIG = '{% if os() == "windows" %}{{ env.USERPROFILE }}\.jjconfig.toml;{{ env.APPDATA }}\jj\config.toml;{{ env.APPDATA }}\jj\conf.d;{{ config_root }}\jj.toml{% else %}{{ env.HOME }}/.jjconfig.toml:{{ xdg_config_home }}/jj/config.toml:{{ xdg_config_home }}/jj/conf.d:{{ config_root }}/jj.toml{% endif %}'
 
 [tasks.check]
 description = "The root's own checks"
 depends = [":lint", ":check-affected", ":check-pr-status"]
-
-# The release is the commit this leaves to make: pushed to main, release.yml tags it.
-[tasks.release]
-description = "Bump the versions and write the changelog from the commits since the last tag"
-run = "release-plz update"

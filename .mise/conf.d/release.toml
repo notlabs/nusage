@@ -1,0 +1,7 @@
+[tools]
+release-plz = "0.4.2"
+
+# The release is the commit this leaves to make: pushed to main, release.yml tags it.
+[tasks.release]
+description = "Bump the versions and write the changelog from the commits since the last tag"
+run = "release-plz update"
