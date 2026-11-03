@@ -7,7 +7,8 @@
     "script",
     "calls",
     "findings",
-    "header"
+    "header",
+    "module_error"
   ],
   "additionalProperties": false,
   "properties": {
@@ -100,6 +101,13 @@
           "type": "string"
         }
       }
+    },
+    "module_error": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Package or module resolution failure, including tool version mismatches in nested callees. Null when preparation succeeds."
     }
   }
 }
