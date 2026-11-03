@@ -5,24 +5,48 @@
   "$defs": {
     "author": {
       "type": "object",
-      "required": ["is_bot", "login"],
+      "required": [
+        "is_bot",
+        "login"
+      ],
       "additionalProperties": false,
       "properties": {
-        "is_bot": {"type": "boolean"},
-        "login": {"type": "string"},
-        "id": {"type": "string"},
-        "name": {"type": "string"}
+        "is_bot": {
+          "type": "boolean"
+        },
+        "login": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
       }
     },
     "label": {
       "type": "object",
-      "required": ["id", "name", "description", "color"],
+      "required": [
+        "id",
+        "name",
+        "description",
+        "color"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": {"type": "string"},
-        "name": {"type": "string"},
-        "description": {"type": "string"},
-        "color": {"type": "string"}
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        }
       }
     },
     "pull_request": {
@@ -42,25 +66,194 @@
         "mergedAt",
         "labels",
         "reviewDecision",
-        "body"
+        "body",
+        "headRefOid",
+        "isCrossRepository",
+        "mergeable",
+        "mergeStateStatus",
+        "statusCheckRollup"
       ],
       "additionalProperties": false,
       "properties": {
-        "number": {"type": "integer"},
-        "title": {"type": "string"},
-        "state": {"enum": ["OPEN", "CLOSED", "MERGED"]},
-        "isDraft": {"type": "boolean"},
-        "url": {"type": "string"},
-        "author": {"$ref": "#/$defs/author"},
-        "headRefName": {"type": "string"},
-        "baseRefName": {"type": "string"},
-        "createdAt": {"type": "string", "format": "date-time"},
-        "updatedAt": {"type": "string", "format": "date-time"},
-        "closedAt": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
-        "mergedAt": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
-        "labels": {"type": "array", "items": {"$ref": "#/$defs/label"}},
-        "reviewDecision": {"enum": ["", "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"]},
-        "body": {"type": "string"}
+        "number": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "OPEN",
+            "CLOSED",
+            "MERGED"
+          ]
+        },
+        "isDraft": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        },
+        "author": {
+          "$ref": "#/$defs/author"
+        },
+        "headRefName": {
+          "type": "string"
+        },
+        "baseRefName": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "closedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mergedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/label"
+          }
+        },
+        "reviewDecision": {
+          "enum": [
+            "",
+            "APPROVED",
+            "CHANGES_REQUESTED",
+            "REVIEW_REQUIRED"
+          ]
+        },
+        "body": {
+          "type": "string"
+        },
+        "headRefOid": {
+          "type": "string"
+        },
+        "isCrossRepository": {
+          "type": "boolean"
+        },
+        "mergeable": {
+          "enum": [
+            "MERGEABLE",
+            "CONFLICTING",
+            "UNKNOWN"
+          ]
+        },
+        "mergeStateStatus": {
+          "type": "string"
+        },
+        "statusCheckRollup": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/check_run"
+                  },
+                  {
+                    "$ref": "#/$defs/status_context"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "check_run": {
+      "type": "object",
+      "required": [
+        "__typename",
+        "name",
+        "workflowName",
+        "status",
+        "conclusion",
+        "startedAt",
+        "completedAt",
+        "detailsUrl"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "__typename": {
+          "const": "CheckRun"
+        },
+        "name": {
+          "type": "string"
+        },
+        "workflowName": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "conclusion": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "detailsUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "status_context": {
+      "type": "object",
+      "required": [
+        "__typename",
+        "context",
+        "state",
+        "targetUrl",
+        "startedAt"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "__typename": {
+          "const": "StatusContext"
+        },
+        "context": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "targetUrl": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        }
       }
     }
   }

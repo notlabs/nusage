@@ -1,0 +1,8 @@
+# `MISE_ENV=audit`: the task cache as mise.toml has it, with each task that runs traced for
+# the files it reads and writes and does not declare (Linux, with strace on PATH).
+[task_config]
+cache = { enabled = true, audit = true, env = [
+  "CARGO_PROFILE_DEV_DEBUG",
+  "CARGO_INCREMENTAL",
+  "RUSTFLAGS",
+] }

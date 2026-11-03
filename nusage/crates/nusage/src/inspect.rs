@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 ///
 /// Paths are absolute, as they are in the analysis; spans are zero-based, end-exclusive
 /// UTF-8 byte offsets in the caller. Calls list resolved command shadows, not every call
-/// occurrence or a complete dependency graph. Header and call findings are data, even when
+/// occurrence or a complete dependency graph. Header, package and call findings are data, even when
 /// incomplete; failure to read the script or a missing nusage shebang is an error.
 /// The wire shape is documented by `nusage/schemas/inspection.schema.json`.
 pub fn inspect(script: &Path) -> Result<Value, Diagnostic> {
@@ -47,5 +47,11 @@ pub fn inspect(script: &Path) -> Result<Value, Diagnostic> {
             "message": finding.message,
         })
     });
-    Ok(json!({"script": script, "calls": calls, "findings": findings, "header": header}))
+    Ok(json!({
+        "script": script,
+        "calls": calls,
+        "findings": findings,
+        "header": header,
+        "module_error": analysis.modules,
+    }))
 }

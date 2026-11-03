@@ -30,20 +30,33 @@ view`'s log flags.
 
 | Command | Output | Fields |
 | --- | --- | --- |
-| `pr list`, `pr view` | a pull request, or a table of them | number, title, state, isDraft, url, author, head and base ref names, the times, labels, reviewDecision, body |
+| `pr list`, `pr view` | a pull request, or a table of them | number, title, state, isDraft, url, author, head and base ref names, the times, labels, reviewDecision, body, headRefOid, isCrossRepository, mergeable, mergeStateStatus, statusCheckRollup |
 | `pr checks` | a table of checks | name, state, startedAt, completedAt, link, bucket, event, workflow, description |
 | `issue list`, `issue view` | an issue, or a table of them | number, title, state, stateReason, url, author, the times, labels, assignees, body |
 | `repo view`, `repo list` | a repository, or a table of them | name, nameWithOwner, owner, description, url, the `is*` flags, defaultBranchRef, the counts, the times |
-| `run list`, `run view` | a run, or a table of them | databaseId, number, attempt, the names, headBranch, headSha, event, status, conclusion, the times, url |
+| `run list`, `run view` | a run, or a table of them | databaseId, number, attempt, the names, headBranch, headSha, event, status, conclusion, the times, url; `run view` also includes jobs and their steps |
 | `release list` | a table of releases | name, tagName, the `is*` flags, createdAt, publishedAt |
 | `release view` | a release with its assets | tagName, name, body, the `is*` flags, the times, targetCommitish, url, author, assets |
 
 Each schema follows the exporter in cli/cli, which `outputs.nuon` names per output: an
 author is `{is_bot, login}` with `id` and `name` for a user, a time is RFC 3339 and decodes
-to a datetime, a time that may be absent is null. A field the selection does not name is
+to a datetime, a time that may be absent is null. Check-rollup timestamps stay strings
+because its check-run and commit-status records have different shapes. A field the selection does not name is
 refused, so a schema says exactly what a wrapper returns. `search`, `api` and the other
 groups wait for their outputs to be declared the same way; `json-fields.json` says which
 take `--json`.
+
+## Repository status
+
+`mise run //:pr-status` reports open PRs, their base branches and parent PR numbers,
+review and merge states, and counts of passed, failed, pending, cancelled, skipped and
+unknown checks. `--repo owner/name` selects another repository; `--limit` defaults to 100.
+`--json` emits the same records, including the head commit and individual check links.
+The report uses each PR's current-head `statusCheckRollup`, including legacy commit
+statuses. Empty checks stay empty; counts alone do not declare a PR ready to merge.
+
+The script imports this checkout's generated gh module and uses the authenticated gh on
+PATH. `//:check-pr-status` checks the summaries offline as part of the root checks.
 
 ## Check
 

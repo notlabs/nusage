@@ -60,7 +60,7 @@ file = "tasks/generate.nu"
 
 [tasks.check]
 description = "Hold each entry's generated files to their inputs and its spec to the tool on PATH, its output to its schemas, and drive the tool through its module"
-depends = ["//nusage:build", ":check-package"]
+depends = ["//nusage:build", ":check-package", ":check-release"]
 file = "tasks/check.nu"
 tools = { docker-compose = "5.6.1", gh = "2.103.3" }
 
@@ -79,6 +79,11 @@ file = "tasks/package.nu"
 description = "Package the catalog's tasks for a release: the directory the OCI task catalog is pushed from"
 depends = [":check"]
 file = "tasks/package.nu"
+
+[tasks.check-release]
+description = "Check interrupted package release recovery without publishing assets"
+depends = ["//nusage:build"]
+file = "tasks/check-release.nu"
 
 [tasks.check-package]
 description = "Run the packaged tasks from an unrelated consumer project"
