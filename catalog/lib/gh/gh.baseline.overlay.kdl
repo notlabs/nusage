@@ -1,7 +1,7 @@
-// The baseline: the groups an agent or a script reaches for, `pr`, `issue`, `repo`, `run`
-// and `release`, with their list and view commands typed by `schemas/outputs.nuon`. The
-// others stay in the spec, `gh.usage.kdl`, and in the original CLI, `^gh`: `api` returns
-// whatever the endpoint does, and the rest wait for their outputs to be declared.
+// The baseline: the groups whose commands `schemas/outputs.nuon` types stay in the module,
+// and those hidden here stay in the spec, `gh.usage.kdl`, and in the original CLI, `^gh`:
+// `api` returns whatever the endpoint does, and the rest wait for their outputs to be
+// declared.
 cmd "agent-task" hide=#true
 cmd "alias" hide=#true
 cmd "api" hide=#true

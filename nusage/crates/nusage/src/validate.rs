@@ -1,7 +1,6 @@
-//! JSON documents held to a JSON Schema: the schema to the dialect first, then each document
-//! to the schema. A binary's output is a contract the module's types rely on, and this is how
-//! a conformance suite checks the raw output before Nushell decodes it. The dialect and the
-//! checking are `nushell-schema`'s; this reads the files.
+//! JSON documents held to a JSON Schema: the schema to the dialect first, then each document to the schema.
+//! A binary's output is a contract the module's types rely on, and this is how a conformance suite checks the raw output before Nushell decodes it.
+//! The dialect and the checking are `nushell-schema`'s; this reads the files.
 
 use std::io::Read;
 use std::path::Path;
@@ -9,13 +8,10 @@ use std::path::Path;
 use nushell_schema::validate::Schema;
 use serde_json::Value;
 
-/// The findings for `documents` against the schema at `schema`, as `<document>:<path>:
-/// <what>` lines; empty when every document conforms. A document named `-` is standard
-/// input; no documents holds the schema alone. With `lines`, each document is JSON lines,
-/// every line that is not blank a document of its own, and a finding names the line:
-/// `<document>:<line>:<path>: <what>`. The error is a check that did not run: a schema or
-/// document that cannot be read, or a schema the dialect refuses, since a faulty schema
-/// judges nothing.
+/// The findings for `documents` against the schema at `schema`, as `<document>:<path>: <what>` lines; empty when every document conforms.
+/// A document named `-` is standard input; no documents holds the schema alone.
+/// With `lines`, each document is JSON lines, every line that is not blank a document of its own, and a finding names the line: `<document>:<line>:<path>: <what>`.
+/// The error is a check that did not run: a schema or document that cannot be read, or a schema the dialect refuses, since a faulty schema judges nothing.
 pub fn validate(
     schema: &Path,
     documents: &[impl AsRef<Path>],

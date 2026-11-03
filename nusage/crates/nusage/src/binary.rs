@@ -1,11 +1,7 @@
 //! The binary target: one `export def` per command of a binary described by a spec file.
-//! The root is `main` and a subcommand carries the binary's name, so `use <bin>.nu *` names
-//! them as the binary does. A wrapper is the binary's data form, as `^tool` is its text form:
-//! its body builds the binary's argv from its typed parameters, asks for the command's
-//! structured output with the spec's own selector words, and decodes it to the type its
-//! schema or annotation declares, so its return type is one type the parser checks. The
-//! helper that builds the argv
-//! ships with the module as Nushell, and a helper runs each shell-backed completer.
+//! The root is `main` and a subcommand carries the binary's name, so `use <bin>.nu *` names them as the binary does.
+//! A wrapper is the binary's data form, as `^tool` is its text form: its body builds the binary's argv from its typed parameters, asks for the command's structured output with the spec's own selector words, and decodes it to the type its schema or annotation declares, so its return type is one type the parser checks.
+//! The helper that builds the argv ships with the module as Nushell, and a helper runs each shell-backed completer.
 
 use nu_protocol::{Span, Value};
 use nusage_model::{
@@ -19,16 +15,13 @@ use nusage_nu::{
 
 use crate::common::{SPEC_COMPLETER, Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
 
-/// The fixed helpers every binary module carries, and every module whose scripts call
-/// scripts.
+/// The fixed helpers every binary module carries, and every module whose scripts call scripts.
 pub(crate) const HELPERS: &str = include_str!("binary-helpers.nu");
-/// The helper that holds a failed decode to the output's schema, carried when a wrapper
-/// decodes a JSON document that has one.
+/// The helper that holds a failed decode to the output's schema, carried when a wrapper decodes a JSON document that has one.
 pub(crate) const DECODED: &str = include_str!("binary-decoded.nu");
 
-/// The module for a binary: the helpers, the completer when a parameter wants one, then a
-/// wrapper per command. `spec` is the spec file's path relative to the module's directory,
-/// for the completer, which runs usage's against it.
+/// The module for a binary: the helpers, the completer when a parameter wants one, then a wrapper per command.
+/// `spec` is the spec file's path relative to the module's directory, for the completer, which runs usage's against it.
 pub fn module(tree: &CommandTree, spec: &str) -> Result<Module, SyntaxError> {
     let mut items = vec![Item::Verbatim(HELPERS.to_string())];
     let wants_completer = tree.commands.iter().any(|command| {
@@ -60,13 +53,9 @@ pub fn module(tree: &CommandTree, spec: &str) -> Result<Module, SyntaxError> {
     })
 }
 
-/// usage's completer as a Nushell one: the words typed so far go to `usage complete-word`
-/// against the spec this module was generated from, which runs the spec's `complete`
-/// commands with their templates rendered and completes `type=` paths. Nothing when the
-/// `usage` CLI is not installed. Nushell hands a completer a record of where the cursor is;
-/// its `command` field is the words of the call so far, the one being completed last, with
-/// the call's name as one word: `demo install`, or `main` for the binary itself. usage wants
-/// the binary's words, so the name is split and `main` becomes the binary.
+/// usage's completer as a Nushell one: the words typed so far go to `usage complete-word` against the spec this module was generated from, which runs the spec's `complete` commands with their templates rendered and completes `type=` paths.
+/// Nothing when the `usage` CLI is not installed.
+/// Nushell hands a completer a record of where the cursor is; its `command` field is the words of the call so far, the one being completed last, with the call's name as one word: `demo install`, or `main` for the binary itself. usage wants the binary's words, so the name is split and `main` becomes the binary.
 fn spec_completer(bin: &str, spec: &str) -> String {
     format!(
         r#"# Completions from usage's own completer, against the spec this module was generated
@@ -170,10 +159,8 @@ fn wrapper(tree: &CommandTree, command: &Command) -> Result<Def, SyntaxError> {
     })
 }
 
-/// A wrapper's parameters, and the argv they make: `nus argv [$a ...$rest] {--flag:
-/// $flag}`. A `def` has one rest parameter; a command declaring several variadic
-/// positionals, as usage allows (`[ARGS]...` and `[-- MORE]...`), gets the first, which takes
-/// every remaining word anyway, since the command parses them.
+/// A wrapper's parameters, and the argv they make: `nus argv [$a ...$rest] {--flag: $flag}`.
+/// A `def` has one rest parameter; a command declaring several variadic positionals, as usage allows (`[ARGS]...` and `[-- MORE]...`), gets the first, which takes every remaining word anyway, since the command parses them.
 pub(crate) fn params_and_argv(
     command: &Command,
     target: Target,
@@ -230,9 +217,8 @@ pub(crate) fn params_and_argv(
     Ok((params, call("nus argv", argv_args)?))
 }
 
-/// A flag's value as `nus argv` takes it. The helper spells a flag by its value's type,
-/// an `int` as a count and a `bool` as a switch, so a valued flag of a type other than text
-/// goes as the list of its value, empty when absent, which it spells `--flag value`.
+/// A flag's value as `nus argv` takes it.
+/// The helper spells a flag by its value's type, an `int` as a count and a `bool` as a switch, so a valued flag of a type other than text goes as the list of its value, empty when absent, which it spells `--flag value`.
 fn flag_value(param: &Param) -> Result<Expr, SyntaxError> {
     let var = Expr::Var(Ident::new(&param.var)?);
     if param.kind != ParamKind::Valued || matches!(param.ty.as_str(), "string" | "path") {
@@ -253,12 +239,7 @@ fn flag_word(param: &Param) -> String {
     }
 }
 
-/// The decoder, `from json` or the reader for the media type or the pipeline the output
-/// states; then what the schema or annotation declares and the text cannot carry: first
-/// `default null` for each property the schema does not require, so the field is there to
-/// read; then each conversion at its cell path, `into <ty> <path>` where the value is text
-/// or a count of bytes, else an `update` whose closure counts the unit and leaves `null`
-/// alone where the value may be one.
+/// The decoder, `from json` or the reader for the media type or the pipeline the output states; then what the schema or annotation declares and the text cannot carry: first `default null` for each property the schema does not require, so the field is there to read; then each conversion at its cell path, `into <ty> <path>` where the value is text or a count of bytes, else an `update` whose closure counts the unit and leaves `null` alone where the value may be one.
 pub(crate) fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, SyntaxError> {
     let mut stages = vec![match &structured.decoder {
         Decoder::From { format, objects } => {
@@ -307,8 +288,7 @@ pub(crate) fn decode_stages(structured: &Structured) -> Result<Vec<Expr>, Syntax
     Ok(stages)
 }
 
-/// `default null <field>` on the fill's record: the whole value, or `update <record> {
-/// default null <field> }` below it; held off where a record on the way may be null.
+/// `default null <field>` on the fill's record: the whole value, or `update <record> { default null <field> }` below it; held off where a record on the way may be null.
 fn fill_stage(fill: &Fill) -> Result<Expr, SyntaxError> {
     if let Some(&at) = fill.nullable.first() {
         let (outer, rest) = fill.path.split_at(at);
@@ -338,11 +318,9 @@ fn fill_stage(fill: &Fill) -> Result<Expr, SyntaxError> {
     )
 }
 
-/// `stages` on the value at `outer` where that may be null, such as jj's `operation` with
-/// `time.start` under it: a null is left as it is, and the stages run on anything else.
+/// `stages` on the value at `outer` where that may be null, such as jj's `operation` with `time.start` under it: a null is left as it is, and the stages run on anything else.
 /// On the whole value when `outer` is empty.
-/// `update <table> {|row| $row.<table> | <stages> }`: the stages on the table at the path,
-/// where they run on every row, as they would on the whole value.
+/// `update <table> {|row| $row.<table> | <stages> }`: the stages on the table at the path, where they run on every row, as they would on the whole value.
 fn each_row(outer: &[String], stages: Vec<Expr>) -> Result<Expr, SyntaxError> {
     let row = Ident::new("row")?;
     let body = Expr::Pipeline(
@@ -526,8 +504,7 @@ fn conversion_stage(conversion: &Conversion) -> Result<Expr, SyntaxError> {
     }
 }
 
-/// A cell path as `into` and `update` take it, written as is, each part quoted when it
-/// needs to be.
+/// A cell path as `into` and `update` take it, written as is, each part quoted when it needs to be.
 fn cell_path(path: &[String]) -> String {
     path.iter()
         .map(|part| word(part))

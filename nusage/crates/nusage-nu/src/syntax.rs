@@ -4,8 +4,8 @@ use crate::Value;
 
 /// A Nushell type as written in a signature: `int`, `list<string>`, `record<x: int>`.
 ///
-/// Carried verbatim. Nushell's parser is the authority on whether it is a type; `nu-check`
-/// on the generated file is where a wrong one surfaces.
+/// Carried verbatim.
+/// Nushell's parser is the authority on whether it is a type; `nu-check` on the generated file is where a wrong one surfaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Type(String);
 
@@ -75,9 +75,9 @@ impl FlagName {
     }
 }
 
-/// A command name, possibly several words: `main`, `db`, `db migrate`. Quoted when printed
-/// if it needs to be. Whether Nushell accepts it as a definition (a parser keyword such as
-/// `run` is not one) is for [`check_module`](crate::check_module) to say.
+/// A command name, possibly several words: `main`, `db`, `db migrate`.
+/// Quoted when printed if it needs to be.
+/// Whether Nushell accepts it as a definition (a parser keyword such as `run` is not one) is for [`check_module`](crate::check_module) to say.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandName(String);
 
@@ -100,9 +100,8 @@ impl CommandName {
     }
 }
 
-/// Text in a syntax position (a command name, an argument, a path, a completion word):
-/// bare when Nushell reads it back as itself, else double-quoted. The rule is Nushell's own,
-/// from `nu-utils`.
+/// Text in a syntax position (a command name, an argument, a path, a completion word): bare when Nushell reads it back as itself, else double-quoted.
+/// The rule is Nushell's own, from `nu-utils`.
 pub fn word(text: &str) -> String {
     if nu_utils::needs_quoting(text) {
         nu_utils::escape_quote_string(text)
@@ -132,8 +131,7 @@ pub struct Module {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Def(Def),
-    /// Nushell source written as given: a fixed block the generator ships, such as helper
-    /// definitions, kept as Nushell rather than modelled.
+    /// Nushell source written as given: a fixed block the generator ships, such as helper definitions, kept as Nushell rather than modelled.
     Verbatim(String),
 }
 
@@ -141,8 +139,8 @@ pub enum Item {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Def {
     pub export: bool,
-    /// Comment paragraphs above the definition: the first is the description, the rest the
-    /// extra description. Each paragraph is one or more lines.
+    /// Comment paragraphs above the definition: the first is the description, the rest the extra description.
+    /// Each paragraph is one or more lines.
     pub doc: Vec<Vec<String>>,
     pub attrs: Vec<Attr>,
     pub name: CommandName,
@@ -152,16 +150,15 @@ pub struct Def {
     pub body: Vec<Stmt>,
 }
 
-/// An attribute line above a definition: `@name 'arg' 'arg'`, each argument a string,
-/// single-quoted so it reads as written, or a raw string when it contains `'`.
+/// An attribute line above a definition: `@name 'arg' 'arg'`, each argument a string, single-quoted so it reads as written, or a raw string when it contains `'`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Attr {
     pub name: FlagName,
     pub args: Vec<String>,
 }
 
-/// The parameters of a signature, in the order Nushell requires: required positionals,
-/// optional positionals, at most one rest, then flags. The constructor enforces it.
+/// The parameters of a signature, in the order Nushell requires: required positionals, optional positionals, at most one rest, then flags.
+/// The constructor enforces it.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Params {
     items: Vec<Param>,
@@ -264,8 +261,7 @@ pub enum Expr {
     Var(Ident),
     /// `$name.a.b`: a cell path into a variable, each part quoted when it needs to be.
     Cell { var: Ident, path: Vec<String> },
-    /// Nushell as written: a literal the printer has no value for, such as `1kB` or a
-    /// datetime, which it copies verbatim.
+    /// Nushell as written: a literal the printer has no value for, such as `1kB` or a datetime, which it copies verbatim.
     Raw(String),
     /// A value written as NUON.
     Literal(Value),

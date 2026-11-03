@@ -1,5 +1,4 @@
 #!/usr/bin/env nus
-#USAGE about "Hold each entry's generated files to their inputs and its spec to the tool on PATH, hold the tool's output to its schemas and the module to usage's reading of the spec, then drive the tool through the module"
 #USAGE arg "[tool]" help="One entry; every entry when absent"
 # The generated files are committed: the module a package ships is reviewed as a diff when the
 # spec, the suite or an overlay changes. So `check` generates again and compares byte for byte,

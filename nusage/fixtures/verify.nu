@@ -1,36 +1,13 @@
 #!/usr/bin/env nus
 #USAGE arg "[fixtures]..." help="Fixture directories; every directory under fixtures/ by default"
 #USAGE flag "--update-signatures" help="Rewrite expected/signatures.nuon instead of comparing it"
-# Verify the fixtures against the `nu` that runs this script.
-#
-# A script fixture's cases go through both entrypoints and must return the same value:
-#   - shim:        `use expected/<bin>.nu; <bin> <words>`        (Nushell types the arguments)
-#   - interpreter: `let usage = ($env.NUS_ARGS | from nuon); $in | run <script>`
-#                                                                  (the record is handed in as NUON,
-#                  after what `nus prelude --run <script>` says precedes it: the shadows of
-#                  the scripts it calls)
-#   - parse:       `nus parse <script> -- <argv>`, for a single script, when
-#                  target/debug/nusage is built: the record usage's parser yields
-#   - prelude:     the record bound by the typed `let usage` that `nus prelude <script>`
-#                  writes, which Nushell checks against the record as it runs
-# A binary fixture (a `<bin>.usage.kdl`) has no scripts: a case's `invoke` runs the module
-# against the fixture's `fake/<bin>`, which records the argv it received and prints what the
-# case says, so argv building and decoding are checked; then completions and signatures.
-# A case with `complete` asks the module for completions at a point of a line. Then the parsed
-# signature and attributes of the root and every command a case names, as `scope commands`
-# reports them, are compared with expected/signatures.nuon, and `nus check` holds the
-# module to the spec as usage reads it.
-#
-#
-#   mise run //nusage:verify-fixtures                       # all fixtures
-#   mise run //nusage:verify-fixtures fixtures/minimal      # one
-#   mise run //nusage:verify-fixtures --update-signatures   # rewrite expected/signatures.nuon
-#
-# `NUS_BIN` names the nus to check; the build `//nusage:build` copies it into `.bin` by
-# default.
+# Verify the fixtures against the `nu` that runs this script. A script fixture's cases go
+# through each entrypoint, and each must return the same value; a binary fixture (a
+# `<bin>.usage.kdl`) has no scripts, and its cases run the module against the fixture's
+# `fake/<bin>`. Then the signatures of the commands the cases name are compared with
+# expected/signatures.nuon, and `nus check` holds the module to the spec as usage reads it.
 
-# One row per check: shim, interpreter, run and (when present) completion per case, then
-# signatures.
+# One row per check.
 def verify-fixture [dir: path, update: bool] {
     let name = $dir | path basename
     let module = glob ($dir | path join expected '*.nu') | first
@@ -153,6 +130,7 @@ def check-shim [import: string, bin: string, case: record] {
     run-nu $code {} | after-printed $case | compare (expected-output $case)
 }
 
+# The interpreter's handoff: the case's record handed in as NUON, and the script `run` with it.
 def check-interpreter [dir: path, bin: string, case: record] {
     let script = script-for $dir $bin $case.usage.cmd
     # The shadows of the scripts it calls, which only the built nusage knows.
@@ -208,8 +186,6 @@ def check-invoke [dir: path, import: string, case: record] {
     }
 }
 
-# The record the built `nus` makes of the case's argv, as its shebang form would hand it
-# to the script.
 # A check the environment cannot run: its own outcome, a failure in CI, where every check
 # has to run for a pass to mean anything.
 def skipped [why: string] {
@@ -271,6 +247,8 @@ def check-run [dir: path, bin: string, case: record] {
     {ok: true, detail: ""}
 }
 
+# The record the built `nus` makes of the case's argv, as its shebang form would hand it
+# to the script.
 def check-parse [dir: path, case: record] {
     if not ($env.NUS_BIN | path exists) {
         return (skipped $"($env.NUS_BIN) is not built")
@@ -438,6 +416,7 @@ def check-signatures [
 }
 
 const root = path self | path dirname
+# The nus to check: by default the one `//nusage:build` copies into `.bin`.
 $env.NUS_BIN = $env.NUS_BIN? | default (
     $root
     | path dirname

@@ -1,5 +1,4 @@
-//! `nus validate` through the plugin, in process: the CLI's interface, answering with the
-//! findings as rows.
+//! `nus validate` through the plugin, in process: the CLI's interface, answering with the findings as rows.
 
 use nu_plugin_nus::NusagePlugin;
 use nusage_plugin::nu_protocol::{ListStream, Signals, Span, Value, record};
@@ -138,8 +137,7 @@ fn documents_are_held_to_the_schema_as_rows() {
     std::fs::remove_dir_all(schema.parent().unwrap()).unwrap();
 }
 
-/// The same documents have the same findings through the CLI's validator and the
-/// plugin; the CLI renders them as errors, while the plugin returns them as rows.
+/// The same documents have the same findings through the CLI's validator and the plugin; the CLI renders them as errors, while the plugin returns them as rows.
 #[test]
 fn the_cli_and_plugin_hold_the_same_documents() {
     let schema = schema_file("parity", SCHEMA);
@@ -221,9 +219,8 @@ fn a_schema_that_holds_nothing_is_an_error() {
     std::fs::remove_dir_all(schema.parent().unwrap()).unwrap();
 }
 
-/// The built plugin under the Nushell on PATH, registered for one run with `--plugins`:
-/// the handshake, the signature as Nushell reads it, and a call. Skipped without `nu`,
-/// except in CI, where it fails.
+/// The built plugin under the Nushell on PATH, registered for one run with `--plugins`: the handshake, the signature as Nushell reads it, and a call.
+/// Skipped without `nu`, except in CI, where it fails.
 #[test]
 fn the_binary_serves_nushell() {
     if std::process::Command::new("nu")

@@ -32,7 +32,7 @@ func main() {
 	cmd.Use = "docker-compose"
 	cmd.Version = composeVersion()
 	trimHelp(cmd)
-	// Usage 7.1.3 leaves reserved words and negative numeric defaults unquoted.
+	// The adapter leaves reserved words and negative numeric defaults unquoted.
 	// Usage requires defaults to be strings. Newlines within help are escaped by
 	// the adapter, so this suffix cannot match inside a quoted description.
 	// Remove this shim when the adapter quotes these defaults itself.

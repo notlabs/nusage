@@ -1,13 +1,10 @@
-//! `nus lsp`: Nushell's language server for the scripts nusage runs. It stands between an
-//! editor and the `nu --lsp` it starts. A document whose shebang names nusage reaches Nushell
-//! with its first line replaced by the line `nus prelude` writes ([`crate::prelude`]),
-//! which binds `$usage` with its type and defines the shadows of the scripts it calls, so
-//! Nushell checks the script as nusage runs it. Every other line is the editor's own, so a
-//! position there means the same on both sides. Line 0 is the editor's, and what Nushell
-//! says about it is about the prelude: a request there is answered here, a result there is
-//! dropped, or, for a definition, led to what the prelude stands for, a shadow to its script
-//! and `$usage` to the header. What the header and the calls get wrong joins Nushell's
-//! diagnostics. Any other document passes as it is.
+//! `nus lsp`: Nushell's language server for the scripts nusage runs.
+//! It stands between an editor and the `nu --lsp` it starts.
+//! A document whose shebang names nusage reaches Nushell with its first line replaced by the line `nus prelude` writes ([`crate::prelude`]), which binds `$usage` with its type and defines the shadows of the scripts it calls, so Nushell checks the script as nusage runs it.
+//! Every other line is the editor's own, so a position there means the same on both sides.
+//! Line 0 is the editor's, and what Nushell says about it is about the prelude: a request there is answered here, a result there is dropped, or, for a definition, led to what the prelude stands for, a shadow to its script and `$usage` to the header.
+//! What the header and the calls get wrong joins Nushell's diagnostics.
+//! Any other document passes as it is.
 
 use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Write};
@@ -20,8 +17,7 @@ use serde_json::{Value as Json, json};
 
 use crate::prelude::{self, Analysis};
 
-/// Serve on standard input and output, with `nu --lsp` and `args` behind; the exit code is
-/// Nushell's.
+/// Serve on standard input and output, with `nu --lsp` and `args` behind; the exit code is Nushell's.
 pub fn serve(args: &[String]) -> io::Result<i32> {
     let mut nu = Command::new(crate::nu::real_nu())
         .arg("--lsp")
@@ -294,8 +290,7 @@ impl State {
         message
     }
 
-    /// Nushell's answer to a request, with what it says of the prelude dropped or led to what
-    /// the prelude stands for.
+    /// Nushell's answer to a request, with what it says of the prelude dropped or led to what the prelude stands for.
     fn revise(&self, method: &str, uri: Option<&str>, result: &mut Json) {
         let analysed = uri.is_some_and(|uri| self.analysed(uri).is_some());
         match method {
@@ -374,8 +369,7 @@ impl State {
         }
     }
 
-    /// A location as the editor is to see it: one in a prelude led to what it stands for, a
-    /// shadow to its script and `$usage` to the header, or none.
+    /// A location as the editor is to see it: one in a prelude led to what it stands for, a shadow to its script and `$usage` to the header, or none.
     fn lead(&self, mut location: Json) -> Option<Json> {
         let link = location.get("targetUri").is_some();
         let (uri_key, range_key) = if link {
@@ -432,8 +426,7 @@ impl State {
         Some((document, document.analysis.as_ref()?))
     }
 
-    /// The editor's other open documents, as they are and not as saved, for what this one
-    /// reads of them.
+    /// The editor's other open documents, as they are and not as saved, for what this one reads of them.
     fn texts(&self, except: &str) -> Texts {
         self.documents
             .iter()
@@ -442,8 +435,7 @@ impl State {
             .collect()
     }
 
-    /// The diagnostics of a document: Nushell's last, and, while it has a prelude, what the
-    /// header and the calls get wrong.
+    /// The diagnostics of a document: Nushell's last, and, while it has a prelude, what the header and the calls get wrong.
     fn publish(&self, uri: &str) -> Json {
         let mut diagnostics = self.diagnostics.get(uri).cloned().unwrap_or_default();
         if let Some((document, analysis)) = self.analysed(uri) {
@@ -571,8 +563,7 @@ fn units(text: &str, encoding: Encoding) -> usize {
     }
 }
 
-/// The byte offset in a line's text that a position's character, in the encoding's units,
-/// stands for; past the end is the end.
+/// The byte offset in a line's text that a position's character, in the encoding's units, stands for; past the end is the end.
 fn byte_at(text: &str, character: usize, encoding: Encoding) -> usize {
     let mut counted = 0;
     for (at, c) in text.char_indices() {
@@ -611,8 +602,8 @@ fn drop_line_0(items: &mut Vec<Json>) {
     }
 }
 
-/// Semantic tokens without those on line 0. Each token is five numbers, its line and start
-/// counted from the token before it, so the first one kept counts its line afresh.
+/// Semantic tokens without those on line 0.
+/// Each token is five numbers, its line and start counted from the token before it, so the first one kept counts its line afresh.
 fn tokens_after_line_0(data: &Json) -> Vec<u64> {
     let numbers: Vec<u64> = data
         .as_array()
@@ -691,8 +682,8 @@ fn file_uri(path: &Path) -> String {
     uri
 }
 
-/// One message of the base protocol: headers, a blank line, and as many bytes of JSON as
-/// `Content-Length` says. `None` at the end of the stream.
+/// One message of the base protocol: headers, a blank line, and as many bytes of JSON as `Content-Length` says.
+/// `None` at the end of the stream.
 fn read_message(reader: &mut impl BufRead) -> io::Result<Option<Json>> {
     let mut length = None;
     let mut headers = false;

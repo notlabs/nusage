@@ -11,7 +11,7 @@ outputs = []
 file = "check.nu"
 
 [tasks.claims]
-description = "List the intent's claims, by topic and status"
+description = "The intent's claims, as a table"
 depends = ["//nusage:build"]
 sources = ["**/*"]
 outputs = []
