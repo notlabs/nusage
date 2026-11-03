@@ -95,7 +95,7 @@ MBX_REMOTE_NAMESPACE = "notlabs/nusage/builds"
 
 [tasks.check]
 description = "The root's own checks"
-depends = [":lint", ":check-affected"]
+depends = [":lint", ":check-affected", ":check-pr-status"]
 
 # The release is the commit this leaves to make: pushed to main, release.yml tags it.
 [tasks.release]

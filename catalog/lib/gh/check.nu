@@ -48,6 +48,15 @@ with-env {GH_CONFIG_DIR: $dir, GH_TOKEN: $token, GH_PROMPT_DISABLED: "1", GH_NO_
     assert (($runs | length) > 0)
     assert equal ($runs.0.databaseId | describe) int
 
+    let run = gh run view ($runs.0.databaseId | into string) --repo notlabs/nusage
+    assert equal $run.databaseId $runs.0.databaseId
+    assert equal ($run.jobs | describe --detailed | get type) list
+    for job in $run.jobs {
+        assert equal ($job.startedAt | describe) datetime
+        assert equal ($job.completedAt | describe) datetime
+        assert equal ($job.steps | describe --detailed | get type) list
+    }
+
     # The checks of a merged pull request, a table whose times decode.
     let checks = gh pr checks 34 --repo notlabs/nusage
     assert (($checks | describe) | str starts-with "table<")

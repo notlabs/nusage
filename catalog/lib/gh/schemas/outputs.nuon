@@ -18,7 +18,7 @@
             id: pr-list
             command: [pr list]
             name: json
-            select: [--json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body"]
+            select: [--json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body,headRefOid,isCrossRepository,mergeable,mergeStateStatus,statusCheckRollup"]
             framing: json
             schema: pull-request-list.schema.json
             source: ["api/query_builder.go:353" "api/export_pr.go:91" "api/queries_pr.go:27" "api/queries_issue.go:294" "api/queries_repo.go:223"]
@@ -27,7 +27,7 @@
             id: pr-view
             command: [pr view]
             name: json
-            select: [--json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body"]
+            select: [--json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body,headRefOid,isCrossRepository,mergeable,mergeStateStatus,statusCheckRollup"]
             framing: json
             schema: pull-request.schema.json
             source: ["api/query_builder.go:353" "api/export_pr.go:91" "api/queries_pr.go:27" "api/queries_issue.go:294" "api/queries_repo.go:223"]
@@ -90,7 +90,7 @@
             id: run-view
             command: [run view]
             name: json
-            select: [--json "databaseId,number,attempt,name,displayTitle,workflowName,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,startedAt,url"]
+            select: [--json "databaseId,number,attempt,name,displayTitle,workflowName,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,startedAt,url,jobs"]
             framing: json
             schema: run.schema.json
             source: ["pkg/cmd/run/shared/shared.go:89" "pkg/cmd/run/shared/shared.go:164" "pkg/cmd/run/shared/shared.go:91"]
@@ -119,8 +119,8 @@
     # is named, since an issue may be closed away and a run's id is the moment's; those outputs
     # are held to `examples.nuon`.
     cases: [
-        {id: pr-list, output: pr-list, argv: [pr list --repo notlabs/nusage --state all --limit 3 --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body"], exit_codes: [0], expect: {minItems: 1}}
-        {id: pr-view, output: pr-view, argv: [pr view 34 --repo notlabs/nusage --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body"], exit_codes: [0], expect: {properties: {number: {const: 34}, state: {const: MERGED}}}}
+        {id: pr-list, output: pr-list, argv: [pr list --repo notlabs/nusage --state all --limit 3 --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body,headRefOid,isCrossRepository,mergeable,mergeStateStatus,statusCheckRollup"], exit_codes: [0], expect: {minItems: 1}}
+        {id: pr-view, output: pr-view, argv: [pr view 34 --repo notlabs/nusage --json "number,title,state,isDraft,url,author,headRefName,baseRefName,createdAt,updatedAt,closedAt,mergedAt,labels,reviewDecision,body,headRefOid,isCrossRepository,mergeable,mergeStateStatus,statusCheckRollup"], exit_codes: [0], expect: {properties: {number: {const: 34}, state: {const: MERGED}}}}
         {id: pr-checks, output: pr-checks, argv: [pr checks 34 --repo notlabs/nusage --json "name,state,startedAt,completedAt,link,bucket,event,workflow,description"], exit_codes: [0], expect: {minItems: 1}}
         {id: issue-list, output: issue-list, argv: [issue list --repo notlabs/nusage --state all --limit 3 --json "number,title,state,stateReason,url,author,createdAt,updatedAt,closedAt,labels,assignees,body"], exit_codes: [0], expect: {type: array}}
         {id: repo-view, output: repo-view, argv: [repo view notlabs/nusage --json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt"], exit_codes: [0], expect: {properties: {nameWithOwner: {const: "notlabs/nusage"}, defaultBranchRef: {properties: {name: {const: main}}}}}}
