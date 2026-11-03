@@ -1,5 +1,4 @@
 #!/usr/bin/env nus
-#USAGE about "Check catalog release recovery without publishing assets"
 
 use std/assert
 use release.nu prepare-packages

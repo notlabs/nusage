@@ -106,7 +106,7 @@ description = "The workspace's lints"
 depends = [":clippy", ":docs"]
 
 [tasks.verify-fixtures]
-description = "Run every fixture through its entrypoints, check completions and parsed signatures"
+description = "Hold nusage to its fixtures"
 depends = [":build"]
 sources = ["fixtures/**/*"]
 outputs = []
@@ -118,5 +118,5 @@ depends = [":test", ":verify-fixtures", ":lint"]
 
 # CI runs `check` once, on Linux, and this on each platform.
 [tasks."check:platform"]
-description = "Tests, the fixture harness and clippy on this platform"
+description = "The checks of nusage that each platform runs"
 depends = [":test", ":verify-fixtures", ":clippy"]

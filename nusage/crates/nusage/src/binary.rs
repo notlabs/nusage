@@ -4,8 +4,8 @@
 //! its body builds the binary's argv from its typed parameters, asks for the command's
 //! structured output with the spec's own selector words, and decodes it to the type its
 //! schema or annotation declares, so its return type is one type the parser checks. The
-//! helper that builds the argv
-//! ships with the module as Nushell, and a helper runs each shell-backed completer.
+//! helper that builds the argv ships with the module as Nushell, and a helper runs each
+//! shell-backed completer.
 
 use nu_protocol::{Span, Value};
 use nusage_model::{

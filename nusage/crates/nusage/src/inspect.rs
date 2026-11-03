@@ -1,4 +1,4 @@
-//! The existing script analysis as data, without generated source or execution.
+//! The script analysis as data, without generated source or execution.
 use std::path::Path;
 
 use nusage_spec::{Diagnostic, Texts};

@@ -83,12 +83,11 @@ jobs:
               echo "run=true" >> "$GITHUB_OUTPUT"
             fi
           fi
-      # Formatting, workflow lint and documentation run once on Linux. Both platforms
-      # retain Rust tests, Clippy and the runtime/consumer checks.
+      # Linux runs each project's `check`; macOS its `check:platform`, what differs by platform.
       - name: Check repository
         run: |
           if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ -n "$AFFECTED_BASE" ]; then
-            # Root formatting and selection-regression checks cover the whole repository.
+            # The root's checks hold the whole repository, whatever the change.
             if [ "$RUNNER_OS" = Linux ]; then
               mise run //:check
             fi
