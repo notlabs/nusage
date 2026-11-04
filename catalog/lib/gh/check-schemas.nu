@@ -2,7 +2,7 @@
 # Check gh's raw JSON against the reviewed output schemas. The catalog's `check` runs this;
 # `--bin` names a candidate gh binary, the one on PATH otherwise. The cases read this
 # repository on GitHub, so they run with a token, `GH_TOKEN` or `GITHUB_TOKEN`, and without
-# one only the examples are checked, a failure in CI. A plain Nushell script: to the nusage
+# one only the examples are checked, a failure in CI. A plain Nushell script: to the nus
 # interpreter, the package's `mod.nu` beside it would read as the root of a tree.
 use ../../schemas/lib.nu [load-suite check-examples run-suite finish]
 

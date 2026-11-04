@@ -51,12 +51,12 @@ pub struct Generate {
     /// Where to write the module; `run` paths are relative to it. Standard output when absent
     #[usage(long, short = 'o')]
     out: Option<PathBuf>,
-    /// A usage KDL document merged onto the spec file first: a `cmd` merges into the command of the same name, any other node replaces the one with the same name and first argument.
+    /// A usage KDL document merged onto the spec file first: a node merges into the spec's node with the same name and first argument, and any other is added.
     /// For outputs, selectors, media types, schemas, type annotations and `nusage-decode` pipelines a spec one does not own lacks; an `output`'s `nusage-args` child holds the words that ask for it where a `select` cannot, such as `--no-graph --template 'json(self)'`, and the wrapper owns the flags they name
     #[usage(long)]
     overlay: Vec<PathBuf>,
     /// The HTTP mapping beside a spec that describes a service, `<name>.http.kdl` as `openapi-usage` writes it: then each command's wrapper sends the request the mapping says, with the body as its input, and decodes the response as a binary's output.
-    /// The service's base URL and credentials come from the environment, `$env.<NAME>_URL` and `$env.<NAME>_TOKEN`, as the module's helpers say
+    /// The service's base URL and credentials can come from `$env.<NAME>_*` variables, as the module's helpers say
     #[usage(long)]
     http: Option<PathBuf>,
 }
@@ -276,7 +276,7 @@ impl Run for Parse {
 /// Header and call findings remain structured data in the result.
 #[derive(Args)]
 pub struct Inspect {
-    /// The script whose shebang names nusage
+    /// The script whose shebang names `nus`
     script: PathBuf,
 }
 
@@ -296,14 +296,14 @@ impl Run for Inspect {
 /// Print the line that stands in for a script's first where Nushell checks it
 ///
 /// For an editor or a linter: with this line in place of the shebang, Nushell checks the script as nusage runs it.
-/// The line binds `$usage` with its type, and defines a shadow for each script the script calls by its path, as `./x.nu`, `nus x.nu` or `nu x.nu`: that script's typed command, named as the call writes it, which the interpreter and the module define too.
+/// The line imports the modules the script's calls name, binds `$usage` with its type, and defines a shadow for each script the script calls by its path, as `./x.nu`, `nus x.nu` or `nu x.nu`: that script's typed command, named as the call writes it, which the interpreter and the module define too.
 /// Every other line stays where it was.
 /// What the calls get wrong goes to standard error, a line each, `<script>:<line>:<column>: <what>`.
 #[derive(Args)]
 pub struct Prelude {
-    /// The script, whose shebang names nusage
+    /// The script, whose shebang names `nus`
     script: PathBuf,
-    /// Print the definitions the interpreter `source`s before the script instead: the shadows, each running its script by its absolute path
+    /// Print what the interpreter `source`s before the script instead: the imports of the modules its calls name, and the shadows, each running its script by its absolute path
     #[usage(long)]
     run: bool,
 }
@@ -331,7 +331,7 @@ impl Run for Prelude {
 /// Serve Nushell's language server for the scripts nusage runs
 ///
 /// For an editor, in place of `nu --lsp`, which it starts and stands in front of.
-/// A script whose shebang names nusage reaches Nushell with its first line replaced by the line `nusage prelude` writes, so Nushell knows `$usage` and holds each call of another script to that script's header; what the header and the calls get wrong joins Nushell's diagnostics, and a definition of a called script leads to it.
+/// A script whose shebang names `nus` reaches Nushell with its first line replaced by the line `nus prelude` writes, so Nushell knows `$usage` and holds each call of another script to that script's header; what the header and the calls get wrong joins Nushell's diagnostics, and a definition of a called script leads to it.
 /// Every other line is the editor's, and any other document passes as it is.
 /// Arguments after `--` go to `nu --lsp`.
 #[derive(Args)]
@@ -394,7 +394,7 @@ impl Run for Activate {
 
 /// Print a module that exports every package `NUS_MODULES` names, for `overlay use`
 ///
-/// A package whose tool `NUS_TOOLS` gives at another version than the package was generated from is left out, and why is said on standard error, so a session has the rest.
+/// A package that cannot be used, such as one whose tool `NUS_TOOLS` gives at another version than the package was generated from, is left out, and why is said on standard error.
 #[derive(Args)]
 pub struct Modules;
 

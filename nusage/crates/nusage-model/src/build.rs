@@ -373,7 +373,6 @@ impl Context<'_> {
         })
     }
 
-    /// A flag as declared at `level`, the command that declares it.
     /// The mapping's request for the command, each parameter on the wire resolved to the variable of the positional or flag that carries it, and the body's input type read from its schema.
     fn request(
         &self,
@@ -442,6 +441,7 @@ impl Context<'_> {
         })
     }
 
+    /// A flag as declared at `level`, the command that declares it.
     fn flag_param(&self, flag: &SpecFlag, level: Level<'_>) -> Result<Param, Diagnostic> {
         let node = flag_node(level.header, flag);
         let long = flag.long.first().cloned();
@@ -515,7 +515,7 @@ impl Context<'_> {
     }
 
     /// The completer for an argument.
-    /// In order: a provider in the tree, static `choices`, `choices run=`, then a `complete` node on the arg, on the command, or at the top level.
+    /// In order: a provider in the tree, `choices run=`, static `choices`, then a `complete` node on the arg, on the command, or at the top level.
     fn completer_for(
         &self,
         arg: &SpecArg,
@@ -581,7 +581,7 @@ fn spec_completer(
     }
 }
 
-/// A usage name as a Nushell identifier: every run of characters an identifier cannot hold becomes one `_`, letters are lowercased (`dry-run` is `dry_run`, `TOOL@VERSION` is `tool_version`), and a leading digit gets one in front. usage's own `snake_case` does the same for its SDKs; it is a copy, since usage keeps it private.
+/// A usage name as a Nushell identifier: every run of characters an identifier cannot hold, between two it keeps, becomes one `_`, letters are lowercased (`dry-run` is `dry_run`, `TOOL@VERSION` is `tool_version`), and a leading digit gets one in front. usage's own `snake_case` does the same for its SDKs; it is a copy, since usage keeps it private.
 fn snake(name: &str) -> String {
     let mut out = String::new();
     let mut gap = false;
@@ -728,7 +728,7 @@ fn flag_named(flag: &Param, selector: &str) -> bool {
         || (name.chars().count() == 1 && flag.short == name.chars().next())
 }
 
-/// The structured output a wrapper asks for, among those that have a decoder: the default output, else the first `json` output that is selectable, else the first selectable one; `None` for a text command.
+/// The structured output a wrapper asks for, chosen as [`crate::Structured`] says; `None` for a text command.
 /// An output is selectable when its `nusage-args` say how to ask for it, it is the default, has its own `select` switch, or the command has a `select` flag whose value names it.
 fn structured_output<'a>(
     outputs: &[SpecOutput],
@@ -918,7 +918,6 @@ pub fn value_from_text(text: &str, ty: &NuType) -> Result<Value, String> {
         .map_err(|err| format!("{text:?} does not read as a `{}`: {err}", ty.as_str()))
 }
 
-/// The type a signature reads from the annotation: nu-parser keeps its type parser private, so the annotation is parsed as the type of a parameter.
 /// The type with the optional columns of its record, or of its table's rows, left out: what a schema requires of an input.
 /// Nushell holds a record to every field its type names and lets it carry more, so a caller passes the optional properties it has and none it does not; the fields a schema does not require are `oneof<T, nothing>` in the shape.
 fn required_columns(ty: &NuType) -> Result<NuType, String> {
@@ -942,6 +941,7 @@ fn required_columns(ty: &NuType) -> Result<NuType, String> {
     Ok(NuType(narrowed.to_string()))
 }
 
+/// The type a signature reads from the annotation: nu-parser keeps its type parser private, so the annotation is parsed as the type of a parameter.
 fn parse_type(ty: &NuType) -> Result<Type, String> {
     nu_shape(ty).map(|shape| shape.to_type())
 }

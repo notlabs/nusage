@@ -1,4 +1,4 @@
-//! `nus validate` through the plugin, in process: the CLI's interface, answering with the findings as rows.
+//! `nus validate` through the plugin, in process and once as the built binary under the `nu` on PATH: the CLI's interface, answering with the findings as rows.
 
 use nu_plugin_nus::NusagePlugin;
 use nusage_plugin::nu_protocol::{ListStream, Signals, Span, Value, record};

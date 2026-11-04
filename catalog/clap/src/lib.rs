@@ -2,8 +2,7 @@
 //!
 //! A binary built with clap often describes itself nowhere else: no spec ships with it and nothing prints one.
 //! When its crate is also a library that builds the command, the spec can be read there, at the binary's version, with nothing in the binary's source changed.
-//! An extractor is a binary crate outside the binary's tree that depends on that library and hands its command to [`main`]; `clap/spec.nu` pins the version, runs the extractor and writes what it prints.
-//! A crate that keeps its command private to its own `main` needs a fork that makes it public, which the extractor depends on instead.
+//! An extractor, a binary crate that depends on that library, hands its command to [`main`].
 //!
 //! usage converts the command.
 //! This crate names the binary and its version, which a library's command does not carry, and holds the printed spec to usage's reading of it.

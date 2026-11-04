@@ -1,6 +1,6 @@
 # When a script's analysis must be worked out again, said by what a change does to it, not
 # by how it is kept: an engine of revisions (Salsa), a memo by content, or a build engine
-# could each meet these. The checked ones hold today's `nus prelude` to them.
+# could each meet these.
 [
   {
     id: line-without-calls

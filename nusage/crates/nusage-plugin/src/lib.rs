@@ -1,14 +1,12 @@
 //! What a Nushell plugin of nusage's shares, so that a plugin is its commands and nothing else.
-//! A plugin here stands for a command line: the hot path of a CLI whose wrappers a module already carries, inside the interpreter rather than a process per call.
+//! A plugin here stands for a command line: a CLI's commands inside the interpreter rather than a process per call.
 //! So the plugin's commands are the CLI's, by the same usage spec, and the spec is the one place the interface is declared: [`commands`] reads the spec into nusage's command model, and [`signature`] writes a command of it as the signature a plugin declares, named as the module's wrappers are named, `<bin> <command>`, with the same parameters, types and help.
 //! A plugin registered under the CLI's name shadows the external of the same words, and a shell without the plugin runs the external where the plugin would answer.
 //!
-//! A plugin is the exception, not the pattern: one for nusage itself, and one for what only Rust reaches, as a library without a command line.
-//! A binary or a service is a module, and its hot path is nusage's plugin serving the helpers the module calls.
+//! A plugin is the exception, not the pattern: for nusage itself, and for what only Rust reaches, a library without a command line.
+//! A binary or a service is a module.
 //!
-//! A command is written as a [`Run`] over its evaluated [`Args`] and a [`Context`], and [`Adapter`] registers it in the plugin.
-//!
-//! The rest is the boundary: [`value`] carries values across it as JSON and back, [`env()`] reads the caller's environment, [`serve`] runs the plugin, and [`test`] runs it in process for its tests.
+//! The rest is the boundary: values across it as JSON ([`value`]), and serving and testing the plugin.
 //! The Nushell crates a plugin needs are re-exported, so a plugin depends on this crate and the version they are pinned to is pinned once.
 
 pub use nu_plugin;

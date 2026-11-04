@@ -1,5 +1,5 @@
 //! usage's argv corpus through `nus parse`: each vector's spec becomes a script's `#USAGE` header, the script is parsed with the vector's argv and environment, and the `$usage` record has to hold everything `expect.ok` binds, or the arguments have to be rejected when the vector expects an error.
-//! The corpus is usage's own, at `$NUS_CORPUS` (the `corpus/` directory of its source, which `mise.toml` installs); without it the test is skipped.
+//! The corpus is usage's own, at `$NUS_CORPUS` (the `corpus/` directory of its source, which `mise.toml` installs); without it the test is skipped, except in CI, where it fails.
 //! The format is usage's:
 //! <https://github.com/jdx/usage/blob/main/corpus/README.md>
 //!

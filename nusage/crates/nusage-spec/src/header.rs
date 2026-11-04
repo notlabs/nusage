@@ -50,7 +50,7 @@ impl HeaderNode {
 #[derive(Debug, Clone)]
 pub struct ScriptHeader {
     pub header: Header,
-    /// The header's KDL, the `#USAGE` lines joined.
+    /// The header's KDL: the `#USAGE` lines joined, or the sidecar's text.
     pub kdl: String,
     /// usage's parse: the whole spec for a root script; for a subcommand's, the spec that wraps its header in a `cmd`, which [`ScriptHeader::cmd`] is taken from.
     pub spec: usage::Spec,
@@ -181,7 +181,7 @@ pub(crate) fn header_node(
 /// Text to read in place of what a file holds on disk, by the file's path: what an editor has open and not yet saved.
 pub type Texts = BTreeMap<PathBuf, String>;
 
-/// Read a root script's header: a usage spec, as its `#USAGE` lines spell it.
+/// Read a root script's header: a usage spec, as its `#USAGE` lines or the sidecar beside it spell it.
 pub fn read_header(path: &Path) -> Result<ScriptHeader, Diagnostic> {
     read(path, None, &Texts::new())
 }
@@ -191,7 +191,7 @@ pub fn read_header_in(path: &Path, texts: &Texts) -> Result<ScriptHeader, Diagno
     read(path, None, texts)
 }
 
-/// Read a subcommand script's header: what a `cmd "<name>" { }` holds, as its `#USAGE` lines spell it, `about` and `long_about` standing for the command's `help` and `long_help`, so a subcommand declares what usage lets a command declare, an `alias` or `hide` included.
+/// Read a subcommand script's header: what a `cmd "<name>" { }` holds, as its `#USAGE` lines or the sidecar beside it spell it, `about` and `long_about` standing for the command's `help` and `long_help`, so a subcommand declares what usage lets a command declare, an `alias` or `hide` included.
 pub fn read_subcommand_header(path: &Path, name: &str) -> Result<ScriptHeader, Diagnostic> {
     read(path, Some(name), &Texts::new())
 }

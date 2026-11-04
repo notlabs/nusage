@@ -146,10 +146,10 @@ def "nus unsent" [method: string]: nothing -> error {
     error make --unspanned {msg: $"the wrapper sends no ($method | str uppercase) request"}
 }
 
-# A binary's output decoded as the module's closure decodes it. When that fails and the
-# `nus` this module was generated with is on PATH, the output is held to the schema the
-# spec declares, line by line with `--lines`, so the error names what does not match it
-# rather than what failed to convert; what failed to convert follows, as the inner error.
+# A binary's output decoded as the module's closure decodes it. When that fails and a `nus` is
+# on PATH, the output is held to the schema the spec declares, line by line with `--lines`, so
+# the error names what does not match it rather than what failed to convert; what failed to
+# convert follows, as the inner error.
 # The error is the decoding's own when the output matches or there is no `nus` to ask,
 # and the inner one under why the output could not be held to its schema when the check
 # did not run.

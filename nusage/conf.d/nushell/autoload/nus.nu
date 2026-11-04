@@ -1,4 +1,3 @@
-# nusage's activation for Nushell, which `mise dot apply` links beside Nushell's
-# configuration as `nus.nu`, used as `config.nu` would use it: its own commands stay in the
-# module.
+# Uses nusage's activation as `config.nu` would; `[dotfiles.nus-activate]` in nusage's
+# `mise.toml` links both into place.
 use ($nu.default-config-dir | path join nus.nu)

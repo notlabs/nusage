@@ -1,6 +1,5 @@
 # The properties a claim can name. Nothing infers or enforces them yet; each says what it
-# would take. The subset with guarantees is what `pure` and `reads` cover; `effect` stays
-# allowed, and says where the guarantees stop.
+# would take.
 [
   {
     name: pure

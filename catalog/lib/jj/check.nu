@@ -13,9 +13,8 @@ for name in ["jj log" "jj evolog" "jj operation log"] {
     assert ($breaks_output | is-empty) $"($name) exposes flags that replace its JSON lines: ($breaks_output | to nuon)"
 }
 
-# A repository of its own, in a home of its own and configured by global flags alone: jj keeps
-# each repository's configuration under the user's configuration directory, reads the user's
-# files, and a path that does not exist is passed over.
+# A repository of its own, in a home of its own for the reason `check-schemas.nu` gives, and
+# configured by global flags alone; a path that does not exist is passed over.
 let dir = mktemp --directory
 let repo = $dir | path join repo
 let inherited = $env | columns | where {|name| $name | str starts-with "JJ_" }

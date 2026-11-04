@@ -66,8 +66,7 @@ def verify-fixture [dir: path, update: bool] {
     )) | append ((row $name conform "" (check-conform $dir $module $bin $is_binary)))
 }
 
-# `nus check`: the module carries what the spec shows, as usage reads the spec, for
-# every command, its positionals, flags, completers and description.
+# `nus check`: the module held to the spec as usage reads it.
 def check-conform [
     dir: path
     module: path
@@ -133,7 +132,7 @@ def check-shim [import: string, bin: string, case: record] {
 # The interpreter's handoff: the case's record handed in as NUON, and the script `run` with it.
 def check-interpreter [dir: path, bin: string, case: record] {
     let script = script-for $dir $bin $case.usage.cmd
-    # The shadows of the scripts it calls, which only the built nusage knows.
+    # The shadows of the scripts it calls, which only the built `nus` knows.
     let prelude = if ($env.NUS_BIN | path exists) {
         ^$env.NUS_BIN prelude --run $script
     } else {

@@ -12,7 +12,8 @@ def in-ci []: nothing -> bool {
     ($env.CI? | default "") == "true"
 }
 
-# The unified difference between a committed file and what was generated for it, when any.
+# Whether a committed file differs from what was generated for it, printing and annotating the
+# unified difference when it does.
 def differs [committed: string, made: string]: nothing -> bool {
     if not ($committed | path exists) {
         print $"  ($committed | path relative-to (root)) is not committed"

@@ -1,6 +1,6 @@
 //! The Nushell-facing view of an assembled usage spec.
 //!
-//! Every lossy decision between usage's vocabulary and a Nushell signature is made here, once, in [`model`]: which usage argument becomes which parameter kind, what type it gets, how a repeated or counted flag is spelled, the order of inherited flags, the `$usage` record shape, which header nodes ride along as attributes, what a completion provider may look like, and how a binary's outputs are selected and decoded.
+//! Every lossy decision between usage's vocabulary and a Nushell signature is made here, once, in [`model`].
 //! The result is plain data a target turns into a module; it names no Nushell syntax and performs no I/O.
 //! It serializes, so a tool can show what a target is handed: `nus model` prints it.
 
@@ -196,8 +196,8 @@ pub struct Param {
     pub short: Option<char>,
     pub completer: Option<Completer>,
     /// The declared default as a Nushell value of type `ty`.
-    /// `Count` is `0` and `Repeated` is `[]` unless usage declares otherwise; a switch has one only when usage declares it.
-    /// A binary applies its own defaults, so an extern never writes them. Serialized as NUON.
+    /// `Count` is `0`, and `Repeated` is `[]` unless usage declares otherwise; a switch has one only when usage declares it.
+    /// A binary applies its own defaults, so its wrapper never writes them. Serialized as NUON.
     #[serde(serialize_with = "as_nuon")]
     pub default: Option<Value>,
     /// usage `negate`: the long name, without dashes, of the switch that turns this one off.
@@ -245,10 +245,8 @@ pub enum ParamKind {
     /// `flag "--x <v>"`
     Valued,
     /// `flag "-v" count=#true`: an `int` in `$usage`, since a `def`'s flags cannot repeat.
-    /// An extern keeps the switch, since an external accepts `-vv`.
     Count,
     /// `flag "--x <v>" var=#true`: a `list` in `$usage`, since a `def`'s flags cannot repeat.
-    /// An extern keeps the single value, since an external accepts `--x a --x b`.
     Repeated,
 }
 

@@ -8,7 +8,7 @@ use crate::{SyntaxError, Type};
 /// `to_nuon` wants an engine state only for closures and custom values, which a signature default never holds; the parser's engine, with Nushell's keywords, serves both uses.
 static ENGINE: LazyLock<EngineState> = LazyLock::new(nu_cmd_lang::create_default_context);
 
-/// A value as NUON, on one line, written by Nushell's own `nuon` crate: bare where Nushell reads a bare word as that value, quoted otherwise.
+/// A value as NUON, on one line, written by Nushell's own `nuon` crate.
 pub fn nuon(value: &Value) -> String {
     nuon::to_nuon(&ENGINE, value, nuon::ToNuonConfig::default())
         .expect("a signature default has no closures or custom values")
