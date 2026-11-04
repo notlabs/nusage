@@ -54,7 +54,7 @@ let cases = [
         roots: [catalog/cobra catalog]
     }
     {
-        path: catalog/schemas/lib.nu
+        path: catalog/schemas/tasks/.support/lib.nu
         roots: [catalog/schemas catalog]
     }
     {
@@ -65,7 +65,7 @@ let cases = [
         path: mergiraf/patches/selection-probe.patch
         roots: [mergiraf]
     }
-    {path: .mise/lib/actions.nu, roots: $roots}
+    {path: .mise/tasks/report/emit.nu, roots: $roots}
     {path: Cargo.lock, roots: $roots}
     {path: catalog/mise.toml, roots: $roots}
 ]

@@ -2,12 +2,11 @@
 # Check jj's raw JSON against the reviewed output schemas. The catalog's `check` runs this;
 # `--bin` names a candidate jj binary, the one on PATH otherwise. A plain Nushell script: to
 # the nus interpreter, the package's `mod.nu` beside it would read as the root of a tree.
-use ../../schemas/lib.nu [load-suite check-examples run-suite finish]
-
 const here = path self | path dirname
 
 def main [--bin: string] {
-    let suite = load-suite ($here | path join schemas outputs.nuon)
+    let manifest = $here | path join schemas outputs.nuon
+    let suite = open $manifest
 
     let binary = if $bin != null {
         $bin | path expand
@@ -15,7 +14,7 @@ def main [--bin: string] {
         which jj | first | get path
     }
 
-    finish (check-examples $suite (open ($here | path join schemas examples.nuon)))
+    ^mise run --quiet --output interleave catalog:schemas:examples $manifest ($here | path join schemas examples.nuon)
 
     # The repository the cases run in, built in a home of its own: jj keeps each repository's
     # configuration under the user's configuration directory, and reads the user's files, so
@@ -52,12 +51,15 @@ def main [--bin: string] {
             do $setup $repo [tag set --revision @- v1]
             do $setup $repo [workspace add ../second]
             do $setup $repo [bookmark delete main]
-            run-suite $suite $binary $repo
+            $suite.cases | each {|case|
+                let result = do { cd $repo; ^$binary ...$case.argv | complete }
+                {id: $case.id} | merge $result
+            }
         }
     } catch {|err|
         rm -r $scratch
         error make --unspanned {msg: $err.msg}
     }
     rm -r $scratch
-    finish $result
+    $result | to json | ^mise run --quiet --output interleave catalog:schemas:validate $manifest
 }

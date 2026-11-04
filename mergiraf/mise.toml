@@ -6,7 +6,7 @@
 # are written against, and a bump means holding them to the new source with `check`.
 "http:mergiraf-source" = { version = "0.20.0", url = "https://static.crates.io/crates/mergiraf/mergiraf-{{ version }}.crate", format = "tar.gz", strip_components = 1, bin_path = "doc", checksum = "sha256:4a7be1108bbb7d636476c790bb512f80351433fabbc481fefe78a2e36eaacb0e" }
 
-# The tasks print annotations through `.mise/lib/actions.nu`, so each interleaves its output
+# The tasks print annotations through `report:emit`, so each interleaves its output
 # and is quiet, since mise would print these scripts whole. A task's `env`
 # is rendered with the tools of the task's own config root, which the source is one of; a
 # `run` script sees only the root's from `//`, so the source comes in as variables.
@@ -50,14 +50,13 @@ arg "<bin>" help="Output directory relative to the repository root"
 output = "interleave"
 env = { MERGIRAF_VERSION = "{{ tools['mergiraf-source'].version }}" }
 run = '''
-use "{{ config_root }}/../.mise/lib/actions.nu" *
 let target = "{{ config_root }}/../target" | path expand
 let work = $target | path join mergiraf-source
 let build = ^cargo build --quiet --profile $env.usage_profile --locked --manifest-path ($work | path join Cargo.toml) --target-dir ($target | path join mergiraf) --message-format json-render-diagnostics
   | complete
 print --stderr --no-newline $build.stderr
 if $build.exit_code != 0 {
-    annotate error $build.stderr --file "{{ config_root }}/mise.toml" --title $"Mergiraf ($env.MERGIRAF_VERSION) with the patches does not build"
+    ^mise run --quiet --output interleave report:emit error $build.stderr --file "{{ config_root }}/mise.toml" --title $"Mergiraf ($env.MERGIRAF_VERSION) with the patches does not build"
     error make --unspanned { msg: $"cargo build failed with exit code ($build.exit_code)" }
 }
 let built = $build.stdout
@@ -85,10 +84,9 @@ description = "Merge each case of the Nushell patch with the Mergiraf built and 
 depends = [[":compile", "dev", "target/mergiraf-test"]]
 output = "interleave"
 quiet = true
-sources = ["patches/*.patch", "../.mise/lib/actions.nu"]
+sources = ["patches/*.patch"]
 outputs = []
 run = '''
-use "{{ config_root }}/../.mise/lib/actions.nu" *
 let patch = "{{ config_root }}/patches/0001-Add-Nushell-support.patch"
 let binary = "{{ config_root }}/../target/mergiraf-test/mergiraf" | path expand
 let cases = "{{ config_root }}/../target/mergiraf-source/tests/data/nushell/working" | path expand
@@ -108,7 +106,8 @@ let failed = glob ($cases | path join "*") | sort | each {|case|
     print $"($name): differs from Expected.($suffix); ($status)"
     print --no-newline $diff
     let line = open --raw $patch | lines | enumerate | where $it.item == $"+++ b/tests/data/nushell/working/($name)/Expected.($suffix)" | get 0?.index
-    annotate error ($status + "\n" + $diff + $merged.stderr) --file $patch --line (if $line != null { $line + 1 }) --title $"($name): not what Mergiraf merges now"
+    let location = if $line != null { [--line ($line + 1)] } else { [] }
+    ^mise run --quiet --output interleave report:emit error ($status + "\n" + $diff + $merged.stderr) --file $patch ...$location --title $"($name): not what Mergiraf merges now"
     $name
 } | compact
 if ($failed | is-not-empty) {
@@ -124,18 +123,17 @@ if ($failed | is-not-empty) {
 description = "Hold the patches to the pinned Mergiraf source: each applies"
 output = "interleave"
 quiet = true
-sources = ["patches/*.patch", "../.mise/lib/actions.nu"]
+sources = ["patches/*.patch"]
 outputs = []
 env = { MERGIRAF_SOURCE = "{{ tools['mergiraf-source'].path }}", MERGIRAF_VERSION = "{{ tools['mergiraf-source'].version }}" }
 run = '''
-use "{{ config_root }}/../.mise/lib/actions.nu" *
 let work = (mktemp -d) | path join source
 cp -r $env.MERGIRAF_SOURCE $work
 for patch in (glob "{{ config_root }}/patches/*.patch" | sort) {
     let applied = ^patch -p1 -s -F0 -d $work -i $patch | complete
     if $applied.exit_code != 0 {
         let why = $applied.stdout + $applied.stderr
-        annotate error $why --file $patch --title $"($patch | path basename) no longer applies to Mergiraf ($env.MERGIRAF_VERSION)"
+        ^mise run --quiet --output interleave report:emit error $why --file $patch --title $"($patch | path basename) no longer applies to Mergiraf ($env.MERGIRAF_VERSION)"
         error make --unspanned { msg: $"($patch | path basename) no longer applies to Mergiraf ($env.MERGIRAF_VERSION):\n($why)" }
     }
     print $"($patch | path basename): applies"

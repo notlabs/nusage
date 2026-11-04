@@ -51,6 +51,8 @@ depends = ["//nusage:build"]
 file = "tasks/generate.nu"
 
 [tasks.check]
+output = "interleave"
+quiet = true
 description = "Hold every entry to its inputs and to its tool"
 depends = ["//nusage:build", ":check-package", ":check-release"]
 file = "tasks/check.nu"

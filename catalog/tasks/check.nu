@@ -1,12 +1,12 @@
 #!/usr/bin/env nus
+#MISE output="interleave"
+#MISE quiet=true
 #USAGE arg "[tool]" help="One entry; every entry when absent"
 # The generated files are committed: the module a package ships is reviewed as a diff when the
 # spec, the suite or an overlay changes. So `check` generates again and compares byte for byte,
 # and asks after the tool's version: a stale spec fails in CI, where the tool's version is
 # pinned, and is a warning elsewhere, where any version may be on PATH.
 use catalog.nu *
-use support.nu actions
-use $actions *
 
 def in-ci []: nothing -> bool {
     ($env.CI? | default "") == "true"
@@ -24,7 +24,7 @@ def differs [committed: string, made: string]: nothing -> bool {
     let diff = ^diff --unified --label $"($committed | path relative-to (root)) committed" --label "generated now" $committed $made
     | complete
     print --no-newline $diff.stdout
-    annotate-diff $committed "not what the spec, suite and overlays give; `mise run generate` rewrites it" $diff.stdout
+    run-task report:emit diff $diff.stdout --file $committed --title "not what the spec, suite and overlays give; `mise run generate` rewrites it" | print --no-newline
     true
 }
 

@@ -28,7 +28,10 @@ The include also makes `nu` the `nus nu` wrapper; run `mise reshim` after adding
 An interactive Nushell gets the packages from `nus activate nu`, as the root README describes.
 
 The tasks are also published as the OCI task catalog `ghcr.io/notlabs/nusage-tasks`, for a project with its own `[_.nusage.catalog]` entries: `[task_config] includes = ["oci::ghcr.io/notlabs/nusage-tasks:<version>"]`.
-They need `nus`, `nu` and `usage` on PATH; a `clap` entry also Cargo and rustfmt, an `openapi` entry `openapi-usage`.
+They need `nus`, `nu`, `mise` and `usage` on PATH; a `clap` entry also Cargo and rustfmt, an `openapi` entry `openapi-usage`.
+The catalog calls the producers through the same task aliases in the checkout and in the OCI catalog: `catalog:clap:spec`, `catalog:schemas:overlay`, `catalog:schemas:examples`, `catalog:schemas:validate` and `report:emit`.
+Schema validation takes JSON case results on stdin (`id`, `stdout`, `stderr`, `exit_code`); the suite owns the expected exit codes and schemas, while each tool's check owns its fixture and environment.
+The producers' packaging tasks export these interfaces with their private implementation.
 
 ## Release
 

@@ -2,12 +2,11 @@
 # Check mise's raw JSON against the reviewed output schemas. The catalog's `check` runs this;
 # `--bin` names a candidate mise binary, the one on PATH otherwise. A plain Nushell script: to
 # the nus interpreter, the package's `mod.nu` beside it would read as the root of a tree.
-use ../../schemas/lib.nu [load-suite check-examples run-suite finish]
-
 const here = path self | path dirname
 
 def main [--bin: string] {
-    let suite = load-suite ($here | path join schemas outputs.nuon)
+    let manifest = $here | path join schemas outputs.nuon
+    let suite = open $manifest
 
     let binary = if $bin != null {
         $bin | path expand
@@ -17,7 +16,7 @@ def main [--bin: string] {
 
     # The schemas themselves, then the documents they must accept or reject: the shapes a
     # fixture cannot produce, such as an empty listing's rows.
-    finish (check-examples $suite (open ($here | path join schemas examples.nuon)))
+    ^mise run --quiet --output interleave catalog:schemas:examples $manifest ($here | path join schemas examples.nuon)
 
     let scratch = mktemp -d
 
@@ -52,12 +51,15 @@ def main [--bin: string] {
             if $plugin.exit_code != 0 {
                 error make --unspanned {msg: $"Fixture plugin setup failed: ($plugin.stderr)"}
             }
-            run-suite $suite $binary $project
+            $suite.cases | each {|case|
+                let result = do { cd $project; ^$binary ...$case.argv | complete }
+                {id: $case.id} | merge $result
+            }
         }
     } catch {|err|
         rm -r $scratch
         error make --unspanned {msg: $err.msg}
     }
     rm -r $scratch
-    finish $result
+    $result | to json | ^mise run --quiet --output interleave catalog:schemas:validate $manifest
 }

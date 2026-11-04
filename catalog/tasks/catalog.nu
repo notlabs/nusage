@@ -4,11 +4,20 @@
 # entry's package is `lib/<tool>/`, a Nushell module directory: with `lib` on `$NU_LIB_DIRS`,
 # `use <tool> *` names the commands as the tool does.
 
-use support.nu schema_overlay
-
 # The directory the packages are under: the config root mise runs the task in.
 export def root []: nothing -> string {
     $env.MISE_CONFIG_ROOT? | default $env.PWD
+}
+
+# Cross-project operations use the same task aliases in the checkout and the OCI catalog.
+export def --wrapped run-task [name: string, ...args: string]: any -> string {
+    let input = $in
+    let result = $input | ^mise run --quiet --output interleave $name ...$args | complete
+    if $result.exit_code != 0 {
+        error make --unspanned {msg: $result.stderr}
+    }
+    print --stderr --no-newline $result.stderr
+    $result.stdout
 }
 
 # Every entry as a row with its tool's name, or the one named.
@@ -59,7 +68,7 @@ export def files [tool: string]: nothing -> record {
 
 # How the entry's spec is obtained, the one key of its `spec`: `run`, a command line that
 # prints the tool's own; `clap`, for a binary whose crate builds its clap command, the
-# directory under the package of the extractor `../clap/spec.nu` builds and runs; `openapi`,
+# directory under the package of the extractor `catalog:clap:spec` builds and runs; `openapi`,
 # for a service, the OpenAPI document under the package that `openapi-usage` writes as a spec
 # with the HTTP mapping and the schemas beside it.
 export def spec-kind [entry: record]: nothing -> string {
@@ -217,7 +226,7 @@ export def generate [entry: record, --into: string]: nothing -> record {
     }
     if ($files.schemas | path exists) {
         let schemas = $out | path join ($files.schemas_overlay | path basename)
-        ^nus $schema_overlay $files.schemas | save --force $schemas
+        run-task catalog:schemas:overlay $files.schemas | save --force $schemas
         $generated = $generated | append $schemas
     }
     let overlays = $generated ++ $files.overlays
