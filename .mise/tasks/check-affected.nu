@@ -18,7 +18,8 @@ def --wrapped git [...args: string] {
 let root = git rev-parse --show-toplevel
 cd $root
 let graph = ^mise tasks graph --json | from json | get projects
-let roots = open mise.toml | get monorepo.config_roots | sort
+let tasks = ^mise tasks ls --all --json | from json | get name
+let roots = $tasks | parse --regex '^//(?<root>.+):check$' | get root | sort
 assert equal (
     $graph
     | where id =~ '^custom:'
@@ -28,34 +29,52 @@ assert equal (
 let crates = $graph | where id =~ '^cargo:'
 assert ($crates | is-not-empty)
 assert ($crates | all {|project| $project.root | str starts-with nusage/crates/ })
-let tasks = ^mise tasks ls --all --json | from json | get name
+assert ($graph | any {|p| $p.id =~ '^go:' })
 let platform_roots = $roots | where $it != catalog/schemas
 assert equal (
     $tasks | where $it =~ ':check:platform$' | sort
 ) ($platform_roots | each {|root| $"//($root):check:platform" } | sort)
 
+let consumers = [
+    nusage
+    catalog
+    catalog/cobra
+    catalog/schemas
+    intent
+    catalog/lib/mise
+    catalog/lib/jj
+    catalog/lib/gh
+    catalog/lib/docker-compose
+    catalog/lib/typesafe
+]
+
 let cases = [
-    {path: nusage/crates/nusage/src/lib.rs, roots: $roots}
-    {path: nusage/crates/nu_plugin_future/src/lib.rs, roots: $roots}
-    {
-        path: nusage/fixtures/script/script.nu
-        roots: [nusage catalog catalog/cobra catalog/schemas intent]
-    }
+    {path: nusage/crates/nusage/src/lib.rs, roots: $consumers}
+    {path: nusage/crates/nu_plugin_future/src/lib.rs, roots: $consumers}
+    {path: nusage/fixtures/script/script.nu, roots: $consumers}
     {
         path: catalog/lib/mise/mod.nu
-        roots: [catalog]
+        roots: [catalog/lib/mise]
     }
     {
         path: catalog/clap/src/main.rs
-        roots: [catalog/clap catalog]
+        roots: [catalog/clap]
     }
     {
         path: catalog/cobra/export.go
-        roots: [catalog/cobra catalog]
+        roots: [catalog/cobra]
+    }
+    {
+        path: catalog/lib/docker-compose/spec/main.go
+        roots: [catalog/cobra catalog/lib/docker-compose]
+    }
+    {
+        path: catalog/tasks/catalog.nu
+        roots: [catalog]
     }
     {
         path: catalog/schemas/lib.nu
-        roots: [catalog/schemas catalog]
+        roots: [catalog/schemas]
     }
     {
         path: intent/claims/identity.nuon

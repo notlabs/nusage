@@ -4,3 +4,7 @@ target/
 /mise.local.toml
 /.mise.local.toml
 /catalog/dist/
+
+/go.work
+/go.work.sum
+/.mise/conf.d/_workspace-graph.toml

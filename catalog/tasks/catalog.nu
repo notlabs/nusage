@@ -1,25 +1,29 @@
-# The catalog's entries and the files of each, shared by the tasks. An entry is a table under
-# `[_.nusage.catalog]` in the mise config of the directory the tasks run in, their config
-# root, which `mise config get` prints as TOML; each key is described where it is read. The
-# entry's package is `lib/<tool>/`, a Nushell module directory: with `lib` on `$NU_LIB_DIRS`,
-# `use <tool> *` names the commands as the tool does.
+# Entry metadata lives in lib/<tool>/mise.toml under [_.nusage.catalog].
+# Mise discovers the projects; the directory supplies the entry's name.
 
 use support.nu schema_overlay
 
 # The directory the packages are under: the config root mise runs the task in.
 export def root []: nothing -> string {
-    $env.MISE_CONFIG_ROOT? | default $env.PWD
+    $env.NUS_CATALOG_ROOT? | default $env.MISE_CONFIG_ROOT? | default $env.PWD | path expand
 }
 
 # Every entry as a row with its tool's name, or the one named.
 export def entries [tool?: string]: nothing -> table {
-    let got = ^mise config get _.nusage.catalog | complete
-    if $got.exit_code != 0 {
-        error make --unspanned {
-            msg: $"no `[_.nusage.catalog]` entries in the mise config of (root): ($got.stderr | str trim)"
-        }
+    let tasks = do {
+        cd (root)
+        ^mise tasks ls --all --json
+    } | from json
+    let directory = root | path join lib
+    let all = $tasks | get dir | uniq | sort | where {|dir| ($dir | path dirname) == $directory } | each {|dir|
+        let config = $dir | path join mise.toml
+        let entry = open $config | get -o _.nusage.catalog
+        if $entry != null { {name: ($dir | path basename)} | merge $entry }
     }
-    let all = $got.stdout | from toml | transpose name entry | each {|row| {name: $row.name} | merge $row.entry }
+    if ($all | is-empty) {
+        error make --unspanned {msg: $"no catalog entries in discovered projects under ($directory)"}
+    }
+    let tool = $tool | default $env.NUS_CATALOG_ENTRY?
     if $tool == null {
         return $all
     }

@@ -10,11 +10,16 @@ let package = $consumer | path join dist
 mkdir ($consumer | path join lib demo schemas) ($consumer | path join bin)
 let config = $consumer | path join mise.toml
 {
+    monorepo_root: true
+    monorepo: {
+        config_roots: ["[!.]*", "[!.]*/[!.]*", "[!.]*/[!.]*/[!.]*"]
+    }
     task_config: {
         includes: [
             ($package | path join oci)
         ]
     }
+    vars: {catalog_version: "0.0.0"}
     env: {
         _: {
             path: (
@@ -34,17 +39,19 @@ let config = $consumer | path join mise.toml
             )
         }
     }
+} | to toml | save $config
+{
     _: {
         nusage: {
             catalog: {
-                demo: {
-                    spec: {run: "open --raw lib/demo/source.kdl | print --no-newline"}
-                }
+                spec: {run: "open --raw lib/demo/source.kdl | print --no-newline"}
             }
         }
     }
-    vars: {catalog_version: "0.0.0"}
-} | to toml | save $config
+    tasks: {
+        check: {run: "true"}
+    }
+} | to toml | save ($consumer | path join lib demo mise.toml)
 'name "demo"
 bin "demo"
 ' | save ($consumer | path join lib demo source.kdl)
@@ -92,7 +99,7 @@ let checked = try {
         assert equal $packed.exit_code 0 $packed.stderr
         let listed = ^mise tasks ls --json | complete
         assert equal $listed.exit_code 0 $listed.stderr
-        let names = $listed.stdout | from json | get name | sort
+        let names = $listed.stdout | from json | get name | where $it != "//lib/demo:check" | each { str replace --regex "^//:" "" } | sort
         assert equal $names [catalog:check catalog:generate catalog:spec]
         for task in [catalog:spec catalog:generate catalog:check] {
             let result = ^mise run $task | complete

@@ -53,3 +53,21 @@ A shell that starts with mise's environment already set has it taken out first; 
 
 The tools install with `mise install --monorepo`.
 The tasks run through the `nus` built in the checkout, not a release.
+
+Mise discovers config roots one to three directories below the repository root.
+`[deps.workspace-graph]` prepares an ignored `go.work` with `go work use -r .` and an ignored `.mise/conf.d/_workspace-graph.toml` supplement.
+Cargo projects and their dependency edges stay native; the supplement adds Go import edges and projects for discovered task roots, with cross-project edges from Mise's resolved task prerequisites.
+A task root also depends on native projects beneath it or selected by a task's `dir`, so changes to the Compose Go module select its catalog entry and the Cobra checks.
+
+Prepare before asking Mise to select affected tasks:
+
+```sh
+mise exec -- mise run --affected --affected-base main '//...:check'
+```
+
+The outer `exec` refreshes stale providers; the inner `run` reads the updated graph before selecting tasks.
+For inspection, use `mise deps install workspace-graph` followed by `mise tasks graph --json`.
+The graph preparation runs in plain Nu and Go and does not build `nus`.
+The generated fragment's `_` prefix keeps it outside the provider's configuration inputs.
+Go edges follow the current Go build context, including test imports; after changing build-context environment variables, refresh explicitly with `mise deps install workspace-graph`.
+Declared task prerequisites supply custom edges; commands embedded in scripts are not inferred.

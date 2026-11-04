@@ -1,0 +1,16 @@
+[_.nusage.catalog]
+spec = { run = "mise usage" }
+switch = { flag = "--json", framing = "json" }
+version = "0.2.0"
+
+[tasks.spec]
+extends = "catalog-entry-spec"
+
+[tasks.generate]
+extends = "catalog-entry-generate"
+
+[tasks.check]
+extends = "catalog-entry-check"
+
+[tasks."check:platform"]
+depends = [":check"]

@@ -1,40 +1,4 @@
-# The catalog: a module package per wrapped tool under lib/, and the tasks that make them.
-# An entry under [_.nusage.catalog] says what the tasks cannot read off lib/<tool>/; mise
-# ignores the `_` table, and tasks/catalog.nu reads it.
-#
-# An entry with a `version` is released on its own, as the packslip project
-# `github.com/<repository>/catalog/<tool>` tagged `catalog/<tool>/v<version>`: `pack` writes
-# its archive. `tool` is the mise tool that provides the wrapped binary; the package records
-# it with the version its spec was read from, and nus refuses the package to a project that
-# has that tool at another version. An entry without `tool` wraps a binary nothing pins, as
-# mise is.
-[_.nusage.catalog.mise]
-spec = { run = "mise usage" }
-switch = { flag = "--json", framing = "json" }
-version = "0.2.0"
-
-[_.nusage.catalog.jj]
-spec = { clap = "spec" }
-version = "0.2.0"
-tool = "jujutsu"
-
-[_.nusage.catalog.docker-compose]
-spec = { run = "mise run //catalog/cobra:compose", probe = "version" }
-version = "0.2.0"
-tool = "docker-compose"
-
-# gh takes `--json <fields>`, a field list rather than an output name, so no `switch`: each
-# typed command's overlay names its fields with `nusage-args`.
-[_.nusage.catalog.gh]
-spec = { run = "mise run //catalog/cobra:gh", probe = "version" }
-version = "0.2.0"
-tool = "gh"
-
-# A service: the document under the package is the source, and `spec` writes the usage spec,
-# the HTTP mapping and the schemas from it.
-[_.nusage.catalog.typesafe]
-spec = { openapi = "openapi.yaml" }
-
+# Catalog-wide orchestration. Entry metadata and tasks live under lib/.
 # The task catalog's own version, which release.yml releases.
 [vars]
 catalog_version = "0.1.0"
@@ -43,18 +7,17 @@ catalog_version = "0.1.0"
 [tasks.spec]
 description = "Obtain each entry's spec into its package"
 depends = ["//nusage:build"]
-file = "tasks/spec.nu"
+run = [{ tasks = ["./lib/...:spec"] }]
 
 [tasks.generate]
 description = "Generate each entry's module"
 depends = ["//nusage:build"]
-file = "tasks/generate.nu"
+run = [{ tasks = ["./lib/...:generate"] }]
 
 [tasks.check]
 description = "Hold every entry to its inputs and to its tool"
 depends = ["//nusage:build", ":check-package", ":check-release"]
-file = "tasks/check.nu"
-tools = { docker-compose = "5.6.1", gh = "2.103.3" }
+run = [{ tasks = ["./lib/...:check"] }]
 
 [tasks."check:platform"]
 description = "Check the catalog's contracts and packaged tasks on this platform"
