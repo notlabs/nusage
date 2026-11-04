@@ -1,5 +1,5 @@
-# The schema each kind of TOML file is held to, as SchemaStore lists it; the fixtures that
-# show mise refusing a config stay unvalidated.
+# The schema each kind of TOML file is held to; the fixtures that show mise refusing a config
+# stay unvalidated.
 [[rule]]
 include = ["**/Cargo.toml"]
 schema.url = "https://www.schemastore.org/cargo.json"
@@ -24,3 +24,7 @@ schema.url = "https://www.schemastore.org/taplo.json"
 [[rule]]
 include = ["release-plz.toml"]
 schema.url = "https://raw.githubusercontent.com/release-plz/release-plz/main/.schema/latest.json"
+
+[[rule]]
+include = ["jj.toml"]
+schema.url = "https://docs.jj-vcs.dev/latest/config-schema.json"
