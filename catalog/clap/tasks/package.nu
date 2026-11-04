@@ -1,6 +1,5 @@
 #!/usr/bin/env nu
 #MISE description="Export the Clap extraction task"
-#MISE alias="catalog:clap:package"
 #MISE hide=true
 const here = path self | path dirname
 

@@ -20,7 +20,7 @@ for entry in (entries $usage.args.tool) {
         clap => {
             let dir = (extractor $entry).dir
             let force = if $usage.flags.force { ["--force"] } else { [] }
-            run-task catalog:clap:spec $dir --out $files.spec ...$force | print --no-newline
+            run-task nusage:clap:spec $dir --out $files.spec ...$force | print --no-newline
         }
         openapi => {
             # The committed set is made the written set: a file the document no longer gives

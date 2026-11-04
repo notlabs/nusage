@@ -16,7 +16,7 @@ def main [--bin: string] {
 
     # The schemas themselves, then the documents they must accept or reject: the shapes a
     # fixture cannot produce, such as an empty listing's rows.
-    ^mise run --quiet --output interleave catalog:schemas:examples $manifest ($here | path join schemas examples.nuon)
+    ^mise run --quiet --output interleave nusage:schemas:examples $manifest ($here | path join schemas examples.nuon)
 
     let scratch = mktemp -d
 
@@ -61,5 +61,5 @@ def main [--bin: string] {
         error make --unspanned {msg: $err.msg}
     }
     rm -r $scratch
-    $result | to json | ^mise run --quiet --output interleave catalog:schemas:validate $manifest
+    $result | to json | ^mise run --quiet --output interleave nusage:schemas:validate $manifest
 }

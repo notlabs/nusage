@@ -1,5 +1,5 @@
 #!/usr/bin/env nus
-#MISE alias="catalog:clap:spec"
+#MISE alias="nusage:clap:spec"
 #MISE outputs=[]
 #MISE cache={enabled=false}
 #USAGE about "Writes the usage spec of a binary on PATH from the clap command its crate builds"

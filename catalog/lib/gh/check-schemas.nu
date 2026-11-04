@@ -17,7 +17,7 @@ def main [--bin: string] {
     }
 
     # The schemas themselves, then the documents they must accept or reject.
-    ^mise run --quiet --output interleave catalog:schemas:examples $manifest ($here | path join schemas examples.nuon)
+    ^mise run --quiet --output interleave nusage:schemas:examples $manifest ($here | path join schemas examples.nuon)
 
     let token = $env.GH_TOKEN? | default $env.GITHUB_TOKEN? | default ""
     if ($token | is-empty) {
@@ -49,5 +49,5 @@ def main [--bin: string] {
         error make --unspanned {msg: $err.msg}
     }
     rm -r $scratch
-    $result | to json | ^mise run --quiet --output interleave catalog:schemas:validate $manifest
+    $result | to json | ^mise run --quiet --output interleave nusage:schemas:validate $manifest
 }

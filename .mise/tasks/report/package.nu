@@ -1,6 +1,5 @@
 #!/usr/bin/env nu
 #MISE description="Export the reporting task with its private implementation"
-#MISE alias="report:package"
 #MISE hide=true
 const here = path self | path dirname
 

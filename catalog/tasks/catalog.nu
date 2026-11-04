@@ -68,7 +68,7 @@ export def files [tool: string]: nothing -> record {
 
 # How the entry's spec is obtained, the one key of its `spec`: `run`, a command line that
 # prints the tool's own; `clap`, for a binary whose crate builds its clap command, the
-# directory under the package of the extractor `catalog:clap:spec` builds and runs; `openapi`,
+# directory under the package of the extractor `nusage:clap:spec` builds and runs; `openapi`,
 # for a service, the OpenAPI document under the package that `openapi-usage` writes as a spec
 # with the HTTP mapping and the schemas beside it.
 export def spec-kind [entry: record]: nothing -> string {
@@ -226,7 +226,7 @@ export def generate [entry: record, --into: string]: nothing -> record {
     }
     if ($files.schemas | path exists) {
         let schemas = $out | path join ($files.schemas_overlay | path basename)
-        run-task catalog:schemas:overlay $files.schemas | save --force $schemas
+        run-task nusage:schemas:overlay $files.schemas | save --force $schemas
         $generated = $generated | append $schemas
     }
     let overlays = $generated ++ $files.overlays

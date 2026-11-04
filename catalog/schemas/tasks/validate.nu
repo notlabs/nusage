@@ -1,6 +1,6 @@
 #!/usr/bin/env -S nu --stdin
 #MISE description="Validate captured case results from JSON on stdin against a schema suite"
-#MISE alias="catalog:schemas:validate"
+#MISE alias="nusage:schemas:validate"
 #MISE outputs=[]
 #MISE cache={enabled=false}
 use std/assert

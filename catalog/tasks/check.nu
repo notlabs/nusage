@@ -24,7 +24,7 @@ def differs [committed: string, made: string]: nothing -> bool {
     let diff = ^diff --unified --label $"($committed | path relative-to (root)) committed" --label "generated now" $committed $made
     | complete
     print --no-newline $diff.stdout
-    run-task report:emit diff $diff.stdout --file $committed --title "not what the spec, suite and overlays give; `mise run generate` rewrites it" | print --no-newline
+    run-task nusage:report:emit diff $diff.stdout --file $committed --title "not what the spec, suite and overlays give; `mise run generate` rewrites it" | print --no-newline
     true
 }
 

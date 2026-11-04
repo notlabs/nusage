@@ -6,7 +6,7 @@
 # are written against, and a bump means holding them to the new source with `check`.
 "http:mergiraf-source" = { version = "0.20.0", url = "https://static.crates.io/crates/mergiraf/mergiraf-{{ version }}.crate", format = "tar.gz", strip_components = 1, bin_path = "doc", checksum = "sha256:4a7be1108bbb7d636476c790bb512f80351433fabbc481fefe78a2e36eaacb0e" }
 
-# The tasks print annotations through `report:emit`, so each interleaves its output
+# The tasks print annotations through `nusage:report:emit`, so each interleaves its output
 # and is quiet, since mise would print these scripts whole. A task's `env`
 # is rendered with the tools of the task's own config root, which the source is one of; a
 # `run` script sees only the root's from `//`, so the source comes in as variables.
@@ -56,7 +56,7 @@ let build = ^cargo build --quiet --profile $env.usage_profile --locked --manifes
   | complete
 print --stderr --no-newline $build.stderr
 if $build.exit_code != 0 {
-    ^mise run --quiet --output interleave report:emit error $build.stderr --file "{{ config_root }}/mise.toml" --title $"Mergiraf ($env.MERGIRAF_VERSION) with the patches does not build"
+    ^mise run --quiet --output interleave nusage:report:emit error $build.stderr --file "{{ config_root }}/mise.toml" --title $"Mergiraf ($env.MERGIRAF_VERSION) with the patches does not build"
     error make --unspanned { msg: $"cargo build failed with exit code ($build.exit_code)" }
 }
 let built = $build.stdout
@@ -107,7 +107,7 @@ let failed = glob ($cases | path join "*") | sort | each {|case|
     print --no-newline $diff
     let line = open --raw $patch | lines | enumerate | where $it.item == $"+++ b/tests/data/nushell/working/($name)/Expected.($suffix)" | get 0?.index
     let location = if $line != null { [--line ($line + 1)] } else { [] }
-    ^mise run --quiet --output interleave report:emit error ($status + "\n" + $diff + $merged.stderr) --file $patch ...$location --title $"($name): not what Mergiraf merges now"
+    ^mise run --quiet --output interleave nusage:report:emit error ($status + "\n" + $diff + $merged.stderr) --file $patch ...$location --title $"($name): not what Mergiraf merges now"
     $name
 } | compact
 if ($failed | is-not-empty) {
@@ -133,7 +133,7 @@ for patch in (glob "{{ config_root }}/patches/*.patch" | sort) {
     let applied = ^patch -p1 -s -F0 -d $work -i $patch | complete
     if $applied.exit_code != 0 {
         let why = $applied.stdout + $applied.stderr
-        ^mise run --quiet --output interleave report:emit error $why --file $patch --title $"($patch | path basename) no longer applies to Mergiraf ($env.MERGIRAF_VERSION)"
+        ^mise run --quiet --output interleave nusage:report:emit error $why --file $patch --title $"($patch | path basename) no longer applies to Mergiraf ($env.MERGIRAF_VERSION)"
         error make --unspanned { msg: $"($patch | path basename) no longer applies to Mergiraf ($env.MERGIRAF_VERSION):\n($why)" }
     }
     print $"($patch | path basename): applies"

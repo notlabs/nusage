@@ -1,6 +1,6 @@
 #!/usr/bin/env nu
 #MISE description="Check schemas and their accepted and rejected examples"
-#MISE alias="catalog:schemas:examples"
+#MISE alias="nusage:schemas:examples"
 #MISE outputs=[]
 #MISE cache={enabled=false}
 use .support/lib.nu [load-suite check-examples finish]

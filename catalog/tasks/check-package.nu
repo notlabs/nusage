@@ -119,11 +119,11 @@ def interfaces [consumer: path, current: string] {
     let examples = $consumer | path join lib demo schemas examples.nuon
     mut overlay = ""
     for attempt in 1..2 {
-        let made = ^mise run --quiet --output interleave catalog:schemas:overlay $manifest | complete
+        let made = ^mise run --quiet --output interleave nusage:schemas:overlay $manifest | complete
         assert equal $made.exit_code 0 $made.stderr
         assert ($made.stdout | str starts-with 'output "json"') $made.stdout
         if $attempt == 1 { $overlay = $made.stdout } else { assert equal $made.stdout $overlay }
-        let checked = ^mise run --quiet --output interleave catalog:schemas:examples $manifest $examples | complete
+        let checked = ^mise run --quiet --output interleave nusage:schemas:examples $manifest $examples | complete
         assert equal $checked.exit_code 0 $checked.stderr
         let captured = [
             {
@@ -133,19 +133,19 @@ def interfaces [consumer: path, current: string] {
                 exit_code: 0
             }
         ] | to json
-        let valid = $captured | ^mise run --quiet --output interleave catalog:schemas:validate $manifest | complete
+        let valid = $captured | ^mise run --quiet --output interleave nusage:schemas:validate $manifest | complete
         assert equal $valid.exit_code 0 $valid.stderr
         let report = with-env {GITHUB_ACTIONS: "true"} {
-            ^mise run --quiet --output interleave report:emit error "message%\nnext" --file "a,b.nu" --line 7 --title "a:b" | complete
+            ^mise run --quiet --output interleave nusage:report:emit error "message%\nnext" --file "a,b.nu" --line 7 --title "a:b" | complete
         }
         assert equal $report.exit_code 0 $report.stderr
         assert equal $report.stdout "::error file=a%2Cb.nu,line=7,title=a%3Ab::message%25%0Anext\n"
         let annotated = with-env {GITHUB_ACTIONS: "true"} {
-            ^mise run --quiet --output interleave report:emit diff "@@ -2 +2 @@\n-old\n+new\n" --file a.nu --title changed | complete
+            ^mise run --quiet --output interleave nusage:report:emit diff "@@ -2 +2 @@\n-old\n+new\n" --file a.nu --title changed | complete
         }
         assert equal $annotated.exit_code 0 $annotated.stderr
         assert equal $annotated.stdout "::error file=a.nu,line=2,endLine=2,title=changed::-old%0A+new%0A\n"
-        let clap = ^mise run --quiet --output interleave catalog:clap:spec ($consumer | path join extractor) --out ($consumer | path join current.kdl) | complete
+        let clap = ^mise run --quiet --output interleave nusage:clap:spec ($consumer | path join extractor) --out ($consumer | path join current.kdl) | complete
         assert equal $clap.exit_code 0 $clap.stderr
         assert equal (open --raw ($consumer | path join current.kdl)) $current
     }
@@ -157,12 +157,12 @@ def interfaces [consumer: path, current: string] {
             exit_code: 0
         }
     ] | to json
-    let refused = $invalid | ^mise run --quiet --output interleave catalog:schemas:validate $manifest | complete
+    let refused = $invalid | ^mise run --quiet --output interleave nusage:schemas:validate $manifest | complete
     assert ($refused.exit_code != 0) "Invalid output must fail through the task interface"
     assert ($refused.stderr | str contains ok) $refused.stderr
-    let missing = '[]' | ^mise run --quiet --output interleave catalog:schemas:validate $manifest | complete
+    let missing = '[]' | ^mise run --quiet --output interleave nusage:schemas:validate $manifest | complete
     assert ($missing.exit_code != 0) "Missing cases must fail"
-    let absent = ^mise run --quiet --output interleave catalog:clap:spec ($consumer | path join missing) --out ($consumer | path join absent.kdl) | complete
+    let absent = ^mise run --quiet --output interleave nusage:clap:spec ($consumer | path join missing) --out ($consumer | path join absent.kdl) | complete
     assert ($absent.exit_code != 0) "Extractor failures must reach the caller"
 }
 
@@ -185,9 +185,9 @@ let checked = try {
         let listed = ^mise tasks ls --json | complete
         assert equal $listed.exit_code 0 $listed.stderr
         let names = $listed.stdout | from json | get name | sort
-        assert equal $names [catalog:check catalog:clap:spec catalog:generate catalog:report:emit catalog:schemas:examples catalog:schemas:overlay catalog:schemas:validate catalog:spec]
+        assert equal $names [nusage:check nusage:clap:spec nusage:generate nusage:report:emit nusage:schemas:examples nusage:schemas:overlay nusage:schemas:validate nusage:spec]
         interfaces $consumer $current
-        for task in [catalog:spec catalog:generate catalog:check] {
+        for task in [nusage:spec nusage:generate nusage:check] {
             let result = ^mise run $task | complete
             assert equal $result.exit_code 0 $"($task): ($result.stdout)($result.stderr)"
         }

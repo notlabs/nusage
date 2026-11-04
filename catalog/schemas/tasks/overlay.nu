@@ -1,6 +1,6 @@
 #!/usr/bin/env nu
 #MISE description="Emit a Usage overlay from a schema suite"
-#MISE alias="catalog:schemas:overlay"
+#MISE alias="nusage:schemas:overlay"
 #MISE outputs=[]
 #MISE cache={enabled=false}
 use .support/lib.nu [load-suite schema-overlay]

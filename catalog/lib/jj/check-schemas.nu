@@ -14,7 +14,7 @@ def main [--bin: string] {
         which jj | first | get path
     }
 
-    ^mise run --quiet --output interleave catalog:schemas:examples $manifest ($here | path join schemas examples.nuon)
+    ^mise run --quiet --output interleave nusage:schemas:examples $manifest ($here | path join schemas examples.nuon)
 
     # The repository the cases run in, built in a home of its own: jj keeps each repository's
     # configuration under the user's configuration directory, and reads the user's files, so
@@ -61,5 +61,5 @@ def main [--bin: string] {
         error make --unspanned {msg: $err.msg}
     }
     rm -r $scratch
-    $result | to json | ^mise run --quiet --output interleave catalog:schemas:validate $manifest
+    $result | to json | ^mise run --quiet --output interleave nusage:schemas:validate $manifest
 }

@@ -1,6 +1,5 @@
 #!/usr/bin/env nu
 #MISE description="Export the schema tasks with their private implementation"
-#MISE alias="catalog:schemas:package"
 #MISE hide=true
 const here = path self | path dirname
 

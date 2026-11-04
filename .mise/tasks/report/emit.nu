@@ -1,6 +1,6 @@
 #!/usr/bin/env nu
 #MISE description="Emit a CI annotation, annotated diff, or log group"
-#MISE alias="report:emit"
+#MISE alias="nusage:report:emit"
 #MISE outputs=[]
 #MISE cache={enabled=false}
 use .support/actions.nu *
