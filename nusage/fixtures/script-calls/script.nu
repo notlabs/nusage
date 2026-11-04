@@ -1,7 +1,7 @@
 #!/usr/bin/env nus
 #USAGE name "caller"
 #USAGE bin "caller"
-#USAGE about "Calls the script beside it, by its path and through nusage and nu"
+#USAGE about "Calls the script beside it, by its path and through nus and nu"
 #USAGE arg "<who>"
 #USAGE output ("record<path: record<greeting: string, times: int, at: datetime>, nus: string, nu: int, at: string>")"nuon" default=#true
 

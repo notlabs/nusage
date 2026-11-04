@@ -4,7 +4,7 @@
 #MISE depends=["//catalog:pack"]
 # For each tool of this repository the project's config names, `mise link` installs this
 # checkout's build under the version the project asks for: `github:notlabs/nusage` is the
-# built `nus`, and `packslip:github.com/notlabs/nusage/catalog/<tool>` the package
+# built `nus` and its plugin, and `packslip:github.com/notlabs/nusage/catalog/<tool>` the package
 # `//catalog:pack` wrote. The project's files stay as they will be once the releases exist;
 # only this machine's mise holds the links, and `mise install` treats them as installed. A
 # link goes when its version is uninstalled (`mise uninstall <tool>@<version>`); the release

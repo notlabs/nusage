@@ -1,12 +1,12 @@
 // Export gh's command tree through Usage's Cobra adapter, without running a command, reading
 // a configuration file, loading an extension or touching the network.
 //
-// This file is not built where it is committed. `catalog/cobra/gh.nu` copies it into a
-// checkout of cli/cli at the tag `pin.toml` names, as `cmd/nusage-spec/main.go`, where it may
-// import the internal packages the root command's constructor takes, as the upstream
-// documentation generator does; a module of its own could not. It is given the tag, and
-// prints the spec, or with `--json-fields` the fields each command's `--json` accepts, as
-// `cmdutil.AddJSONFlags` records them in the command's annotations.
+// This file is not built where it is committed: `catalog/cobra/gh.nu` builds it inside a
+// checkout of cli/cli, where it may import the internal packages the root command's
+// constructor takes, as the upstream documentation generator does; a module of its own could
+// not. It is given the tag, and prints the spec, or with `--json-fields` the fields each
+// command's `--json` accepts, as `cmdutil.AddJSONFlags` records them in the command's
+// annotations.
 package main
 
 import (
@@ -64,10 +64,8 @@ func main() {
 	cmd.Use = "gh"
 	cmd.Version = version
 	normalize(cmd)
-	// The adapter leaves reserved words and signed numeric defaults unquoted, and usage requires
-	// defaults to be strings; the adapter escapes newlines in help, so this suffix cannot match
-	// inside a quoted description. Remove this shim when the adapter quotes these defaults
-	// itself: https://github.com/jdx/usage/issues/1594
+	// The default-quoting shim `../../docker-compose/spec/main.go` explains, until
+	// https://github.com/jdx/usage/issues/1594 is fixed.
 	defaults := regexp.MustCompile(`(?m)( default=)(true|false|null|[+-][0-9][^ \t\r\n]*)( \{)?$`)
 	spec := defaults.ReplaceAllString(cobrausage.Generate(cmd), `${1}"${2}"${3}`)
 	fmt.Print(dedupePersistentFlags(spec))

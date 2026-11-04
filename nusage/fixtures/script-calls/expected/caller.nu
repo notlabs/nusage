@@ -1,6 +1,6 @@
 alias "attr usage" = echo
 
-# Calls the script beside it, by its path and through nusage and nu
+# Calls the script beside it, by its path and through nus and nu
 @usage 'arg "<who>"'
 @usage 'output ("record<path: record<greeting: string, times: int, at: datetime>, nus: string, nu: int, at: string>")"nuon" default=#true'
 export def main [

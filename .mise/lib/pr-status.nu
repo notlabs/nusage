@@ -1,4 +1,4 @@
-# Summarize the current-head checks returned by gh's typed PR wrapper.
+# One check's state: pass, skip, cancel, fail, pending or unknown.
 def check-state [check: record] {
     if $check.__typename == CheckRun {
         if $check.status != COMPLETED { return pending }
@@ -19,6 +19,7 @@ def check-state [check: record] {
     }
 }
 
+# Summarize the current-head checks returned by gh's typed PR wrapper.
 export def report [prs: list<record>] {
     $prs | sort-by number | each {|pr|
         let checks = $pr.statusCheckRollup | default [] | each {|check|

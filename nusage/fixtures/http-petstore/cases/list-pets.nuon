@@ -1,6 +1,4 @@
-# The signature of a request with a query and a header: no case runs it, since a service
-# is not a binary a fake stands in for; `tests/http.rs` sends the requests to a server of
-# its own.
+# The signature of a request with a query and a header.
 {
     cmd: [list-pets],
 }
