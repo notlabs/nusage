@@ -248,7 +248,7 @@ struct Command {
     positionals: Vec<Param>,
     flags: Vec<Param>,
     body: Option<Body>,
-    /// The output schema's file, when a 2xx response is JSON.
+    /// The output schema's file, when the success response, a 2xx or else `default`, is JSON.
     output: Option<String>,
     schemas: Vec<(String, Value)>,
 }
@@ -413,8 +413,6 @@ impl Command {
             if param.required {
                 flag = flag.flag("required");
             }
-            // A boolean is a switch: given, it goes on the wire as `true`. A Nushell flag
-            // takes no boolean value.
             if matches!(param.ty, ParamType::Typed("bool")) {
                 cmd = cmd.child(flag);
                 continue;
@@ -710,7 +708,7 @@ fn line(text: &str) -> String {
         .join(" ")
 }
 
-/// A KDL node as a spec is written by hand: `name "arg" key="value" { children }`, every string quoted, so a KDL reader of either version takes it.
+/// A KDL node as a spec is written by hand: `name "arg" key="value" { children }`, every string quoted.
 struct Node {
     name: String,
     args: Vec<Entry>,

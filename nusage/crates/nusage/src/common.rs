@@ -1,4 +1,4 @@
-//! What both targets share: the attribute alias, doc comments, parameters, the `$usage` a script's definition builds, relative paths.
+//! What the targets, the interpreter and the language server share: the attribute alias, doc comments, parameters, the `$usage` a script's definition builds, relative paths.
 
 use std::path::{Component, Path, PathBuf};
 
@@ -12,7 +12,7 @@ use nusage_nu::{
 pub const SPEC_COMPLETER: &str = "nus complete";
 
 /// Which module a parameter is written for.
-/// In both, a counted flag is an `int` and a repeatable one a `list`, since a `def`'s flags cannot repeat.
+/// In each, a counted flag is an `int` and a repeatable one a `list`, since a `def`'s flags cannot repeat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Target {
     /// A `def` that hands the script `$usage`: declared defaults apply.

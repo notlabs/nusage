@@ -44,7 +44,7 @@ impl Context {
     }
 }
 
-/// Every module `NUS_MODULES` names, for an interactive session, which has no calls to read beforehand; and why any is left out: a tool at another version than its package was generated from, or a variable that does not read.
+/// Every module `NUS_MODULES` names, for an interactive session, which has no calls to read beforehand; and why any is left out.
 pub fn every() -> (Vec<PathBuf>, Vec<String>) {
     let modules = match record(MODULES) {
         Ok(Some(modules)) => modules,

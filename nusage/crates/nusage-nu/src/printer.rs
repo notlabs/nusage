@@ -1,7 +1,7 @@
 //! The printer: one genco template per shape of output.
 //!
 //! Layout lives in the templates, where it reads as the Nushell it produces.
-//! The only rules outside them are a record's breaking (a statement's value, or more than three fields, goes one field per line), the alignment of parameter comments, and that documentation is commented line by line: a description's lines each get a `#`, and a parameter's lines are joined, since Nushell reads only the comment on the parameter's own line.
+//! The only rules outside them are a record's breaking ([`expr_tokens`]), the alignment of parameter comments, and that documentation is commented line by line: a description's lines each get a `#`, and a parameter's lines are joined, since Nushell reads only the comment on the parameter's own line.
 
 use genco::quote;
 
@@ -276,8 +276,8 @@ fn expr_tokens(expr: &Expr, statement_value: bool) -> Tokens {
         Expr::Record(fields) => {
             quote!({$(for (key, value) in fields join (, ) => $(word(key)): $(expr_tokens(value, false)))})
         }
-        // A call writes a many-word name bare; only a definition or a completer reference
-        // quotes one.
+        // A call writes a many-word name bare; only a definition, an alias or a completer
+        // reference quotes one.
         Expr::Call { name, args } => {
             quote!($(name.as_str())$(for arg in args => $[' ']$(expr_tokens(arg, false))))
         }

@@ -1,6 +1,6 @@
 //! `nus lsp`: Nushell's language server for the scripts nusage runs.
 //! It stands between an editor and the `nu --lsp` it starts.
-//! A document whose shebang names nusage reaches Nushell with its first line replaced by the line `nus prelude` writes ([`crate::prelude`]), which binds `$usage` with its type and defines the shadows of the scripts it calls, so Nushell checks the script as nusage runs it.
+//! A document whose shebang names `nus` reaches Nushell with its first line replaced by the line `nus prelude` writes ([`crate::prelude`]), which imports the modules its calls name, binds `$usage` with its type and defines the shadows of the scripts it calls, so Nushell checks the script as nusage runs it.
 //! Every other line is the editor's own, so a position there means the same on both sides.
 //! Line 0 is the editor's, and what Nushell says about it is about the prelude: a request there is answered here, a result there is dropped, or, for a definition, led to what the prelude stands for, a shadow to its script and `$usage` to the header.
 //! What the header and the calls get wrong joins Nushell's diagnostics.
@@ -91,7 +91,7 @@ struct Document {
     path: PathBuf,
     /// The editor's text.
     text: String,
-    /// While its shebang names nusage, what Nushell sees in place of the first line.
+    /// While its shebang names `nus`, what Nushell sees in place of the first line.
     analysis: Option<Analysis>,
 }
 
@@ -391,7 +391,7 @@ impl State {
         let shadow = analysis.shadows.iter().find(|(span, _)| span.contains(&at));
         let (target, range) = match shadow {
             Some((_, script)) => (file_uri(script), zero_range()),
-            // Before the shadows is `$usage`, which the header declares.
+            // Before the shadows, after the modules' `use`s, is `$usage`, which the header declares.
             None if analysis
                 .shadows
                 .first()

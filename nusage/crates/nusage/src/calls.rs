@@ -1,6 +1,6 @@
 //! Scripts that call scripts.
 //! A script calls another the way it calls a binary, by its path: `./x.nu ...`, `nus x.nu ...` or `nu x.nu ...`, and Nushell types none of them: an external call returns text, whatever the script returned.
-//! So a call of a script whose shebang names nusage is shadowed by a command named as the call writes it, which is that script's typed command: its signature is the script's header, and its body binds `$usage` from its parameters and `run`s the script, which returns its value in the caller's own Nushell, of the type its output declares, while what it prints passes through.
+//! So a call of a script whose shebang names `nus` is shadowed by a command named as the call writes it, which is that script's typed command: its signature is the script's header, and its body binds `$usage` from its parameters and `run`s the script, which returns its value in the caller's own Nushell, of the type its output declares, while what it prints passes through.
 //! The shadows of the scripts the called script calls are defined inside that body, since a call's path is its script's, and `run` reads a script's calls where it parses it.
 //! The shadows are defined where the script runs, by the interpreter and by the module, and stand in its first line where Nushell checks it, so what is checked is what runs.
 //! Runtime and editor definitions also import each called script's project packages in that script's scope, checking their tool versions before any script runs.

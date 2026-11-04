@@ -108,7 +108,7 @@ pub fn assemble(source: &Path) -> Result<Assembled, Diagnostic> {
     assemble_with(source, &[])
 }
 
-/// [`assemble`], with overlays merged onto a spec file before usage reads it: each is a usage KDL document whose nodes are added to the spec's, a `cmd` merging into the command of the same name and any other node replacing the one with the same name and first argument.
+/// [`assemble`], with overlays merged onto a spec file before usage reads it: each is a usage KDL document merged onto the spec's node by node: a node with the same name and first argument as one of the spec's is merged into it, and any other is added.
 /// Scripts take no overlay; their headers are their own.
 pub fn assemble_with(source: &Path, overlays: &[PathBuf]) -> Result<Assembled, Diagnostic> {
     assemble_from(source, overlays, &Texts::new())

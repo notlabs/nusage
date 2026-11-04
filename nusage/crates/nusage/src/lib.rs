@@ -2,7 +2,7 @@
 //!
 //! [`generate`] is the whole pipeline: assemble the source into one spec, derive the command model, write the module for the target the source implies: the shim for scripts, the binary target for a spec file, the HTTP target for a spec file with the mapping of a service beside it.
 //! Each stage prints: [`spec`] the assembled spec, [`model`] the command model, [`generate`] the module.
-//! The CLI in `main.rs` is a thin shell around it.
+//! The CLI, [`cli`], is a thin shell around the library.
 
 mod activate;
 mod binary;
@@ -85,7 +85,7 @@ pub fn generate_with(
     Ok(text)
 }
 
-/// Check a module written for the source, with overlays, against the spec as usage reads it: every command the spec shows is a definition with the spec's positionals, flags and completers, named as the generator names them, with its description once. [`generate`] checks what it writes the same way.
+/// Check a module written for the source, with overlays, against the spec as usage reads it. [`generate`] checks what it writes the same way.
 pub fn check(
     source: &Path,
     overlays: &[PathBuf],
@@ -126,7 +126,7 @@ fn assemble(
     }
 }
 
-/// The line that stands in for a script's first where Nushell checks it, binding `$usage` with its type and defining the shadows of the scripts it calls, and what those calls get wrong, each as `<script>:<line>:<column>: <what>`.
+/// The line that stands in for a script's first where Nushell checks it, importing the modules its calls name, binding `$usage` with its type and defining the shadows of the scripts it calls, and what those calls get wrong, each as `<script>:<line>:<column>: <what>`.
 pub fn prelude(script: &Path) -> Result<(String, Vec<String>), Diagnostic> {
     let (line, calls) = prelude::line(script)?;
     let source = std::fs::read_to_string(script)
@@ -144,7 +144,7 @@ pub fn prelude(script: &Path) -> Result<(String, Vec<String>), Diagnostic> {
     Ok((line, findings))
 }
 
-/// Serve Nushell's language server for the scripts nusage runs, on standard input and output: `nu --lsp`, with `args` after it, sees a script whose shebang names nusage with the line [`prelude`] writes in place of its first.
+/// Serve Nushell's language server for the scripts nusage runs, on standard input and output: `nu --lsp`, with `args` after it, sees a script whose shebang names `nus` with the line [`prelude`] writes in place of its first.
 /// The exit code is Nushell's.
 pub fn lsp(args: &[String]) -> std::io::Result<i32> {
     lsp::serve(args)
@@ -156,13 +156,12 @@ pub fn nu(args: &[String]) -> std::io::Result<i32> {
     nu::run(args)
 }
 
-/// The definitions the interpreter `source`s before the script: the shadows of the scripts it calls, each running its script by its absolute path.
+/// What the interpreter `source`s before the script: the imports of the modules its calls name, and the shadows of the scripts it calls, each running its script by its absolute path.
 pub fn prelude_run(script: &Path) -> Result<String, Diagnostic> {
     prelude::runtime(script)
 }
 
 /// The command model derived from the source, as NUON: what a target is handed, after every decision between usage's vocabulary and a Nushell signature is made and before any Nushell is written.
-/// The stages of [`generate`] are each printable: [`spec`] the assembled spec, this the model, [`generate`] the module.
 pub fn model(
     source: &Path,
     overlays: &[PathBuf],

@@ -1,5 +1,5 @@
-//! `nus nu`: `nu`, as a command wrapper standing in Nushell's place starts it (mise's `[wrappers.nu]` with `args = ["nu"]`, say), so an editor that starts `nu --lsp` gets nusage's language server without being told of it: kakehashi with nusage's layer when kakehashi is on PATH, which highlights a script's header and bridges the script to `nus lsp`, else `nus lsp` alone.
-//! Anything else is `nu`, as it was asked for: an interactive shell has its packages from `nus activate nu`, as overlays that follow the working directory ([`crate::activate`]).
+//! `nus nu`: `nu`, for a command wrapper standing in Nushell's place ([`crate::cli::Nu`]).
+//! An interactive shell has its packages from `nus activate nu`, as overlays that follow the working directory ([`crate::activate`]).
 //! The arguments are read by Nushell's own command line, as a usage spec, so `--lsp` is found among Nushell's flags and never among a script's.
 
 use std::ffi::OsStr;

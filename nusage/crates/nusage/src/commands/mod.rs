@@ -1,5 +1,4 @@
-//! The commands nusage serves inside Nushell, as the plugin's: each written once as a `Run` of the kit, with its signature from the CLI's own spec.
-//! `nus validate` holds documents to a schema.
+//! The commands nusage serves inside Nushell, as the plugin's: each written once as a [`nusage_plugin::Run`], with its signature from the CLI's own spec.
 
 use nusage_plugin::nu_plugin::{Plugin, PluginCommand};
 use nusage_plugin::{Adapter, CommandTree};

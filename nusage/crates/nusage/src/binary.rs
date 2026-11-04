@@ -15,7 +15,7 @@ use nusage_nu::{
 
 use crate::common::{SPEC_COMPLETER, Target, attr_usage_alias, doc_of, nu_params, usage_attrs};
 
-/// The fixed helpers every binary module carries, and every module whose scripts call scripts.
+/// The fixed helpers every binary module and every service module carries.
 pub(crate) const HELPERS: &str = include_str!("binary-helpers.nu");
 /// The helper that holds a failed decode to the output's schema, carried when a wrapper decodes a JSON document that has one.
 pub(crate) const DECODED: &str = include_str!("binary-decoded.nu");
@@ -318,8 +318,6 @@ fn fill_stage(fill: &Fill) -> Result<Expr, SyntaxError> {
     )
 }
 
-/// `stages` on the value at `outer` where that may be null, such as jj's `operation` with `time.start` under it: a null is left as it is, and the stages run on anything else.
-/// On the whole value when `outer` is empty.
 /// `update <table> {|row| $row.<table> | <stages> }`: the stages on the table at the path, where they run on every row, as they would on the whole value.
 fn each_row(outer: &[String], stages: Vec<Expr>) -> Result<Expr, SyntaxError> {
     let row = Ident::new("row")?;
@@ -343,6 +341,8 @@ fn each_row(outer: &[String], stages: Vec<Expr>) -> Result<Expr, SyntaxError> {
     )
 }
 
+/// `stages` on the value at `outer` where that may be null, such as jj's `operation` with `time.start` under it: a null is left as it is, and the stages run on anything else.
+/// On the whole value when `outer` is empty.
 fn unless_null(outer: &[String], stages: Vec<Expr>) -> Result<Expr, SyntaxError> {
     let nothing = || Expr::Literal(Value::nothing(Span::unknown()));
     let guarded = move |value: Expr| Expr::If {

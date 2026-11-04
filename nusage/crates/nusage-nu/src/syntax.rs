@@ -5,7 +5,7 @@ use crate::Value;
 /// A Nushell type as written in a signature: `int`, `list<string>`, `record<x: int>`.
 ///
 /// Carried verbatim.
-/// Nushell's parser is the authority on whether it is a type; `nu-check` on the generated file is where a wrong one surfaces.
+/// Nushell's parser is the authority on whether it is a type; [`check_module`](crate::check_module) on the generated module is where a wrong one surfaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Type(String);
 
@@ -150,7 +150,7 @@ pub struct Def {
     pub body: Vec<Stmt>,
 }
 
-/// An attribute line above a definition: `@name 'arg' 'arg'`, each argument a string, single-quoted so it reads as written, or a raw string when it contains `'`.
+/// An attribute line above a definition: `@name 'arg' 'arg'`, each argument a string.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Attr {
     pub name: FlagName,
@@ -261,7 +261,7 @@ pub enum Expr {
     Var(Ident),
     /// `$name.a.b`: a cell path into a variable, each part quoted when it needs to be.
     Cell { var: Ident, path: Vec<String> },
-    /// Nushell as written: a literal the printer has no value for, such as `1kB` or a datetime, which it copies verbatim.
+    /// Nushell as written, copied verbatim: what the model has no node for, such as a literal the printer has no value for, a cell path or a decode pipeline.
     Raw(String),
     /// A value written as NUON.
     Literal(Value),
@@ -277,7 +277,7 @@ pub enum Expr {
     Str(String),
     /// `(expr)`: a call or pipeline where a value is expected, such as a record field.
     Group(Box<Expr>),
-    /// `lhs and rhs`, `lhs or rhs`.
+    /// `lhs <op> rhs`: a binary operator.
     Infix {
         lhs: Box<Expr>,
         op: Infix,

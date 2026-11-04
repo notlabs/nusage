@@ -1,5 +1,5 @@
-//! nusage's commands as a Nushell plugin: the same commands as the CLI, with the same parameters, by the CLI's own usage spec, which `usage-rs` derives from the CLI and the plugin reads at startup.
-//! A module whose wrappers call `nus validate` calls this plugin when it is registered and the `nus` binary when it is not, the words being the same; the plugin's process lives across calls, so a module that checks every output pays no process per check.
+//! nusage's commands as a Nushell plugin ([`Commands`]): each the CLI's command of the same words, with the same parameters, by the CLI's own usage spec, which `usage-rs` derives from the CLI and the plugin reads at startup.
+//! A call of those words reaches the plugin when it is registered and the `nus` binary when it is not; one written `^nus`, as the modules nusage writes call it, reaches the binary.
 //! Where the CLI prints and exits, a plugin command returns the data: the findings, as a table, not a line each on standard error and an exit code.
 
 use nusage::commands::Commands;

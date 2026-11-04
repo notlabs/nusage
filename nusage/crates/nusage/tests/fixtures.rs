@@ -1,6 +1,6 @@
 //! Every fixture under `fixtures/` generates byte for byte what its `expected/<bin>.nu` says.
 //!
-//! The fixtures are the design: a hand-written target module per script or tree, with the cases `fixtures/verify.nu` runs against the pinned Nushell.
+//! The fixtures are the design: a hand-written target module per script, tree or spec, with the cases `fixtures/verify.nu` runs against the pinned Nushell.
 //! This test keeps the generator honest to them; `mise run //nusage:verify-fixtures` keeps them honest to Nushell.
 
 use std::fs;
@@ -67,7 +67,7 @@ fn fixtures_generate_their_expected_modules() {
 }
 
 /// Every fixture module parses with Nushell's own parser, and defines every command its signature snapshot names.
-/// The parse runs in-process; the harness in `fixtures/verify.nu` still covers behaviour against the pinned binary.
+/// The parse runs in-process; the harness in `fixtures/verify.nu` covers behaviour against the pinned binary.
 #[test]
 fn fixtures_parse_with_nu_parser() {
     use nu_protocol::engine::StateWorkingSet;

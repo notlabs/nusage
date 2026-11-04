@@ -1,4 +1,4 @@
-//! A small model of the Nushell a generator writes, and the one printer that writes it.
+//! A small model of the Nushell a generator writes, the one printer that writes it, and what Nushell's parser says of a module or a script ([`check_module`], [`script_calls`]).
 //!
 //! The model covers what a module needs: a preamble, `def`s with attributes, typed parameters, an output type and a body of a few statements, and verbatim blocks.
 //! The constructors carry the invariants the printer relies on; whether the result is Nushell is for Nushell to say, and [`check_module`] asks its parser.

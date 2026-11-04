@@ -1,5 +1,5 @@
 //! What a script has before its first line.
-//! Where it runs, the interpreter defines the shadows of the scripts it calls ([`crate::calls`]) and binds `$usage`; where Nushell checks it, as an editor does, one line stands in for the script's first, the shebang, saying the same: `$usage` with its type, and the shadows as the interpreter defines them.
+//! Where it runs, the interpreter imports the modules its calls name ([`crate::modules`]), defines the shadows of the scripts it calls ([`crate::calls`]) and binds `$usage`; where Nushell checks it, as an editor does, one line stands in for the script's first, the shebang, saying the same: the modules its calls name, `$usage` with its type, and the shadows as the interpreter defines them.
 //! Replacing a line with a line keeps every other line where it was.
 
 use std::ops::Range;

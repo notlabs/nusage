@@ -1,7 +1,7 @@
 //! The interpreter entrypoint: `nus <script> [args...]`, what a `#!/usr/bin/env nus` line runs when anything outside Nushell executes the script.
 //!
 //! usage's own parser reads the arguments against the script's header, so help, errors, defaults and `negate` are usage's.
-//! The `$usage` record is built from the parse, and the script runs in the `nu` on PATH, as Nushell runs any script: what nusage hands it is the definitions of the scripts it calls ([`crate::calls`]), from a file of their own, then `let usage = ...; $in | run <script>`.
+//! The `$usage` record is built from the parse, and the script runs in the `nu` on PATH, as Nushell runs any script: what nusage hands it is the modules its calls name ([`crate::modules`]) and the definitions of the scripts it calls ([`crate::calls`]), from a file of their own, then `let usage = ...; $in | run <script>`.
 //! A script inside a tree (a `mod.nu` beside it) is parsed as that tree's command, with its siblings as providers and its ancestors' globals; a script on its own is its own root.
 //! The interpreter becomes that `nu`, so the script's value is shown as Nushell shows it, an error reported as Nushell reports it, and the exit code the script's.
 
