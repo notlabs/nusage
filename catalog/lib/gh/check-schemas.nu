@@ -4,12 +4,11 @@
 # repository on GitHub, so they run with a token, `GH_TOKEN` or `GITHUB_TOKEN`, and without
 # one only the examples are checked, a failure in CI. A plain Nushell script: to the nusage
 # interpreter, the package's `mod.nu` beside it would read as the root of a tree.
-use ../../schemas/lib.nu [load-suite check-examples run-suite finish]
-
 const here = path self | path dirname
 
 def main [--bin: string] {
-    let suite = load-suite ($here | path join schemas outputs.nuon)
+    let manifest = $here | path join schemas outputs.nuon
+    let suite = open $manifest
 
     let binary = if $bin != null {
         $bin | path expand
@@ -18,7 +17,7 @@ def main [--bin: string] {
     }
 
     # The schemas themselves, then the documents they must accept or reject.
-    finish (check-examples $suite (open ($here | path join schemas examples.nuon)))
+    ^mise run --quiet --output interleave nusage:schemas:examples $manifest ($here | path join schemas examples.nuon)
 
     let token = $env.GH_TOKEN? | default $env.GITHUB_TOKEN? | default ""
     if ($token | is-empty) {
@@ -40,12 +39,15 @@ def main [--bin: string] {
             GH_NO_UPDATE_NOTIFIER: "1"
             NO_COLOR: "1"
         } {
-            run-suite $suite $binary $scratch
+            $suite.cases | each {|case|
+                let result = do { cd $scratch; ^$binary ...$case.argv | complete }
+                {id: $case.id} | merge $result
+            }
         }
     } catch {|err|
         rm -r $scratch
         error make --unspanned {msg: $err.msg}
     }
     rm -r $scratch
-    finish $result
+    $result | to json | ^mise run --quiet --output interleave nusage:schemas:validate $manifest
 }

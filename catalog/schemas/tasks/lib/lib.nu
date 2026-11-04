@@ -144,18 +144,6 @@ export def check-examples [suite: record, examples: list<record>] {
     }
 }
 
-# The cases run from `cwd`; the caller has set the environment up.
-export def run-suite [suite: record, binary: path, cwd: path] {
-    let binary = $binary | path expand
-    $suite.cases | each {|case|
-        let result = do {
-            cd $cwd
-            ^$binary ...$case.argv | complete
-        }
-        validate-result $suite $case $result
-    }
-}
-
 export def finish [results: list<record>] {
     print ($results | select id ok exit_code)
     let failures = $results | where ok == false
