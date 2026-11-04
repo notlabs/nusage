@@ -3,7 +3,7 @@
 #MISE alias="nusage:schemas:examples"
 #MISE outputs=[]
 #MISE cache={enabled=false}
-use .support/lib.nu [load-suite check-examples finish]
+use lib/lib.nu [load-suite check-examples finish]
 
 def main [manifest: path, examples: path] {
     finish (check-examples (load-suite $manifest) (open $examples))

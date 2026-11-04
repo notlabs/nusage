@@ -54,7 +54,7 @@ let cases = [
         roots: [catalog/cobra catalog]
     }
     {
-        path: catalog/schemas/tasks/.support/lib.nu
+        path: catalog/schemas/tasks/lib/lib.nu
         roots: [catalog/schemas catalog]
     }
     {

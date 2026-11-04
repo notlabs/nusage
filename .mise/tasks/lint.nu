@@ -2,7 +2,7 @@
 #MISE description="Hold the tree to what `jj fix` writes for it and to what its linters accept"
 #MISE depends=["//nusage:build"]
 #MISE output="interleave"
-use report/.support/actions.nu *
+use report/lib/actions.nu *
 
 # A Git diff as each file's path and its own part of the diff.
 def files-of []: string -> table<path: string, diff: string> {

@@ -3,7 +3,7 @@
 #MISE alias="nusage:schemas:overlay"
 #MISE outputs=[]
 #MISE cache={enabled=false}
-use .support/lib.nu [load-suite schema-overlay]
+use lib/lib.nu [load-suite schema-overlay]
 
 def main [manifest: path] {
     schema-overlay (load-suite $manifest) | print

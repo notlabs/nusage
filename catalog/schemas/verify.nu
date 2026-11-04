@@ -1,6 +1,6 @@
 #!/usr/bin/env nus
 use std/assert
-use tasks/.support/lib.nu [validate-result schema-overlay]
+use tasks/lib/lib.nu [validate-result schema-overlay]
 
 const directory = path self | path dirname | path join fixtures
 

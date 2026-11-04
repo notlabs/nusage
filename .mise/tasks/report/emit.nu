@@ -3,7 +3,7 @@
 #MISE alias="nusage:report:emit"
 #MISE outputs=[]
 #MISE cache={enabled=false}
-use .support/actions.nu *
+use lib/actions.nu *
 
 def main [
     operation: string

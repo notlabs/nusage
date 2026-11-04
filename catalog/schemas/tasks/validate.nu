@@ -4,7 +4,7 @@
 #MISE outputs=[]
 #MISE cache={enabled=false}
 use std/assert
-use .support/lib.nu [load-suite validate-result finish]
+use lib/lib.nu [load-suite validate-result finish]
 
 def main [manifest: path] {
     let results = $in | from json
