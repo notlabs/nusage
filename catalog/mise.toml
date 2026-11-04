@@ -52,6 +52,8 @@ file = "tasks/generate.nu"
 
 [tasks.check]
 description = "Hold every entry to its inputs and to its tool"
+# Unprefixed, so the runner reads its annotations, as `.mise/lib/actions.nu` says.
+output = "interleave"
 depends = ["//nusage:build", ":check-package", ":check-release"]
 file = "tasks/check.nu"
 tools = { docker-compose = "5.6.1", gh = "2.103.3" }
