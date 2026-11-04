@@ -1,0 +1,23 @@
+# The collector the dev container's programs send telemetry to, on the port its daemon is
+# given. The debug exporter logs each batch that arrives to the daemon's log, `mise daemons
+# logs otelcol`; a backend is another exporter beside it.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: localhost:${env:PORT}
+
+exporters:
+  debug: {}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      exporters: [debug]

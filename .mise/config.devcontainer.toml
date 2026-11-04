@@ -1,0 +1,14 @@
+# The dev container's own services, which `mise daemons start` starts with the container.
+# `MISE_ENV=devcontainer` selects this file there; a host runs its own.
+[tools]
+"github:open-telemetry/opentelemetry-collector-releases" = { version = "0.164.0", matching = "otelcol-contrib" }
+pitchfork = "2.33.0"
+
+# mise's traces go where `OTEL_EXPORTER_OTLP_ENDPOINT` says, which `devcontainer.json` sets
+# for every process in the container: mise reads it from its own environment, not `[env]`.
+[settings]
+otel.enabled = true
+
+[daemons.otelcol]
+run = "exec otelcol-contrib --config .mise/otelcol.yaml"
+port = 4318
