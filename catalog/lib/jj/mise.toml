@@ -6,14 +6,5 @@ spec = { clap = "spec" }
 version = "0.2.0"
 tool = "jujutsu"
 
-[tasks.spec]
-extends = "catalog-entry-spec"
-
-[tasks.generate]
-extends = "catalog-entry-generate"
-
-[tasks.check]
-extends = "catalog-entry-check"
-
-[tasks."check:platform"]
-extends = "catalog-entry-platform-check"
+[task_config]
+includes = ["../../tasks/entry.tasks.toml"]

@@ -39,7 +39,9 @@ with-env {GH_CONFIG_DIR: $dir, GH_TOKEN: $token, GH_PROMPT_DISABLED: "1", GH_NO_
     assert equal ($merged.mergedAt | describe) datetime
 
     let releases = gh release list --repo notlabs/nusage --limit 5
-    assert ("v0.1.1" in ($releases | get tagName))
+    assert (($releases | length) > 0)
+    assert (($releases | length) <= 5)
+    assert equal ($releases.0.publishedAt | describe) datetime
     let release = gh release view v0.1.1 --repo notlabs/nusage
     assert equal $release.tagName "v0.1.1"
     assert (($release.assets | describe) | str starts-with "table<")

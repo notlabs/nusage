@@ -1,6 +1,7 @@
 /.jj/
 target/
 /.bin/
+/.cache/mbx-targets/
 /mise.local.toml
 /.mise.local.toml
 /catalog/dist/

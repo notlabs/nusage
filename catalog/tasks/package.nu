@@ -3,12 +3,13 @@
 # The OCI directory holds the tasks under `catalog/`, so that a consumer's
 # `task_config.includes` names each `catalog:<task>`; this task and the module they share are
 # not tasks there. The modules themselves are released as packages of their own, by `pack`.
+use mise *
 use catalog.nu *
 use support.nu *
 
 const tasks = path self | path dirname
 
-let version = ^mise config get vars.catalog_version | str trim
+let version = mise config get vars.catalog_version | str trim
 if $version == "" {
     error make --unspanned {
         msg: "`vars.catalog_version` names the catalog's version in the mise config"
@@ -21,6 +22,10 @@ mkdir ($oci | path join catalog)
 for file in [catalog.nu spec.nu generate.nu check.nu] {
     cp ($tasks | path join $file) ($oci | path join catalog $file)
 }
+# Bundle the public bootstrap module; the task catalog also works outside this checkout.
+let bootstrap = mise where http:catalog-bootstrap --cd ($tasks | path dirname) | str trim
+mkdir ($oci | path join catalog mise)
+cp ($bootstrap | path join lib mise mod.nu) ($oci | path join catalog mise mod.nu)
 # Hidden from mise's task discovery, but shipped with the scripts that import them.
 let helpers = [
     {name: actions, source: $actions, relative: .support/actions.nu}
@@ -40,4 +45,4 @@ cp --recursive ($schema_overlay | path dirname | path join lib) ($oci | path joi
 $helpers | each {|helper|
     $'export const ($helper.name) = path self | path dirname | path join ($helper.relative)'
 } | str join "\n" | save --force ($oci | path join catalog support.nu)
-print $"($oci | path relative-to (root))/catalog: push it with `oras push <registry>/nusage-tasks:($version) catalog` from ($oci | path relative-to (root))"
+print $"($oci | path join catalog): push it with `oras push <registry>/nusage-tasks:($version) catalog` from ($oci)"

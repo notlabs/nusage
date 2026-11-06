@@ -1,0 +1,28 @@
+# Cargo selects the package in the including project's working directory.
+[test]
+description = "Test this crate and its upstream crates"
+depends = ["^test"]
+sources = ["**/*"]
+outputs = []
+run = "cargo test --locked"
+
+[clippy]
+description = "Clippy for this crate's targets and its upstream crates"
+depends = ["^clippy"]
+sources = ["**/*"]
+outputs = []
+run = "cargo clippy --quiet --all-targets --locked -- -D warnings"
+
+[docs]
+description = "Build this crate's documentation without warnings"
+depends = ["^docs"]
+sources = ["**/*"]
+outputs = []
+env.RUSTDOCFLAGS = "-D warnings"
+run = "cargo doc --quiet --no-deps --locked"
+
+[check]
+depends = ["^check", ":test", ":clippy", ":docs"]
+
+["check:platform"]
+depends = ["^check:platform", ":test", ":clippy"]

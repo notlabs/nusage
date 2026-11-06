@@ -35,10 +35,10 @@ They need `nus`, `nu` and `usage` on PATH; a `clap` entry also Cargo and rustfmt
 A checked main commit releases each entry whose `catalog/<tool>/v<version>` has no release yet: the archive `//catalog:pack` writes, and its packslip signature.
 When `catalog_version` under `[vars]` has no `catalog/v<version>` release, the task catalog is pushed to GHCR at that version.
 
-Each entry owns `spec`, `generate`, `check`, and `check:platform` tasks, using the root's shared templates.
+Each entry owns `spec`, `generate`, `check`, and `check:platform` tasks, by including the shared `tasks/entry.tasks.toml` definitions.
 For example, `mise exec -- mise run //catalog/lib/jj:spec --force` refreshes jj's spec and `mise exec -- mise run //catalog/lib/jj:generate` regenerates its module.
 The catalog-wide `spec` and `generate` tasks select `./lib/...` tasks through Mise; adding an entry requires no parent registry edit.
 `//catalog:check` checks the catalog's own implementation and package interfaces.
 Use `mise exec -- mise run '//catalog/...:check'` to check the whole subtree.
-An entry declares its direct project providers in `[_.nusage.project].depends_add`; its shared check task uses `^build` and `^check` to validate upstream projects before the entry.
+An entry declares its direct project providers in `[_.nusage.project].depends_add`; its included check task uses `^build` and `^check` to validate upstream projects before the entry.
 Platform checks use `^check:platform` so they retain the upstream platform-specific scope.

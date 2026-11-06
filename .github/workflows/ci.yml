@@ -17,6 +17,8 @@ env:
   CI: "true"
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  # Keep managed target links inside the discovery boundary; the object store remains shared.
+  MBX_TARGET_ROOT: ${{ github.workspace }}/.cache/mbx-targets
 
 jobs:
   check:
@@ -34,6 +36,8 @@ jobs:
           # Native affected-project selection needs the merge base, including on restacks.
           fetch-depth: 0
           persist-credentials: false
+      # Artifact trees must not become projects when broad discovery globs reach target links.
+      - run: echo "MISE_IGNORED_CONFIG_PATHS=$MBX_TARGET_ROOT" >> "$GITHUB_ENV"
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21

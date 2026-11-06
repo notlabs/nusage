@@ -1,4 +1,5 @@
 # Prepare native Mise overrides from project-local metadata and Go imports.
+use mise *
 def --wrapped checked [...args: string]: any -> string {
     let input = $in
     let result = $input | run-external ...$args | complete
@@ -42,7 +43,7 @@ def prepare [root: path] {
         # Ask Mise which files are active: this also handles local config fragments.
         let configs = $directories | par-each {|directory|
             cd $directory
-            let local = checked mise config ls --json | from json | get path
+            let local = mise config ls | get path
                 | where {|file| (within $file $directory) and ($file | path parse | get extension) == toml }
             if ($local | is-not-empty) {
                 let added = $local | each {|file|
@@ -54,8 +55,8 @@ def prepare [root: path] {
         } | sort-by root
         {
             configs: $configs
-            tasks: (checked mise tasks ls --all --hidden --json | from json | where global == false)
-            native: (checked mise tasks graph --json | from json | get projects)
+            tasks: (mise tasks ls --all --hidden | where global == false)
+            native: (mise tasks graph | get projects)
         }
     }
     let roots = $discovered.configs

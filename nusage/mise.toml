@@ -29,6 +29,16 @@ variants = [
 ]
 
 [task_config]
+cascade = true
+# Shared Rust test data and workspace configuration apply to every crate's checks.
+global_inputs = [
+  "mise.toml",
+  "fixtures/**/*",
+  "schemas/**/*",
+  "../Cargo.toml",
+  "../Cargo.lock",
+  "../.mise/lib/cargo.tasks.toml",
+]
 shell = "nu -c"
 # A cached result is also keyed by the variables that change what Cargo builds.
 cache = { enabled = true, env = [
@@ -87,37 +97,18 @@ for plugin in (glob ("{{ config_root }}/../.bin/nu_plugin_*" | path expand)) {
 }
 '''
 
-# After the build: both write the target directory's `nus`, and the corpus test runs it.
+# The native Cargo projects own the checks; these are workspace selectors.
 [tasks.test]
-description = "Rust tests: every fixture generating its expected module byte for byte, and usage's corpus through the parser"
-depends = [":build"]
-env = { NUS_CORPUS = "{{ tools['usage-source'].path }}/corpus" }
-sources = [
-  "../Cargo.toml",
-  "../Cargo.lock",
-  "crates/**/*",
-  "fixtures/**/*",
-  "schemas/**/*",
-]
-outputs = []
-run = "cargo test --workspace --locked"
+description = "Test the workspace's discovered Cargo crates"
+depends = ["^test"]
 
 [tasks.clippy]
-description = "Clippy for every workspace target on this platform"
-# The tests are targets too, and one includes the inspection schema.
-sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*", "schemas/**/*"]
-outputs = []
-run = "cargo clippy --quiet --workspace --all-targets --locked -- -D warnings"
+depends = ["^clippy"]
 
 [tasks.docs]
-description = "Build the workspace's documentation without warnings"
-env = { RUSTDOCFLAGS = "-D warnings" }
-sources = ["../Cargo.toml", "../Cargo.lock", "crates/**/*"]
-outputs = []
-run = "cargo doc --quiet --workspace --no-deps --locked"
+depends = ["^docs"]
 
 [tasks.lint]
-description = "The workspace's lints"
 depends = [":clippy", ":docs"]
 
 [tasks.verify-fixtures]
@@ -129,9 +120,9 @@ file = "fixtures/verify.nu"
 
 [tasks.check]
 description = "Every check of nusage"
-depends = [":test", ":verify-fixtures", ":lint"]
+depends = ["^check", ":verify-fixtures"]
 
 # CI runs `check` once, on Linux, and this on each platform.
 [tasks."check:platform"]
 description = "The checks of nusage that each platform runs"
-depends = [":test", ":verify-fixtures", ":clippy"]
+depends = ["^check:platform", ":verify-fixtures"]

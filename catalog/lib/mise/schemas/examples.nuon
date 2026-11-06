@@ -100,4 +100,9 @@
 
                 }, null,     false,  true,     false]
         ],                                                                                                     false]
+
+    ["graph-empty", "tasks-graph", {"projects": []}, true],
+    ["graph-project", "tasks-graph", {"projects": [{"id": "cargo:fixture", "root": "crates/fixture", "metadata": {}, "dependencies": ["cargo:upstream"], "provenance": {"provider": "cargo", "source": "crates/fixture/Cargo.toml"}, "dependency_provenance": {}, "tasks": {}}]}, true],
+    ["graph-invalid-dependency", "tasks-graph", {"projects": [{"id": "cargo:fixture", "root": "crates/fixture", "metadata": {}, "dependencies": [42], "provenance": {"provider": "cargo", "source": "crates/fixture/Cargo.toml"}, "dependency_provenance": {}, "tasks": {}}]}, false],
+    ["graph-missing-root", "tasks-graph", {"projects": [{"id": "cargo:fixture", "metadata": {}, "dependencies": ["cargo:upstream"], "provenance": {"provider": "cargo", "source": "crates/fixture/Cargo.toml"}, "dependency_provenance": {}, "tasks": {}}]}, false]
 ]

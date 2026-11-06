@@ -1,6 +1,7 @@
 # Entry metadata lives in lib/<tool>/mise.toml under [_.nusage.catalog].
 # Mise discovers the projects; the directory supplies the entry's name.
 
+use mise *
 use support.nu schema_overlay
 
 # The directory the packages are under: the config root mise runs the task in.
@@ -12,8 +13,8 @@ export def root []: nothing -> string {
 export def entries [tool?: string]: nothing -> table {
     let tasks = do {
         cd (root)
-        ^mise tasks ls --all --json
-    } | from json
+        mise tasks ls --all
+    }
     let directory = root | path join lib
     let all = $tasks | get dir | uniq | sort | where {|dir| ($dir | path dirname) == $directory } | each {|dir|
         let config = $dir | path join mise.toml
@@ -23,7 +24,10 @@ export def entries [tool?: string]: nothing -> table {
     if ($all | is-empty) {
         error make --unspanned {msg: $"no catalog entries in discovered projects under ($directory)"}
     }
-    let tool = $tool | default $env.NUS_CATALOG_ENTRY?
+    let local = $all | where {|entry|
+        (root | path join lib $entry.name) == $env.MISE_CONFIG_ROOT?
+    } | get -o name.0
+    let tool = $tool | default $env.NUS_CATALOG_ENTRY? | default $local
     if $tool == null {
         return $all
     }

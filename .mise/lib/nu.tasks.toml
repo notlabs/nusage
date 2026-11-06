@@ -1,0 +1,25 @@
+[test]
+description = "Run this project's co-located Nutest suites"
+sources = ["**/*.nu", "**/*.toml", "../mise.toml", "../mise.lock"]
+outputs = []
+cache = { enabled = true, command_inputs = [
+  "mise --version",
+  "go version",
+  "nu --version",
+], env = [
+  "GOOS",
+  "GOARCH",
+  "GOFLAGS",
+] }
+usage = '''
+flag "--match-suites <pattern>" default=".*" help="Regex selecting discovered suites"
+flag "--match-tests <pattern>" default=".*" help="Regex selecting tests"
+'''
+run = '''
+nu --no-config-file -c '
+use "{{tools.nutest.path}}/nutest"
+# Nu expands this to a list; child Nu processes need its exported string form.
+$env.NU_LIB_DIRS = $env.NU_LIB_DIRS | str join (char esep)
+nutest run-tests --fail --match-suites $env.usage_match_suites --match-tests $env.usage_match_tests
+'
+'''

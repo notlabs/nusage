@@ -4,14 +4,5 @@ depends_add = ["custom:catalog"]
 [_.nusage.catalog]
 spec = { openapi = "openapi.yaml" }
 
-[tasks.spec]
-extends = "catalog-entry-spec"
-
-[tasks.generate]
-extends = "catalog-entry-generate"
-
-[tasks.check]
-extends = "catalog-entry-check"
-
-[tasks."check:platform"]
-extends = "catalog-entry-platform-check"
+[task_config]
+includes = ["../../tasks/entry.tasks.toml"]

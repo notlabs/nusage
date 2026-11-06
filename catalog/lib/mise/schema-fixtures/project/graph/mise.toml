@@ -1,0 +1,4 @@
+monorepo_root = true
+
+[monorepo.projects."custom:fixture"]
+root = "."

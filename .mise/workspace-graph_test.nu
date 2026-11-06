@@ -1,4 +1,5 @@
 use std/assert
+use mise *
 use std/testing *
 
 const generator = path self | path dirname | path join workspace-graph.nu
@@ -10,7 +11,7 @@ def --wrapped checked [...args: string] {
 }
 
 def graph [] {
-    checked mise tasks graph --json | from json | get projects
+    mise tasks graph | get projects
 }
 
 def before [events: list<string>, first: string, second: string] {
@@ -26,6 +27,7 @@ def "discovered project edges drive caret tasks and affected selection" [] {
     let scratch = mktemp -d | path expand
     let result = try {
         with-env {
+            NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep))
             MISE_CONFIG_DIR: ($scratch | path join config)
             MISE_DATA_DIR: ($scratch | path join data)
             MISE_CACHE_DIR: ($scratch | path join cache)
@@ -50,7 +52,7 @@ exit 99
                 monorepo: {config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]}
                 settings: {experimental: true}
                 task_config: {cache: {enabled: false}, global_inputs: (open ($generator | path dirname | path dirname | path join mise.toml) | get task_config.global_inputs)}
-                env: {_: {path: ($env.PATH | prepend ($scratch | path join bin))}, GRAPH_LOG: ($scratch | path join events)}
+                env: {NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep)), _: {path: ($env.PATH | prepend ($scratch | path join bin))}, GRAPH_LOG: ($scratch | path join events)}
                 _: {nusage: {project: {depends_add: ["custom:bridge"]}}}
                 deps: {workspace-graph: ($provider | update run $'nu "($generator)" && echo prepared >> provider-runs')}
                 tasks: {
@@ -130,6 +132,11 @@ func Value() int { return b.Value() }
             let runs = open --raw provider-runs | lines | length
             checked mise exec -- "true" | ignore
             assert equal (open --raw provider-runs | lines | length) $runs
+            # Included task definitions are provider inputs, including hidden shared files.
+            mkdir .mise/lib
+            "[probe]\nrun = 'true'\n" | save .mise/lib/probe.tasks.toml
+            checked mise exec -- "true" | ignore
+            assert equal (open --raw provider-runs | lines | length) ($runs + 1)
             # Metadata in active config fragments extends native project dependencies.
             mkdir consumer/.mise/conf.d
             {_: {nusage: {project: {depends_add: ["cargo:a"]}}}} | to toml | save consumer/.mise/conf.d/project.toml
@@ -233,6 +240,45 @@ import _ "example.test/missing"
             "invalid [toml" | save --force $output
             checked nu $generator | ignore
             assert (graph | any {|p| $p.id == custom:consumer})
+        }
+        null
+    } catch {|err| $err}
+    rm -rf $scratch
+    if $result != null { error make $result }
+}
+
+@test
+def "managed target configurations stay outside the discovered project graph" [] {
+    let provider = open ($generator | path dirname | path dirname | path join mise.toml) | get deps.workspace-graph
+    let scratch = mktemp -d | path expand
+    let targets = $scratch | path join .managed targets
+    let result = try {
+        mkdir ($targets | path join view) ($scratch | path join app)
+        {tasks: {unwanted: {run: "true"}}} | to toml | save ($targets | path join view mise.toml)
+        checked ln -s ($targets | path join view) ($scratch | path join target) | ignore
+        with-env {
+            NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep))
+            MISE_CONFIG_DIR: ($scratch | path join .config)
+            MISE_DATA_DIR: ($scratch | path join .data)
+            MISE_CACHE_DIR: ($scratch | path join .cache)
+            MISE_TRUSTED_CONFIG_PATHS: $scratch
+            MISE_IGNORED_CONFIG_PATHS: $targets
+            GOWORK: ""
+        } {
+            cd $scratch
+            {
+                monorepo_root: true
+                monorepo: {config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]}
+                settings: {experimental: true}
+                env: {NU_LIB_DIRS: $env.NU_LIB_DIRS, _: {path: $env.PATH}}
+                deps: {workspace-graph: ($provider | update run $'nu "($generator)"')}
+            } | to toml | save mise.toml
+            {tasks: {check: {run: "true"}}} | to toml | save app/mise.toml
+            let discovered = ^mise exec -- mise tasks ls --all --json | complete
+            assert equal $discovered.exit_code 0 $discovered.stderr
+            assert not ($discovered.stderr | str contains "glob matched path outside") $discovered.stderr
+            assert equal ($discovered.stdout | from json | get name) [//app:check]
+            assert equal (graph | get id | sort) [custom:app custom:root]
         }
         null
     } catch {|err| $err}

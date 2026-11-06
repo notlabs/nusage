@@ -15,9 +15,11 @@ config_roots = ["[!.]*", "[!.]*/[!.]*", "[!.]*/[!.]*/[!.]*"]
 auto = true
 sources = [
   "**/mise*.toml",
+  "**/*.tasks.toml",
   "**/.mise/conf.d/[!_]*.toml",
   ".mise/conf.d/[!_]*.toml",
   ".mise/**/*.nu",
+  ".mise/**/*.tasks.toml",
   "**/Cargo.toml",
   "**/go.mod",
   "**/go.sum",
@@ -28,6 +30,7 @@ outputs = ["go.work", ".mise/conf.d/_workspace-graph.toml"]
 run = "nu .mise/workspace-graph.nu"
 
 [task_config]
+includes = [".mise/tasks", ".mise/lib/nu.tasks.toml"]
 # Shared configuration and infrastructure affect inherited tools and task behavior.
 global_inputs = [
   "mise*.toml",
@@ -49,30 +52,22 @@ cache = { enabled = true }
 nu = "0.116.1"
 usage = "7.1.3"
 
+# The released public module bootstraps the catalog that produces its next version.
+[tools."http:catalog-bootstrap"]
+version = "0.1.0"
+url = "https://github.com/notlabs/nusage/releases/download/catalog/v0.1.0/nusage-catalog-0.1.0.tar.gz"
+strip_components = 1
+bin_path = "lib"
+
 # The repository's tasks run through the nus `//nusage:build` copies into `.bin`, not through
 # a release.
 [env]
 _.path = ["{{config_root}}/.bin"]
+NU_LIB_DIRS = { value = "{{ tools['catalog-bootstrap'].path }}/lib", tools = true }
 
 [tasks.check]
 description = "The root's own checks"
 depends = [":lint", ":check-pr-status", ":test"]
-
-[task_templates."catalog-entry-spec"]
-file = "../../tasks/spec.nu"
-depends = ["^build"]
-env = { NUS_CATALOG_ROOT = "{{config_root}}/../..", NUS_CATALOG_ENTRY = "{{config_root | basename}}" }
-
-[task_templates."catalog-entry-generate"]
-file = "../../tasks/generate.nu"
-depends = ["^build"]
-env = { NUS_CATALOG_ROOT = "{{config_root}}/../..", NUS_CATALOG_ENTRY = "{{config_root | basename}}" }
-
-[task_templates."catalog-entry-check"]
-file = "../../tasks/check.nu"
-depends = ["^build", "^check"]
-env = { NUS_CATALOG_ROOT = "{{config_root}}/../..", NUS_CATALOG_ENTRY = "{{config_root | basename}}" }
-
 
 [tools."http:nutest"]
 version = "1.2.0"
@@ -81,33 +76,4 @@ strip_components = 1
 bin_path = "."
 
 [tasks.test]
-description = "Discover the infrastructure's co-located Nu tests"
 dir = ".mise"
-sources = ["**/*.nu", "../mise.toml", "../mise.lock"]
-outputs = []
-cache = { enabled = true, command_inputs = [
-  "mise --version",
-  "go version",
-  "nu --version",
-], env = [
-  "GOOS",
-  "GOARCH",
-  "GOFLAGS",
-] }
-env = { NU_LIB_DIRS = "{{tools.nutest.path}}" }
-usage = '''
-flag "--match-suites <pattern>" default=".*" help="Regex selecting discovered suites"
-flag "--match-tests <pattern>" default=".*" help="Regex selecting tests"
-'''
-run = '''
-nu --no-config-file -c '
-use nutest
-nutest run-tests --fail --match-suites $env.usage_match_suites --match-tests $env.usage_match_tests
-'
-'''
-
-
-[task_templates."catalog-entry-platform-check"]
-file = "../../tasks/check.nu"
-depends = ["^build", "^check:platform"]
-env = { NUS_CATALOG_ROOT = "{{config_root}}/../..", NUS_CATALOG_ENTRY = "{{config_root | basename}}" }

@@ -10,6 +10,7 @@
     # names a file of. An output with `attach: false` is checked but not declared in the
     # generated overlay, since the module would give it the wrong type; each says why.
     outputs: [
+        {id: tasks-graph, command: [tasks graph], name: json, select: --json, framing: json, schema: tasks-graph.schema.json, source: ["src/cli/tasks/graph.rs:40" "src/task/workspace.rs"]}
         {id: version, command: [version], name: json, select: --json, framing: json, schema: version.schema.json, source: ["src/cli/version.rs:164"]}
         {id: env, command: [env], name: json, select: --json, framing: json, schema: env.schema.json, source: ["src/cli/env.rs:156"]}
         {id: config-ls, command: [config ls], name: json, select: --json, framing: json, schema: config-ls.schema.json, source: ["src/cli/config/ls.rs:123"]}
@@ -241,6 +242,7 @@
     ]
     # The cases run the real mise in `../schema-fixtures/project`, apart from the user's own.
     cases: [
+        {id: tasks-graph, output: tasks-graph, argv: [tasks graph --json --cd graph], exit_codes: [0], expect: {properties: {projects: {minItems: 1}}}}
         {id: version, output: version, argv: [version --json], exit_codes: [0], expect: {properties: {version: {pattern: '^[0-9]{4}[.][0-9]+[.][0-9]+'}}}}
         {id: env-populated, output: env, argv: [env --json], exit_codes: [0], expect: {required: [NUS_SCHEMA_FIXTURE], properties: {NUS_SCHEMA_FIXTURE: {const: "present"}}}}
         {id: config-populated, output: config-ls, argv: [config ls --json], exit_codes: [0], expect: {minItems: 1, contains: {properties: {tools: {contains: {const: "node"}}}, required: [tools]}}}
