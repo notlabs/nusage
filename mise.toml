@@ -1,6 +1,9 @@
 min_version = "2026.10.21"
 monorepo_root = true
 
+[_.nusage.project]
+depends_add = ["custom:catalog", "custom:catalog/lib/gh"]
+
 [settings]
 # Native global task inputs are gated in the pinned mise version, as is the task cache.
 experimental = true
@@ -12,6 +15,7 @@ config_roots = ["[!.]*", "[!.]*/[!.]*", "[!.]*/[!.]*/[!.]*"]
 auto = true
 sources = [
   "**/mise*.toml",
+  "**/.mise/conf.d/[!_]*.toml",
   ".mise/conf.d/[!_]*.toml",
   ".mise/**/*.nu",
   "**/Cargo.toml",
@@ -24,9 +28,19 @@ outputs = ["go.work", ".mise/conf.d/_workspace-graph.toml"]
 run = "nu .mise/workspace-graph.nu"
 
 [task_config]
-# Shared configuration affects inherited tools and task behavior. Unowned paths
-# (root files and .mise/) retain Mise's conservative fallback to every project.
-global_inputs = ["**/mise*.toml", "**/mise.lock", ".mise/conf.d/*.toml"]
+# Shared configuration and infrastructure affect inherited tools and task behavior.
+global_inputs = [
+  "mise*.toml",
+  "mise.lock",
+  "jj.toml",
+  "Cargo.lock",
+  "Cargo.toml",
+  # Basename patterns also match descendants. Keep project-local files out.
+  "!*/**",
+  ".mise/**",
+  ".cargo/**",
+  ".github/**",
+]
 # A task that declares what it reads, and what it writes or that it writes nothing, keeps
 # its result in mise's task cache.
 cache = { enabled = true }
@@ -42,24 +56,58 @@ _.path = ["{{config_root}}/.bin"]
 
 [tasks.check]
 description = "The root's own checks"
-depends = [
-  ":lint",
-  ":check-affected",
-  ":check-pr-status",
-  ":check-workspace-graph",
-]
+depends = [":lint", ":check-pr-status", ":test"]
 
 [task_templates."catalog-entry-spec"]
-file = "{{config_root}}/../../tasks/spec.nu"
-depends = ["//nusage:build"]
+file = "../../tasks/spec.nu"
+depends = ["^build"]
 env = { NUS_CATALOG_ROOT = "{{config_root}}/../..", NUS_CATALOG_ENTRY = "{{config_root | basename}}" }
 
 [task_templates."catalog-entry-generate"]
-file = "{{config_root}}/../../tasks/generate.nu"
-depends = ["//nusage:build"]
+file = "../../tasks/generate.nu"
+depends = ["^build"]
 env = { NUS_CATALOG_ROOT = "{{config_root}}/../..", NUS_CATALOG_ENTRY = "{{config_root | basename}}" }
 
 [task_templates."catalog-entry-check"]
-file = "{{config_root}}/../../tasks/check.nu"
-depends = ["//nusage:build"]
+file = "../../tasks/check.nu"
+depends = ["^build", "^check"]
+env = { NUS_CATALOG_ROOT = "{{config_root}}/../..", NUS_CATALOG_ENTRY = "{{config_root | basename}}" }
+
+
+[tools."http:nutest"]
+version = "1.2.0"
+url = "https://github.com/vyadh/nutest/releases/download/v1.2.0/nutest-1.2.0.zip"
+strip_components = 1
+bin_path = "."
+
+[tasks.test]
+description = "Discover the infrastructure's co-located Nu tests"
+dir = ".mise"
+sources = ["**/*.nu", "../mise.toml", "../mise.lock"]
+outputs = []
+cache = { enabled = true, command_inputs = [
+  "mise --version",
+  "go version",
+  "nu --version",
+], env = [
+  "GOOS",
+  "GOARCH",
+  "GOFLAGS",
+] }
+env = { NU_LIB_DIRS = "{{tools.nutest.path}}" }
+usage = '''
+flag "--match-suites <pattern>" default=".*" help="Regex selecting discovered suites"
+flag "--match-tests <pattern>" default=".*" help="Regex selecting tests"
+'''
+run = '''
+nu --no-config-file -c '
+use nutest
+nutest run-tests --fail --match-suites $env.usage_match_suites --match-tests $env.usage_match_tests
+'
+'''
+
+
+[task_templates."catalog-entry-platform-check"]
+file = "../../tasks/check.nu"
+depends = ["^build", "^check:platform"]
 env = { NUS_CATALOG_ROOT = "{{config_root}}/../..", NUS_CATALOG_ENTRY = "{{config_root | basename}}" }

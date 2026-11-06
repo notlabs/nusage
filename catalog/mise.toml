@@ -1,3 +1,6 @@
+[_.nusage.project]
+depends_add = ["custom:nusage", "custom:catalog/clap", "custom:catalog/schemas"]
+
 # Catalog-wide orchestration. Entry metadata and tasks live under lib/.
 # The task catalog's own version, which release.yml releases.
 [vars]
@@ -6,28 +9,27 @@ catalog_version = "0.1.0"
 # The generated files are committed; `spec` and `generate` are the steps that change them.
 [tasks.spec]
 description = "Obtain each entry's spec into its package"
-depends = ["//nusage:build"]
+depends = ["^build"]
 run = [{ tasks = ["./lib/...:spec"] }]
 
 [tasks.generate]
 description = "Generate each entry's module"
-depends = ["//nusage:build"]
+depends = ["^build"]
 run = [{ tasks = ["./lib/...:generate"] }]
 
 [tasks.check]
-description = "Hold every entry to its inputs and to its tool"
-depends = ["//nusage:build", ":check-package", ":check-release"]
-run = [{ tasks = ["./lib/...:check"] }]
+description = "Check the catalog implementation and its packaged interfaces"
+depends = ["^build", "^check", ":check-package", ":check-release"]
 
 [tasks."check:platform"]
 description = "Check the catalog's contracts and packaged tasks on this platform"
-depends = [":check"]
+depends = ["^build", "^check:platform", ":check-package", ":check-release"]
 
 # CI validates the revision before release assembly. Keep package's checks for local use;
 # both entrypoints run the same script.
 [tasks.assemble]
 description = "Assemble the task catalog from an already checked revision"
-depends = ["//nusage:build"]
+depends = ["^build"]
 file = "tasks/package.nu"
 
 [tasks.package]
@@ -37,17 +39,17 @@ file = "tasks/package.nu"
 
 [tasks.check-release]
 description = "Check interrupted package release recovery without publishing assets"
-depends = ["//nusage:build"]
+depends = ["^build"]
 file = "tasks/check-release.nu"
 
 [tasks.check-package]
 description = "Run the packaged tasks from an unrelated consumer project"
-depends = ["//nusage:build"]
+depends = ["^build"]
 file = "tasks/check-package.nu"
 
 # What the catalog's per-tool release jobs run on an already checked revision; the archives
 # are the committed packages', so nothing is generated here.
 [tasks.pack]
 description = "Pack each entry with a version as a release archive of its own"
-depends = ["//nusage:build"]
+depends = ["^build"]
 file = "tasks/pack.nu"

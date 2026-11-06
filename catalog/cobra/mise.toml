@@ -1,3 +1,6 @@
+[_.nusage.project]
+depends_add = ["custom:nusage"]
+
 [tasks.compose]
 description = "Export the pinned Compose command tree through Usage's Cobra adapter"
 dir = "../lib/docker-compose/spec"
@@ -5,12 +8,12 @@ run = "go run -mod=readonly ."
 
 [tasks.gh]
 description = "Export the pinned gh command tree through Usage's Cobra adapter, built in a checkout of cli/cli"
-depends = ["//nusage:build"]
+depends = ["^build"]
 file = "gh.nu"
 
 [tasks.gh-json-fields]
 description = "Write the fields each gh command's --json accepts into the package, from the same checkout"
-depends = ["//nusage:build"]
+depends = ["^build"]
 run = "nus {{ config_root }}/gh.nu --json-fields | save --force {{ config_root }}/../lib/gh/json-fields.json"
 
 [task_config]

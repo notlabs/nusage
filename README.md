@@ -56,18 +56,35 @@ The tasks run through the `nus` built in the checkout, not a release.
 
 Mise discovers config roots one to three directories below the repository root.
 `[deps.workspace-graph]` prepares an ignored `go.work` with `go work use -r .` and an ignored `.mise/conf.d/_workspace-graph.toml` supplement.
-Cargo projects and their dependency edges stay native; the supplement adds Go import edges and projects for discovered task roots, with cross-project edges from Mise's resolved task prerequisites.
-A task root also depends on native projects beneath it or selected by a task's `dir`, so changes to the Compose Go module select its catalog entry and the Cobra checks.
+Cargo projects and edges stay native; the supplement adds Go import edges and projects for discovered config roots, including projects with no tasks.
+A config root also depends on native projects beneath it or selected by a task's `dir`.
 
-Prepare before asking Mise to select affected tasks:
+Dependencies that are not described by language metadata belong to the consuming project's existing config:
+
+```toml
+# catalog/lib/jj/mise.toml
+[_.nusage.project]
+depends_add = ["custom:catalog"]
+```
+
+Custom IDs are `custom:<relative config root>` (`custom:root` for the repository root); native Cargo and Go IDs are preserved.
+Local `depends_add` declarations, including those in active config fragments, extend the graph without replacing native edges.
+There is no producer-side consumer inventory.
+Project-local config changes affect their owning project and its consumers; root shared configuration remains a global input.
+Task prerequisites consume this graph: `^build`, `^check`, or `^check:platform` select the corresponding upstream tasks; `:task` selects a local prerequisite.
+
+Prepare the graph before task dependencies or affected projects are resolved:
 
 ```sh
+mise exec -- mise run '//catalog/...:check'
 mise exec -- mise run --affected --affected-base main '//...:check'
 ```
 
-The outer `exec` refreshes stale providers; the inner `run` reads the updated graph before selecting tasks.
-For inspection, use `mise deps install workspace-graph` followed by `mise tasks graph --json`.
+The outer `exec` refreshes stale providers; the inner `run` reads the updated graph before resolving its prerequisites.
+For inspection, use `mise deps install workspace-graph` followed by `mise tasks graph --json` or `mise tasks deps`.
 The graph preparation runs in plain Nu and Go and does not build `nus`.
 The generated fragment's `_` prefix keeps it outside the provider's configuration inputs.
 Go edges follow the current Go build context, including test imports; after changing build-context environment variables, refresh explicitly with `mise deps install workspace-graph`.
-Declared task prerequisites supply custom edges; commands embedded in scripts are not inferred.
+
+Infrastructure tests are co-located `*_test.nu` suites discovered by the pinned Nutest module; `mise exec -- mise run //:test` runs them without building `nus`.
+The graph fixture verifies actual caret execution, cold preparation, platform checks, native edges, project add/move/remove, affected selection, and failures before consumer execution.

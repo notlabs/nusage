@@ -1,4 +1,4 @@
-# Prepare Mise's supplement from discovered tasks and Go's resolved imports.
+# Prepare native Mise overrides from project-local metadata and Go imports.
 def --wrapped checked [...args: string]: any -> string {
     let input = $in
     let result = $input | run-external ...$args | complete
@@ -11,7 +11,8 @@ def --wrapped checked [...args: string]: any -> string {
 }
 
 def task-root [name: string] {
-    $name | parse --regex '^//(?<root>[^:]*):' | get -o root.0
+    let root = $name | parse --regex '^//(?<root>[^:]*):' | get -o root.0
+    if $root == "" { "." } else { $root }
 }
 
 def within [path: string, directory: string] {
@@ -32,43 +33,71 @@ def prepare [root: path] {
     # Read only the original configuration, never our previous generated supplement.
     let ignored = [$env.MISE_IGNORED_CONFIG_PATHS? $output] | compact | str join (char esep)
     let discovered = with-env {MISE_IGNORED_CONFIG_PATHS: $ignored} {
+        let policy = open mise.toml | get monorepo.config_roots
+        let directories = [($root)] ++ ($policy | each {|pattern| glob $pattern } | flatten)
+            | where {|p| ($p | path type) == dir }
+            | each { path expand }
+            | where {|p| within $p $root }
+            | uniq
+        # Ask Mise which files are active: this also handles local config fragments.
+        let configs = $directories | par-each {|directory|
+            cd $directory
+            let local = checked mise config ls --json | from json | get path
+                | where {|file| (within $file $directory) and ($file | path parse | get extension) == toml }
+            if ($local | is-not-empty) {
+                let added = $local | each {|file|
+                    open $file | get -o _.nusage.project.depends_add | default []
+                } | flatten | uniq | sort
+                let relative = $directory | path relative-to $root
+                {root: (if $relative == "" { "." } else { $relative }), depends_add: $added}
+            }
+        } | sort-by root
         {
+            configs: $configs
             tasks: (checked mise tasks ls --all --hidden --json | from json | where global == false)
             native: (checked mise tasks graph --json | from json | get projects)
-            dag: (checked mise tasks deps --dot --hidden)
         }
     }
-    let roots = $discovered.tasks | get name | each { task-root $in } | compact | where $it != "" | uniq | sort
+    let roots = $discovered.configs
+    | get root
+    | append (
+        $discovered.tasks
+        | get name
+        | each { task-root $in }
+        | compact
+    )
+    | uniq
+    | sort
     let custom = $roots | where {|dir| not ($discovered.native | any {|p| $p.root == $dir})} | each {|dir|
-        {id: $"custom:($dir)", root: $dir}
+        let name = if $dir == "." { "root" } else { $dir }
+        {id: $"custom:($name)", root: $dir}
     }
     let projects = $discovered.native ++ $custom
     mut edges = []
-
-    # Mise resolves aliases, globs and argument-bearing prerequisites into this DAG.
-    let nodes = $discovered.dag | lines | parse --regex '^\s*(?<index>\d+) \[ label = (?<label>".*")\]$' | each {|n|
-        {index: $n.index, root: (task-root ($n.label | from json))}
-    }
-    for edge in ($discovered.dag | lines | parse --regex '^\s*(?<from>\d+) -> (?<to>\d+)') {
-        let from = $nodes | where index == $edge.from | get root.0
-        let to = $nodes | where index == $edge.to | get root.0
-        if $from != null and $to != null and $from != "" and $to != "" and $from != $to {
-            let a = $projects | where root == $from | get id.0
-            let b = $projects | where root == $to | get id.0
-            $edges = $edges | append {from: $a, to: $b}
+    for config in $discovered.configs {
+        let id = $projects | where root == $config.root | get id.0
+        for dependency in $config.depends_add {
+            if not ($projects | any {|p| $p.id == $dependency}) {
+                error make --unspanned {
+                    msg: $"($config.root): unknown project dependency ($dependency)"
+                }
+            }
+            $edges = $edges | append {from: $id, to: $dependency}
         }
     }
 
     # A config root's tasks also exercise native projects contained in it or selected by dir.
     for native in $discovered.native {
-        let owners = $custom | where {|p| within $native.root $p.root} | sort-by {|p| $p.root | str length}
+        let owners = $custom | where {|p| $p.root != "." and (within $native.root $p.root)} | sort-by {|p| $p.root | str length}
         if ($owners | is-not-empty) {
             $edges = $edges | append {from: ($owners | last | get id), to: $native.id}
         }
         for task in $discovered.tasks {
             let owner = task-root $task.name
-            if $owner == null or $owner == "" { continue }
-            let dir = $task.dir | path expand | path relative-to $root
+            if $owner == null { continue }
+            let absolute = $task.dir | path expand
+            if not (within $absolute $root) { continue }
+            let dir = $absolute | path relative-to $root
             if $owner != $native.root and (within $dir $native.root) {
                 let id = $projects | where root == $owner | get id.0
                 $edges = $edges | append {from: $id, to: $native.id}

@@ -44,17 +44,17 @@ cache = { enabled = true, env = [
 # It runs at the root, the Cargo workspace's, where its outputs are: the task cache stores
 # only what is under a task's directory.
 [tasks.build]
-description = "Build the workspace and copy nusage and its plugin into the repository's bin directory"
+description = "Build the workspace and copy its CLI tools and plugin into the repository's bin directory"
 dir = "{{ config_root }}/.."
 sources = ["Cargo.toml", "Cargo.lock", "nusage/crates/**/*"]
-outputs = [".bin/nus", ".bin/nu_plugin_nus"]
+outputs = [".bin/nus", ".bin/nu_plugin_nus", ".bin/openapi-usage"]
 run = '''
 let built = ^cargo build --workspace --locked --message-format json-render-diagnostics
   | lines
   | where ($it | str starts-with "{")
   | each { from json }
   | where reason == compiler-artifact and executable != null
-  | where $it.target.name == nus or ($it.target.name | str starts-with nu_plugin_)
+  | where $it.target.name in [nus openapi-usage] or ($it.target.name | str starts-with nu_plugin_)
   | get executable
 let bin = "{{ config_root }}/../.bin" | path expand
 mkdir $bin

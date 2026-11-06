@@ -1,3 +1,6 @@
+[_.nusage.project]
+depends_add = ["custom:catalog", "custom:catalog/cobra"]
+
 [_.nusage.catalog]
 spec = { run = "mise run //catalog/cobra:gh", probe = "version" }
 version = "0.2.0"
@@ -16,4 +19,4 @@ extends = "catalog-entry-generate"
 extends = "catalog-entry-check"
 
 [tasks."check:platform"]
-depends = [":check"]
+extends = "catalog-entry-platform-check"

@@ -216,7 +216,7 @@ jobs:
           version: 2026.10.21
           cache: false
       - run: mise install --monorepo --locked
-      - run: mise run //catalog:pack
+      - run: mise exec -- mise run //catalog:pack
       - id: release
         env:
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -327,7 +327,7 @@ jobs:
       - if: steps.version.outputs.released == 'false'
         run: mise install --monorepo --locked
       - if: steps.version.outputs.released == 'false'
-        run: mise run //catalog:assemble
+        run: mise exec -- mise run //catalog:assemble
       - if: steps.version.outputs.released == 'false'
         env:
           VERSION: ${{ steps.version.outputs.version }}

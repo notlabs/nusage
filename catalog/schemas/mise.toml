@@ -1,4 +1,7 @@
+[_.nusage.project]
+depends_add = ["custom:nusage"]
+
 [tasks.check]
 description = "Check the shared output-schema tooling against valid and invalid documents"
-depends = ["//nusage:build"]
+depends = ["^build"]
 file = "verify.nu"

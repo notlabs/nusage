@@ -1,16 +1,19 @@
+[_.nusage.project]
+depends_add = ["custom:nusage"]
+
 [task_config]
 cache = { enabled = true }
 
 [tasks.check]
 description = "Hold the intent's files to their schemas and its checked claims to nusage as it is"
-depends = ["//nusage:build"]
+depends = ["^build"]
 sources = ["**/*"]
 outputs = []
 file = "check.nu"
 
 [tasks.claims]
 description = "The intent's claims, as a table"
-depends = ["//nusage:build"]
+depends = ["^build"]
 sources = ["**/*"]
 outputs = []
 file = "claims.nu"

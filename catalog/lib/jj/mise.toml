@@ -1,3 +1,6 @@
+[_.nusage.project]
+depends_add = ["custom:catalog"]
+
 [_.nusage.catalog]
 spec = { clap = "spec" }
 version = "0.2.0"
@@ -13,4 +16,4 @@ extends = "catalog-entry-generate"
 extends = "catalog-entry-check"
 
 [tasks."check:platform"]
-depends = [":check"]
+extends = "catalog-entry-platform-check"
