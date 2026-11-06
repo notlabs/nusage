@@ -73,7 +73,7 @@ let cases = [
         roots: [catalog]
     }
     {
-        path: catalog/schemas/lib.nu
+        path: catalog/schemas/lib/mod.nu
         roots: [catalog/schemas]
     }
     {

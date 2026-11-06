@@ -36,7 +36,7 @@ for helper in $helpers {
     mkdir ($target | path dirname)
     cp $helper.source $target
 }
-cp ($schema_overlay | path dirname | path join lib.nu) ($oci | path join catalog .support schemas lib.nu)
+cp --recursive ($schema_overlay | path dirname | path join lib) ($oci | path join catalog .support schemas lib)
 $helpers | each {|helper|
     $'export const ($helper.name) = path self | path dirname | path join ($helper.relative)'
 } | str join "\n" | save --force ($oci | path join catalog support.nu)
