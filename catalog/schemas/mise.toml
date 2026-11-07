@@ -1,4 +1,7 @@
+# The generator `gen:schemas`: the output-schema tooling entries load.
+[_.nusage.project]
+kind = "gen"
+
 [tasks.check]
 description = "Check the shared output-schema tooling against valid and invalid documents"
-depends = ["//nusage:build"]
 file = "verify.nu"

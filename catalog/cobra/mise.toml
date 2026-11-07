@@ -1,3 +1,7 @@
+# The generator `gen:cobra`: entries whose spec it exports depend on it.
+[_.nusage.project]
+kind = "gen"
+
 [tasks.compose]
 description = "Export the pinned Compose command tree through Usage's Cobra adapter"
 dir = "../lib/docker-compose/spec"
@@ -5,12 +9,10 @@ run = "go run -mod=readonly ."
 
 [tasks.gh]
 description = "Export the pinned gh command tree through Usage's Cobra adapter, built in a checkout of cli/cli"
-depends = ["//nusage:build"]
 file = "gh.nu"
 
 [tasks.gh-json-fields]
 description = "Write the fields each gh command's --json accepts into the package, from the same checkout"
-depends = ["//nusage:build"]
 run = "nus {{ config_root }}/gh.nu --json-fields | save --force {{ config_root }}/../lib/gh/json-fields.json"
 
 [task_config]

@@ -1,17 +1,19 @@
+# The project `nu:intent`. Its checks run the root's `nus` provider's build, which keys
+# their cached results.
+[_.nusage.project]
+
 [task_config]
 cache = { enabled = true }
 
 [tasks.check]
 description = "Hold the intent's files to their schemas and its checked claims to nusage as it is"
-depends = ["//nusage:build"]
-sources = ["**/*"]
+sources = ["**/*", "../.bin/nus"]
 outputs = []
 file = "check.nu"
 
 [tasks.claims]
 description = "The intent's claims, as a table"
-depends = ["//nusage:build"]
-sources = ["**/*"]
+sources = ["**/*", "../.bin/nus"]
 outputs = []
 file = "claims.nu"
 

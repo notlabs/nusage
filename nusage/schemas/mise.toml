@@ -1,0 +1,5 @@
+# The project `schemas:nusage`: the schemas nusage's output is held to. The crates that read
+# them declare it, so a change here selects them.
+[_.nusage.project]
+kind = "schemas"
+name = "nusage"

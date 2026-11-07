@@ -1,3 +1,6 @@
+# Build artifacts are not repository TOML, including targets reached through MBX links.
+exclude = ["**/target/**", ".cache/**"]
+
 # The schema each kind of TOML file is held to, as SchemaStore lists it; the fixtures that
 # show mise refusing a config stay unvalidated.
 [[rule]]
@@ -8,6 +11,10 @@ schema.url = "https://www.schemastore.org/cargo.json"
 include = ["**/mise.toml", "**/mise.*.toml", "**/conf.d/**/*.toml"]
 exclude = ["**/schema-fixtures/**"]
 schema.url = "https://mise.jdx.dev/schema/mise.json"
+
+[[rule]]
+include = ["**/.miserc*.toml"]
+schema.url = "https://raw.githubusercontent.com/jdx/mise/v2026.10.21/schema/miserc.json"
 
 [[rule]]
 include = [".rumdl.toml"]

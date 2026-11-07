@@ -1,0 +1,10 @@
+{
+  "name": "graph-app",
+  "scripts": {
+    "build": "echo fixture build",
+    "check": "echo fixture check"
+  },
+  "dependencies": {
+    "graph-core": "workspace:*"
+  }
+}

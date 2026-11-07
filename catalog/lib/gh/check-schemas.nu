@@ -4,7 +4,7 @@
 # repository on GitHub, so they run with a token, `GH_TOKEN` or `GITHUB_TOKEN`, and without
 # one only the examples are checked, a failure in CI. A plain Nushell script: to the nusage
 # interpreter, the package's `mod.nu` beside it would read as the root of a tree.
-use ../../schemas/lib.nu [load-suite check-examples run-suite finish]
+use ../../schemas/lib [load-suite check-examples run-suite finish]
 
 const here = path self | path dirname
 

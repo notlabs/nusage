@@ -17,6 +17,8 @@ env:
   CI: "true"
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  # Keep managed target links inside the discovery boundary; the object store remains shared.
+  MBX_TARGET_ROOT: ${{ github.workspace }}/.cache/mbx-targets
 
 jobs:
   check:
@@ -80,24 +82,25 @@ jobs:
             fi
           fi
       # Linux runs each project's `check`; macOS its `check:platform`, what differs by platform.
+      # `mise exec` prepares the project graph before the inner `mise run` resolves tasks with it.
       - name: Check repository
         run: |
           if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ -n "$AFFECTED_BASE" ]; then
             # The root's checks hold the whole repository, whatever the change.
             if [ "$RUNNER_OS" = Linux ]; then
-              mise run //:check
+              mise exec -- mise run //:check
             fi
-            mise run --affected --affected-base "$AFFECTED_BASE" --affected-head HEAD --affected-committed "$NUS_CHECK_TASK"
+            mise exec -- mise run --affected --affected-base "$AFFECTED_BASE" --affected-head HEAD --affected-committed "$NUS_CHECK_TASK"
           else
             # Main is the full validation boundary used by release assembly.
-            mise run "$NUS_CHECK_TASK"
+            mise exec -- mise run "$NUS_CHECK_TASK"
           fi
         env:
           GH_TOKEN: ${{ github.token }}
           AFFECTED_BASE: ${{ steps.mergiraf-changes.outputs.base }}
           NUS_CHECK_TASK: ${{ runner.os == 'Linux' && '//...:check' || '//...:check:platform' }}
       - if: steps.mergiraf-changes.outputs.run == 'true'
-        run: mise run //mergiraf:test
+        run: mise exec -- mise run //mergiraf:test
       # A push to main saves mise's task results for later runs. mise stores a task's
       # result only when it succeeded.
       - if: ${{ !cancelled() && github.event_name == 'push' }}

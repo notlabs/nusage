@@ -12,6 +12,8 @@
 # where nus is a link to the checkout's own, so a rebuild reaches the project without
 # linking again.
 
+use mise *
+
 let root = $env.MISE_PROJECT_ROOT? | default $env.PWD
 let project = $usage.args.project | path expand
 let links = $root | path join target nusage-link
@@ -20,8 +22,8 @@ const PREFIX = "packslip:github.com/notlabs/nusage/catalog/"
 
 let wanted = do {
     cd $project
-    ^mise ls --current --json
-} | from json | transpose tool installs | each {|row|
+    mise ls --current
+} | transpose tool installs | each {|row|
     {tool: $row.tool, version: ($row.installs | get requested_version | compact | first)}
 } | where {|row| $row.tool == "github:notlabs/nusage" or ($row.tool | str starts-with $PREFIX) }
 if ($wanted | is-empty) {
@@ -49,9 +51,9 @@ let linked = $wanted | each {|row|
         }
         ^tar --extract --gzip --file ($root | path join catalog $package.0.archive) --directory $dir
     }
-    ^mise link --force $"($row.tool)@($row.version)" $dir
+    mise link --force $"($row.tool)@($row.version)" $dir
     $"($row.tool)@($row.version)"
 }
 cd $project
-^mise install
+mise install
 $linked | str join "\n"

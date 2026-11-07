@@ -1,6 +1,9 @@
 # Mergiraf, the structural merge tool `jj resolve` runs here, built from its published source
 # with the patches beside it applied: patches/ teaches it Nushell, which it does not know yet.
 # `build` writes the binary where the root's `[env] _.path` looks.
+# The project `nu:mergiraf`.
+[_.nusage.project]
+
 [tools]
 # The source as crates.io serves it, with its checksum; the version is the one the patches
 # are written against, and a bump means holding them to the new source with `check`.

@@ -1,0 +1,29 @@
+# The crate builds `nus`. Its tests read the fixtures and the inspection schema, projects of
+# their own, so a change to either selects this crate.
+[_.nusage.project]
+depends_add = ["fixtures:nusage", "schemas:nusage"]
+
+[task_config]
+includes = ["../../../.mise/lib/cargo.tasks.toml"]
+
+[tasks.test]
+sources = ["../../fixtures/**/*", "../../schemas/inspection.schema.json"]
+outputs = []
+env.NUS_CORPUS = "{{ tools['usage-source'].path }}/corpus"
+
+[tasks.clippy]
+sources = ["../../schemas/inspection.schema.json"]
+outputs = []
+
+# The `nus` the root's `nus` provider builds into `.bin`, which keys the cached result.
+[tasks.verify-fixtures]
+description = "Hold nusage to its fixtures"
+sources = ["../../fixtures/**/*", "../../../.bin/nus"]
+outputs = []
+file = "../../fixtures/verify.nu"
+
+[tasks.check]
+depends = [":verify-fixtures"]
+
+[tasks."check:platform"]
+depends = [":verify-fixtures"]

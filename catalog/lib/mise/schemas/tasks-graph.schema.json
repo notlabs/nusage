@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mise tasks graph --json",
+  "type": "object",
+  "properties": {
+    "projects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/project"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "projects"
+  ],
+  "$defs": {
+    "project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "dependency_provenance": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "tasks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/task"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "root",
+        "metadata",
+        "dependencies",
+        "provenance",
+        "dependency_provenance",
+        "tasks"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "task": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "suggestions": {
+          "$ref": "#/$defs/suggestions"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "description",
+        "source",
+        "provenance",
+        "suggestions"
+      ]
+    },
+    "suggestions": {
+      "type": "object",
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outputs": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "cache": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "depends": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "inputs": {
+              "$ref": "#/$defs/provenance"
+            },
+            "outputs": {
+              "$ref": "#/$defs/provenance"
+            },
+            "cache": {
+              "$ref": "#/$defs/provenance"
+            },
+            "depends": {
+              "$ref": "#/$defs/provenance"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "inputs",
+        "outputs",
+        "cache",
+        "depends",
+        "provenance"
+      ]
+    }
+  }
+}
