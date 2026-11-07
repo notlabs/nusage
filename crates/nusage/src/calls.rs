@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     fn a_definition_binds_usage_from_its_parameters_and_runs_the_script() {
-        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/script-calls");
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../nusage/fixtures/script-calls");
         let (defs, findings) = written(&fixture.join("script.nu"));
         assert!(findings.is_empty(), "{findings:?}");
         let path = resolve(&fixture, "callee.nu");

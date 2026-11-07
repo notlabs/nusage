@@ -93,20 +93,32 @@ sources = [
   "Cargo.lock",
   ".cargo/**",
   ".mise/conf.d/rust.toml",
-  "nusage/crates/**",
+  "crates/**",
 ]
 outputs = [".bin/nus", ".bin/nu_plugin_nus", ".bin/openapi-usage"]
-run = "mise run --no-deps //nusage:build"
+run = "mise run --no-deps //:build"
 
 [task_config]
 includes = [".mise/tasks", ".mise/lib/nu.tasks.toml"]
 # A task that declares what it reads, and what it writes or that it writes nothing, keeps
 # its result in mise's task cache.
-cache = { enabled = true }
+shell = "nu -c"
+# A cached result is also keyed by the variables that change what Cargo builds.
+cache = { enabled = true, env = [
+  "CARGO_PROFILE_DEV_DEBUG",
+  "CARGO_INCREMENTAL",
+  "RUSTFLAGS",
+] }
+
+[task_config.input_groups]
+cargo-workspace = ["Cargo.toml", "Cargo.lock", ".cargo/**"]
 
 [tools]
 nu = "0.116.1"
 usage = "7.1.3"
+# usage's source, for its argv corpus, which the tests pose to the interpreter's parser.
+"http:usage-source" = { version = "7.1.3", url = "https://github.com/jdx/usage/archive/refs/tags/v{% raw %}{{ version }}{% endraw %}.tar.gz", strip_components = 1, bin_path = "corpus" }
+
 
 # The released public module bootstraps the catalog that produces its next version.
 [tools."http:catalog-bootstrap"]
@@ -115,7 +127,7 @@ url = "https://github.com/notlabs/nusage/releases/download/catalog/v0.1.0/nusage
 strip_components = 1
 bin_path = "lib"
 
-# The repository's tasks run through the nus `//nusage:build` copies into `.bin`, not through
+# The repository's tasks run through the nus `//:build` copies into `.bin`, not through
 # a release.
 [env]
 # Keep managed target links inside the discovery boundary; the object store remains shared.
@@ -128,7 +140,7 @@ NU_LIB_DIRS = { value = "{{ tools['catalog-bootstrap'].path }}/lib", tools = tru
 
 [tasks.check]
 description = "The root's own checks"
-depends = [":lint", ":check-pr-status", ":test"]
+depends = [":lint", ":check-pr-status", ":test", "./crates/...:check"]
 
 # Tasks that resolve through the generated graph or inputs depend on this: a `mise run` that
 # resolved them from configuration its providers then rewrote fails here, before they run.
@@ -150,8 +162,7 @@ dir = ".mise"
 sources = [
   "../mise.toml",
   "../.miserc.toml",
-  "../nusage/mise.toml",
-  "../nusage/crates/nusage/mise.toml",
+  "../crates/nusage/mise.toml",
 ]
 outputs = []
 cache = { enabled = true, command_inputs = [
@@ -161,3 +172,98 @@ cache = { enabled = true, command_inputs = [
   "GOARCH",
   "GOFLAGS",
 ] }
+
+# The released nusage for this user: fragments of the global mise config that
+# `mise dot apply` links into place.
+[dotfiles]
+"~/.config/mise/conf.d/nusage.toml" = { source = "nusage/conf.d/nusage.toml", mode = "symlink" }
+"~/.config/mise/conf.d/nusage/mise.nus-lsp.toml" = { source = "nusage/conf.d/nusage/mise.nus-lsp.toml", mode = "symlink" }
+"~/.config/mise/conf.d/nusage/mise.nus-kakehashi.toml" = { source = "nusage/conf.d/nusage/mise.nus-kakehashi.toml", mode = "symlink" }
+
+# nusage's activation for Nushell, in place of `mise activate nu`, beside Nushell's
+# configuration on each system, and an autoloaded file that uses it as `config.nu` would, so
+# that `config.nu` itself is left alone.
+[dotfiles.nus-activate]
+source = "crates/nusage/src/activate.nu"
+mode = "symlink"
+variants = [
+  { os = "linux", target = "~/.config/nushell/nus.nu" },
+  { os = "macos", target = "~/Library/Application Support/nushell/nus.nu" },
+]
+
+[dotfiles.nus-activate-use]
+source = "nusage/conf.d/nushell/autoload/nus.nu"
+mode = "symlink"
+variants = [
+  { os = "linux", target = "~/.config/nushell/autoload/nus.nu" },
+  { os = "macos", target = "~/Library/Application Support/nushell/autoload/nus.nu" },
+]
+
+# The build, copied where the root's `[env] _.path` looks for it, from the paths Cargo
+# reports: a build cache may keep the target directory elsewhere, and Cargo rewrites a
+# binary there whenever another of its commands relinks it, under a task that is running it.
+# The plugin is copied beside nusage, for `plugins` to register.
+# It runs at the root, the Cargo workspace's, where its outputs are: the task cache stores
+# only what is under a task's directory.
+[tasks.build]
+description = "Build the workspace and copy its CLI tools and plugin into the repository's bin directory"
+sources = ["@group:cargo-workspace", "crates/**/*"]
+outputs = [".bin/nus", ".bin/nu_plugin_nus", ".bin/openapi-usage"]
+run = '''
+let built = ^cargo build --workspace --locked --message-format json-render-diagnostics
+  | lines
+  | where ($it | str starts-with "{")
+  | each { from json }
+  | where reason == compiler-artifact and executable != null
+  | where $it.target.name in [nus openapi-usage] or ($it.target.name | str starts-with nu_plugin_)
+  | get executable
+let bin = "{{ config_root }}/.bin" | path expand
+mkdir $bin
+for exe in $built {
+    let copy = $bin | path join ($exe | path basename)
+    if ($copy | path type) == symlink {
+        rm $copy
+    }
+    # Beside it first, then in its place: a language server an editor started from the old
+    # copy keeps running it, where copying over it would fail as a busy file.
+    if not ($copy | path exists) or (open --raw $exe | hash sha256) != (open --raw $copy | hash sha256) {
+        let partial = $"($copy).partial"
+        cp $exe $partial
+        mv --force $partial $copy
+    }
+}
+'''
+
+# Registration is the user's: `plugin add` writes the plugin registry of the Nushell that
+# runs this, and a session then takes the plugin with `plugin use nus`. The plugin's
+# commands are the CLI's by its spec, so `nus validate` in a module is the plugin where
+# it is registered and the binary where it is not.
+[tasks.plugins]
+description = "Register the plugin built here with the Nushell on PATH, for `plugin use` in a session"
+depends = [":build"]
+run = '''
+for plugin in (glob ("{{ config_root }}/.bin/nu_plugin_*" | path expand)) {
+    plugin add $plugin
+    print $"registered ($plugin | path basename): `plugin use ($plugin | path basename | str replace nu_plugin_ '')`"
+}
+'''
+
+# The native Cargo projects own the checks; these select them by path.
+[tasks."test:crates"]
+description = "Test the workspace's discovered Cargo crates"
+depends = ["./crates/...:test"]
+
+[tasks.clippy]
+depends = ["./crates/...:clippy"]
+
+[tasks.docs]
+depends = ["./crates/...:docs"]
+
+[tasks.lint]
+file = ".mise/tasks/lint.nu"
+depends = [":clippy", ":docs"]
+
+# CI runs `check` once, on Linux, and this on each platform.
+[tasks."check:platform"]
+description = "The checks of nusage that each platform runs"
+depends = ["./crates/...:check:platform"]

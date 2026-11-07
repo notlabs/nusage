@@ -54,7 +54,7 @@ Install the tools with `mise install --monorepo`, and run tasks through `mise ex
 
 ```sh
 mise exec -- mise run '//catalog/...:check'
-mise exec -- mise run //nusage/crates/nusage-spec:check
+mise exec -- mise run //crates/nusage-spec:check
 ```
 
 The project graph and the tests' inputs are generated configuration.
@@ -97,7 +97,7 @@ The `nus` provider builds `nus`, `nu_plugin_nus` and `openapi-usage` into `.bin`
 A tool is no edge, so `--affected` selects the crates' checks for a change to the crates, not those of the projects that run `nus`; CI checks everything on main.
 
 Each crate's check runs its tests, Clippy, documentation checks, and upstream checks; the `nusage` crate's also holds `nus` to the fixtures.
-`//nusage:check` runs every crate's, and `//nusage:build` builds the distributed binaries.
+`//:check` runs every crate's, and `//:build` builds the distributed binaries.
 
 Mr Boxington manages build targets under the ignored `.cache/mbx-targets` directory.
 The repository's discovery exclusions, `target` among them, keep build artifacts out of the project graph.

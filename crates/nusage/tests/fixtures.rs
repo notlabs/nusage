@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn fixtures_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../nusage/fixtures")
 }
 
 /// The source of a fixture: its single `script.nu`, its `<bin>.usage.kdl` spec, or its `<bin>/` tree, where `<bin>` is the module's name.
