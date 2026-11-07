@@ -1,20 +1,19 @@
-# These tasks belong to the entry that includes this file.
+# These tasks belong to the entry that includes this file. The `nus` they run is the root's
+# `nus` provider's build, on PATH.
 [spec]
 file = "../../tasks/spec.nu"
-depends = ["^build"]
 env.NUS_CATALOG_ROOT = "{{config_root}}/.."
 
 [generate]
 file = "../../tasks/generate.nu"
-depends = ["^build"]
 env.NUS_CATALOG_ROOT = "{{config_root}}/.."
 
 [check]
 file = "../../tasks/check.nu"
-depends = ["^build", "^check"]
+depends = ["//:graph-current", "^check"]
 env.NUS_CATALOG_ROOT = "{{config_root}}/.."
 
 ["check:platform"]
 file = "../../tasks/check.nu"
-depends = ["^build", "^check:platform"]
+depends = ["//:graph-current", "^check:platform"]
 env.NUS_CATALOG_ROOT = "{{config_root}}/.."

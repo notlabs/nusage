@@ -1,8 +1,10 @@
 min_version = "2026.10.21"
 monorepo_root = true
 
+# The repository root is the project `nu:root`. Its shell autoload loads a file the user's
+# Nushell resolves; it names no file here.
 [_.nusage.project]
-depends_add = ["custom:catalog", "custom:catalog/lib/gh"]
+dynamic = ["nusage/conf.d/nushell/autoload/nus.nu"]
 
 [settings]
 # Task result caching uses Mise's experimental features.
@@ -11,24 +13,90 @@ experimental = true
 [monorepo]
 config_roots = ["[!.]*", "[!.]*/[!.]*", "[!.]*/[!.]*/[!.]*"]
 
-[deps.workspace-graph]
+# The project graph: `auto` providers run before `mise exec` and `mise run` when their sources
+# changed, but after `mise run` has resolved its tasks, so a run sees the graph its providers
+# wrote only from the next mise process: `mise exec -- mise run ...` is that process.
+# Analyzers write JSON under `.cache/graph`; `project-graph` alone writes configuration.
+# Each provider is `auto`: mise passes over a provider that is not, even one an `auto` one
+# depends on.
+[deps.go-workspace]
 auto = true
+description = "The ignored go.work over the workspace's Go modules"
+sources = [".mise/graph/common.nu", ".mise/graph/go-workspace.nu", "**/go.mod"]
+outputs = ["go.work"]
+run = "nu .mise/graph/go-workspace.nu"
+
+[deps.go-imports]
+auto = true
+description = "Imports between the workspace's Go modules"
+depends = ["go-workspace"]
 sources = [
+  ".mise/graph/common.nu",
+  ".mise/graph/go-imports.nu",
+  "go.work",
+  "**/go.mod",
+  "**/go.sum",
+  "**/*.go",
+]
+outputs = [".cache/graph/go.json"]
+run = "nu .mise/graph/go-imports.nu"
+
+[deps.nu-imports]
+auto = true
+description = "Loads, path constants and task calls in the workspace's Nushell"
+sources = [
+  ".mise/graph/common.nu",
+  ".mise/graph/nu-imports.nu",
+  "**/*.nu",
+  "**/*.tasks.toml",
+  "**/mise*.toml",
+  "**/.mise/conf.d/[!_]*.toml",
+  ".mise/conf.d/[!_]*.toml",
+]
+outputs = [".cache/graph/nu.json"]
+run = "nu .mise/graph/nu-imports.nu"
+
+# mise judges every provider's freshness before it runs any, so this one's sources include
+# what its analyzers read: a change they see makes it stale in the same pass.
+[deps.project-graph]
+auto = true
+description = "Projects named for their kind, typed edges, and Nushell test inputs"
+depends = ["go-imports", "nu-imports"]
+sources = [
+  ".mise/graph/common.nu",
+  ".mise/graph/project-graph.nu",
   ".miserc.toml",
   "**/mise*.toml",
   "**/*.tasks.toml",
   "**/.mise/conf.d/[!_]*.toml",
   ".mise/conf.d/[!_]*.toml",
-  ".mise/**/*.nu",
-  ".mise/**/*.tasks.toml",
   "**/Cargo.toml",
   "**/go.mod",
   "**/go.sum",
   "**/*.go",
   "**/*.nu",
+  ".cache/graph/go.json",
+  ".cache/graph/nu.json",
 ]
-outputs = ["go.work", ".mise/conf.d/_workspace-graph.toml"]
-run = "nu .mise/workspace-graph.nu"
+# The graph also fingerprints the `_nu-inputs.toml` fragments it writes beside suites.
+outputs = [".mise/conf.d/_project-graph.toml"]
+run = "nu .mise/graph/project-graph.nu"
+
+# The CLI tools the tasks run, on PATH through `.bin`: a tool the tasks need, not an edge of
+# the project graph. The build runs without providers, this one among them.
+[deps.nus]
+auto = true
+description = "The nus, nu_plugin_nus and openapi-usage builds in .bin"
+depends = ["project-graph"]
+sources = [
+  "Cargo.toml",
+  "Cargo.lock",
+  ".cargo/**",
+  ".mise/conf.d/rust.toml",
+  "nusage/crates/**",
+]
+outputs = [".bin/nus", ".bin/nu_plugin_nus", ".bin/openapi-usage"]
+run = "mise run --no-deps //nusage:build"
 
 [task_config]
 includes = [".mise/tasks", ".mise/lib/nu.tasks.toml"]
@@ -52,8 +120,9 @@ bin_path = "lib"
 [env]
 # Keep managed target links inside the discovery boundary; the object store remains shared.
 MBX_TARGET_ROOT = "{{config_root}}/.cache/mbx-targets"
-# Carry the exclusion into nested Mise invocations during graph preparation.
-MISE_IGNORED_CONFIG_PATHS = "{{env.MBX_TARGET_ROOT}}"
+# Carry `.miserc.toml`'s exclusions into nested mise invocations: the variable replaces the
+# file's list wherever it is set.
+MISE_IGNORED_CONFIG_PATHS = "{{env.MBX_TARGET_ROOT}}{% if os() == 'windows' %};{% else %}:{% endif %}{{config_root}}/target"
 _.path = ["{{config_root}}/.bin"]
 NU_LIB_DIRS = { value = "{{ tools['catalog-bootstrap'].path }}/lib", tools = true }
 
@@ -61,12 +130,21 @@ NU_LIB_DIRS = { value = "{{ tools['catalog-bootstrap'].path }}/lib", tools = tru
 description = "The root's own checks"
 depends = [":lint", ":check-pr-status", ":test"]
 
+# Tasks that resolve through the generated graph or inputs depend on this: a `mise run` that
+# resolved them from configuration its providers then rewrote fails here, before they run.
+[tasks.graph-current]
+description = "Fail when this mise process resolved its tasks from a project graph since rewritten"
+hide = true
+env.NUS_LOADED_GRAPH = "{{ vars.project_graph | default(value='') }}"
+run = "nu .mise/graph/current.nu"
+
 [tools."http:nutest"]
 version = "1.2.0"
 url = "https://github.com/vyadh/nutest/releases/download/v1.2.0/nutest-1.2.0.zip"
 strip_components = 1
 bin_path = "."
 
+# Beside what the suites load, the configuration they copy into their scratch workspaces.
 [tasks.test]
 dir = ".mise"
 sources = [

@@ -1,6 +1,3 @@
-[_.nusage.project]
-depends_add = ["custom:catalog"]
-
 [_.nusage.catalog]
 spec = { clap = "spec" }
 version = "0.2.0"

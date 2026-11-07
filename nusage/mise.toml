@@ -91,32 +91,26 @@ for plugin in (glob ("{{ config_root }}/../.bin/nu_plugin_*" | path expand)) {
 }
 '''
 
-# The native Cargo projects own the checks; these are workspace selectors.
+# The native Cargo projects own the checks; these select them by path. This root is no
+# project, so `^` dependencies would resolve to nothing here.
 [tasks.test]
 description = "Test the workspace's discovered Cargo crates"
-depends = ["^test"]
+depends = ["./crates/...:test"]
 
 [tasks.clippy]
-depends = ["^clippy"]
+depends = ["./crates/...:clippy"]
 
 [tasks.docs]
-depends = ["^docs"]
+depends = ["./crates/...:docs"]
 
 [tasks.lint]
 depends = [":clippy", ":docs"]
 
-[tasks.verify-fixtures]
-description = "Hold nusage to its fixtures"
-depends = [":build"]
-sources = ["fixtures/**/*"]
-outputs = []
-file = "fixtures/verify.nu"
-
 [tasks.check]
 description = "Every check of nusage"
-depends = ["^check", ":verify-fixtures"]
+depends = ["./crates/...:check"]
 
 # CI runs `check` once, on Linux, and this on each platform.
 [tasks."check:platform"]
 description = "The checks of nusage that each platform runs"
-depends = ["^check:platform", ":verify-fixtures"]
+depends = ["./crates/...:check:platform"]

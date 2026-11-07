@@ -1,6 +1,5 @@
 #!/usr/bin/env nus
 #MISE description="Hold the tree to what `jj fix` writes for it and to what its linters accept"
-#MISE depends=["^build"]
 #MISE output="interleave"
 use ../lib/actions.nu *
 

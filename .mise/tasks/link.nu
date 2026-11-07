@@ -1,7 +1,7 @@
 #!/usr/bin/env nus
 #USAGE arg "<project>" help="A project whose mise config names notlabs/nusage tools"
 #MISE description="Install this checkout's builds into mise as the nusage versions a project names"
-#MISE depends=["^build", "^pack"]
+#MISE depends=["//catalog:pack"]
 # For each tool of this repository the project's config names, `mise link` installs this
 # checkout's build under the version the project asks for: `github:notlabs/nusage` is the
 # built `nus`, and `packslip:github.com/notlabs/nusage/catalog/<tool>` the package

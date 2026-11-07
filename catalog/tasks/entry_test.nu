@@ -41,9 +41,9 @@ assert equal ($selected | length) 1
                 monorepo: {
                     config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]
                     projects: {
-                        "custom:producer": {root: producer}
-                        "custom:alpha": {root: "catalog/lib/alpha", depends_add: [custom:producer]}
-                        "custom:beta": {root: "catalog/lib/beta", depends_add: [custom:producer]}
+                        "gen:producer": {root: producer}
+                        "catalog:alpha": {root: "catalog/lib/alpha", depends_add: [gen:producer]}
+                        "catalog:beta": {root: "catalog/lib/beta", depends_add: [gen:producer]}
                     }
                 }
                 settings: {experimental: true}
@@ -51,6 +51,8 @@ assert equal ($selected | length) 1
                     NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep))
                     GRAPH_LOG: ($scratch | path join events)
                 }
+                # The entry checks hold their graph to the one on disk through the root's guard.
+                tasks: {graph-current: {run: "true"}}
             } | to toml | save mise.toml
             {tasks: {
                 build: {run: 'echo build >> "$GRAPH_LOG.providers"'}
@@ -78,7 +80,8 @@ assert equal ($selected | length) 1
                 assert equal $event.cwd ($scratch | path join catalog lib $event.entry)
                 assert equal $event.catalog ($scratch | path join catalog)
             }
-            assert equal (open --raw events.providers | lines) [build build build check build platform build check]
+            # Only the checks run upstream tasks: the entry's own spec and generate need none.
+            assert equal (open --raw events.providers | lines) [build check build platform build check]
         }
         null
     } catch {|err| $err}

@@ -1,28 +1,30 @@
-# Cargo selects the package in the including project's working directory.
+# Cargo selects the package in the including project's working directory. `^` dependencies
+# resolve through the generated project graph, which `//:graph-current` holds to the one on
+# disk.
 [test]
 description = "Test this crate and its upstream crates"
-depends = ["^test"]
+depends = ["//:graph-current", "^test"]
 sources = ["**/*", "@group:cargo-workspace"]
 outputs = []
 run = "cargo test --locked"
 
 [clippy]
 description = "Clippy for this crate's targets and its upstream crates"
-depends = ["^clippy"]
+depends = ["//:graph-current", "^clippy"]
 sources = ["**/*", "@group:cargo-workspace"]
 outputs = []
 run = "cargo clippy --quiet --all-targets --locked -- -D warnings"
 
 [docs]
 description = "Build this crate's documentation without warnings"
-depends = ["^docs"]
+depends = ["//:graph-current", "^docs"]
 sources = ["**/*", "@group:cargo-workspace"]
 outputs = []
 env.RUSTDOCFLAGS = "-D warnings"
 run = "cargo doc --quiet --no-deps --locked"
 
 [check]
-depends = ["^check", ":test", ":clippy", ":docs"]
+depends = ["//:graph-current", "^check", ":test", ":clippy", ":docs"]
 
 ["check:platform"]
-depends = ["^check:platform", ":test", ":clippy"]
+depends = ["//:graph-current", "^check:platform", ":test", ":clippy"]

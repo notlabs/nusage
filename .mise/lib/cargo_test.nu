@@ -41,6 +41,8 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
                     _: {path: ($env.PATH | prepend ($scratch | path join .bin))}
                     GRAPH_LOG: ($scratch | path join events)
                 }
+                # The shared tasks hold their graph to the one on disk through the root's guard.
+                tasks: {graph-current: {run: "true"}}
             } | to toml | save mise.toml
             {workspace: {members: ["nusage/crates/*"], resolver: "2"}} | to toml | save Cargo.toml
             mkdir nusage

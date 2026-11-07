@@ -1,2 +1,5 @@
-# Read before project config: build artifacts must not become discovered projects.
-ignored_config_paths = [".cache/mbx-targets"]
+# Read before project config: build artifacts must not become discovered projects. `target`
+# holds real configs after `cargo package` copies a crate to `target/package/<crate>`.
+# MISE_IGNORED_CONFIG_PATHS replaces this list where it is set; the root's `[env]` sets it to
+# the same paths for nested mise invocations.
+ignored_config_paths = [".cache/mbx-targets", "target"]

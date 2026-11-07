@@ -1,6 +1,9 @@
+# The suites, and what they load, are the generated `nu-test` input group of the including
+# config root; what they read otherwise, its own `sources` add.
 [test]
 description = "Run this project's co-located Nutest suites"
-sources = ["**/*.nu", "**/*.toml"]
+depends = ["//:graph-current"]
+sources = ["@group:nu-test"]
 outputs = []
 cache = { enabled = true }
 usage = '''
