@@ -36,9 +36,11 @@ def deepest [path: string]: list<any> -> any {
     $in | where {|p| within $path $p.root } | sort-by {|p| depth $p.root } | last
 }
 
-# The file, and the line the text first appears on, for an edge's source.
+# The file, and the line outside comments the text first appears on, for an edge's source.
 def located [root: string, file: string, text: string]: nothing -> string {
-    let found = open --raw ($root | path join $file) | lines | enumerate | where {|l| $l.item | str contains $text } | get -o 0.index
+    let found = open --raw ($root | path join $file) | lines | enumerate | where {|l|
+        not ($l.item | str trim | str starts-with "#") and ($l.item | str contains $text)
+    } | get -o 0.index
     if $found == null { $file } else { $"($file):($found + 1)" }
 }
 
