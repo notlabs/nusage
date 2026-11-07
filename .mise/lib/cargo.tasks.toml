@@ -2,21 +2,21 @@
 [test]
 description = "Test this crate and its upstream crates"
 depends = ["^test"]
-sources = ["**/*"]
+sources = ["**/*", "@group:cargo-workspace"]
 outputs = []
 run = "cargo test --locked"
 
 [clippy]
 description = "Clippy for this crate's targets and its upstream crates"
 depends = ["^clippy"]
-sources = ["**/*"]
+sources = ["**/*", "@group:cargo-workspace"]
 outputs = []
 run = "cargo clippy --quiet --all-targets --locked -- -D warnings"
 
 [docs]
 description = "Build this crate's documentation without warnings"
 depends = ["^docs"]
-sources = ["**/*"]
+sources = ["**/*", "@group:cargo-workspace"]
 outputs = []
 env.RUSTDOCFLAGS = "-D warnings"
 run = "cargo doc --quiet --no-deps --locked"

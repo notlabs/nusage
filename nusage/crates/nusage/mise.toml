@@ -2,4 +2,10 @@
 includes = ["../../../.mise/lib/cargo.tasks.toml"]
 
 [tasks.test]
+sources = ["../../fixtures/**/*", "../../schemas/inspection.schema.json"]
+outputs = []
 env.NUS_CORPUS = "{{ tools['usage-source'].path }}/corpus"
+
+[tasks.clippy]
+sources = ["../../schemas/inspection.schema.json"]
+outputs = []

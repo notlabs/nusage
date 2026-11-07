@@ -11,7 +11,10 @@ def --wrapped checked [...args: string] {
 }
 
 @test
-def "shared Cargo tasks follow native crate edges without checking peers" [] {
+def "shared Cargo tasks follow native edges and scope cached inputs to their consumers" [] {
+    let project = $tasks | path dirname | path dirname | path dirname
+    let rust = open ($project | path join nusage mise.toml) | get task_config
+    let cli = open ($project | path join nusage crates nusage mise.toml)
     let scratch = mktemp -d | path expand
     let result = try {
         mkdir ($scratch | path join .bin) ($scratch | path join .mise lib)
@@ -40,12 +43,25 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
                 }
             } | to toml | save mise.toml
             {workspace: {members: ["nusage/crates/*"], resolver: "2"}} | to toml | save Cargo.toml
+            mkdir nusage
+            {task_config: $rust} | to toml | save nusage/mise.toml
+            "version = 4\n" | save Cargo.lock
+            mkdir nusage/fixtures nusage/schemas
+            "# fixture\n" | save nusage/fixtures/example.nu
+            "{}\n" | save nusage/schemas/inspection.schema.json
             for name in [a b c] {
                 let dir = $scratch | path join nusage crates $name
                 mkdir ($dir | path join src)
                 {package: {name: $name, version: "0.1.0"}} | to toml | save ($dir | path join Cargo.toml)
                 "" | save ($dir | path join src lib.rs)
-                {task_config: {includes: ["../../../.mise/lib/cargo.tasks.toml"]}} | to toml | save ($dir | path join mise.toml)
+                mut config = {task_config: {includes: ["../../../.mise/lib/cargo.tasks.toml"]}}
+                if $name == a {
+                    $config = $config | merge {tasks: {
+                        test: {sources: $cli.tasks.test.sources, outputs: $cli.tasks.test.outputs}
+                        clippy: {sources: $cli.tasks.clippy.sources, outputs: $cli.tasks.clippy.outputs}
+                    }}
+                }
+                $config | to toml | save ($dir | path join mise.toml)
             }
             '\n[dependencies]\nb = {path = "../b"}\n' | str replace --all '\n' (char nl) | save --append nusage/crates/a/Cargo.toml
             checked mise run --force //nusage/crates/a:check | ignore
@@ -58,6 +74,51 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
             checked mise run --force //nusage/crates/a:check:platform | ignore
             assert equal (open --raw events | lines | sort) [a:clippy a:test b:clippy b:test]
             assert equal (mise tasks graph | get projects | where id == cargo:a | get dependencies.0) [cargo:b]
+            rm events
+
+            # A warm run reuses all three checks.
+            checked mise run //nusage/crates/a:check | ignore
+            assert not ("events" | path exists)
+
+            # Fixture changes rerun only the CLI's tests.
+            "# changed fixture\n" | save --append nusage/fixtures/example.nu
+            checked mise run //nusage/crates/a:check | ignore
+            assert equal (open --raw events | lines) [a:test]
+            rm events
+
+            # The schema is compiled into the CLI's tests, also checked by Clippy.
+            " \n" | save --append nusage/schemas/inspection.schema.json
+            checked mise run //nusage/crates/a:check | ignore
+            assert equal (open --raw events | lines | sort) [a:clippy a:test]
+            rm events
+
+            # Native upstream edges carry invalidation into the consumer's cache key.
+            "// changed upstream\n" | save --append nusage/crates/b/src/lib.rs
+            checked mise run //nusage/crates/a:check | ignore
+            assert equal (open --raw events | lines | sort) [a:clippy a:doc a:test b:clippy b:doc b:test]
+            rm events
+
+            # Workspace lockfiles and Cargo configuration are shared Rust inputs.
+            "# changed resolution\n" | save --append Cargo.lock
+            checked mise run //nusage/crates/a:check | ignore
+            assert equal (open --raw events | lines | sort) [a:clippy a:doc a:test b:clippy b:doc b:test]
+            rm events
+            mkdir .cargo
+            "[build]\njobs = 1\n" | save .cargo/config.toml
+            checked mise run //nusage/crates/a:check | ignore
+            assert equal (open --raw events | lines | sort) [a:clippy a:doc a:test b:clippy b:doc b:test]
+            rm events
+
+            # Unrelated workflows do not invalidate cached checks.
+            mkdir .github/workflows
+            "name: release\n" | save .github/workflows/release.yml
+            checked mise run //nusage/crates/a:check | ignore
+            assert not ("events" | path exists)
+
+            # Included task definitions are tracked automatically.
+            "# changed definition\n" | save --append .mise/lib/cargo.tasks.toml
+            checked mise run //nusage/crates/a:check | ignore
+            assert equal (open --raw events | lines | sort) [a:clippy a:doc a:test b:clippy b:doc b:test]
         }
         null
     } catch {|err| $err}

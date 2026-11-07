@@ -51,18 +51,11 @@ A shell that starts with mise's environment already set has it taken out first; 
 
 ## Development
 
-The tools install with `mise install --monorepo`.
-The CLI tasks run through the `nus` built in the checkout.
-Plain Nu infrastructure uses the public Mise module from the checksum-locked catalog 0.1.0.
-This bootstrap dependency lets graph preparation and catalog tooling use structured Mise commands before building the next release, without a source-project dependency cycle.
-The assembled task catalog bundles that module for consumers outside this repository.
+Install the tools with `mise install --monorepo`.
+Infrastructure tasks use the released Mise module pinned by the repository configuration.
 
-Mise discovers config roots one to three directories below the repository root.
-`[deps.workspace-graph]` prepares an ignored `go.work` with Go's recursive module discovery over non-hidden source directories and an ignored `.mise/conf.d/_workspace-graph.toml` supplement.
-Cargo projects and edges stay native; the supplement adds Go import edges and projects for discovered config roots, including projects with no tasks.
-A config root also depends on native projects beneath it or selected by a task's `dir`.
-
-Dependencies that are not described by language metadata belong to the consuming project's existing config:
+Mise discovers project configs one to three directories below the repository root.
+The workspace-graph provider supplements native Cargo dependencies with Go import edges and dependencies declared in each consuming project's config:
 
 ```toml
 # catalog/lib/jj/mise.toml
@@ -70,35 +63,29 @@ Dependencies that are not described by language metadata belong to the consuming
 depends_add = ["custom:catalog"]
 ```
 
-Custom IDs are `custom:<relative config root>` (`custom:root` for the repository root); native Cargo and Go IDs are preserved.
-Local `depends_add` declarations, including those in active config fragments, extend the graph without replacing native edges.
-There is no producer-side consumer inventory.
-Project-local config changes affect their owning project and its consumers; root shared configuration remains a global input.
-Task prerequisites consume this graph: `^build`, `^check`, or `^check:platform` select the corresponding upstream tasks; `:task` selects a local prerequisite.
+Custom project IDs use `custom:<relative config root>`, with `custom:root` for the repository root.
+Cargo and Go retain their native IDs.
+Tasks use `^build`, `^check`, and `^check:platform` for upstream prerequisites and `:task` for local prerequisites.
 
-Prepare the graph before task dependencies or affected projects are resolved:
+Use an outer `mise exec` to refresh the graph before the inner `run` resolves task dependencies:
 
 ```sh
 mise exec -- mise run '//catalog/...:check'
-mise exec -- mise run --affected --affected-base main '//...:check'
+mise exec -- mise run //nusage/crates/nusage-spec:check
 ```
 
-The outer `exec` refreshes stale providers; the inner `run` reads the updated graph before resolving its prerequisites.
-For inspection, use `mise deps install workspace-graph` followed by `mise tasks graph --json` or `mise tasks deps`.
-The graph preparation runs in plain Nu and Go and does not build `nus`.
-Included `*.tasks.toml` files participate in provider freshness.
-The generated fragment's `_` prefix keeps it outside the provider's configuration inputs.
-Go edges follow the current Go build context, including test imports; after changing build-context environment variables, refresh explicitly with `mise deps install workspace-graph`.
+Each crate's check runs its tests, Clippy, documentation checks, and upstream checks.
+`//nusage:check` checks all crates and verifies the shared fixtures; `//nusage:build` builds the distributed binaries.
 
-Each Cargo crate includes the shared test, Clippy, documentation and check tasks from `.mise/lib/cargo.tasks.toml`.
-For example, `mise exec -- mise run //nusage/crates/nusage-spec:check` checks that crate and its native Cargo upstream projects.
-`//nusage:build` assembles the distributed binaries; `//nusage:check` selects all crate checks and verifies the shared fixtures.
-The `custom:nusage` aggregate and the native `cargo:nusage` crate are distinct projects.
+To inspect the graph, run `mise deps install workspace-graph`, then `mise tasks graph --json` or `mise tasks deps`.
+Go edges reflect the current build context; refresh the provider explicitly after changing build-context environment variables.
 
-The repository sets `MBX_TARGET_ROOT` to ignored `.cache/mbx-targets` inside the checkout for local builds and CI.
-The early `.miserc.toml` exclusion keeps artifact configuration out of discovery through the public `target` links.
-Managed check lanes and the shared object store remain enabled.
-In an existing checkout, after active builds finish, the next Cargo build through Mise moves each workspace's managed target to this root and updates its link.
+Mr Boxington manages build targets under the ignored `.cache/mbx-targets` directory.
+The repository's discovery exclusions keep build artifacts out of the project graph.
 
-Infrastructure tests are co-located `*_test.nu` suites discovered by the pinned Nutest module; `mise exec -- mise run //:test` and `mise exec -- mise run //catalog:test` run them without building `nus`.
-The graph fixture verifies actual caret execution, cold preparation, platform checks, native edges, project add/move/remove, affected selection, and failures before consumer execution.
+Infrastructure tests are co-located `*_test.nu` suites run by Nutest:
+
+```sh
+mise exec -- mise run //:test
+mise exec -- mise run //catalog:test
+```

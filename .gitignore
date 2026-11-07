@@ -8,4 +8,4 @@ target/
 
 /go.work
 /go.work.sum
-/.mise/conf.d/_workspace-graph.toml
+/.mise/conf.d/_*.toml

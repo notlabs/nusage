@@ -51,7 +51,7 @@ exit 99
                 monorepo_root: true
                 monorepo: {config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]}
                 settings: {experimental: true}
-                task_config: {cache: {enabled: false}, global_inputs: (open ($generator | path dirname | path dirname | path join mise.toml) | get task_config.global_inputs)}
+                task_config: {cache: {enabled: false}}
                 env: {NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep)), _: {path: ($env.PATH | prepend ($scratch | path join bin))}, GRAPH_LOG: ($scratch | path join events)}
                 _: {nusage: {project: {depends_add: ["custom:bridge"]}}}
                 deps: {workspace-graph: ($provider | update run $'nu "($generator)" && echo prepared >> provider-runs')}
@@ -156,7 +156,7 @@ func Value() int { return b.Value() }
             # Select affected checks in this fixture, independently of the real repo layout.
             'go.work
 go.work.sum
-.mise/conf.d/_workspace-graph.toml
+.mise/conf.d/_*.toml
 provider-runs
 events*
 cache/
@@ -182,14 +182,15 @@ config/
             let local = checked mise exec -- mise run --affected --affected-base $local_base --affected-head HEAD --affected-committed --affected-json //...:check
                 | from json | get tasks | get name | sort
             assert equal $local [//consumer:check]
-            let shared_base = checked git rev-parse HEAD
-            mkdir .cargo
-            "" | save .cargo/config.toml
-            checked git add .cargo/config.toml | ignore
-            checked git -c commit.gpgsign=false commit --quiet --message shared | ignore
-            let shared = checked mise exec -- mise run --affected --affected-base $shared_base --affected-head HEAD --affected-committed --affected-json //...:check
+            # CI configuration belongs to the root; it must not select unrelated checks.
+            let workflow_base = checked git rev-parse HEAD
+            mkdir .github/workflows
+            "name: release\non: workflow_dispatch\njobs: {}\n" | save .github/workflows/release.yml
+            checked git add .github/workflows/release.yml | ignore
+            checked git -c commit.gpgsign=false commit --quiet --message workflow | ignore
+            let workflow = checked mise exec -- mise run --affected --affected-base $workflow_base --affected-head HEAD --affected-committed --affected-json //...:check
                 | from json | get tasks | get name | sort
-            assert equal $shared [//consumer:check //newcomer:check //services/a:check //services/b:check]
+            assert equal $workflow []
             mv newcomer moved
             checked mise exec -- "true" | ignore
             assert not (graph | any {|p| $p.id == custom:newcomer})

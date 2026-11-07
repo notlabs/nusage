@@ -5,7 +5,7 @@ monorepo_root = true
 depends_add = ["custom:catalog", "custom:catalog/lib/gh"]
 
 [settings]
-# Native global task inputs are gated in the pinned mise version, as is the task cache.
+# Task result caching uses Mise's experimental features.
 experimental = true
 
 [monorepo]
@@ -32,20 +32,6 @@ run = "nu .mise/workspace-graph.nu"
 
 [task_config]
 includes = [".mise/tasks", ".mise/lib/nu.tasks.toml"]
-# Shared configuration and infrastructure affect inherited tools and task behavior.
-global_inputs = [
-  ".miserc.toml",
-  "mise*.toml",
-  "mise.lock",
-  "jj.toml",
-  "Cargo.lock",
-  "Cargo.toml",
-  # Basename patterns also match descendants. Keep project-local files out.
-  "!*/**",
-  ".mise/**",
-  ".cargo/**",
-  ".github/**",
-]
 # A task that declares what it reads, and what it writes or that it writes nothing, keeps
 # its result in mise's task cache.
 cache = { enabled = true }
@@ -83,3 +69,17 @@ bin_path = "."
 
 [tasks.test]
 dir = ".mise"
+sources = [
+  "../mise.toml",
+  "../.miserc.toml",
+  "../nusage/mise.toml",
+  "../nusage/crates/nusage/mise.toml",
+]
+outputs = []
+cache = { enabled = true, command_inputs = [
+  "mise --version",
+], env = [
+  "GOOS",
+  "GOARCH",
+  "GOFLAGS",
+] }

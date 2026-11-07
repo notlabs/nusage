@@ -65,3 +65,5 @@ includes = ["../.mise/lib/nu.tasks.toml"]
 
 [tasks.test]
 dir = "tasks"
+outputs = []
+cache = { enabled = true, command_inputs = ["mise --version"] }

@@ -30,15 +30,6 @@ variants = [
 
 [task_config]
 cascade = true
-# Shared Rust test data and workspace configuration apply to every crate's checks.
-global_inputs = [
-  "mise.toml",
-  "fixtures/**/*",
-  "schemas/**/*",
-  "../Cargo.toml",
-  "../Cargo.lock",
-  "../.mise/lib/cargo.tasks.toml",
-]
 shell = "nu -c"
 # A cached result is also keyed by the variables that change what Cargo builds.
 cache = { enabled = true, env = [
@@ -46,6 +37,9 @@ cache = { enabled = true, env = [
   "CARGO_INCREMENTAL",
   "RUSTFLAGS",
 ] }
+
+[task_config.input_groups]
+cargo-workspace = ["../Cargo.toml", "../Cargo.lock", "../.cargo/**"]
 
 # The build, copied where the root's `[env] _.path` looks for it, from the paths Cargo
 # reports: a build cache may keep the target directory elsewhere, and Cargo rewrites a
@@ -56,7 +50,7 @@ cache = { enabled = true, env = [
 [tasks.build]
 description = "Build the workspace and copy its CLI tools and plugin into the repository's bin directory"
 dir = "{{ config_root }}/.."
-sources = ["Cargo.toml", "Cargo.lock", "nusage/crates/**/*"]
+sources = ["@group:cargo-workspace", "nusage/crates/**/*"]
 outputs = [".bin/nus", ".bin/nu_plugin_nus", ".bin/openapi-usage"]
 run = '''
 let built = ^cargo build --workspace --locked --message-format json-render-diagnostics

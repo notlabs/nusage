@@ -1,16 +1,8 @@
 [test]
 description = "Run this project's co-located Nutest suites"
-sources = ["**/*.nu", "**/*.toml", "../mise.toml", "../mise.lock"]
+sources = ["**/*.nu", "**/*.toml"]
 outputs = []
-cache = { enabled = true, command_inputs = [
-  "mise --version",
-  "go version",
-  "nu --version",
-], env = [
-  "GOOS",
-  "GOARCH",
-  "GOFLAGS",
-] }
+cache = { enabled = true }
 usage = '''
 flag "--match-suites <pattern>" default=".*" help="Regex selecting discovered suites"
 flag "--match-tests <pattern>" default=".*" help="Regex selecting tests"
