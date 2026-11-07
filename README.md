@@ -23,7 +23,7 @@ A script's spec is its `#USAGE` header, or the hidden `.<filename>.usage.kdl` be
 `include` paths resolve against that file, and `mount` adds the spec its command prints.
 Type annotations such as `arg (int)"<n>"` are kept from the header and the sidecar, not from included or mounted specs, where the value stays a string.
 
-`nus inspect script.nu | from json` gives the calls the analyzer resolves and its findings without running the script, as `nusage/schemas/inspection.schema.json` describes.
+`nus inspect script.nu | from json` gives the calls the analyzer resolves and its findings without running the script, as `crates/nusage/schemas/inspection.schema.json` describes.
 
 ## Editors
 

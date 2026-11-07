@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 /// Paths are absolute, as they are in the analysis; spans are zero-based, end-exclusive UTF-8 byte offsets in the caller.
 /// Calls list resolved command shadows, not every call occurrence or a complete dependency graph.
 /// Header, package and call findings are data, even when incomplete; failure to read the script or a missing nusage shebang is an error.
-/// The wire shape is documented by `nusage/schemas/inspection.schema.json`.
+/// The wire shape is documented by `crates/nusage/schemas/inspection.schema.json`.
 pub fn inspect(script: &Path) -> Result<Value, Diagnostic> {
     let script =
         std::path::absolute(script).map_err(|err| Diagnostic::new(script, err.to_string()))?;

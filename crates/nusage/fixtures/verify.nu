@@ -416,9 +416,10 @@ def check-signatures [
 }
 
 const root = path self | path dirname
-# The nus to check: by default the one `//nusage:build` copies into `.bin`.
+# The nus to check: by default the one `//:build` copies into `.bin`.
 $env.NUS_BIN = $env.NUS_BIN? | default (
     $root
+    | path dirname
     | path dirname
     | path dirname
     | path join .bin nus

@@ -47,9 +47,9 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
             } | to toml | save mise.toml
             {workspace: {members: ["crates/*"], resolver: "2"}} | to toml | save Cargo.toml
             "version = 4\n" | save Cargo.lock
-            mkdir nusage/fixtures nusage/schemas
-            "# fixture\n" | save nusage/fixtures/example.nu
-            "{}\n" | save nusage/schemas/inspection.schema.json
+            mkdir crates/a/fixtures crates/a/schemas
+            "# fixture\n" | save crates/a/fixtures/example.nu
+            "{}\n" | save crates/a/schemas/inspection.schema.json
             for name in [a b c] {
                 let dir = $scratch | path join crates $name
                 mkdir ($dir | path join src)
@@ -82,13 +82,13 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
             assert not ("events" | path exists)
 
             # Fixture changes rerun only the CLI's tests.
-            "# changed fixture\n" | save --append nusage/fixtures/example.nu
+            "# changed fixture\n" | save --append crates/a/fixtures/example.nu
             checked mise run //crates/a:check | ignore
             assert equal (open --raw events | lines) [a:test]
             rm events
 
             # The schema is compiled into the CLI's tests, also checked by Clippy.
-            " \n" | save --append nusage/schemas/inspection.schema.json
+            " \n" | save --append crates/a/schemas/inspection.schema.json
             checked mise run //crates/a:check | ignore
             assert equal (open --raw events | lines | sort) [a:clippy a:test]
             rm events

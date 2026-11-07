@@ -6,7 +6,7 @@ use nu_protocol::engine::StateWorkingSet;
 use nu_protocol::{Span, Value};
 
 fn caller() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/script-calls/script.nu")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/script-calls/script.nu")
 }
 
 /// The script with the prelude in place of its first line, as Nushell's parser reads it: what it rejects, in the order it says so.
@@ -71,7 +71,7 @@ fn a_call_is_held_to_the_called_scripts_header() {
 
 #[test]
 fn only_a_script_nusage_runs_has_one() {
-    let callee = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/script-calls");
+    let callee = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/script-calls");
     assert!(nusage::prelude(&callee.join("callee.nu")).is_ok());
     let err = nusage::prelude(&callee.join("expected/caller.nu")).unwrap_err();
     assert!(err.to_string().contains("shebang"), "{err}");

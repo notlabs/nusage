@@ -1,5 +1,0 @@
-# The project `fixtures:nusage`: the cases nusage is held to. The crates that read them
-# declare it, so a change here selects them.
-[_.nusage.project]
-kind = "fixtures"
-name = "nusage"

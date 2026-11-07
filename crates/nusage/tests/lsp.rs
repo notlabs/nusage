@@ -12,7 +12,7 @@ use serde_json::{Value as Json, json};
 
 fn caller() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../fixtures/script-calls/script.nu")
+        .join("fixtures/script-calls/script.nu")
         .canonicalize()
         .unwrap()
 }

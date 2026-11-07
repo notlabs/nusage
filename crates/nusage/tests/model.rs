@@ -6,7 +6,7 @@ use std::process::Command;
 use nu_protocol::{Span, Value};
 
 fn fixtures() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures")
 }
 
 fn model(args: &[&str]) -> Value {

@@ -80,7 +80,7 @@ fn run(url: &str, code: &str) -> Option<std::process::Output> {
         return None;
     }
     let module = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../fixtures/http-petstore/expected/petstore.nu")
+        .join("fixtures/http-petstore/expected/petstore.nu")
         .canonicalize()
         .unwrap();
     let script = format!("use {} *\n{code}", nuon_string(&module.to_string_lossy()));
