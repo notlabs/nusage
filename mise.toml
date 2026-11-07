@@ -4,7 +4,7 @@ monorepo_root = true
 # The repository root is the project `nu:root`. Its shell autoload loads a file the user's
 # Nushell resolves; it names no file here.
 [_.nusage.project]
-dynamic = ["nusage/conf.d/nushell/autoload/nus.nu"]
+dynamic = ["share/nushell/autoload/nus.nu"]
 
 [settings]
 # Task result caching uses Mise's experimental features.
@@ -176,9 +176,9 @@ cache = { enabled = true, command_inputs = [
 # The released nusage for this user: fragments of the global mise config that
 # `mise dot apply` links into place.
 [dotfiles]
-"~/.config/mise/conf.d/nusage.toml" = { source = "nusage/conf.d/nusage.toml", mode = "symlink" }
-"~/.config/mise/conf.d/nusage/mise.nus-lsp.toml" = { source = "nusage/conf.d/nusage/mise.nus-lsp.toml", mode = "symlink" }
-"~/.config/mise/conf.d/nusage/mise.nus-kakehashi.toml" = { source = "nusage/conf.d/nusage/mise.nus-kakehashi.toml", mode = "symlink" }
+"~/.config/mise/conf.d/nusage.toml" = { source = "share/nusage.toml", mode = "symlink" }
+"~/.config/mise/conf.d/nusage/mise.nus-lsp.toml" = { source = "share/nusage/mise.nus-lsp.toml", mode = "symlink" }
+"~/.config/mise/conf.d/nusage/mise.nus-kakehashi.toml" = { source = "share/nusage/mise.nus-kakehashi.toml", mode = "symlink" }
 
 # nusage's activation for Nushell, in place of `mise activate nu`, beside Nushell's
 # configuration on each system, and an autoloaded file that uses it as `config.nu` would, so
@@ -192,7 +192,7 @@ variants = [
 ]
 
 [dotfiles.nus-activate-use]
-source = "nusage/conf.d/nushell/autoload/nus.nu"
+source = "share/nushell/autoload/nus.nu"
 mode = "symlink"
 variants = [
   { os = "linux", target = "~/.config/nushell/autoload/nus.nu" },

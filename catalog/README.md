@@ -8,7 +8,7 @@ Each entry with a `version` is released as the packslip package `github.com/notl
 A project installs the packages it uses, pins the tools they wrap at those versions, and includes nusage's fragment:
 
 ```toml
-include = ["git::https://github.com/notlabs/nusage.git//nusage/conf.d/nus.toml?ref=v<nusage>"]
+include = ["git::https://github.com/notlabs/nusage.git//share/nus.toml?ref=v<nusage>"]
 
 [tools]
 "github:notlabs/nusage" = { version = "<nusage>", version_prefix = "v" }
