@@ -221,7 +221,7 @@ jobs:
         env:
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          mise exec -- nu catalog/tasks/release.nu catalog/dist/packages/packages.json \
+          mise exec -- nu catalog/lib/release.nu catalog/dist/packages/packages.json \
             --repo "$GITHUB_REPOSITORY" --commit "$SOURCE_SHA"
 
   # Sign each released package. This job reads the release and cannot change it.

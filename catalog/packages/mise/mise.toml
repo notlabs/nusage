@@ -1,0 +1,11 @@
+# The generated module wraps `mise run` for its callers; it names no task of its own.
+[_.nusage.project]
+dynamic = ["mod.nu"]
+
+[_.nusage.catalog]
+spec = { run = "mise usage" }
+switch = { flag = "--json", framing = "json" }
+version = "0.2.0"
+
+[task_config]
+includes = ["../package.tasks.toml"]
