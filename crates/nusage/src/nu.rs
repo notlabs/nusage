@@ -224,7 +224,7 @@ mod tests {
     fn the_spec_is_nushells_own() {
         let spec: usage::Spec = SPEC.parse().unwrap();
         let lock = std::fs::read_to_string(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Cargo.lock"),
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.lock"),
         )
         .unwrap();
         let crates = lock

@@ -3,8 +3,8 @@
 Typed Nushell commands from usage-annotated scripts, and typed wrappers from the usage specs of binaries and services.
 The command is `nus`, and so is the shebang, `#!/usr/bin/env nus`. Early development.
 
-- `nusage/`: `nus` and its crates; `nus --help` for the CLI, and each crate's documentation, `cargo doc --workspace --no-deps`, for what it is.
-- `catalog/`: a generated module package per tool under `catalog/lib/`, each released as `packslip:github.com/notlabs/nusage/catalog/<tool>`.
+- `crates/`: `nus` and its crates; `nus --help` for the CLI, and each crate's documentation, `cargo doc --workspace --no-deps`, for what it is.
+- `catalog/`: a generated module package per tool under `catalog/packages/`, each released as `packslip:github.com/notlabs/nusage/catalog/<tool>`.
 - `mergiraf/`: Mergiraf, the structural merge tool `jj resolve` runs here, built with patches that teach it Nushell.
 
 ## Scripts
@@ -28,7 +28,7 @@ Type annotations such as `arg (int)"<n>"` are kept from the header and the sidec
 ## Editors
 
 `nus lsp` is Nushell's language server with nusage's view of a script: `$usage` and its type, and each call of another script held to that script's header.
-In a project that includes `nusage/conf.d/nus.toml`, `nu` is `nus nu`, which serves `nus lsp` when asked for `nu --lsp`, so an editor that starts `nu` through mise gets it; that `nus` is the release mise installs, so it needs one that has `nus nu`.
+In a project that includes `share/nus.toml`, `nu` is `nus nu`, which serves `nus lsp` when asked for `nu --lsp`, so an editor that starts `nu` through mise gets it; that `nus` is the release mise installs, so it needs one that has `nus nu`.
 Elsewhere, after `mise dot apply`, `MISE_ENV=nus-lsp` in the editor's environment does the same, and `MISE_ENV=nus-lsp,nus-kakehashi` adds [kakehashi](https://github.com/atusy/kakehashi), which highlights a script's header as KDL.
 A project with its own `[wrappers.nu]` keeps nusage's server with `command = "nus"` and `args = ["nu"]`.
 
@@ -74,10 +74,10 @@ A config root that declares `[_.nusage.project]` or `[_.nusage.catalog]` is a pr
 | `fixtures:<name>`, `schemas:<name>` | Data other projects read, depending on nothing: `kind` and `name` |
 | `nu:<name>` | Any other project; `nu:root` is the repository root |
 
-Another config root is no project: `nusage/` only selects its crates' tasks by path.
+A config root without project metadata is no project.
 Mise drops `^task` dependencies in such a root, so the graph refuses them there.
 
-The providers are in `.mise/graph`: `go-workspace` writes the ignored `go.work`, `go-imports` and `nu-imports` analyze the code into `.cache/graph`, and `project-graph` writes the configuration.
+The providers are in `tooling/graph`: `go-workspace` writes the ignored `go.work`, `go-imports` and `nu-imports` analyze the code into `.cache/graph`, and `project-graph` writes the configuration.
 Each edge it adds keeps its kind and the file and line it comes from, as JSON in the project's `metadata.edges`:
 
 - `declared`: `[_.nusage.project].depends_add`, for what nothing else shows, and `fixtures` when the target is a data project.

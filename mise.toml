@@ -22,31 +22,31 @@ config_roots = ["[!.]*", "[!.]*/[!.]*", "[!.]*/[!.]*/[!.]*"]
 [deps.go-workspace]
 auto = true
 description = "The ignored go.work over the workspace's Go modules"
-sources = [".mise/graph/common.nu", ".mise/graph/go-workspace.nu", "**/go.mod"]
+sources = ["tooling/graph/common.nu", "tooling/graph/go-workspace.nu", "**/go.mod"]
 outputs = ["go.work"]
-run = "nu .mise/graph/go-workspace.nu"
+run = "nu tooling/graph/go-workspace.nu"
 
 [deps.go-imports]
 auto = true
 description = "Imports between the workspace's Go modules"
 depends = ["go-workspace"]
 sources = [
-  ".mise/graph/common.nu",
-  ".mise/graph/go-imports.nu",
+  "tooling/graph/common.nu",
+  "tooling/graph/go-imports.nu",
   "go.work",
   "**/go.mod",
   "**/go.sum",
   "**/*.go",
 ]
 outputs = [".cache/graph/go.json"]
-run = "nu .mise/graph/go-imports.nu"
+run = "nu tooling/graph/go-imports.nu"
 
 [deps.nu-imports]
 auto = true
 description = "Loads, path constants and task calls in the workspace's Nushell"
 sources = [
-  ".mise/graph/common.nu",
-  ".mise/graph/nu-imports.nu",
+  "tooling/graph/common.nu",
+  "tooling/graph/nu-imports.nu",
   "**/*.nu",
   "**/*.tasks.toml",
   "**/mise*.toml",
@@ -54,7 +54,7 @@ sources = [
   ".mise/conf.d/[!_]*.toml",
 ]
 outputs = [".cache/graph/nu.json"]
-run = "nu .mise/graph/nu-imports.nu"
+run = "nu tooling/graph/nu-imports.nu"
 
 # mise judges every provider's freshness before it runs any, so this one's sources include
 # what its analyzers read: a change they see makes it stale in the same pass.
@@ -63,8 +63,8 @@ auto = true
 description = "Projects named for their kind, typed edges, and Nushell test inputs"
 depends = ["go-imports", "nu-imports"]
 sources = [
-  ".mise/graph/common.nu",
-  ".mise/graph/project-graph.nu",
+  "tooling/graph/common.nu",
+  "tooling/graph/project-graph.nu",
   ".miserc.toml",
   "**/mise*.toml",
   "**/*.tasks.toml",
@@ -80,7 +80,7 @@ sources = [
 ]
 # The graph also fingerprints the `_nu-inputs.toml` fragments it writes beside suites.
 outputs = [".mise/conf.d/_project-graph.toml"]
-run = "nu .mise/graph/project-graph.nu"
+run = "nu tooling/graph/project-graph.nu"
 
 # The CLI tools the tasks run, on PATH through `.bin`: a tool the tasks need, not an edge of
 # the project graph. The build runs without providers, this one among them.
@@ -99,7 +99,7 @@ outputs = [".bin/nus", ".bin/nu_plugin_nus", ".bin/openapi-usage"]
 run = "mise run --no-deps //:build"
 
 [task_config]
-includes = [".mise/tasks", ".mise/lib/nu.tasks.toml"]
+includes = [".mise/tasks", "tooling/tasks/nu.tasks.toml"]
 # A task that declares what it reads, and what it writes or that it writes nothing, keeps
 # its result in mise's task cache.
 shell = "nu -c"
@@ -109,9 +109,6 @@ cache = { enabled = true, env = [
   "CARGO_INCREMENTAL",
   "RUSTFLAGS",
 ] }
-
-[task_config.input_groups]
-cargo-workspace = ["Cargo.toml", "Cargo.lock", ".cargo/**"]
 
 [tools]
 nu = "0.116.1"
@@ -148,7 +145,7 @@ depends = [":lint", ":check-pr-status", ":test", "./crates/...:check"]
 description = "Fail when this mise process resolved its tasks from a project graph since rewritten"
 hide = true
 env.NUS_LOADED_GRAPH = "{{ vars.project_graph | default(value='') }}"
-run = "nu .mise/graph/current.nu"
+run = "nu tooling/graph/current.nu"
 
 [tools."http:nutest"]
 version = "1.2.0"
@@ -158,7 +155,7 @@ bin_path = "."
 
 # Beside what the suites load, the configuration they copy into their scratch workspaces.
 [tasks.test]
-dir = ".mise"
+dir = "tooling"
 sources = [
   "../mise.toml",
   "../.miserc.toml",
@@ -207,7 +204,7 @@ variants = [
 # only what is under a task's directory.
 [tasks.build]
 description = "Build the workspace and copy its CLI tools and plugin into the repository's bin directory"
-sources = ["@group:cargo-workspace", "crates/**/*"]
+sources = ["Cargo.toml", "Cargo.lock", ".cargo/**", "crates/**/*"]
 outputs = [".bin/nus", ".bin/nu_plugin_nus", ".bin/openapi-usage"]
 run = '''
 let built = ^cargo build --workspace --locked --message-format json-render-diagnostics

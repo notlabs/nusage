@@ -1,9 +1,9 @@
 #!/usr/bin/env nus
 #MISE description="Check PR status summaries without contacting GitHub"
-#MISE sources=[".mise/lib/pr-status.nu", ".mise/tasks/check-pr-status.nu", ".mise/tasks/pr-status.nu", "catalog/lib/gh/mod.nu", "catalog/lib/gh/schemas/examples.nuon", ".bin/nus"]
+#MISE sources=["tooling/lib/pr-status.nu", ".mise/tasks/check-pr-status.nu", ".mise/tasks/pr-status.nu", "catalog/packages/gh/mod.nu", "catalog/packages/gh/schemas/examples.nuon", ".bin/nus"]
 #MISE outputs=[]
 use std/assert
-use ../lib/pr-status.nu report
+use ../../tooling/lib/pr-status.nu report
 
 let base = {
     number: 1

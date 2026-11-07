@@ -1,31 +1,14 @@
 # The project `nu:catalog`: it aggregates its entries, which its `spec` and `generate` run.
-# Entry metadata and tasks live under lib/.
+# Entry metadata and tasks live under packages/.
 [_.nusage.project]
 # The packaged tasks run in a scratch consumer project, not in this workspace.
-dynamic = ["tasks/check-package.nu"]
+dynamic = ["mise-tasks/check-package.nu"]
 
 # The task catalog's own version, which release.yml releases.
 [vars]
 catalog_version = "0.1.0"
 
 # The generated files are committed; `spec` and `generate` are the steps that change them.
-[tasks.spec]
-description = "Obtain each entry's spec into its package"
-run = [{ tasks = ["./lib/...:spec"] }]
-
-[tasks.generate]
-description = "Generate each entry's module"
-run = [{ tasks = ["./lib/...:generate"] }]
-
-[tasks.check]
-description = "Check the catalog implementation and its packaged interfaces"
-depends = [
-  "//:graph-current",
-  "^check",
-  ":check-package",
-  ":check-release",
-  ":test",
-]
 
 [tasks."check:platform"]
 description = "Check the catalog's contracts and packaged tasks on this platform"
@@ -41,33 +24,14 @@ depends = [
 # both entrypoints run the same script.
 [tasks.assemble]
 description = "Assemble the task catalog from an already checked revision"
-file = "tasks/package.nu"
-
-[tasks.package]
-description = "Package the catalog's tasks for a release: the directory the OCI task catalog is pushed from"
-depends = [":check"]
-file = "tasks/package.nu"
-
-[tasks.check-release]
-description = "Check interrupted package release recovery without publishing assets"
-file = "tasks/check-release.nu"
-
-[tasks.check-package]
-description = "Run the packaged tasks from an unrelated consumer project"
-file = "tasks/check-package.nu"
-
-# What the catalog's per-tool release jobs run on an already checked revision; the archives
-# are the committed packages', so nothing is generated here.
-[tasks.pack]
-description = "Pack each entry with a version as a release archive of its own"
-file = "tasks/pack.nu"
+run = "nus {{config_root}}/mise-tasks/package.nu"
 
 [task_config]
-includes = ["../.mise/lib/nu.tasks.toml"]
+includes = ["mise-tasks", "../tooling/tasks/nu.tasks.toml"]
 
 # Beside what the suites load, the files they copy into a scratch workspace.
 [tasks.test]
-dir = "tasks"
-sources = ["entry.tasks.toml", "catalog.nu", "support.nu"]
+dir = "."
+sources = ["packages/package.tasks.toml", "lib/catalog.nu", "lib/support.nu"]
 outputs = []
 cache = { enabled = true, command_inputs = ["mise --version"] }
