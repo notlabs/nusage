@@ -385,7 +385,7 @@ def prepare [root: string] {
         }
         let monorepo = {projects: $overrides}
         let fingerprint = [({monorepo: $monorepo} | to toml)] ++ ($fragments | get content) | str join "\n" | hash sha256
-        let content = "# Written by the project-graph provider (.mise/graph/project-graph.nu); edits are replaced.\n" + ({vars: {project_graph: $fingerprint}, monorepo: $monorepo} | to toml)
+        let content = "# Written by the project-graph provider (tooling/graph/project-graph.nu); edits are replaced.\n" + ({vars: {project_graph: $fingerprint}, monorepo: $monorepo} | to toml)
         write-if-changed $graph $content | ignore
     }
 }

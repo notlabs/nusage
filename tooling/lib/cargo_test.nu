@@ -2,7 +2,8 @@ use std/assert
 use std/testing *
 use mise *
 
-const tasks = path self | path dirname | path join cargo.tasks.toml
+const project = path self | path dirname | path dirname | path dirname
+const tasks = path self | path dirname | path join ../tasks/cargo.tasks.toml
 
 def --wrapped checked [...args: string] {
     let result = run-external ...$args | complete
@@ -12,13 +13,12 @@ def --wrapped checked [...args: string] {
 
 @test
 def "shared Cargo tasks follow native edges and scope cached inputs to their consumers" [] {
-    let project = $tasks | path dirname | path dirname | path dirname
     let rust = open ($project | path join nusage mise.toml) | get task_config
     let cli = open ($project | path join nusage crates nusage mise.toml)
     let scratch = mktemp -d | path expand
     let result = try {
-        mkdir ($scratch | path join .bin) ($scratch | path join .mise lib)
-        cp $tasks ($scratch | path join .mise lib cargo.tasks.toml)
+        mkdir ($scratch | path join .bin) ($scratch | path join tooling tasks)
+        cp $tasks ($scratch | path join tooling tasks cargo.tasks.toml)
         let command = '#!/bin/sh
 printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
 '
@@ -56,7 +56,7 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
                 mkdir ($dir | path join src)
                 {package: {name: $name, version: "0.1.0"}} | to toml | save ($dir | path join Cargo.toml)
                 "" | save ($dir | path join src lib.rs)
-                mut config = {task_config: {includes: ["../../../.mise/lib/cargo.tasks.toml"]}}
+                mut config = {task_config: {includes: ["../../../tooling/tasks/cargo.tasks.toml"]}}
                 if $name == a {
                     $config = $config | merge {tasks: {
                         test: {sources: $cli.tasks.test.sources, outputs: $cli.tasks.test.outputs}
@@ -118,7 +118,7 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
             assert not ("events" | path exists)
 
             # Included task definitions are tracked automatically.
-            "# changed definition\n" | save --append .mise/lib/cargo.tasks.toml
+            "# changed definition\n" | save --append tooling/tasks/cargo.tasks.toml
             checked mise run //nusage/crates/a:check | ignore
             assert equal (open --raw events | lines | sort) [a:clippy a:doc a:test b:clippy b:doc b:test]
         }

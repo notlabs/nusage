@@ -77,7 +77,7 @@ A config root that declares `[_.nusage.project]` or `[_.nusage.catalog]` is a pr
 Another config root is no project: `nusage/` only selects its crates' tasks by path.
 Mise drops `^task` dependencies in such a root, so the graph refuses them there.
 
-The providers are in `.mise/graph`: `go-workspace` writes the ignored `go.work`, `go-imports` and `nu-imports` analyze the code into `.cache/graph`, and `project-graph` writes the configuration.
+The providers are in `tooling/graph`: `go-workspace` writes the ignored `go.work`, `go-imports` and `nu-imports` analyze the code into `.cache/graph`, and `project-graph` writes the configuration.
 Each edge it adds keeps its kind and the file and line it comes from, as JSON in the project's `metadata.edges`:
 
 - `declared`: `[_.nusage.project].depends_add`, for what nothing else shows, and `fixtures` when the target is a data project.

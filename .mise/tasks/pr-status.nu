@@ -5,8 +5,8 @@
 #MISE description="Report where each open pull request stands"
 #MISE tools={gh="2.103.3"}
 #MISE cache={enabled=false}
-use ../../catalog/lib/gh *
-use ../lib/pr-status.nu report
+use ../../catalog/packages/gh *
+use ../../tooling/lib/pr-status.nu report
 
 let prs = gh pr list --repo $usage.flags.repo --limit ($usage.flags.limit | into string) --state open
 let rows = report $prs

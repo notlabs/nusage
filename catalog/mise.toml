@@ -27,7 +27,7 @@ description = "Assemble the task catalog from an already checked revision"
 run = "nus {{config_root}}/mise-tasks/package.nu"
 
 [task_config]
-includes = ["mise-tasks", "../.mise/lib/nu.tasks.toml"]
+includes = ["mise-tasks", "../tooling/tasks/nu.tasks.toml"]
 
 # Beside what the suites load, the files they copy into a scratch workspace.
 [tasks.test]

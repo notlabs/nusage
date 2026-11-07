@@ -1,7 +1,7 @@
 #!/usr/bin/env nus
 #MISE description="Hold the tree to what `jj fix` writes for it and to what its linters accept"
 #MISE output="interleave"
-use ../lib/actions.nu *
+use ../../tooling/lib/actions.nu *
 
 # A Git diff as each file's path and its own part of the diff.
 def files-of []: string -> table<path: string, diff: string> {

@@ -211,8 +211,8 @@ func Value() int { return b.Value() }
             assert equal (runs-since $runs) [go-imports project-graph]
             # Included task definitions are analyzer inputs, including hidden shared files.
             let runs = open --raw provider-runs | lines | length
-            mkdir .mise/lib
-            "[probe]\nrun = 'true'\n" | save .mise/lib/probe.tasks.toml
+            mkdir tooling/tasks
+            "[probe]\nrun = 'true'\n" | save tooling/tasks/probe.tasks.toml
             checked mise exec -- "true" | ignore
             assert equal (runs-since $runs) [nu-imports project-graph]
             # Metadata in active config fragments extends native project dependencies.

@@ -4,7 +4,7 @@
 depends_add = ["fixtures:nusage", "schemas:nusage"]
 
 [task_config]
-includes = ["../../../.mise/lib/cargo.tasks.toml"]
+includes = ["../../../tooling/tasks/cargo.tasks.toml"]
 
 [tasks.test]
 sources = ["../../fixtures/**/*", "../../schemas/inspection.schema.json"]
