@@ -1,0 +1,8 @@
+[_.nusage.project]
+depends_add = ["custom:catalog"]
+
+[_.nusage.catalog]
+spec = { openapi = "openapi.yaml" }
+
+[task_config]
+includes = ["../../tasks/entry.tasks.toml"]

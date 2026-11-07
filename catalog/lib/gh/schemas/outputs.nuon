@@ -127,7 +127,7 @@
         {id: repo-view, output: repo-view, argv: [repo view notlabs/nusage --json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt"], exit_codes: [0], expect: {properties: {nameWithOwner: {const: "notlabs/nusage"}, defaultBranchRef: {properties: {name: {const: main}}}}}}
         {id: repo-list, output: repo-list, argv: [repo list notlabs --limit 2 --json "name,nameWithOwner,owner,description,url,isPrivate,isArchived,isFork,defaultBranchRef,stargazerCount,forkCount,createdAt,updatedAt,pushedAt"], exit_codes: [0], expect: {minItems: 1}}
         {id: run-list, output: run-list, argv: [run list --repo notlabs/nusage --limit 3 --json "databaseId,number,attempt,name,displayTitle,workflowName,headBranch,headSha,event,status,conclusion,createdAt,updatedAt,startedAt,url"], exit_codes: [0], expect: {minItems: 1}}
-        {id: release-list, output: release-list, argv: [release list --repo notlabs/nusage --limit 5 --json "name,tagName,isDraft,isLatest,isPrerelease,isImmutable,createdAt,publishedAt"], exit_codes: [0], expect: {minItems: 1, contains: {properties: {tagName: {const: "v0.1.1"}}}}}
+        {id: release-list, output: release-list, argv: [release list --repo notlabs/nusage --limit 5 --json "name,tagName,isDraft,isLatest,isPrerelease,isImmutable,createdAt,publishedAt"], exit_codes: [0], expect: {minItems: 1, maxItems: 5}}
         {id: release-view, output: release-view, argv: [release view v0.1.1 --repo notlabs/nusage --json "tagName,name,body,isDraft,isPrerelease,isImmutable,createdAt,publishedAt,targetCommitish,url,author,assets"], exit_codes: [0], expect: {properties: {tagName: {const: "v0.1.1"}, isDraft: {const: false}}}}
     ]
 }

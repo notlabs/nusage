@@ -1,6 +1,6 @@
 #!/usr/bin/env nus
 #MISE description="Check PR status summaries without contacting GitHub"
-#MISE depends=["//nusage:build"]
+#MISE depends=["^build"]
 #MISE sources=[".mise/lib/pr-status.nu", ".mise/tasks/check-pr-status.nu", ".mise/tasks/pr-status.nu", "catalog/lib/gh/mod.nu", "catalog/lib/gh/schemas/examples.nuon"]
 #MISE outputs=[]
 use std/assert

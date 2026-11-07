@@ -1,0 +1,13 @@
+[_.nusage.project]
+depends_add = ["custom:catalog", "custom:catalog/cobra"]
+
+[_.nusage.catalog]
+spec = { run = "mise run //catalog/cobra:gh", probe = "version" }
+version = "0.2.0"
+tool = "gh"
+
+[tools]
+gh = "2.103.3"
+
+[task_config]
+includes = ["../../tasks/entry.tasks.toml"]

@@ -1,0 +1,17 @@
+{
+  "tasks": {
+    "build": {
+      "inputs": [
+        "src/**",
+        "package.json"
+      ],
+      "outputs": [
+        "dist/**"
+      ],
+      "cache": true,
+      "dependsOn": [
+        "^build"
+      ]
+    }
+  }
+}

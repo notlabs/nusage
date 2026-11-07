@@ -1,20 +1,29 @@
 #!/usr/bin/env nus
 use std/assert
+use mise *
 
 const tasks = path self | path dirname
 
 # A consumer owns its entries and schemas; the package must supply everything else.
-let scratch = mktemp --directory
+let scratch = mktemp --directory | path expand
 let consumer = $scratch | path join consumer
-let package = $consumer | path join dist
+let alias = $scratch | path join consumer-link
+let package = $alias | path join dist
 mkdir ($consumer | path join lib demo schemas) ($consumer | path join bin)
+# Exercise output through a symlink, including macOS temporary-directory aliases.
+^ln -s $consumer $alias
 let config = $consumer | path join mise.toml
 {
+    monorepo_root: true
+    monorepo: {
+        config_roots: ["[!.]*", "[!.]*/[!.]*", "[!.]*/[!.]*/[!.]*"]
+    }
     task_config: {
         includes: [
             ($package | path join oci)
         ]
     }
+    vars: {catalog_version: "0.0.0"}
     env: {
         _: {
             path: (
@@ -34,17 +43,19 @@ let config = $consumer | path join mise.toml
             )
         }
     }
+} | to toml | save $config
+{
     _: {
         nusage: {
             catalog: {
-                demo: {
-                    spec: {run: "open --raw lib/demo/source.kdl | print --no-newline"}
-                }
+                spec: {run: "open --raw lib/demo/source.kdl | print --no-newline"}
             }
         }
     }
-    vars: {catalog_version: "0.0.0"}
-} | to toml | save $config
+    tasks: {
+        check: {run: "true"}
+    }
+} | to toml | save ($consumer | path join lib demo mise.toml)
 'name "demo"
 bin "demo"
 ' | save ($consumer | path join lib demo source.kdl)
@@ -81,6 +92,7 @@ assert equal (demo).ok true
 
 let checked = try {
     with-env {
+        NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep))
         MISE_CONFIG_ROOT: $consumer
         MISE_CONFIG_DIR: ($scratch | path join config)
         MISE_TRUSTED_CONFIG_PATHS: $scratch
@@ -90,9 +102,7 @@ let checked = try {
         cd $consumer
         let packed = ^nus ($tasks | path join package.nu) --out $package | complete
         assert equal $packed.exit_code 0 $packed.stderr
-        let listed = ^mise tasks ls --json | complete
-        assert equal $listed.exit_code 0 $listed.stderr
-        let names = $listed.stdout | from json | get name | sort
+        let names = mise tasks ls | get name | where $it != "//lib/demo:check" | each { str replace --regex "^//:" "" } | sort
         assert equal $names [catalog:check catalog:generate catalog:spec]
         for task in [catalog:spec catalog:generate catalog:check] {
             let result = ^mise run $task | complete
