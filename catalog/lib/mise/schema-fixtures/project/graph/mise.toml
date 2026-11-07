@@ -1,3 +1,4 @@
+# Metadata-only fixture: package scripts and Turbo settings are inspected, never executed.
 monorepo_root = true
 
 [monorepo.projects."custom:fixture"]
