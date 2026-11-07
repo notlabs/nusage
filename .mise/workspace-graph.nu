@@ -25,11 +25,26 @@ def prepare [root: path] {
     cd $root
     let output = $root | path join .mise conf.d _workspace-graph.toml
 
-    # This is a real Go workspace. Go discovers membership, including removed modules.
+    # Let Go discover modules in source directories, keeping hidden managed artifacts out.
     if not ("go.work" | path exists) {
         checked go work init | ignore
     }
-    checked go work use -r . | ignore
+    let previous = checked go work edit -json | from json | get -o Use | default []
+    if ($previous | is-not-empty) {
+        (checked
+            go
+            work
+            edit
+            ...($previous | get DiskPath | each {|p| $"-dropuse=($p)" })
+        ) | ignore
+    }
+    if ("go.mod" | path exists) {
+        checked go work use . | ignore
+    }
+    let sources = glob "[!.]*" --no-file --no-symlink | where {|p| ($p | path type) == dir }
+    if ($sources | is-not-empty) {
+        checked go work use -r ...$sources | ignore
+    }
 
     # Read only the original configuration, never our previous generated supplement.
     let ignored = [$env.MISE_IGNORED_CONFIG_PATHS? $output] | compact | str join (char esep)

@@ -249,31 +249,41 @@ import _ "example.test/missing"
 
 @test
 def "managed target configurations stay outside the discovered project graph" [] {
-    let provider = open ($generator | path dirname | path dirname | path join mise.toml) | get deps.workspace-graph
+    let project = $generator | path dirname | path dirname
+    let config = open ($project | path join mise.toml)
+    let provider = $config.deps.workspace-graph
     let scratch = mktemp -d | path expand
-    let targets = $scratch | path join .managed targets
+    let targets = $scratch | path join .cache mbx-targets
     let result = try {
         mkdir ($targets | path join view) ($scratch | path join app)
         {tasks: {unwanted: {run: "true"}}} | to toml | save ($targets | path join view mise.toml)
+        "not a Go module" | save ($targets | path join view go.mod)
         checked ln -s ($targets | path join view) ($scratch | path join target) | ignore
+        cp ($project | path join .miserc.toml) ($scratch | path join .miserc.toml)
         with-env {
             NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep))
             MISE_CONFIG_DIR: ($scratch | path join .config)
             MISE_DATA_DIR: ($scratch | path join .data)
             MISE_CACHE_DIR: ($scratch | path join .cache)
             MISE_TRUSTED_CONFIG_PATHS: $scratch
-            MISE_IGNORED_CONFIG_PATHS: $targets
             GOWORK: ""
         } {
+            hide-env --ignore-errors MISE_IGNORED_CONFIG_PATHS
             cd $scratch
             {
                 monorepo_root: true
                 monorepo: {config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]}
                 settings: {experimental: true}
-                env: {NU_LIB_DIRS: $env.NU_LIB_DIRS, _: {path: $env.PATH}}
+                env: {
+                    NU_LIB_DIRS: $env.NU_LIB_DIRS
+                    MBX_TARGET_ROOT: $config.env.MBX_TARGET_ROOT
+                    MISE_IGNORED_CONFIG_PATHS: $config.env.MISE_IGNORED_CONFIG_PATHS
+                    _: {path: $env.PATH}
+                }
                 deps: {workspace-graph: ($provider | update run $'nu "($generator)"')}
             } | to toml | save mise.toml
             {tasks: {check: {run: "true"}}} | to toml | save app/mise.toml
+            assert equal (mise env | get MBX_TARGET_ROOT) $targets
             let discovered = ^mise exec -- mise tasks ls --all --json | complete
             assert equal $discovered.exit_code 0 $discovered.stderr
             assert not ($discovered.stderr | str contains "glob matched path outside") $discovered.stderr

@@ -58,7 +58,7 @@ This bootstrap dependency lets graph preparation and catalog tooling use structu
 The assembled task catalog bundles that module for consumers outside this repository.
 
 Mise discovers config roots one to three directories below the repository root.
-`[deps.workspace-graph]` prepares an ignored `go.work` with `go work use -r .` and an ignored `.mise/conf.d/_workspace-graph.toml` supplement.
+`[deps.workspace-graph]` prepares an ignored `go.work` with Go's recursive module discovery over non-hidden source directories and an ignored `.mise/conf.d/_workspace-graph.toml` supplement.
 Cargo projects and edges stay native; the supplement adds Go import edges and projects for discovered config roots, including projects with no tasks.
 A config root also depends on native projects beneath it or selected by a task's `dir`.
 
@@ -95,9 +95,10 @@ For example, `mise exec -- mise run //nusage/crates/nusage-spec:check` checks th
 `//nusage:build` assembles the distributed binaries; `//nusage:check` selects all crate checks and verifies the shared fixtures.
 The `custom:nusage` aggregate and the native `cargo:nusage` crate are distinct projects.
 
-In CI, `MBX_TARGET_ROOT` places managed targets under ignored `.cache/mbx-targets` inside the checkout.
-Mise also ignores configuration under that target root, so artifact trees cannot become projects through the public `target` links.
-Managed check lanes and the separate object store remain enabled.
+The repository sets `MBX_TARGET_ROOT` to ignored `.cache/mbx-targets` inside the checkout for local builds and CI.
+The early `.miserc.toml` exclusion keeps artifact configuration out of discovery through the public `target` links.
+Managed check lanes and the shared object store remain enabled.
+In an existing checkout, after active builds finish, the next Cargo build through Mise moves each workspace's managed target to this root and updates its link.
 
 Infrastructure tests are co-located `*_test.nu` suites discovered by the pinned Nutest module; `mise exec -- mise run //:test` and `mise exec -- mise run //catalog:test` run them without building `nus`.
 The graph fixture verifies actual caret execution, cold preparation, platform checks, native edges, project add/move/remove, affected selection, and failures before consumer execution.

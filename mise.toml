@@ -14,6 +14,7 @@ config_roots = ["[!.]*", "[!.]*/[!.]*", "[!.]*/[!.]*/[!.]*"]
 [deps.workspace-graph]
 auto = true
 sources = [
+  ".miserc.toml",
   "**/mise*.toml",
   "**/*.tasks.toml",
   "**/.mise/conf.d/[!_]*.toml",
@@ -33,6 +34,7 @@ run = "nu .mise/workspace-graph.nu"
 includes = [".mise/tasks", ".mise/lib/nu.tasks.toml"]
 # Shared configuration and infrastructure affect inherited tools and task behavior.
 global_inputs = [
+  ".miserc.toml",
   "mise*.toml",
   "mise.lock",
   "jj.toml",
@@ -62,6 +64,10 @@ bin_path = "lib"
 # The repository's tasks run through the nus `//nusage:build` copies into `.bin`, not through
 # a release.
 [env]
+# Keep managed target links inside the discovery boundary; the object store remains shared.
+MBX_TARGET_ROOT = "{{config_root}}/.cache/mbx-targets"
+# Carry the exclusion into nested Mise invocations during graph preparation.
+MISE_IGNORED_CONFIG_PATHS = "{{env.MBX_TARGET_ROOT}}"
 _.path = ["{{config_root}}/.bin"]
 NU_LIB_DIRS = { value = "{{ tools['catalog-bootstrap'].path }}/lib", tools = true }
 

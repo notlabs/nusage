@@ -1,0 +1,2 @@
+# Read before project config: build artifacts must not become discovered projects.
+ignored_config_paths = [".cache/mbx-targets"]
