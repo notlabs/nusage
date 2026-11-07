@@ -3,7 +3,7 @@
 [test]
 description = "Run this project's co-located Nutest suites"
 depends = ["//:graph-current"]
-sources = ["@group:nu-test"]
+sources = ["**/*.nu", "**/*.toml"]
 outputs = []
 cache = { enabled = true }
 usage = '''

@@ -5,7 +5,6 @@ The command is `nus`, and so is the shebang, `#!/usr/bin/env nus`. Early develop
 
 - `nusage/`: `nus` and its crates; `nus --help` for the CLI, and each crate's documentation, `cargo doc --workspace --no-deps`, for what it is.
 - `catalog/`: a generated module package per tool under `catalog/lib/`, each released as `packslip:github.com/notlabs/nusage/catalog/<tool>`.
-- `intent/`: where the project is going, as claims checked where they can be.
 - `mergiraf/`: Mergiraf, the structural merge tool `jj resolve` runs here, built with patches that teach it Nushell.
 
 ## Scripts
