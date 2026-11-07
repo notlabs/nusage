@@ -19,7 +19,13 @@ run = [{ tasks = ["./lib/...:generate"] }]
 
 [tasks.check]
 description = "Check the catalog implementation and its packaged interfaces"
-depends = ["//:graph-current", "^check", ":check-package", ":check-release", ":test"]
+depends = [
+  "//:graph-current",
+  "^check",
+  ":check-package",
+  ":check-release",
+  ":test",
+]
 
 [tasks."check:platform"]
 description = "Check the catalog's contracts and packaged tasks on this platform"

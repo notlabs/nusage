@@ -40,5 +40,6 @@ For example, `mise exec -- mise run //catalog/lib/jj:spec --force` refreshes jj'
 The catalog-wide `spec` and `generate` tasks select `./lib/...` tasks through Mise; adding an entry requires no parent registry edit.
 `//catalog:check` checks the catalog's own implementation and package interfaces.
 Use `mise exec -- mise run '//catalog/...:check'` to check the whole subtree.
-An entry declares its direct project providers in `[_.nusage.project].depends_add`; its included check task uses `^build` and `^check` to validate upstream projects before the entry.
+An entry depends on the generator its spec names and on what its Nushell loads, which the project graph derives; its included check task uses `^check` to validate those projects before the entry.
 Platform checks use `^check:platform` so they retain the upstream platform-specific scope.
+The `nus` the tasks run is the root's `nus` provider's build, on PATH.

@@ -11,7 +11,14 @@ const load_kinds = {
     "source": nu-source
     "source-env": nu-source
 }
-const literal_shapes = [shape_string shape_filepath shape_globpattern shape_externalarg shape_directory]
+
+const literal_shapes = [
+    shape_string
+    shape_filepath
+    shape_globpattern
+    shape_externalarg
+    shape_directory
+]
 
 def unquote []: string -> string {
     let text = $in
@@ -40,7 +47,7 @@ def resolve-load [dir: string, target: string]: nothing -> any {
 
 # The constants a file builds from its own location (`path self`, optionally joined to a
 # literal): each one's name, path and line.
-def path-consts [source: string, tokens: list, dir: string]: nothing -> list {
+def path-consts [source: string, tokens: list<any>, dir: string]: nothing -> list<any> {
     $tokens | enumerate | where {|t| $t.item.shape == shape_internalcall and $t.item.content in [const "export const"] } | each {|t|
         let rest = $tokens | skip ($t.index + 1) | first 7
         let name = $rest | get -o 0
@@ -57,15 +64,24 @@ def path-consts [source: string, tokens: list, dir: string]: nothing -> list {
     } | compact
 }
 
-def by-name []: list -> record {
+def by-name []: list<any> -> record {
     reduce --fold {} {|c, acc| $acc | upsert $c.name $c.path }
 }
 
 # The references in a piece of Nushell: loads, `path self` constants that name a file, and
 # `mise run` targets. `consts` are the path constants in scope, by name.
-def scan [source: string, tokens: list, dir: string, consts: record, --loads, --runs]: nothing -> list {
+def scan [
+    source: string
+    tokens: list<any>
+    dir: string
+    consts: record
+    --loads
+    --runs
+]: nothing -> list<any> {
     let bytes = $source | encode utf8
-    let line = {|token| $source | line-at $token.span.start }
+    let line = {|token|
+        $source | line-at $token.span.start
+    }
     let heads = ($load_kinds | columns) ++ [mise ^mise "mise run"]
     # Only these tokens can start a reference; the rest are skipped without a closure each.
     let starts = $tokens | enumerate | where ($it.item.content in $heads) or ($it.item.shape == shape_garbage)
@@ -115,7 +131,11 @@ def scan [source: string, tokens: list, dir: string, consts: record, --loads, --
             if $start != null {
                 # The call's arguments end with its line.
                 let rest = $bytes | bytes at $token.span.end.. | bytes index-of 0x[0a]
-                let end = if $rest < 0 { $bytes | bytes length } else { $token.span.end + $rest }
+                let end = if $rest < 0 {
+                    $bytes | bytes length
+                } else {
+                    $token.span.end + $rest
+                }
                 let argument = $tokens | skip $start | take while {|a| $a.span.start < $end and $a.shape not-in [shape_pipe shape_semicolon] } | where {|a| not ($a.content | str starts-with '-') } | get -o 0
                 if $argument != null {
                     let call = do $line $token
@@ -139,21 +159,35 @@ def scan [source: string, tokens: list, dir: string, consts: record, --loads, --
 def config-roots [root: string]: nothing -> list<string> {
     let policy = open ($root | path join mise.toml) | get -o monorepo.config_roots | default []
     cd $root
-    ["."] ++ ($policy | each {|pattern| glob $pattern --no-file --exclude ["**/.*/**"] } | flatten | each { workspace-path $root })
+    ["."] ++ (
+        $policy
+        | each {|pattern| glob $pattern --no-file --exclude ["**/.*/**"] }
+        | flatten
+        | each { workspace-path $root }
+    )
     | uniq
 }
 
 # The index of a task's table header among a file's enumerated lines, or 0.
-def header-index [name: string]: list -> int {
+def header-index [name: string]: list<any> -> int {
     let quoted = $name | str replace --all '"' '\"'
-    let headers = [$"[tasks.($name)]" $"[tasks.\"($quoted)\"]" $"[($name)]" $"[\"($quoted)\"]"]
+    let headers = [
+        $"[tasks.($name)]"
+        $"[tasks.\"($quoted)\"]"
+        $"[($name)]"
+        $"[\"($quoted)\"]"
+    ]
     $in | where {|l| ($l.item | str trim) in $headers } | get -o 0.index | default 0
 }
 
 # Each task definition in a config file or task include: its name and table.
-def task-tables [file: string]: nothing -> list {
+def task-tables [file: string]: nothing -> list<any> {
     let data = open --raw $file | from toml
-    let tasks = if ($file | str ends-with .tasks.toml) { $data } else { $data | get -o tasks | default {} }
+    let tasks = if ($file | str ends-with .tasks.toml) {
+        $data
+    } else {
+        $data | get -o tasks | default {}
+    }
     let shell = $data | get -o task_config.shell
     $tasks | items {|name, task| {name: $name, task: $task} } | where {|t| ($t.task | describe) =~ '^record' } | each {|t|
         {name: $t.name, task: $t.task, shell: ($t.task | get -o shell | default $shell)}
@@ -161,7 +195,9 @@ def task-tables [file: string]: nothing -> list {
 }
 
 def analyze [root: string] {
-    let workspace = {|p| $p | workspace-path $root }
+    let workspace = {|p|
+        $p | workspace-path $root
+    }
     let nu_files = workspace-files $root '*.nu'
     let sources = $nu_files | par-each {|file|
         let source = open --raw ($root | path join $file)
@@ -281,5 +317,9 @@ def analyze [root: string] {
 }
 
 def main [root: path = "."] {
-    try { analyze ($root | path expand) } catch {|err| $err | report-failure nu-imports }
+    try {
+        analyze ($root | path expand)
+    } catch {|err|
+        $err | report-failure nu-imports
+    }
 }

@@ -24,5 +24,9 @@ def prepare [root: string] {
 }
 
 def main [root: path = "."] {
-    try { prepare ($root | path expand) } catch {|err| $err | report-failure go-workspace }
+    try {
+        prepare ($root | path expand)
+    } catch {|err|
+        $err | report-failure go-workspace
+    }
 }

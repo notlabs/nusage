@@ -82,6 +82,7 @@ jobs:
             fi
           fi
       # Linux runs each project's `check`; macOS its `check:platform`, what differs by platform.
+      # `mise exec` prepares the project graph before the inner `mise run` resolves tasks with it.
       - name: Check repository
         run: |
           if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ -n "$AFFECTED_BASE" ]; then

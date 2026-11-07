@@ -50,5 +50,9 @@ def analyze [root: string] {
 }
 
 def main [root: path = "."] {
-    try { analyze ($root | path expand) } catch {|err| $err | report-failure go-imports }
+    try {
+        analyze ($root | path expand)
+    } catch {|err|
+        $err | report-failure go-imports
+    }
 }

@@ -24,11 +24,15 @@ def task-root [name: string]: nothing -> any {
 }
 
 def depth [root: string]: nothing -> int {
-    if $root == "." { 0 } else { $root | path split | length }
+    if $root == "." {
+        0
+    } else {
+        $root | path split | length
+    }
 }
 
 # The entry among those with a `root` whose root is deepest of the ones holding the path.
-def deepest [path: string]: list -> any {
+def deepest [path: string]: list<any> -> any {
     $in | where {|p| within $path $p.root } | sort-by {|p| depth $p.root } | last
 }
 
@@ -50,7 +54,9 @@ def from-root [root: string]: string -> string {
 }
 
 def fail [lines: list<string>] {
-    error make --unspanned {msg: ($lines | str join (char nl))}
+    error make --unspanned {
+        msg: ($lines | str join (char nl))
+    }
 }
 
 def prepare [root: string] {
@@ -231,7 +237,7 @@ def prepare [root: string] {
             let from = do $at $config.root
             let spec = $config.catalog.table | get -o spec | default {}
             let run = $spec | get -o run | default "" | parse --regex 'mise run\s+(?<target>//\S+)' | get -o target.0
-            let generators = ($spec | columns | where $it in $spec_generators | each {|kind| $spec_generators | get $kind })
+            let generators = $spec | columns | where $it in $spec_generators | each {|kind| $spec_generators | get $kind }
             let generators = $generators ++ (
                 if $run != null {
                     do $resolve $run $config.root | default [] | each {|r| (do $at $r | default (do $owner $r)).id }
@@ -383,5 +389,9 @@ def prepare [root: string] {
 }
 
 def main [root: path = "."] {
-    try { prepare ($root | path expand) } catch {|err| $err | report-failure project-graph }
+    try {
+        prepare ($root | path expand)
+    } catch {|err|
+        $err | report-failure project-graph
+    }
 }

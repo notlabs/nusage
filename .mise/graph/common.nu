@@ -21,7 +21,11 @@ export def within [path: string, directory: string]: nothing -> bool {
 # path outside the root starts with `..`.
 export def workspace-path [root: string]: string -> string {
     let path = $in | path expand --no-symlink
-    let relative = try { $path | path relative-to ($root | path expand --no-symlink) } catch { $"../($path)" }
+    let relative = try {
+        $path | path relative-to ($root | path expand --no-symlink)
+    } catch {
+        $"../($path)"
+    }
     let relative = $relative | str replace --all '\' '/'
     if $relative == "" { "." } else { $relative }
 }
@@ -36,7 +40,10 @@ export def line-at [offset: int]: string -> int {
 # and untracked files git does not ignore, or, outside a work tree, a walk that keeps the
 # hidden `.mise` directories and skips other hidden directories and `target`.
 export def workspace-files [root: string, ...patterns: string]: nothing -> list<string> {
-    let listed = do { cd $root; ^git ls-files --cached --others --exclude-standard -z -- ...$patterns } | complete
+    let listed = do {
+        cd $root
+        ^git ls-files --cached --others --exclude-standard -z -- ...$patterns
+    } | complete
     if $listed.exit_code == 0 {
         return (
             $listed.stdout
@@ -77,7 +84,11 @@ export def write-if-changed [file: string, content: string]: nothing -> bool {
 # comes wrapped in one about the closure's input.
 def causes [error: record]: nothing -> list<string> {
     let inner = $error.inner? | default []
-    if ($inner | is-empty) { [$error.msg] } else { $inner | each {|e| causes $e } | flatten }
+    if ($inner | is-empty) {
+        [$error.msg]
+    } else {
+        $inner | each {|e| causes $e } | flatten
+    }
 }
 
 # Providers report only their final stderr line; the failure goes on that line, after the
