@@ -24,8 +24,7 @@ fn inspected_env(script: &Path, env: &[(&str, &str)]) -> Value {
     );
     assert!(output.stderr.is_empty());
     let value: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let schema =
-        serde_json::from_str(include_str!("../schemas/inspection.schema.json")).unwrap();
+    let schema = serde_json::from_str(include_str!("../schemas/inspection.schema.json")).unwrap();
     assert!(
         nushell_schema::validate::Schema::new(&schema)
             .unwrap()

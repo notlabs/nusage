@@ -10,11 +10,11 @@ def --wrapped checked [...args: string] {
 }
 
 @test
-def "included entry tasks retain local context Usage and upstream checks" [] {
+def "entry tasks retain local context and Usage without ordering-only upstream checks" [] {
     let scratch = mktemp -d | path expand
     let result = try {
         mkdir ($scratch | path join catalog packages) ($scratch | path join catalog lib) ($scratch | path join catalog mise-tasks) ($scratch | path join producer)
-        cp ($here | path join package.tasks.toml) ($scratch | path join catalog packages package.tasks.toml)
+        let definitions = open ($here | path join mise mise.toml) | get tasks
         for file in [catalog.nu support.nu] {
             cp ($here | path join ../lib $file) ($scratch | path join catalog lib $file)
         }
@@ -44,17 +44,15 @@ assert equal ($selected | length) 1
                 monorepo: {
                     config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]
                     projects: {
-                        "gen:producer": {root: producer}
-                        "catalog:alpha": {root: "catalog/packages/alpha", depends_add: [gen:producer]}
-                        "catalog:beta": {root: "catalog/packages/beta", depends_add: [gen:producer]}
+                        "nu:producer": {root: producer}
+                        "catalog:alpha": {root: "catalog/packages/alpha", depends_add: [nu:producer]}
+                        "catalog:beta": {root: "catalog/packages/beta", depends_add: [nu:producer]}
                     }
                 }
                 settings: {experimental: true}
                 env: {
                     GRAPH_LOG: ($scratch | path join events)
                 }
-                # The entry checks hold their graph to the one on disk through the root's guard.
-                tasks: {graph-current: {run: "true"}}
             } | to toml | save mise.toml
             {tasks: {
                 build: {run: 'echo build >> "$GRAPH_LOG.providers"'}
@@ -66,7 +64,7 @@ assert equal ($selected | length) 1
                 mkdir $dir
                 {
                     _: {nusage: {catalog: {version: "1.0.0"}}}
-                    task_config: {includes: ["../package.tasks.toml"]}
+                    tasks: $definitions
                 } | to toml | save ($dir | path join mise.toml)
             }
             for task in [spec generate check "check:platform"] {
@@ -82,8 +80,8 @@ assert equal ($selected | length) 1
                 assert equal $event.cwd ($scratch | path join catalog packages $event.entry)
                 assert equal $event.catalog ($scratch | path join catalog)
             }
-            # Only the checks run upstream tasks: the entry's own spec and generate need none.
-            assert equal (open --raw events.providers | lines) [build check build platform build check]
+            # Project dependencies affect selection, without running an upstream check for ordering.
+            assert not ('events.providers' | path exists)
         }
         null
     } catch {|err| $err}

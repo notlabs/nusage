@@ -4,4 +4,37 @@ version = "0.2.0"
 tool = "jujutsu"
 
 [task_config]
-includes = ["../package.tasks.toml"]
+cache = { enabled = true }
+
+[_.nusage.project]
+depends_add = ["cargo:clap-usage"]
+
+[tasks.spec]
+file = "../../mise-tasks/spec.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks.generate]
+file = "../../mise-tasks/generate.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks.check]
+sources = [
+  "**/*",
+  "../../mise-tasks/**/*.nu",
+  "../../lib/**/*.nu",
+  "../../../target/install/bin/nus",
+]
+outputs = []
+file = "../../mise-tasks/check.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks."check:platform"]
+sources = [
+  "**/*",
+  "../../mise-tasks/**/*.nu",
+  "../../lib/**/*.nu",
+  "../../../target/install/bin/nus",
+]
+outputs = []
+file = "../../mise-tasks/check.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."

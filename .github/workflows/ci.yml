@@ -36,10 +36,8 @@ jobs:
           # Native affected-project selection needs the merge base, including on restacks.
           fetch-depth: 0
           persist-credentials: false
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
-        with:
-          version: 2026.10.21
-      # The lint runs `jj fix`, so the checkout is a jj repository too.
+      - uses: ./.github/actions/setup-mise
+      # The acceptance harness creates isolated JJ workspaces from this checkout.
       - run: jj git init --colocate
       # mise's task results, under the runner's temporary directory, from the Actions cache
       # as main last saved them.
@@ -60,6 +58,8 @@ jobs:
           # Revisions of a same-repository PR can reuse their scoped build cache.
           save-on-pull-request: true
           clean-target-before-export: true
+      - name: Install local binaries
+        run: mise run //:build
       # rustc's and clippy's findings as annotations, through mise's task prefix.
       - run: echo "::add-matcher::.github/matchers/rust.json"
       # The base a pull request's affected projects are selected against, and whether Mergiraf's
@@ -75,32 +75,31 @@ jobs:
             # Checkout leaves no credential behind; supply its read-only token for this fetch.
             git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --no-tags --depth=1 origin "$BASE_SHA"
             echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
-            if git diff --quiet "$BASE_SHA" HEAD -- mergiraf jj.toml mise.toml mise.lock .mise/conf.d tooling/lib/actions.nu .github/workflows/ci.yml; then
+            if git diff --quiet "$BASE_SHA" HEAD -- mergiraf jj.toml mise.toml mise.lock .mise/conf.d actions/mod.nu .github/workflows/ci.yml; then
               echo "run=false" >> "$GITHUB_OUTPUT"
             else
               echo "run=true" >> "$GITHUB_OUTPUT"
             fi
           fi
       # Linux runs each project's `check`; macOS its `check:platform`, what differs by platform.
-      # `mise exec` prepares the project graph before the inner `mise run` resolves tasks with it.
       - name: Check repository
         run: |
           if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ -n "$AFFECTED_BASE" ]; then
             # The root's checks hold the whole repository, whatever the change.
             if [ "$RUNNER_OS" = Linux ]; then
-              mise exec -- mise run //:check
+              mise run //:check
             fi
-            mise exec -- mise run --affected --affected-base "$AFFECTED_BASE" --affected-head HEAD --affected-committed "$NUS_CHECK_TASK"
+            mise run --affected --affected-base "$AFFECTED_BASE" --affected-head HEAD --affected-committed "$NUS_CHECK_TASK"
           else
             # Main is the full validation boundary used by release assembly.
-            mise exec -- mise run "$NUS_CHECK_TASK"
+            mise run "$NUS_CHECK_TASK"
           fi
         env:
           GH_TOKEN: ${{ github.token }}
           AFFECTED_BASE: ${{ steps.mergiraf-changes.outputs.base }}
           NUS_CHECK_TASK: ${{ runner.os == 'Linux' && '//...:check' || '//...:check:platform' }}
       - if: steps.mergiraf-changes.outputs.run == 'true'
-        run: mise exec -- mise run //mergiraf:test
+        run: mise run //mergiraf:test
       # A push to main saves mise's task results for later runs. mise stores a task's
       # result only when it succeeded.
       - if: ${{ !cancelled() && github.event_name == 'push' }}

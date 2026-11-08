@@ -7,7 +7,7 @@ tool = "docker-compose"
 docker-compose = "5.6.1"
 
 [task_config]
-includes = ["../package.tasks.toml"]
+cache = { enabled = true }
 
 [tasks.spec-export]
 dir = "spec"
@@ -37,3 +37,33 @@ if $exported.stdout != (open --raw ../docker-compose.usage.kdl) {
 [tasks."spec-check:platform"]
 description = "Reproduce the Compose spec on this platform"
 depends = [":spec-check"]
+
+[tasks.spec]
+file = "../../mise-tasks/spec.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks.generate]
+file = "../../mise-tasks/generate.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks.check]
+sources = [
+  "**/*",
+  "../../mise-tasks/**/*.nu",
+  "../../lib/**/*.nu",
+  "../../../target/install/bin/nus",
+]
+outputs = []
+file = "../../mise-tasks/check.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks."check:platform"]
+sources = [
+  "**/*",
+  "../../mise-tasks/**/*.nu",
+  "../../lib/**/*.nu",
+  "../../../target/install/bin/nus",
+]
+outputs = []
+file = "../../mise-tasks/check.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."

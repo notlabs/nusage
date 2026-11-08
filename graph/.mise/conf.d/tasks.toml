@@ -1,0 +1,45 @@
+[_.nusage.project]
+dynamic = ["mise.toml", "check.nu", "assemble.nu"]
+
+[task_config]
+cache = { enabled = true }
+
+[tasks.test]
+run = '''
+nu --no-config-file -c '
+use "{{tools.nutest.path}}/nutest"
+nutest run-tests --fail
+'
+'''
+sources = [
+  "**/*.nu",
+  "**/*.sh",
+  "**/*.toml",
+  "**/*.json",
+  "**/*.kdl",
+  "**/*.gotmpl",
+  "plugin/**/*.lua",
+]
+outputs = []
+
+[tasks.check]
+file = "check.nu"
+depends = [":test"]
+sources = [
+  "**/*.nu",
+  "**/*.sh",
+  "**/*.toml",
+  "**/*.json",
+  "**/*.kdl",
+  "**/*.gotmpl",
+  "plugin/**/*.lua",
+]
+outputs = []
+
+[tasks.assemble]
+sources = ["assemble.nu", "common.nu", "discovery.nu", "materialize.json"]
+shell = "sh -c"
+usage = 'arg "<root>"'
+run = 'exec "$(mise which nu)" --no-config-file "{{config_root}}/assemble.nu" "$usage_root"'
+hide = true
+cache = { enabled = false }

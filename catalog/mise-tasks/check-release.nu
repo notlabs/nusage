@@ -1,5 +1,7 @@
 #!/usr/bin/env nus
 #MISE description="Check interrupted package release recovery without publishing assets"
+#MISE sources=["mise-tasks/**/*.nu", "lib/**/*.nu", "packages/**/*", "../target/install/bin/nus"]
+#MISE outputs=[]
 
 use std/assert
 use ../lib/release.nu prepare-packages

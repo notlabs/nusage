@@ -1,0 +1,1 @@
+{"projects":[{"id":"nu:app","root":"app"},{"id":"nu:shared","root":"shared"}],"configs":[],"tasks":[{"name":"//app:check","source":"app/mise.toml","file":"main.nu","run":[]}]}

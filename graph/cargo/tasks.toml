@@ -1,0 +1,14 @@
+[test]
+run = "cargo test --locked"
+outputs = []
+[clippy]
+run = "cargo clippy --quiet --all-targets --locked -- -D warnings"
+outputs = []
+[doc]
+run = "cargo doc --quiet --no-deps --locked"
+env.RUSTDOCFLAGS = "-D warnings"
+outputs = []
+[check]
+depends = [":test", ":clippy", ":doc"]
+["check:platform"]
+depends = [":test", ":clippy"]

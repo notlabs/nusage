@@ -1,0 +1,29 @@
+name: Set up mise and the project graph
+description: Link the local graph plugin before loading the project environment
+inputs:
+  version:
+    description: Mise version matching the catalog baseline
+    default: 2026.10.21
+runs:
+  using: composite
+  steps:
+    - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      with:
+        version: ${{ inputs.version }}
+        install: false
+        cache: false
+        env: false
+        export_path: false
+    - shell: bash
+      run: mise plugins link nusage-graph ./graph/plugin
+    # The fresh graph is written before its one explicit refusal.
+    - shell: bash
+      run: mise tasks ls --all
+      continue-on-error: true
+    - shell: bash
+      run: mise tasks ls --all
+    - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      with:
+        version: ${{ inputs.version }}
+        install: false
+        cache: false

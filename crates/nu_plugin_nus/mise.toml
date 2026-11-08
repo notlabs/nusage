@@ -1,7 +1,0 @@
-[task_config]
-includes = ["../../tooling/tasks/cargo.tasks.toml"]
-
-[tasks.build]
-run = "cargo install --path . --root ../../target/install --target-dir ../../target --debug --locked"
-sources = ["**/*", "../../Cargo.toml", "../../Cargo.lock", "../../.cargo/**", "../../rust-toolchain.toml"]
-outputs = ["../../target/install/bin/nu_plugin_nus"]

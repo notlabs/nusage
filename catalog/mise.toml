@@ -2,7 +2,7 @@
 # Entry metadata and tasks live under packages/.
 [_.nusage.project]
 # The packaged tasks run in a scratch consumer project, not in this workspace.
-dynamic = ["mise-tasks/check-package.nu"]
+dynamic = ["mise-tasks/check-package.nu", "mise.toml"]
 
 # The task catalog's own version, which release.yml releases.
 [vars]
@@ -12,12 +12,7 @@ catalog_version = "0.1.0"
 
 [tasks."check:platform"]
 description = "Check the catalog's contracts and packaged tasks on this platform"
-depends = [
-    "^check:platform",
-  ":check-package",
-  ":check-release",
-  ":test",
-]
+depends = [":check-package", ":check-release", ":test"]
 
 # CI validates the revision before release assembly. Keep package's checks for local use;
 # both entrypoints run the same script.
@@ -26,6 +21,7 @@ description = "Assemble the task catalog from an already checked revision"
 run = "nus {{config_root}}/mise-tasks/package.nu"
 
 [task_config]
+cache = { enabled = true }
 includes = ["mise-tasks"]
 
 # Beside what the suites load, the files they copy into a scratch workspace.
@@ -45,7 +41,7 @@ nutest run-tests --fail --match-suites $env.usage_match_suites --match-tests $en
 dir = "."
 sources = [
   "packages/**/*.nu",
-  "packages/package.tasks.toml",
+  "packages/*/mise.toml",
   "lib/catalog.nu",
   "lib/support.nu",
 ]

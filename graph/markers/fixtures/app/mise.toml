@@ -1,0 +1,6 @@
+[_.nusage.project]
+depends_add = ["nu:lib"]
+
+[tasks.check]
+depends = ["//lib:check"]
+dir = "../lib"

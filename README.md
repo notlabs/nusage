@@ -1,4 +1,4 @@
-# nusage
+# nusage: bootstrap with `mise plugins link nusage-graph ./graph/plugin`
 
 Typed Nushell commands from usage-annotated scripts, and typed wrappers from the usage specs of binaries and services.
 The command is `nus`, and so is the shebang, `#!/usr/bin/env nus`. Early development.
@@ -55,19 +55,22 @@ The root includes `share/nusage.toml` for tool pins and the `nu` wrapper.
 Libraries and Nutest suites use relative imports because Nushell parses them without a script prelude; no catalog bootstrap release or `NU_LIB_DIRS` is needed.
 The installed `target/install/bin/nus` is the project tool; `//:build` refreshes it.
 
-Install the tools with `mise install --monorepo`, and run tasks through `mise exec -- mise run`:
+After linking the plugin, `mise tasks ls --all` refuses once while writing the graph; run it again.
+Run `mise run //:build` to install the local binaries, then `mise install --monorepo` for the remaining tools.
+Automatic tool installation excludes the local `github:notlabs/nusage` prefix, which Cargo supplies.
+Run tasks normally:
 
 ```sh
-mise exec -- mise run '//catalog/...:check'
-mise exec -- mise run //crates/nusage-spec:check
+mise run '//catalog/...:check'
+mise run //crates/nusage-spec:check
 ```
 
-The graph providers under `graph/` are placeholders until the environment plugin is installed.
-Only native Cargo and Go projects are currently registered; catalog tasks still resolve by path.
-The `nus` tool resolves to `target/install/bin/nus`; each binary crate's build task owns freshness.
+The environment plugin discovers `//graph/...:provider` tasks, runs them under Nu, and projects their records into ignored crate task fragments and `.mise/conf.d/_projects.toml`.
+A changed project graph is written and the command refuses with `project graph changed; run the command again`; the next command reads it.
+Mise caches the hook's result against provider input records in its env cache. This needs a session key, supplied automatically by `mise activate` and inside `mise exec` and tasks. A bare shell without activation recomputes the graph on every command. Set `MISE_ENV_CACHE=0` to force a recompute; the plugin has no cache of its own. `//graph:check` validates provider JSON Lines against the output contract through `nus validate` after the tool is built.
 
-Each crate's check runs its tests, Clippy, documentation checks, and upstream checks; the `nusage` crate's also holds `nus` to the fixtures.
-`//:check` runs every crate's, and `//:build` builds the distributed binaries.
+Each crate's check runs its tests, Clippy and documentation checks, with transitive Cargo inputs; the `nusage` crate's also holds `nus` to the fixtures.
+`mise run //...:check` checks every project; `//:build` installs the distributed binaries.
 
 Mr Boxington manages build targets under the ignored `.cache/mbx-targets` directory.
 The repository's discovery exclusions, `target` among them, keep build artifacts out of the project graph.

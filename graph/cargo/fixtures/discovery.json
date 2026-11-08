@@ -1,0 +1,1 @@
+{"projects":[{"id":"nu:consumer","root":"consumer"},{"id":"cargo:a","root":"crates/a"}],"tasks":[{"name":"//consumer:check","file":"run.nu","source":"consumer/mise.toml","tools":{}}]}

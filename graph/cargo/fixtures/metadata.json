@@ -1,0 +1,69 @@
+{
+  "workspace_root": "/workspace",
+  "workspace_members": [
+    "a",
+    "b",
+    "c"
+  ],
+  "packages": [
+    {
+      "id": "a",
+      "name": "a",
+      "manifest_path": "/workspace/crates/a/Cargo.toml",
+      "targets": [
+        {
+          "name": "nus",
+          "kind": [
+            "bin"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b",
+      "name": "b",
+      "manifest_path": "/workspace/crates/b/Cargo.toml",
+      "targets": [
+        {
+          "name": "b",
+          "kind": [
+            "lib"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c",
+      "name": "c",
+      "manifest_path": "/workspace/crates/c/Cargo.toml",
+      "targets": [
+        {
+          "name": "c",
+          "kind": [
+            "lib"
+          ]
+        }
+      ]
+    }
+  ],
+  "resolve": {
+    "nodes": [
+      {
+        "id": "a",
+        "dependencies": [
+          "b"
+        ]
+      },
+      {
+        "id": "b",
+        "dependencies": [
+          "c"
+        ]
+      },
+      {
+        "id": "c",
+        "dependencies": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "registered": [
+    {
+      "id": "nu:app",
+      "root": "app"
+    },
+    {
+      "id": "nu:lib",
+      "root": "lib"
+    }
+  ],
+  "projects": [
+    {
+      "id": "nu:root",
+      "root": "."
+    },
+    {
+      "id": "nu:app",
+      "root": "app"
+    },
+    {
+      "id": "nu:lib",
+      "root": "lib"
+    }
+  ],
+  "configs": [
+    {
+      "root": "app",
+      "file": "app/mise.toml",
+      "data": {
+        "_": {
+          "nusage": {
+            "project": {
+              "depends_add": [
+                "nu:lib"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "name": "//app:check",
+      "source": "/workspace/app/mise.toml",
+      "depends": [
+        "//lib:check"
+      ],
+      "run": [],
+      "dir": "/workspace/lib"
+    },
+    {
+      "name": "//lib:check",
+      "source": "/workspace/lib/mise.toml",
+      "depends": [],
+      "run": [],
+      "dir": "/workspace/lib"
+    }
+  ]
+}

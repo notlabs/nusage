@@ -1,5 +1,7 @@
 #!/usr/bin/env nus
 #MISE description="Run the packaged tasks from an unrelated consumer project"
+#MISE sources=["mise-tasks/**/*.nu", "lib/**/*.nu", "packages/**/*", "../target/install/bin/nus"]
+#MISE outputs=[]
 use std/assert
 use ../packages/mise *
 

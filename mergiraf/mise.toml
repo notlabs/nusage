@@ -1,6 +1,6 @@
 # Mergiraf, the structural merge tool `jj resolve` runs here, built from its published source
 # with the patches beside it applied: patches/ teaches it Nushell, which it does not know yet.
-# `build` writes the binary where the root's `[env] _.path` looks.
+# `build` writes the binary into target/install/bin beside the local tools.
 # The project `nu:mergiraf`.
 [_.nusage.project]
 

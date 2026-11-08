@@ -1,10 +1,11 @@
 /.jj/
 target/
 /.cache/mbx-targets/
+/.rumdl_cache/
 /mise.local.toml
 /.mise.local.toml
 /catalog/dist/
 
-/go.work
 /go.work.sum
-**/.mise/conf.d/_*.toml
+/.mise/conf.d/_projects.toml
+/crates/*/.mise/conf.d/_cargo.toml

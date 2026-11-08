@@ -1,0 +1,5 @@
+shell = "sh -c"
+run = "cargo install --path . --root ../../target/install --target-dir ../../target --debug --locked"
+outputs = []
+# Installed binaries live outside the crate; mise's result cache forbids such outputs.
+cache = { enabled = false }

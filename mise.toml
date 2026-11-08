@@ -8,8 +8,10 @@ include = ["share/nusage.toml"]
 dynamic = ["share/nushell/autoload/nus.nu"]
 
 [settings]
-# Task result caching uses Mise's experimental features.
+auto_install_disable_tools = ["github:notlabs/nusage"]
 experimental = true
+env_cache = true
+env_cache_ttl = "24h"
 
 [monorepo]
 config_roots = ["[!.]*", "[!.]*/[!.]*", "[!.]*/[!.]*/[!.]*"]
@@ -42,6 +44,7 @@ docker-compose = "5.6.1"
 
 
 [env]
+_.nusage-graph = {}
 # Keep managed target links inside the discovery boundary; the object store remains shared.
 MBX_TARGET_ROOT = "{{config_root}}/.cache/mbx-targets"
 # Carry `.miserc.toml`'s exclusions into nested mise invocations: the variable replaces the
@@ -50,7 +53,7 @@ MISE_IGNORED_CONFIG_PATHS = "{{env.MBX_TARGET_ROOT}}{% if os() == 'windows' %};{
 
 [tasks.check]
 description = "The root's own checks"
-depends = [":lint", ":test", "./crates/...:check"]
+depends = [":lint", ":test"]
 
 [tools."http:nutest"]
 version = "1.2.0"
@@ -58,37 +61,9 @@ url = "https://github.com/vyadh/nutest/releases/download/v1.2.0/nutest-1.2.0.zip
 strip_components = 1
 bin_path = "."
 
-# Beside what the suites load, the configuration they copy into their scratch workspaces.
 [tasks.test]
-description = "Run the root Nutest suites"
-usage = '''
-flag "--match-suites <pattern>" default=".*" help="Regex selecting discovered suites"
-flag "--match-tests <pattern>" default=".*" help="Regex selecting tests"
-'''
-run = '''
-nu --no-config-file -c '
-use "{{tools.nutest.path}}/nutest"
-nutest run-tests --path tooling/lib --fail --match-suites $env.usage_match_suites --match-tests $env.usage_match_tests
-'
-'''
-
-dir = "."
-sources = [
-  "tooling/lib/**/*.nu",
-  "tooling/tasks/cargo.tasks.toml",
-  "catalog/packages/mise/**/*.nu",
-  "mise.toml",
-  ".miserc.toml",
-  "crates/nusage/mise.toml",
-]
-outputs = []
-cache = { enabled = true, command_inputs = [
-  "mise --version",
-], env = [
-  "GOOS",
-  "GOARCH",
-  "GOFLAGS",
-] }
+description = "Run graph and provider Nutest suites"
+depends = ["//graph:test"]
 
 # The released nusage for this user: fragments of the global mise config that
 # `mise dot apply` links into place.
@@ -142,12 +117,22 @@ depends = ["./crates/...:test"]
 [tasks.clippy]
 depends = ["./crates/...:clippy"]
 
-[tasks.docs]
-depends = ["./crates/...:docs"]
+[tasks.doc]
+depends = ["./crates/...:doc"]
 
 [tasks.lint]
 file = ".mise/tasks/lint.nu"
-depends = [":clippy", ":docs"]
+cache = { enabled = true }
+sources = [
+  "**/*",
+  "!target/**",
+  "!.cache/**",
+  "!.git/**",
+  "!.jj/**",
+  "!.rumdl_cache/**",
+  "!catalog/dist/**",
+]
+outputs = []
 
 # CI runs `check` once, on Linux, and this on each platform.
 [tasks."check:platform"]

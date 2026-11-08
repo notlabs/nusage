@@ -1,29 +1,13 @@
-[task_config]
-includes = ["../../tooling/tasks/cargo.tasks.toml"]
+[env]
+NUS_CORPUS = { value = "{{ tools['usage-source'].path }}/corpus", tools = true }
 
-[tasks.test]
-sources = ["fixtures/**/*", "schemas/inspection.schema.json"]
-outputs = []
-env.NUS_CORPUS = "{{ tools['usage-source'].path }}/corpus"
-
-[tasks.clippy]
-sources = ["schemas/inspection.schema.json"]
-outputs = []
-
-# The installed nus binary is an input to fixture verification.
 [tasks.verify-fixtures]
-description = "Hold nusage to its fixtures"
+file = "fixtures/verify.nu"
 sources = ["fixtures/**/*", "../../target/install/bin/nus"]
 outputs = []
-file = "fixtures/verify.nu"
 
 [tasks.check]
-depends = [":verify-fixtures"]
+depends = [":test", ":clippy", ":doc", ":verify-fixtures"]
 
 [tasks."check:platform"]
-depends = [":verify-fixtures"]
-
-[tasks.build]
-run = "cargo install --path . --root ../../target/install --target-dir ../../target --debug --locked"
-sources = ["**/*", "../../Cargo.toml", "../../Cargo.lock", "../../.cargo/**", "../../rust-toolchain.toml"]
-outputs = ["../../target/install/bin/nus"]
+depends = [":test", ":clippy", ":verify-fixtures"]
