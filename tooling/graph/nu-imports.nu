@@ -1,3 +1,5 @@
+#!/usr/bin/env nus
+#USAGE arg "[root]" default="."
 # The workspace's Nushell references, as typed records in `.cache/graph/nu.json` for the
 # project graph: the modules and scripts each file loads or names by a path beside itself,
 # and the tasks it runs. Only literal targets resolve; a computed one is recorded as dynamic
@@ -316,10 +318,12 @@ def analyze [root: string] {
     write-if-changed $output $content | ignore
 }
 
-def main [root: path = "."] {
+def write-imports [root: path] {
     try {
         analyze ($root | path expand)
     } catch {|err|
         $err | report-failure nu-imports
     }
 }
+
+write-imports $usage.args.root

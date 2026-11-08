@@ -1,7 +1,7 @@
 # Entry metadata lives in packages/<tool>/mise.toml under [_.nusage.catalog].
 # Mise discovers the projects; the directory supplies the entry's name.
 
-use mise *
+use ../packages/mise *
 use support.nu schema_overlay
 
 # The directory the packages are under: the config root mise runs the task in.

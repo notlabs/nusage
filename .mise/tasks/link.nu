@@ -12,7 +12,6 @@
 # where nus is a link to the checkout's own, so a rebuild reaches the project without
 # linking again.
 
-use mise *
 
 let root = $env.MISE_PROJECT_ROOT? | default $env.PWD
 let project = $usage.args.project | path expand

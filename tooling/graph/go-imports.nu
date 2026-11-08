@@ -1,3 +1,5 @@
+#!/usr/bin/env nus
+#USAGE arg "[root]" default="."
 # The imports, test imports included, between the workspace's Go modules, as typed edges in
 # `.cache/graph/go.json` for the project graph.
 use common.nu *
@@ -49,10 +51,12 @@ def analyze [root: string] {
     write-if-changed $output ({modules: $modules, edges: $edges} | to json --indent 2) | ignore
 }
 
-def main [root: path = "."] {
+def write-imports [root: path] {
     try {
         analyze ($root | path expand)
     } catch {|err|
         $err | report-failure go-imports
     }
 }
+
+write-imports $usage.args.root

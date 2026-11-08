@@ -1,6 +1,6 @@
 use std/assert
 use std/testing *
-use mise *
+use ../../catalog/packages/mise *
 
 const project = path self | path dirname | path dirname | path dirname
 const tasks = path self | path dirname | path join ../tasks/cargo.tasks.toml
@@ -13,7 +13,7 @@ def --wrapped checked [...args: string] {
 
 @test
 def "shared Cargo tasks follow native edges and scope cached inputs to their consumers" [] {
-    let rust = open ($project | path join mise.toml) | get task_config | reject includes
+    let rust = open ($project | path join mise.toml) | get task_config | reject includes | update shell $'"($nu.current-exe)" -c'
     let cli = open ($project | path join crates nusage mise.toml)
     let scratch = mktemp -d | path expand
     let result = try {
@@ -37,8 +37,8 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
                 monorepo: {config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]}
                 settings: {experimental: true}
                 env: {
-                    NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep))
-                    _: {path: ($env.PATH | prepend ($scratch | path join .bin))}
+                    NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
+                    _: {path: ($env.PATH | prepend ($nu.current-exe | path dirname) | prepend ($scratch | path join .bin))}
                     GRAPH_LOG: ($scratch | path join events)
                 }
                 # The shared tasks hold their graph to the one on disk through the root's guard.
@@ -55,7 +55,11 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
                 mkdir ($dir | path join src)
                 {package: {name: $name, version: "0.1.0"}} | to toml | save ($dir | path join Cargo.toml)
                 "" | save ($dir | path join src lib.rs)
-                mut config = {task_config: {includes: ["../../tooling/tasks/cargo.tasks.toml"]}}
+                # Each discovered config root opts into caching; the workspace does not cascade.
+                mut config = {task_config: {
+                    includes: ["../../tooling/tasks/cargo.tasks.toml"]
+                    cache: $rust.cache
+                }}
                 if $name == a {
                     $config = $config | merge {tasks: {
                         test: {sources: $cli.tasks.test.sources, outputs: $cli.tasks.test.outputs}
@@ -79,18 +83,18 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
 
             # A warm run reuses all three checks.
             checked mise run //crates/a:check | ignore
-            assert not ("events" | path exists)
+            assert not ("events" | path exists) (if ("events" | path exists) { open --raw events } else { "no events" })
 
-            # Fixture changes rerun only the CLI's tests.
+            # Fixtures now live inside the CLI crate, so only that crate's checks rerun.
             "# changed fixture\n" | save --append crates/a/fixtures/example.nu
             checked mise run //crates/a:check | ignore
-            assert equal (open --raw events | lines) [a:test]
+            assert equal (open --raw events | lines | sort) [a:clippy a:doc a:test]
             rm events
 
-            # The schema is compiled into the CLI's tests, also checked by Clippy.
+            # The co-located schema is another CLI-crate input, without invalidating upstream crates.
             " \n" | save --append crates/a/schemas/inspection.schema.json
             checked mise run //crates/a:check | ignore
-            assert equal (open --raw events | lines | sort) [a:clippy a:test]
+            assert equal (open --raw events | lines | sort) [a:clippy a:doc a:test]
             rm events
 
             # Native upstream edges carry invalidation into the consumer's cache key.
@@ -114,7 +118,7 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
             mkdir .github/workflows
             "name: release\n" | save .github/workflows/release.yml
             checked mise run //crates/a:check | ignore
-            assert not ("events" | path exists)
+            assert not ("events" | path exists) (if ("events" | path exists) { open --raw events } else { "no events" })
 
             # Included task definitions are tracked automatically.
             "# changed definition\n" | save --append tooling/tasks/cargo.tasks.toml

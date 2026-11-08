@@ -1,7 +1,8 @@
+#!/usr/bin/env nus
 # Whether the project graph this mise process resolved its tasks from is the one on disk: the
 # `auto` providers run after `mise run` resolves its tasks, so a run that found them stale
 # resolved its tasks from the graph they then replaced.
-def main [] {
+def check-current [] {
     let file = ".mise/conf.d/_project-graph.toml"
     let current = if ($file | path exists) {
         open $file | get -o vars.project_graph | default ""
@@ -14,3 +15,5 @@ def main [] {
         }
     }
 }
+
+check-current

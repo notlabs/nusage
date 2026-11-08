@@ -1,7 +1,6 @@
 #!/usr/bin/env nus
 #MISE description="Run the packaged tasks from an unrelated consumer project"
 use std/assert
-use mise *
 
 const tasks = path self | path dirname
 
@@ -93,7 +92,7 @@ assert equal (demo).ok true
 
 let checked = try {
     with-env {
-        NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep))
+        NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
         MISE_CONFIG_ROOT: $consumer
         MISE_CONFIG_DIR: ($scratch | path join config)
         MISE_TRUSTED_CONFIG_PATHS: $scratch
@@ -103,6 +102,9 @@ let checked = try {
         cd $consumer
         let packed = ^nus ($tasks | path join package.nu) --out $package | complete
         assert equal $packed.exit_code 0 $packed.stderr
+        # Packaged tasks must use the bundled library, without this repository's module map.
+        $env.NUS_MODULES = "{}"
+        $env.NUS_TOOLS = "{}"
         let names = mise tasks ls | get name | where $it != "//packages/demo:check" | each { str replace --regex "^//:" "" } | sort
         assert equal $names [catalog:check catalog:generate catalog:spec]
         for task in [catalog:spec catalog:generate catalog:check] {

@@ -1,9 +1,10 @@
+#!/usr/bin/env nus
+#USAGE arg "[root]" default="."
 # The project graph mise reads, as native overrides in `.mise/conf.d/_project-graph.toml`: a
 # project for each config root that declares one, named for its kind, and typed edges from
 # declared dependencies, catalog specs, task directories and the Go and Nushell analyzers.
 # A config root whose Nushell test suites load other files gets the `nu-test` input group
 # of them, in its own `.mise/conf.d/_nu-inputs.toml`.
-use mise *
 use common.nu *
 
 const graph_file = ".mise/conf.d/_project-graph.toml"
@@ -390,10 +391,12 @@ def prepare [root: string] {
     }
 }
 
-def main [root: path = "."] {
+def build-graph [root: path] {
     try {
         prepare ($root | path expand)
     } catch {|err|
         $err | report-failure project-graph
     }
 }
+
+build-graph $usage.args.root

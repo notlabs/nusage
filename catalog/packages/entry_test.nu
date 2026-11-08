@@ -18,6 +18,8 @@ def "included entry tasks retain local context Usage and upstream checks" [] {
         for file in [catalog.nu support.nu] {
             cp ($here | path join ../lib $file) ($scratch | path join catalog lib $file)
         }
+        mkdir ($scratch | path join catalog packages mise)
+        cp ($here | path join mise mod.nu) ($scratch | path join catalog packages mise mod.nu)
         for name in [spec generate check] {
             let script = '#!' + $nu.current-exe + (char nl) + '#USAGE flag "--probe" help="Fixture flag"' + (char nl) + 'use std/assert
 use ../lib/catalog.nu [entries root]
@@ -49,7 +51,7 @@ assert equal ($selected | length) 1
                 }
                 settings: {experimental: true}
                 env: {
-                    NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep))
+                    NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
                     GRAPH_LOG: ($scratch | path join events)
                 }
                 # The entry checks hold their graph to the one on disk through the root's guard.

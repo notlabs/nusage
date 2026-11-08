@@ -102,7 +102,7 @@ const root = path self | path dirname | path dirname | path dirname
 let scratch = mktemp -d
 
 let outcome = try {
-    let fixture = open ($root | path join catalog lib gh schemas examples.nuon) | where id == bot-author | first | get document
+    let fixture = open ($root | path join catalog packages gh schemas examples.nuon) | where id == bot-author | first | get document
     [$fixture] | to json | save ($scratch | path join response.json)
     '#!/usr/bin/env nu
 def --wrapped main [...args: string] {

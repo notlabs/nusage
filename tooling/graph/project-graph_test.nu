@@ -1,5 +1,5 @@
 use std/assert
-use mise *
+use ../../catalog/packages/mise *
 use std/testing *
 
 const here = path self | path dirname
@@ -46,7 +46,7 @@ def provider-config [] {
     let config = open ($here | path dirname | path dirname | path join mise.toml)
     let scripts = {go-workspace: $workspace, go-imports: $go_imports, nu-imports: $nu_imports, project-graph: $assembler}
     $providers | reduce --fold {} {|name, acc|
-        $acc | insert $name ($config.deps | get $name | update run $'nu "($scripts | get $name)" && echo ($name) >> provider-runs')
+        $acc | insert $name ($config.deps | get $name | update run $'nus "($scripts | get $name)" && echo ($name) >> provider-runs')
     }
 }
 
@@ -57,7 +57,7 @@ def runs-since [count: int] {
 
 def isolated [scratch: string] {
     {
-        NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep))
+        NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
         MISE_CONFIG_DIR: ($scratch | path join config)
         MISE_DATA_DIR: ($scratch | path join data)
         MISE_CACHE_DIR: ($scratch | path join cache)
@@ -77,7 +77,7 @@ def "discovered projects carry kinds and typed edges that drive caret tasks and 
         with-env (isolated $scratch) {
             cd $scratch
             mkdir bin crates/a/src crates/b/src services/a services/b consumer bridge samples generator entries/alpha
-            for command in [nus cargo] {
+            for command in [cargo] {
                 '#!/bin/sh
 echo unexpected > "$GRAPH_LOG.unexpected"
 exit 99
@@ -89,11 +89,11 @@ exit 99
                 monorepo: {config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]}
                 settings: {experimental: true}
                 task_config: {cache: {enabled: false}}
-                env: {NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep)), _: {path: ($env.PATH | prepend ($scratch | path join bin))}, GRAPH_LOG: ($scratch | path join events)}
+                env: {NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS, _: {path: ($env.PATH | prepend ($nu.current-exe | path dirname) | prepend ($scratch | path join bin))}, GRAPH_LOG: ($scratch | path join events)}
                 _: {nusage: {project: {depends_add: ["nu:bridge"]}}}
                 deps: (provider-config)
                 tasks: {
-                    graph-current: {env: {NUS_LOADED_GRAPH: "{{ vars.project_graph | default(value='') }}"}, run: $'nu "($guard)"'}
+                    graph-current: {env: {NUS_LOADED_GRAPH: "{{ vars.project_graph | default(value='') }}"}, run: $'nus "($guard)"'}
                     root-check: {depends: ["//:graph-current" "^build" "^check"], run: 'echo root-check >> "$GRAPH_LOG"'}
                     root-platform: {depends: ["^build" "^check:platform"], run: 'echo root-platform >> "$GRAPH_LOG"'}
                 }
@@ -341,7 +341,7 @@ import _ "example.test/missing"
             assert equal (open --raw $output) $previous
             "package a\n" | save --force services/a/a.go
             "invalid [toml" | save --force $output
-            checked nu $assembler | ignore
+            checked nus $assembler | ignore
             assert (graph | any {|p| $p.id == nu:consumer })
         }
         null
@@ -361,7 +361,7 @@ def "the graph refuses what mise would drop or what the kinds forbid" [] {
                 monorepo_root: true
                 monorepo: {config_roots: ["[!.]*"]}
                 settings: {experimental: true}
-                env: {NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep)), _: {path: $env.PATH}}
+                env: {NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS, _: {path: ($env.PATH | prepend ($nu.current-exe | path dirname))}}
                 deps: (provider-config)
             } | to toml | save mise.toml
             {_: {nusage: {project: {}}}, tasks: {check: {run: "true"}}} | to toml | save app/mise.toml
@@ -434,7 +434,7 @@ def "managed target configurations stay outside the discovered project graph" []
         checked ln -s ($targets | path join view) ($scratch | path join target) | ignore
         cp ($project | path join .miserc.toml) ($scratch | path join .miserc.toml)
         with-env {
-            NU_LIB_DIRS: ($env.NU_LIB_DIRS | str join (char esep))
+            NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
             MISE_CONFIG_DIR: ($scratch | path join .config)
             MISE_DATA_DIR: ($scratch | path join .data)
             MISE_CACHE_DIR: ($scratch | path join .cache)
@@ -448,10 +448,10 @@ def "managed target configurations stay outside the discovered project graph" []
                 monorepo: {config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]}
                 settings: {experimental: true}
                 env: {
-                    NU_LIB_DIRS: $env.NU_LIB_DIRS
+                    NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
                     MBX_TARGET_ROOT: $config.env.MBX_TARGET_ROOT
                     MISE_IGNORED_CONFIG_PATHS: $config.env.MISE_IGNORED_CONFIG_PATHS
-                    _: {path: $env.PATH}
+                    _: {path: ($env.PATH | prepend ($nu.current-exe | path dirname))}
                 }
                 deps: (provider-config)
             } | to toml | save mise.toml

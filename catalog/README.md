@@ -28,6 +28,11 @@ The include also makes `nu` the `nus nu` wrapper; run `mise reshim` after adding
 An interactive Nushell gets the packages from `nus activate nu`, as the root README describes.
 
 The tasks are also published as the OCI task catalog `ghcr.io/notlabs/nusage-tasks`, for a monorepo with its own discovered entry projects and `[_.nusage.catalog]` metadata: `[task_config] includes = ["oci::ghcr.io/notlabs/nusage-tasks:<version>"]`.
+The task catalog bundles its `mise` library from the committed `packages/mise/mod.nu`,
+so an unrelated consumer needs no bootstrap module or `NU_LIB_DIRS`.
+Repository scripts resolve catalog calls through the root `NUS_MODULES` mapping; imported
+libraries keep explicit relative imports.
+
 They need `nus`, `nu` and `usage` on PATH; a `clap` entry also Cargo and rustfmt, an `openapi` entry `openapi-usage`.
 
 ## Release

@@ -11,7 +11,7 @@ def --wrapped checked [...args: string] {
 
 # The analysis of a scratch tree: its references without `include`, and its carets.
 def analyze [scratch: string] {
-    checked nu $analyzer $scratch | ignore
+    checked nus $analyzer $scratch | ignore
     open ($scratch | path join .cache graph nu.json)
 }
 

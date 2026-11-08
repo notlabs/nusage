@@ -5,7 +5,6 @@
 # The OCI directory holds the tasks under `catalog/`, so that a consumer's
 # `task_config.includes` names each `catalog:<task>`; this task and the module they share are
 # not tasks there. The modules themselves are released as packages of their own, by `pack`.
-use mise *
 use ../lib/catalog.nu *
 use ../lib/support.nu *
 
@@ -21,7 +20,9 @@ let out = root | path join $usage.flags.out
 let oci = $out | path join oci
 rm --recursive --force $oci
 mkdir ($oci | path join catalog)
-cp ($tasks | path join ../lib/catalog.nu) ($oci | path join catalog catalog.nu)
+open --raw ($tasks | path join ../lib/catalog.nu)
+| str replace '../packages/mise' '.support/mise'
+| save --force ($oci | path join catalog catalog.nu)
 for file in [spec.nu generate.nu check.nu] {
     open --raw ($tasks | path join $file)
     | str replace --all '../lib/catalog.nu' 'catalog.nu'
@@ -30,10 +31,9 @@ for file in [spec.nu generate.nu check.nu] {
     | save --force ($oci | path join catalog $file)
     ^chmod +x ($oci | path join catalog $file)
 }
-# Bundle the public bootstrap module; the task catalog also works outside this checkout.
-let bootstrap = mise where http:catalog-bootstrap --cd ($tasks | path dirname) | str trim
-mkdir ($oci | path join catalog mise)
-cp ($bootstrap | path join lib mise mod.nu) ($oci | path join catalog mise mod.nu)
+# Bundle the committed mise module, so consumers need no bootstrap release or search path.
+mkdir ($oci | path join catalog .support mise)
+cp ($tasks | path join ../packages/mise/mod.nu) ($oci | path join catalog .support mise mod.nu)
 # Hidden from mise's task discovery, but shipped with the scripts that import them.
 let helpers = [
     {name: actions, source: $actions, relative: .support/actions.nu}

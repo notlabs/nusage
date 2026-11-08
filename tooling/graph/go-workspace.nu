@@ -1,3 +1,5 @@
+#!/usr/bin/env nus
+#USAGE arg "[root]" default="."
 # The ignored `go.work` over every Go module in the workspace's source directories, which
 # mise's Go provider discovers projects from.
 use common.nu *
@@ -23,10 +25,12 @@ def prepare [root: string] {
     }
 }
 
-def main [root: path = "."] {
+def prepare-workspace [root: path] {
     try {
         prepare ($root | path expand)
     } catch {|err|
         $err | report-failure go-workspace
     }
 }
+
+prepare-workspace $usage.args.root
