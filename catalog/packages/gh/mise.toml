@@ -1,5 +1,5 @@
 [_.nusage.catalog]
-spec = { run = "mise run //catalog/generators/cobra:gh", probe = "version" }
+spec = { run = "mise run //catalog/packages/gh:spec-export", probe = "version" }
 version = "0.2.0"
 tool = "gh"
 
@@ -8,3 +8,9 @@ gh = "2.103.3"
 
 [task_config]
 includes = ["../package.tasks.toml"]
+
+[tasks.spec-export]
+file = "spec.nu"
+
+[tasks.spec-json-fields]
+run = "nus {{config_root}}/spec.nu --json-fields | save --force {{config_root}}/json-fields.json"

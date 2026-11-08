@@ -9,7 +9,7 @@
 # are written against, and a bump means holding them to the new source with `check`.
 "http:mergiraf-source" = { version = "0.20.0", url = "https://static.crates.io/crates/mergiraf/mergiraf-{{ version }}.crate", format = "tar.gz", strip_components = 1, bin_path = "doc", checksum = "sha256:4a7be1108bbb7d636476c790bb512f80351433fabbc481fefe78a2e36eaacb0e" }
 
-# The tasks print annotations through `.mise/lib/actions.nu`, so each interleaves its output
+# The tasks print annotations through `actions/mod.nu`, so each interleaves its output
 # and is quiet, since mise would print these scripts whole. A task's `env`
 # is rendered with the tools of the task's own config root, which the source is one of; a
 # `run` script sees only the root's from `//`, so the source comes in as variables.
@@ -53,7 +53,7 @@ arg "<bin>" help="Output directory relative to the repository root"
 output = "interleave"
 env = { MERGIRAF_VERSION = "{{ tools['mergiraf-source'].version }}" }
 run = '''
-use "{{ config_root }}/../.mise/lib/actions.nu" *
+use "{{ config_root }}/../actions/mod.nu" *
 let target = "{{ config_root }}/../target" | path expand
 let work = $target | path join mergiraf-source
 let build = ^cargo build --quiet --profile $env.usage_profile --locked --manifest-path ($work | path join Cargo.toml) --target-dir ($target | path join mergiraf) --message-format json-render-diagnostics
@@ -88,10 +88,10 @@ description = "Merge each case of the Nushell patch with the Mergiraf built and 
 depends = [[":compile", "dev", "target/mergiraf-test"]]
 output = "interleave"
 quiet = true
-sources = ["patches/*.patch", "../.mise/lib/actions.nu"]
+sources = ["patches/*.patch", "../actions/mod.nu"]
 outputs = []
 run = '''
-use "{{ config_root }}/../.mise/lib/actions.nu" *
+use "{{ config_root }}/../actions/mod.nu" *
 let patch = "{{ config_root }}/patches/0001-Add-Nushell-support.patch"
 let binary = "{{ config_root }}/../target/mergiraf-test/mergiraf" | path expand
 let cases = "{{ config_root }}/../target/mergiraf-source/tests/data/nushell/working" | path expand
@@ -127,11 +127,11 @@ if ($failed | is-not-empty) {
 description = "Hold the patches to the pinned Mergiraf source: each applies"
 output = "interleave"
 quiet = true
-sources = ["patches/*.patch", "../.mise/lib/actions.nu"]
+sources = ["patches/*.patch", "../actions/mod.nu"]
 outputs = []
 env = { MERGIRAF_SOURCE = "{{ tools['mergiraf-source'].path }}", MERGIRAF_VERSION = "{{ tools['mergiraf-source'].version }}" }
 run = '''
-use "{{ config_root }}/../.mise/lib/actions.nu" *
+use "{{ config_root }}/../actions/mod.nu" *
 let work = (mktemp -d) | path join source
 cp -r $env.MERGIRAF_SOURCE $work
 for patch in (glob "{{ config_root }}/patches/*.patch" | sort) {

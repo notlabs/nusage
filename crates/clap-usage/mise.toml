@@ -1,7 +1,3 @@
-# The generator `gen:clap`: entries with a clap spec depend on it.
-[_.nusage.project]
-kind = "gen"
-
 [tasks.test]
 description = "The crate's tests"
 run = "cargo test --locked"

@@ -5,6 +5,7 @@
 # and the tasks it runs. Only literal targets resolve; a computed one is recorded as dynamic
 # for the project graph to reject or accept.
 use common.nu *
+use ../../catalog/packages/mise *
 
 const load_kinds = {
     "use": nu-use

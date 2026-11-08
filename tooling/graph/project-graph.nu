@@ -6,6 +6,7 @@
 # A config root whose Nushell test suites load other files gets the `nu-test` input group
 # of them, in its own `.mise/conf.d/_nu-inputs.toml`.
 use common.nu *
+use ../../catalog/packages/mise *
 
 const graph_file = ".mise/conf.d/_project-graph.toml"
 const inputs_file = ".mise/conf.d/_nu-inputs.toml"
@@ -17,7 +18,7 @@ const native_kinds = [cargo go gradle node uv]
 const data_kinds = [fixtures schemas]
 
 # The generator each kind of catalog spec source names, besides a task `mise run` runs.
-const spec_generators = {clap: "gen:clap", openapi: "cargo:openapi-usage"}
+const spec_generators = {clap: "cargo:clap-usage", openapi: "cargo:openapi-usage"}
 
 def task-root [name: string]: nothing -> any {
     let root = $name | parse --regex '^//(?<root>[^:]*):' | get -o root.0
@@ -246,7 +247,7 @@ def prepare [root: string] {
                     do $resolve $run $config.root | default [] | each {|r| (do $at $r | default (do $owner $r)).id }
                 } else { [] }
             )
-            for generator in $generators {
+            for generator in ($generators | where $it != $from.id) {
                 if not ($projects | any {|p| $p.id == $generator }) {
                     $problems = $problems | append $"($config.catalog.file): spec names generator ($generator), which is no project"
                     continue

@@ -1,7 +1,7 @@
 // Export gh's command tree through Usage's Cobra adapter, without running a command, reading
 // a configuration file, loading an extension or touching the network.
 //
-// This file is not built where it is committed. `catalog/generators/cobra/gh.nu` copies it into a
+// This file is not built where it is committed. `catalog/packages/gh/spec.nu` copies it into a
 // checkout of cli/cli at the tag `pin.toml` names, as `cmd/nusage-spec/main.go`, where it may
 // import the internal packages the root command's constructor takes, as the upstream
 // documentation generator does; a module of its own could not. It is given the tag, and

@@ -67,7 +67,7 @@ export def files [tool: string]: nothing -> record {
 
 # How the entry's spec is obtained, the one key of its `spec`: `run`, a command line that
 # prints the tool's own; `clap`, for a binary whose crate builds its clap command, the
-# directory under the package of the extractor `../generators/clap/spec.nu` builds and runs; `openapi`,
+# directory under the package of the extractor `../../crates/clap-usage/spec.nu` builds and runs; `openapi`,
 # for a service, the OpenAPI document under the package that `openapi-usage` writes as a spec
 # with the HTTP mapping and the schemas beside it.
 export def spec-kind [entry: record]: nothing -> string {

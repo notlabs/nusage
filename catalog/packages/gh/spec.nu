@@ -1,7 +1,7 @@
 #!/usr/bin/env nus
 #USAGE flag "--json-fields" help="Print the fields each command's `--json` accepts, as JSON, instead of the spec"
 # gh's root command is constructed from internal packages, which only code inside the
-# upstream module may import. So the extractor, `../../packages/gh/spec/main.go`, is built there: the
+# upstream module may import. So the extractor, `spec/main.go`, is built there: the
 # repository is cloned at the tag `pin.toml` names, under the user's cache directory, the file
 # is copied in as `cmd/nusage-spec/main.go`, the adapter is added to the checkout's module at
 # the pinned version, and `go run` prints what the extractor exports. The checkout is kept for
@@ -9,7 +9,7 @@
 # one on PATH is older.
 const here = path self | path dirname
 
-let package = $here | path join .. .. packages gh spec | path expand
+let package = $here | path join spec | path expand
 let pin = open ($package | path join pin.toml)
 let cache = $env.XDG_CACHE_HOME? | default ($env.HOME | path join .cache) | path join nusage-catalog cli-cli $pin.gh.tag
 

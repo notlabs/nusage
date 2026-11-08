@@ -1,0 +1,7 @@
+# Root task discovery loads these templates through .mise/conf.d/graph.toml.
+[_.nusage.project]
+
+[task_templates.provider]
+description = "Emit graph provider records as JSON Lines"
+tags = ["graph-provider"]
+usage = 'include file="{{config_root}}/../provider.usage.kdl"'

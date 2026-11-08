@@ -284,6 +284,12 @@
           "string",
           "null"
         ]
+      },
+      "tags": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
       }
     },
     "required": [

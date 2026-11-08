@@ -1,9 +1,5 @@
-# Its own workspace, apart from nusage's: nusage reads specs and never links a binary's crate,
-# so neither usage's clap conversion nor an extractor's dependencies ride along in its build.
-[workspace]
-
 [package]
-name = "clap-spec"
+name = "clap-usage"
 description = "The usage spec of a binary whose interface is the clap command its crate builds"
 version = "0.1.0"
 edition = "2024"
@@ -22,3 +18,6 @@ clap = { version = "4.6", default-features = false, features = [
   "std",
   "string",
 ] }
+
+[lib]
+name = "clap_spec"

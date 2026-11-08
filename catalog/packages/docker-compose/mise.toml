@@ -1,5 +1,5 @@
 [_.nusage.catalog]
-spec = { run = "mise run //catalog/generators/cobra:compose", probe = "version" }
+spec = { run = "mise run //catalog/packages/docker-compose:spec-export", probe = "version" }
 version = "0.2.0"
 tool = "docker-compose"
 
@@ -8,3 +8,32 @@ docker-compose = "5.6.1"
 
 [task_config]
 includes = ["../package.tasks.toml"]
+
+[tasks.spec-export]
+dir = "spec"
+run = "go run -mod=readonly ."
+
+[tasks.spec-check]
+description = "Reproduce the Compose spec despite environment overrides"
+dir = "spec"
+run = '''
+let exported = with-env {
+    COMPOSE_ENV_FILES: "/tmp/catalog-example.env"
+    COMPOSE_PROGRESS: "plain"
+    COMPOSE_REMOVE_ORPHANS: "true"
+    BUILDX_BUILDER: "catalog-example"
+    DOCKER_HOST: "unix:///tmp/catalog-example.sock"
+} {
+    ^go run -mod=readonly . | complete
+}
+if $exported.exit_code != 0 {
+    error make {msg: $exported.stderr}
+}
+if $exported.stdout != (open --raw ../docker-compose.usage.kdl) {
+    error make {msg: "The isolated Cobra export differs from the committed spec"}
+}
+'''
+
+[tasks."spec-check:platform"]
+description = "Reproduce the Compose spec on this platform"
+depends = [":spec-check"]

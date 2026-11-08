@@ -75,7 +75,6 @@ A config root that declares `[_.nusage.project]` or `[_.nusage.catalog]` is a pr
 | ID | Project |
 | --- | --- |
 | `catalog:<entry>` | A catalog entry: `[_.nusage.catalog]` |
-| `gen:<name>` | A generator an entry's spec comes from: `kind = "gen"` |
 | `fixtures:<name>`, `schemas:<name>` | Data other projects read, depending on nothing: `kind` and `name` |
 | `nu:<name>` | Any other project; `nu:root` is the repository root |
 

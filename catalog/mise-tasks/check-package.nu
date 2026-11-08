@@ -1,6 +1,7 @@
 #!/usr/bin/env nus
 #MISE description="Run the packaged tasks from an unrelated consumer project"
 use std/assert
+use ../packages/mise *
 
 const tasks = path self | path dirname
 

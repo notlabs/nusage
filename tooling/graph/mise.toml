@@ -1,4 +1,5 @@
 [_.nusage.project]
+name = "legacy-graph"
 
 [tasks.test]
 description = "Run graph Nutest suites"

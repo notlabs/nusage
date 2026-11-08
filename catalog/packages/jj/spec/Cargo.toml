@@ -15,6 +15,6 @@ bin = "jj"
 crate = "jj-cli"
 
 [dependencies]
-clap-spec = { path = "../../../generators/clap" }
+clap-spec = { package = "clap-usage", path = "../../../../crates/clap-usage" }
 # With its default features, as the released binary is built: `git` adds `jj git`.
 jj-cli = "=0.46.0"
