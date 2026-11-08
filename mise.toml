@@ -23,6 +23,7 @@ run = "mise run --no-deps '//crates/...:build'"
 
 [task_config]
 includes = [".mise/tasks"]
+global_inputs = ["mise.toml"]
 # A task that declares what it reads, and what it writes or that it writes nothing, keeps
 # its result in mise's task cache.
 shell = "nu -c"

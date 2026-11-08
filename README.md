@@ -75,9 +75,12 @@ Each crate's check runs its tests, Clippy and documentation checks, with transit
 Mr Boxington manages build targets under the ignored `.cache/mbx-targets` directory.
 The repository's discovery exclusions, `target` among them, keep build artifacts out of the project graph.
 
-Infrastructure tests are co-located `*_test.nu` suites run by Nutest; a config root's suites, and what they load, are its generated `nu-test` input group:
+Infrastructure tests are co-located `*_test.nu` suites run by Nutest; each config root owns its test task and declares its inputs:
 
 ```sh
-mise exec -- mise run //:test
-mise exec -- mise run //catalog:test
+mise run //:test
+mise run //catalog:test
 ```
+
+`//graph:test`, included in the root check, tests the affected-selection matrix in isolated JJ workspaces with independent Git baselines.
+It inspects `--affected-json` and forgets each workspace and removes its temporary directory after success or failure.

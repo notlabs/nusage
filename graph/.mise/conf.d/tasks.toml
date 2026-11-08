@@ -8,7 +8,8 @@ cache = { enabled = true }
 run = '''
 nu --no-config-file -c '
 use "{{tools.nutest.path}}/nutest"
-nutest run-tests --fail
+let results = nutest run-tests --fail --strategy {threads: 1} --returns table --display terminal
+$results | get output | flatten | each { print $in } | ignore
 '
 '''
 sources = [
