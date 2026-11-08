@@ -28,7 +28,7 @@ Type annotations such as `arg (int)"<n>"` are kept from the header and the sidec
 ## Editors
 
 `nus lsp` is Nushell's language server with nusage's view of a script: `$usage` and its type, and each call of another script held to that script's header.
-In a project that includes `share/nus.toml`, `nu` is `nus nu`, which serves `nus lsp` when asked for `nu --lsp`, so an editor that starts `nu` through mise gets it; that `nus` is the release mise installs, so it needs one that has `nus nu`.
+In a project that includes `share/nusage.toml`, `nu` is `nus nu`, which serves `nus lsp` when asked for `nu --lsp`, so an editor that starts `nu` through mise gets it; that `nus` is the release mise installs, so it needs one that has `nus nu`.
 Elsewhere, after `mise dot apply`, `MISE_ENV=nus-lsp` in the editor's environment does the same, and `MISE_ENV=nus-lsp,nus-kakehashi` adds [kakehashi](https://github.com/atusy/kakehashi), which highlights a script's header as KDL.
 A project with its own `[wrappers.nu]` keeps nusage's server with `command = "nus"` and `args = ["nu"]`.
 
@@ -50,11 +50,9 @@ A shell that starts with mise's environment already set has it taken out first; 
 
 ## Development
 
-Infrastructure entrypoints that call catalog commands run through `nus` and use the committed
-`catalog/packages/` directories through `NUS_MODULES`. The root includes `share/nus.toml`
-for `NUS_TOOLS` and the `nu` wrapper, overriding its released-package module map locally.
-Libraries and Nutest suites use relative imports because Nushell parses them without a
-script prelude; no catalog bootstrap release or `NU_LIB_DIRS` is needed.
+Infrastructure entrypoints use explicit relative imports of the committed catalog modules.
+The root includes `share/nusage.toml` for tool pins and the `nu` wrapper.
+Libraries and Nutest suites use relative imports because Nushell parses them without a script prelude; no catalog bootstrap release or `NU_LIB_DIRS` is needed.
 The built `.bin/nus` must already be on PATH; `//:build` refreshes it.
 
 Install the tools with `mise install --monorepo`, and run tasks through `mise exec -- mise run`:

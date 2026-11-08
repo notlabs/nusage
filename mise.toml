@@ -1,6 +1,6 @@
 min_version = "2026.10.21"
 monorepo_root = true
-include = ["share/nus.toml"]
+include = ["share/nusage.toml"]
 
 # The repository root is the project `nu:root`. Its shell autoload loads a file the user's
 # Nushell resolves; it names no file here.
@@ -23,7 +23,11 @@ config_roots = ["[!.]*", "[!.]*/[!.]*", "[!.]*/[!.]*/[!.]*"]
 [deps.go-workspace]
 auto = true
 description = "The ignored go.work over the workspace's Go modules"
-sources = ["tooling/graph/common.nu", "tooling/graph/go-workspace.nu", "**/go.mod"]
+sources = [
+  "tooling/graph/common.nu",
+  "tooling/graph/go-workspace.nu",
+  "**/go.mod",
+]
 outputs = ["go.work"]
 run = "nus tooling/graph/go-workspace.nu"
 
@@ -100,7 +104,7 @@ outputs = [".bin/nus", ".bin/nu_plugin_nus", ".bin/openapi-usage"]
 run = "mise run --no-deps //:build"
 
 [task_config]
-includes = [".mise/tasks", "tooling/tasks/nu.tasks.toml"]
+includes = [".mise/tasks"]
 # A task that declares what it reads, and what it writes or that it writes nothing, keeps
 # its result in mise's task cache.
 shell = "nu -c"
@@ -112,8 +116,6 @@ cache = { enabled = true, env = [
 ] }
 
 [tools]
-nu = "0.116.1"
-usage = "7.1.3"
 # Infrastructure uses the committed catalog modules with these binaries.
 # The mise package records no tool version; min_version above gates CLI support.
 gh = "2.103.3"
@@ -131,12 +133,10 @@ MBX_TARGET_ROOT = "{{config_root}}/.cache/mbx-targets"
 # file's list wherever it is set.
 MISE_IGNORED_CONFIG_PATHS = "{{env.MBX_TARGET_ROOT}}{% if os() == 'windows' %};{% else %}:{% endif %}{{config_root}}/target"
 _.path = ["{{config_root}}/.bin"]
-# Mise's templates have no directory-listing function; keep every committed package here.
-NUS_MODULES = { value = "{ 'docker-compose': '{{config_root}}/catalog/packages/docker-compose', 'gh': '{{config_root}}/catalog/packages/gh', 'jj': '{{config_root}}/catalog/packages/jj', 'mise': '{{config_root}}/catalog/packages/mise', 'typesafe': '{{config_root}}/catalog/packages/typesafe' }", tools = true }
 
 [tasks.check]
 description = "The root's own checks"
-depends = [":lint", ":check-pr-status", ":test", "./crates/...:check"]
+depends = [":lint", ":test", "./crates/...:check"]
 
 # Tasks that resolve through the generated graph or inputs depend on this: a `mise run` that
 # resolved them from configuration its providers then rewrote fails here, before they run.
@@ -154,11 +154,27 @@ bin_path = "."
 
 # Beside what the suites load, the configuration they copy into their scratch workspaces.
 [tasks.test]
-dir = "tooling"
+description = "Run the root Nutest suites"
+depends = ["//:graph-current"]
+usage = '''
+flag "--match-suites <pattern>" default=".*" help="Regex selecting discovered suites"
+flag "--match-tests <pattern>" default=".*" help="Regex selecting tests"
+'''
+run = '''
+nu --no-config-file -c '
+use "{{tools.nutest.path}}/nutest"
+nutest run-tests --path tooling/lib --fail --match-suites $env.usage_match_suites --match-tests $env.usage_match_tests
+'
+'''
+
+dir = "."
 sources = [
-  "../mise.toml",
-  "../.miserc.toml",
-  "../crates/nusage/mise.toml",
+  "tooling/lib/**/*.nu",
+  "tooling/tasks/cargo.tasks.toml",
+  "catalog/packages/mise/**/*.nu",
+  "mise.toml",
+  ".miserc.toml",
+  "crates/nusage/mise.toml",
 ]
 outputs = []
 cache = { enabled = true, command_inputs = [

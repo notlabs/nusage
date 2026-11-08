@@ -1,11 +1,10 @@
-# The suites, and what they load, are the generated `nu-test` input group of the including
-# config root; what they read otherwise, its own `sources` add.
-[test]
-description = "Run this project's co-located Nutest suites"
+[_.nusage.project]
+
+[tasks.test]
+description = "Run graph Nutest suites"
 depends = ["//:graph-current"]
-sources = ["**/*.nu", "**/*.toml"]
+sources = ["**/*.nu", "../../mise.toml", "../../.miserc.toml"]
 outputs = []
-cache = { enabled = true }
 usage = '''
 flag "--match-suites <pattern>" default=".*" help="Regex selecting discovered suites"
 flag "--match-tests <pattern>" default=".*" help="Regex selecting tests"
@@ -13,7 +12,6 @@ flag "--match-tests <pattern>" default=".*" help="Regex selecting tests"
 run = '''
 nu --no-config-file -c '
 use "{{tools.nutest.path}}/nutest"
-# NUS_MODULES and NUS_TOOLS pass to test subprocesses as strings.
 nutest run-tests --fail --match-suites $env.usage_match_suites --match-tests $env.usage_match_tests
 '
 '''

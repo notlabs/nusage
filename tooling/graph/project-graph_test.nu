@@ -57,7 +57,6 @@ def runs-since [count: int] {
 
 def isolated [scratch: string] {
     {
-        NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
         MISE_CONFIG_DIR: ($scratch | path join config)
         MISE_DATA_DIR: ($scratch | path join data)
         MISE_CACHE_DIR: ($scratch | path join cache)
@@ -89,7 +88,7 @@ exit 99
                 monorepo: {config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]}
                 settings: {experimental: true}
                 task_config: {cache: {enabled: false}}
-                env: {NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS, _: {path: ($env.PATH | prepend ($nu.current-exe | path dirname) | prepend ($scratch | path join bin))}, GRAPH_LOG: ($scratch | path join events)}
+                env: {_: {path: ($env.PATH | prepend ($nu.current-exe | path dirname) | prepend ($scratch | path join bin))}, GRAPH_LOG: ($scratch | path join events)}
                 _: {nusage: {project: {depends_add: ["nu:bridge"]}}}
                 deps: (provider-config)
                 tasks: {
@@ -361,7 +360,7 @@ def "the graph refuses what mise would drop or what the kinds forbid" [] {
                 monorepo_root: true
                 monorepo: {config_roots: ["[!.]*"]}
                 settings: {experimental: true}
-                env: {NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS, _: {path: ($env.PATH | prepend ($nu.current-exe | path dirname))}}
+                env: {_: {path: ($env.PATH | prepend ($nu.current-exe | path dirname))}}
                 deps: (provider-config)
             } | to toml | save mise.toml
             {_: {nusage: {project: {}}}, tasks: {check: {run: "true"}}} | to toml | save app/mise.toml
@@ -434,7 +433,6 @@ def "managed target configurations stay outside the discovered project graph" []
         checked ln -s ($targets | path join view) ($scratch | path join target) | ignore
         cp ($project | path join .miserc.toml) ($scratch | path join .miserc.toml)
         with-env {
-            NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
             MISE_CONFIG_DIR: ($scratch | path join .config)
             MISE_DATA_DIR: ($scratch | path join .data)
             MISE_CACHE_DIR: ($scratch | path join .cache)
@@ -448,7 +446,6 @@ def "managed target configurations stay outside the discovered project graph" []
                 monorepo: {config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]}
                 settings: {experimental: true}
                 env: {
-                    NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
                     MBX_TARGET_ROOT: $config.env.MBX_TARGET_ROOT
                     MISE_IGNORED_CONFIG_PATHS: $config.env.MISE_IGNORED_CONFIG_PATHS
                     _: {path: ($env.PATH | prepend ($nu.current-exe | path dirname))}

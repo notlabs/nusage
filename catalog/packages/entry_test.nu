@@ -51,7 +51,6 @@ assert equal ($selected | length) 1
                 }
                 settings: {experimental: true}
                 env: {
-                    NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
                     GRAPH_LOG: ($scratch | path join events)
                 }
                 # The entry checks hold their graph to the one on disk through the root's guard.

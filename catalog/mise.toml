@@ -27,11 +27,29 @@ description = "Assemble the task catalog from an already checked revision"
 run = "nus {{config_root}}/mise-tasks/package.nu"
 
 [task_config]
-includes = ["mise-tasks", "../tooling/tasks/nu.tasks.toml"]
+includes = ["mise-tasks"]
 
 # Beside what the suites load, the files they copy into a scratch workspace.
 [tasks.test]
+description = "Run catalog Nutest suites"
+depends = ["//:graph-current"]
+usage = '''
+flag "--match-suites <pattern>" default=".*" help="Regex selecting discovered suites"
+flag "--match-tests <pattern>" default=".*" help="Regex selecting tests"
+'''
+run = '''
+nu --no-config-file -c '
+use "{{tools.nutest.path}}/nutest"
+nutest run-tests --fail --match-suites $env.usage_match_suites --match-tests $env.usage_match_tests
+'
+'''
+
 dir = "."
-sources = ["packages/package.tasks.toml", "lib/catalog.nu", "lib/support.nu"]
+sources = [
+  "packages/**/*.nu",
+  "packages/package.tasks.toml",
+  "lib/catalog.nu",
+  "lib/support.nu",
+]
 outputs = []
 cache = { enabled = true, command_inputs = ["mise --version"] }

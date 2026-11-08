@@ -48,7 +48,9 @@ let config = $consumer | path join mise.toml
     _: {
         nusage: {
             catalog: {
-                spec: {run: "open --raw packages/demo/source.kdl | print --no-newline"}
+                spec: {
+                    run: "open --raw packages/demo/source.kdl | print --no-newline"
+                }
             }
         }
     }
@@ -92,7 +94,6 @@ assert equal (demo).ok true
 
 let checked = try {
     with-env {
-        NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
         MISE_CONFIG_ROOT: $consumer
         MISE_CONFIG_DIR: ($scratch | path join config)
         MISE_TRUSTED_CONFIG_PATHS: $scratch

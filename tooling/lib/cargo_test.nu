@@ -37,7 +37,6 @@ printf "%s:%s\\n" "${PWD##*/}" "$1" >> "$GRAPH_LOG"
                 monorepo: {config_roots: ["[!.]*" "[!.]*/[!.]*" "[!.]*/[!.]*/[!.]*"]}
                 settings: {experimental: true}
                 env: {
-                    NUS_MODULES: $env.NUS_MODULES, NUS_TOOLS: $env.NUS_TOOLS
                     _: {path: ($env.PATH | prepend ($nu.current-exe | path dirname) | prepend ($scratch | path join .bin))}
                     GRAPH_LOG: ($scratch | path join events)
                 }
