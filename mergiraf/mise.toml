@@ -76,7 +76,7 @@ cp $built ($bin | path join mergiraf)
 
 [tasks.build]
 description = "Build Mergiraf with the patches applied and copy it into the repository's bin directory"
-depends = [[":compile", "release", ".bin"]]
+depends = [[":compile", "release", "target/install/bin"]]
 
 # The cases the Nushell patch carries, in Mergiraf's own test layout, merged by the binary
 # built, with the flags jj passes it, and held to each case's expected result; a case whose

@@ -10,10 +10,10 @@ env.NUS_CATALOG_ROOT = "{{config_root}}/.."
 
 [check]
 file = "../../mise-tasks/check.nu"
-depends = ["//:graph-current", "^check"]
+depends = ["^check"]
 env.NUS_CATALOG_ROOT = "{{config_root}}/.."
 
 ["check:platform"]
 file = "../../mise-tasks/check.nu"
-depends = ["//:graph-current", "^check:platform"]
+depends = ["^check:platform"]
 env.NUS_CATALOG_ROOT = "{{config_root}}/.."

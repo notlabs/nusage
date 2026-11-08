@@ -3,28 +3,28 @@
 # disk.
 [test]
 description = "Test this crate and its upstream crates"
-depends = ["//:graph-current", "^test"]
+depends = ["^test"]
 sources = ["**/*", "../../Cargo.toml", "../../Cargo.lock", "../../.cargo/**"]
 outputs = []
 run = "cargo test --locked"
 
 [clippy]
 description = "Clippy for this crate's targets and its upstream crates"
-depends = ["//:graph-current", "^clippy"]
+depends = ["^clippy"]
 sources = ["**/*", "../../Cargo.toml", "../../Cargo.lock", "../../.cargo/**"]
 outputs = []
 run = "cargo clippy --quiet --all-targets --locked -- -D warnings"
 
 [docs]
 description = "Build this crate's documentation without warnings"
-depends = ["//:graph-current", "^docs"]
+depends = ["^docs"]
 sources = ["**/*", "../../Cargo.toml", "../../Cargo.lock", "../../.cargo/**"]
 outputs = []
 env.RUSTDOCFLAGS = "-D warnings"
 run = "cargo doc --quiet --no-deps --locked"
 
 [check]
-depends = ["//:graph-current", "^check", ":test", ":clippy", ":docs"]
+depends = ["^check", ":test", ":clippy", ":docs"]
 
 ["check:platform"]
-depends = ["//:graph-current", "^check:platform", ":test", ":clippy"]
+depends = ["^check:platform", ":test", ":clippy"]

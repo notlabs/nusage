@@ -416,13 +416,13 @@ def check-signatures [
 }
 
 const root = path self | path dirname
-# The nus to check: by default the one `//:build` copies into `.bin`.
+# The nus to check: by default the one `//:build` installs into `target/install/bin`.
 $env.NUS_BIN = $env.NUS_BIN? | default (
     $root
     | path dirname
     | path dirname
     | path dirname
-    | path join .bin nus
+    | path join target install bin nus
 )
 let fixtures = if ($usage.args.fixtures | is-empty) {
     ls $root | where type == dir | get name

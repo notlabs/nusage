@@ -13,8 +13,7 @@ catalog_version = "0.1.0"
 [tasks."check:platform"]
 description = "Check the catalog's contracts and packaged tasks on this platform"
 depends = [
-  "//:graph-current",
-  "^check:platform",
+    "^check:platform",
   ":check-package",
   ":check-release",
   ":test",
@@ -32,7 +31,6 @@ includes = ["mise-tasks"]
 # Beside what the suites load, the files they copy into a scratch workspace.
 [tasks.test]
 description = "Run catalog Nutest suites"
-depends = ["//:graph-current"]
 usage = '''
 flag "--match-suites <pattern>" default=".*" help="Regex selecting discovered suites"
 flag "--match-tests <pattern>" default=".*" help="Regex selecting tests"

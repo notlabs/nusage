@@ -53,7 +53,7 @@ A shell that starts with mise's environment already set has it taken out first; 
 Infrastructure entrypoints use explicit relative imports of the committed catalog modules.
 The root includes `share/nusage.toml` for tool pins and the `nu` wrapper.
 Libraries and Nutest suites use relative imports because Nushell parses them without a script prelude; no catalog bootstrap release or `NU_LIB_DIRS` is needed.
-The built `.bin/nus` must already be on PATH; `//:build` refreshes it.
+The installed `target/install/bin/nus` is the project tool; `//:build` refreshes it.
 
 Install the tools with `mise install --monorepo`, and run tasks through `mise exec -- mise run`:
 
@@ -62,43 +62,9 @@ mise exec -- mise run '//catalog/...:check'
 mise exec -- mise run //crates/nusage-spec:check
 ```
 
-The project graph and the tests' inputs are generated configuration.
-The root's `auto` providers refresh them before `mise exec` and `mise run`, but `mise run` has resolved its tasks by then, so only the next mise process reads what they wrote; `mise exec` makes the inner `mise run` that process.
-A plain `mise run` that finds the graph changed fails at `//:graph-current` rather than run with the old one, and running it again works.
-On a fresh clone a plain `mise run` stops earlier: a task that names a generated input group does not load until the providers have run.
-
-### The project graph
-
-Mise discovers config roots one to three directories below the repository root; Cargo and Go projects keep their native IDs and edges.
-A config root that declares `[_.nusage.project]` or `[_.nusage.catalog]` is a project, and so is the repository root, with an ID that names its kind:
-
-| ID | Project |
-| --- | --- |
-| `catalog:<entry>` | A catalog entry: `[_.nusage.catalog]` |
-| `fixtures:<name>`, `schemas:<name>` | Data other projects read, depending on nothing: `kind` and `name` |
-| `nu:<name>` | Any other project; `nu:root` is the repository root |
-
-A config root without project metadata is no project.
-Mise drops `^task` dependencies in such a root, so the graph refuses them there.
-
-The providers are in `tooling/graph`: `go-workspace` writes the ignored `go.work`, `go-imports` and `nu-imports` analyze the code into `.cache/graph`, and `project-graph` writes the configuration.
-Each edge it adds keeps its kind and the file and line it comes from, as JSON in the project's `metadata.edges`:
-
-- `declared`: `[_.nusage.project].depends_add`, for what nothing else shows, and `fixtures` when the target is a data project.
-- `spec-generator`: what an entry's spec names: a `mise run` task, `clap`, or `openapi`.
-- `nu-use`, `nu-source`, `nu-path`: Nushell that loads another project's file, or names it in a `path self` constant.
-- `task-call`: a literal `mise run //root:task`, or a `{ task = }` or `{ tasks = [] }` run entry.
-- `task-dir`: a task that runs in another project's directory.
-- `go-import`: an import between Go modules.
-
-A computed `use` or `mise run` target is an error until the owning project lists its file in `[_.nusage.project].dynamic` and declares what it reaches in `depends_add`.
-A generator does not depend on an entry, a data project depends on nothing, and a cycle names the edges that close it.
-
-`mise tasks graph --json` and `mise tasks deps` show the graph; `mise deps install --force project-graph` writes it again.
-Go edges reflect the current build context; refresh `go-imports` after changing build-context environment variables.
-
-The `nus` provider builds `nus`, `nu_plugin_nus` and `openapi-usage` into `.bin` when the Rust sources change: tasks run them from PATH instead of depending on a build, and a cached task that runs `nus` keys its result on `.bin/nus`.
-A tool is no edge, so `--affected` selects the crates' checks for a change to the crates, not those of the projects that run `nus`; CI checks everything on main.
+The graph providers under `graph/` are placeholders until the environment plugin is installed.
+Only native Cargo and Go projects are currently registered; catalog tasks still resolve by path.
+The `nus` tool resolves to `target/install/bin/nus`; each binary crate's build task owns freshness.
 
 Each crate's check runs its tests, Clippy, documentation checks, and upstream checks; the `nusage` crate's also holds `nus` to the fixtures.
 `//:check` runs every crate's, and `//:build` builds the distributed binaries.

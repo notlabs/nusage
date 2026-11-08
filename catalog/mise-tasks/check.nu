@@ -1,6 +1,6 @@
 #!/usr/bin/env nus
 #MISE description="Check the catalog implementation and its packaged interfaces"
-#MISE depends=["//:graph-current", "^check", ":check-package", ":check-release", ":test"]
+#MISE depends=["^check", ":check-package", ":check-release", ":test"]
 #USAGE arg "[tool]" help="One entry; every entry when absent"
 # The generated files are committed: the module a package ships is reviewed as a diff when the
 # spec, the suite or an overlay changes. So `check` generates again and compares byte for byte,
