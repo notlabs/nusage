@@ -1,4 +1,10 @@
-#!/usr/bin/env nu
+#!/usr/bin/env -S sh -c 'exec "$(mise which nu)" --no-config-file "$0" "$@"'
+#MISE description="Build the workspace and copy its binaries into target/install/bin"
+#MISE sources=["Cargo.toml", "Cargo.lock", ".cargo/**", "rust-toolchain.toml", "crates/**"]
+#MISE outputs=["target/install/bin/*"]
+#MISE cache={enabled=false}
+# MBX makes target a symlink; mise cannot archive outputs through it.
+# Source/output freshness still skips unchanged builds.
 
 let metadata = ^cargo metadata --format-version 1 --no-deps --locked | from json --strict
 let members = $metadata.workspace_members
