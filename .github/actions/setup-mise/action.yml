@@ -11,7 +11,6 @@ runs:
       with:
         version: ${{ inputs.version }}
         install: false
-        cache: false
         env: false
         export_path: false
     - shell: bash
@@ -25,5 +24,5 @@ runs:
     - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
       with:
         version: ${{ inputs.version }}
-        install: false
-        cache: false
+        # Include tools installed by later build/check tasks in a new cache entry.
+        cache_save_post: true
