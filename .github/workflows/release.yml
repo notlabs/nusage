@@ -24,6 +24,12 @@ env:
   MBX_DISABLE: "1"
   MISE_TASK_CACHE: "off"
   MISE_LOCKED: "true"
+  # Runner images ship a Rust of their own (Homebrew's rustup on macOS). Mise gets its own
+  # toolchain homes so every mise process agrees on what is installed, and rustup-init may
+  # install beside the image's rustc.
+  MISE_RUSTUP_HOME: ${{ runner.temp }}/rustup
+  MISE_CARGO_HOME: ${{ runner.temp }}/cargo
+  RUSTUP_INIT_SKIP_PATH_CHECK: "yes"
 
 jobs:
   tag:
