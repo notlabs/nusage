@@ -1,6 +1,6 @@
 /.jj/
-target/
-/.cache/mbx-targets/
+target
+/.cache/mbx-targets
 /.rumdl_cache/
 /mise.local.toml
 /.mise.local.toml

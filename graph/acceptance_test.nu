@@ -31,7 +31,7 @@ def isolated [label: string, change: closure, verify: closure, --refuses] {
             GIT_CONFIG_GLOBAL: '/dev/null'
         } {
             cd $workspace
-            hide-env --ignore-errors NUSAGE_GRAPH_ACTIVE MISE_TASK_NAME MISE_TASK_DIR MISE_CONFIG_ROOT MISE_PROJECT_ROOT GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG GIT_CONFIG_COUNT
+            hide-env --ignore-errors MBX_TARGET_ROOT NUSAGE_GRAPH_ACTIVE MISE_TASK_NAME MISE_TASK_DIR MISE_CONFIG_ROOT MISE_PROJECT_ROOT GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG GIT_CONFIG_COUNT
             checked jj workspace update-stale | ignore
             assert not ('.git' | path exists) 'The JJ workspace must not inherit Git metadata'
             checked git init --quiet | ignore
