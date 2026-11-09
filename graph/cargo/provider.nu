@@ -8,7 +8,7 @@ const inputs = [
     "../../.cargo/**"
     "../../rust-toolchain.toml"
 ]
-export def tasks-from [metadata: record, templates: record, build: record] {
+export def tasks-from [metadata: record, templates: record] {
     let packages = $metadata.packages | where {|p| $p.id in $metadata.workspace_members }
     let nodes = $metadata.resolve.nodes | group-by id
     $packages | each {|package|
@@ -26,13 +26,9 @@ export def tasks-from [metadata: record, templates: record, build: record] {
             $"../($dir)/**/*"
         } | sort
         let sources = ["**/*"] ++ $deps ++ $inputs
-        let tasks = $templates | items {|name, task|
+        $templates | items {|name, task|
             {kind: task, root: $root, name: $name, task: (if $name in [test clippy doc] { $task | insert sources $sources } else { $task })}
         }
-        let binaries = $package.targets | where {|t| 'bin' in $t.kind } | get name
-        $tasks ++ (if ($binaries | is-not-empty) {
-            [{kind: task, root: $root, name: build, task: ($build | insert sources $sources | update outputs ($binaries | each {|bin| $"../../target/install/bin/($bin)" }))}]
-        } else { [] })
     } | flatten
 }
 export def tool-edges [data: record, metadata: record, root: string] {
@@ -61,7 +57,6 @@ def main [root: path = ".", --discovery: path] {
         (tasks-from
             $metadata
             (open ($here | path join tasks.toml))
-            (open ($here | path join build.toml))
         )
     ) ++ (tool-edges $data $metadata $root) ++ (
         $metadata.packages
@@ -73,7 +68,6 @@ def main [root: path = ".", --discovery: path] {
         (input 'Cargo.toml')
         (input ($here | path join provider.nu))
         (input ($here | path join tasks.toml))
-        (input ($here | path join build.toml))
         (input ($here | path join ../common.nu | path expand --no-symlink))
     ] ++ (discovery-inputs $data)
     | emit

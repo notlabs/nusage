@@ -16,10 +16,10 @@ env_cache_ttl = "24h"
 [monorepo]
 config_roots = ["[!.]*", "[!.]*/[!.]*", "[!.]*/[!.]*/[!.]*"]
 
-# Freshness belongs to the installed binaries' build tasks.
+# Freshness belongs to the workspace build task.
 [deps.nus]
 auto = true
-run = "mise run --no-deps '//crates/...:build'"
+run = "mise run --no-deps //:build"
 
 [task_config]
 includes = [".mise/tasks"]
@@ -93,8 +93,14 @@ variants = [
 ]
 
 [tasks.build]
-description = "Install the workspace binaries"
-depends = ["//crates/...:build"]
+description = "Build the workspace and copy its binaries into target/install/bin"
+# Bootstrap without the nu wrapper, which itself needs the nus being built.
+shell = "sh -c"
+run = 'exec "$(mise which nu)" --no-config-file "{{config_root}}/.mise/build.nu"'
+sources = ["Cargo.toml", "Cargo.lock", ".cargo/**", "rust-toolchain.toml", "crates/**", ".mise/build.nu"]
+# The binary names come from Cargo, not a second list in the task definition.
+# These outputs are under the root task directory, as the artifact cache requires.
+outputs = ["target/install/bin/*"]
 
 # Registration is the user's: `plugin add` writes the plugin registry of the Nushell that
 # runs this, and a session then takes the plugin with `plugin use nus`. The plugin's

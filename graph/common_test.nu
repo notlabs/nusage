@@ -4,9 +4,9 @@ use common.nu task-targets
 
 @test
 def "Task selectors preserve ellipses and resolve relative project paths" [] {
-    let tasks = [{name: '//crates/a:build'} {name: '//crates/b:build'} {name: '//crates/a:test'}]
-    for target in ['//crates/...:build' './crates/...:build'] {
+    let tasks = [{name: '//crates/a:test'} {name: '//crates/b:test'} {name: '//crates/a:doc'}]
+    for target in ['//crates/...:test' './crates/...:test'] {
         assert equal (task-targets $tasks $target '.') [crates/a crates/b]
     }
-    assert equal (task-targets $tasks '../crates/...:build' app) [crates/a crates/b]
+    assert equal (task-targets $tasks '../crates/...:test' app) [crates/a crates/b]
 }

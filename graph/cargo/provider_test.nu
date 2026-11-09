@@ -5,11 +5,10 @@ use provider.nu [tasks-from tool-edges]
 const here = path self | path dirname
 @test
 def "Cargo tasks project transitive resolve edges and constant inputs" [] {
-    let records = tasks-from (open ($here | path join fixtures metadata.json)) (open ($here | path join tasks.toml)) (open ($here | path join build.toml))
+    let records = tasks-from (open ($here | path join fixtures metadata.json)) (open ($here | path join tasks.toml))
     let test = $records | where root == crates/a and name == test | get task.0
     assert equal $test.sources ["**/*" "../b/**/*" "../c/**/*" "../../Cargo.toml" "../../Cargo.lock" "../../.cargo/**" "../../rust-toolchain.toml"]
-    assert equal ($records | where name == build | get root) [crates/a]
-    assert equal ($records | where name == build | get task.outputs.0) ["../../target/install/bin/nus"]
+    assert equal ($records | where name == build) []
     assert equal ($records | where name == check | get task.depends.0) [":test" ":clippy" ":doc"]
 }
 

@@ -57,6 +57,8 @@ The installed `target/install/bin/nus` is the project tool; `//:build` refreshes
 
 After linking the plugin, `mise tasks ls --all` refuses once while writing the graph; run it again.
 Run `mise run //:build` to install the local binaries, then `mise install --monorepo` for the remaining tools.
+The build runs `cargo build --workspace --locked` once and copies the workspace's binary artifacts from Cargo's JSON messages into `target/install/bin`, including Nushell plugins.
+Mise tracks the Cargo workspace inputs and installed binaries so an unchanged build is skipped.
 Automatic tool installation excludes the local `github:notlabs/nusage` prefix, which Cargo supplies.
 Run tasks normally:
 
