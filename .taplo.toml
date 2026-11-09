@@ -8,7 +8,12 @@ include = ["**/Cargo.toml"]
 schema.url = "https://www.schemastore.org/cargo.json"
 
 [[rule]]
-include = ["**/mise.toml", "**/mise.*.toml", "**/conf.d/**/*.toml"]
+include = [
+  "**/mise.toml",
+  "**/mise.*.toml",
+  "**/conf.d/**/*.toml",
+  ".mise/config*.toml",
+]
 exclude = ["**/schema-fixtures/**"]
 schema.url = "https://mise.jdx.dev/schema/mise.json"
 
