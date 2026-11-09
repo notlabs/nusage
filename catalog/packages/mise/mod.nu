@@ -350,6 +350,14 @@ case $cur in
     ;;
 esac
 """#'#
+@usage 'config {
+    prop task.remote_no_cache optional=#true type=bool env=MISE_TASK_REMOTE_NO_CACHE help="Do not use the cache for remote tasks" {
+        cli "--no-cache"
+    }
+    prop truncate optional=#true type=bool help="Truncate long terminal output to fit the available width" {
+        cli "--truncate" "--no-truncate"
+    }
+}'
 export def main [
     task?: string@"nus complete",    # Task to run
     ...task_args: string,            # Task arguments
@@ -578,7 +586,7 @@ prints the stored request, which may itself be a prefix.
 @usage 'arg <ALIAS> help="The alias to show"'
 @usage r#'example #"""
 mise tool-alias get node lts
-24
+26
 """# help="Show the version node's lts alias stands for"'#
 @usage 'example #"""
 mise tool-alias set node project 20
@@ -642,7 +650,7 @@ Backend aliases (`[tool_alias] tool = "backend"`) are not listed; run
 @usage r#'example #"""
 mise tool-alias ls node
 tool  alias      version
-node  lts        24
+node  lts        26
 node  lts-jod    22
 node  project    20
 """# help="List node's version aliases"'#
@@ -1116,6 +1124,13 @@ Ask for `[vars]` entries that declare a `prompt` and have no saved answer
 mise saves each answer under `$MISE_STATE_DIR`, not in any config file, and never asks for it again. Without a terminal, a var keeps its default. A `--dry-run` still saves the answers it asks for.
 """#
     }'
+@usage r#'flag --save-env help="Save the environments of `-E` or `MISE_ENV` to `miserc.local.toml`" {
+        long_help #"""
+Save the environments of `-E` or `MISE_ENV` to `miserc.local.toml`
+
+Writes `env` in the `miserc.local.toml` of mise's config directory, so later runs, including `mise bootstrap --update`, select the same environments without `-E`. Names may be sets from `[env_sets]` in `miserc.toml`. Other keys in the file are kept. Needs `-E` or `MISE_ENV`, and a `--dry-run` writes nothing.
+"""#
+    }'#
 @usage 'flag --skip help="Skip these parts" var=#true {
         long_help #"""
 Skip these parts
@@ -1156,7 +1171,7 @@ Repeat the flag or separate parts with commas. Cannot be combined with `--only`.
         long_help #"""
 Refresh package metadata and update repositories before applying
 
-Also fast-forwards a checkout that `--from` or `--adopt` reuses. Without `--update`, a reused checkout stays at its current commit.
+Also fast-forwards a checkout that `--from` or `--adopt` reuses. Without either, fast-forwards the global config when it is a Git checkout with an upstream, as `--adopt` makes, or links into one, as `--config-dir` makes, then bootstraps from the new commit. Without `--update`, a checkout stays at its current commit.
 """#
     }'
 @usage 'flag --upgrade help="Upgrade installed packages and tools as well as installing missing ones" {
@@ -1201,6 +1216,7 @@ export def "mise bootstrap" [
     --only: list<string>@[plugins packages accounts files services firewall compose repos dotfiles mise-shell-activate macos-defaults macos-launchd-agents linux-systemd-units user tools task final-hook],  # Run only these parts
     --prompt-secrets,                                                                                                                                                                                        # Prompt securely for missing bootstrap secret inputs
     --prompt-vars,                                                                                                                                                                                           # Ask for `[vars]` entries that declare a `prompt` and have no saved answer
+    --save-env,                                                                                                                                                                                              # Save the environments of `-E` or `MISE_ENV` to `miserc.local.toml`
     --skip: list<string>@[plugins packages accounts files services firewall compose repos dotfiles mise-shell-activate macos-defaults macos-launchd-agents linux-systemd-units user tools task final-hook],  # Skip these parts
     --update,                                                                                                                                                                                                # Refresh package metadata and update repositories before applying
     --upgrade,                                                                                                                                                                                               # Upgrade installed packages and tools as well as installing missing ones
@@ -1228,6 +1244,7 @@ export def "mise bootstrap" [
         --only: $only
         --prompt-secrets: $prompt_secrets
         --prompt-vars: $prompt_vars
+        --save-env: $save_env
         --skip: $skip
         --update: $update
         --upgrade: $upgrade
@@ -3368,7 +3385,9 @@ warning. Use `--continue-on-error` to visit the rest after a failure.
 @usage 'flag "-n --dry-run" help="Print the commands that would run without running them"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'arg "[PATH]…" help="Run only in repositories at these paths, as written in config or expanded" required=#false var=#true'
-@usage 'arg "<-- COMMAND>…" help="Command and arguments to run in each repository" var=#true'
+@usage 'arg "<-- COMMAND>…" help="Command and arguments to run in each repository" var=#true {
+                complete type=command_args
+            }'
 @usage 'example "mise bootstrap repos exec -- git status --short" help="Show uncommitted changes in every repository"'
 @usage 'example "mise bootstrap repos exec ~/src/mise -- git log -1" help="Run a command in one repository"'
 @usage 'example "mise bootstrap repos exec --continue-on-error -- git fetch" help="Fetch every repository, even after one fails"'
@@ -5532,21 +5551,23 @@ Runs the command with your terminal and environment and saves a checkpoint befor
             arg <LABEL>
         }'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
-@usage 'arg "<-- COMMAND>…" help="Command and arguments to run, after --" var=#true'
+@usage 'arg "<-- COMMAND>…" help="Command and arguments to run, after --" var=#true {
+            complete type=command_args
+        }'
 @usage 'example "mise dot capture -- brew upgrade" help="Record what an upgrade changes"'
 @usage 'example "mise dot capture --label \"theme switch\" -- ./switch-theme.sh" help="Label the operation in history"'
 export def "mise dotfiles capture" [
-    ...command: string,              # Command and arguments to run, after --
-    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
-    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
-    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
-    --quiet (-q),                    # Suppress non-error messages
-    --verbose (-v): int,             # Show extra output (use -vv for even more)
-    --yes (-y),                      # Answer yes to all confirmation prompts
-    --raw,                           # Connect tasks and install commands directly to the terminal
-    --locked,                        # Require download URLs from the lockfile when installing
-    --silent,                        # Suppress all task output and mise non-error messages
-    --label: string,                 # Describe this operation in history
+    ...command: string@"nus complete",  # Command and arguments to run, after --
+    --cd (-C): path@"nus complete",     # Run as if mise were started in DIR
+    --env_ (-E): list<string>,          # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                       # Suppress non-error messages
+    --verbose (-v): int,                # Show extra output (use -vv for even more)
+    --yes (-y),                         # Answer yes to all confirmation prompts
+    --raw,                              # Connect tasks and install commands directly to the terminal
+    --locked,                           # Require download URLs from the lockfile when installing
+    --silent,                           # Suppress all task output and mise non-error messages
+    --label: string,                    # Describe this operation in history
 ]: nothing -> string {
     ^mise dotfiles capture ...(nus argv [...$command] {
         --cd: $cd
@@ -5651,13 +5672,13 @@ export def "mise dotfiles diff" [
 
 # Open a dotfile's source in your editor
 #
-# Opens the file that defines TARGET in `$VISUAL` or `$EDITOR`: the source for symlink, copy, and template entries; the file itself for tracked and permissions-only entries; and the declaring config for inline `content`, `absent` entries, and edits without a source file.
+# Opens the file that defines TARGET in `$VISUAL` or `$EDITOR`: the source for symlink, copy, and template entries; the file itself for tracked and permissions-only entries; and the declaring config for inline `content`, `absent` entries, and edits without a source file. A `fnox` entry is edited with `fnox edit --file`, which stores the change in fnox.
 #
 # An unmanaged target is first added to the global `[dotfiles]`, as `mise dot add --no-apply` would add it, after a prompt that `--yes` skips. Without a terminal, an unmanaged target needs `--yes`. With `--apply`, applies the target after the editor exits.
 @usage r#'long_help #"""
 Open a dotfile's source in your editor
 
-Opens the file that defines TARGET in `$VISUAL` or `$EDITOR`: the source for symlink, copy, and template entries; the file itself for tracked and permissions-only entries; and the declaring config for inline `content`, `absent` entries, and edits without a source file.
+Opens the file that defines TARGET in `$VISUAL` or `$EDITOR`: the source for symlink, copy, and template entries; the file itself for tracked and permissions-only entries; and the declaring config for inline `content`, `absent` entries, and edits without a source file. A `fnox` entry is edited with `fnox edit --file`, which stores the change in fnox.
 
 An unmanaged target is first added to the global `[dotfiles]`, as `mise dot add --no-apply` would add it, after a prompt that `--yes` skips. Without a terminal, an unmanaged target needs `--yes`. With `--apply`, applies the target after the editor exits.
 """#'#
@@ -7326,7 +7347,9 @@ SystemRoot and TEMP.
 @usage 'flag --secrets-all help="[experimental] Give the command every secret the project can inject, except file secrets" conflicts=--secrets'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'arg "[TOOL@VERSION]…" help="Tools to add or override, such as `node@24 python@3.13`" required=#false var=#true'
-@usage 'arg "[-- COMMAND]…" help="Executable and arguments to run directly, after `--`" required=#false var=#true conflicts=--command required_unless=--command'
+@usage 'arg "[-- COMMAND]…" help="Executable and arguments to run directly, after `--`" required=#false var=#true conflicts=--command required_unless=--command {
+        complete type=command_args
+    }'
 @usage 'example "mise exec node@24 -- node ./app.js" help="Run app.js with node 24"'
 @usage 'example "mise x node@24 python@3.13 -c \"node -v && python -V\"" help="Run a shell command string"'
 @usage r#'example "mise x -C ~/work/api -- npm test" help="Run in another project's directory"'#
@@ -9026,17 +9049,20 @@ export def "mise lock" [
 #
 # Lists the tools mise knows about: versions that are installed, and versions
 # requested by a config file (active) whether or not they are installed. Each row
-# shows the tool, the version (marked `(missing)` when it is not installed), the
-# config file that requests it, and the request as written.
+# shows the tool, the version (marked `(missing)` when it is not installed, or
+# `(lazy)` when it is a lazy tool that installs on first use), the config file
+# that requests it, and the request as written.
 @usage 'alias list'
 @usage 'long_help #"""
 List installed and active tool versions
 
 Lists the tools mise knows about: versions that are installed, and versions
 requested by a config file (active) whether or not they are installed. Each row
-shows the tool, the version (marked `(missing)` when it is not installed), the
-config file that requests it, and the request as written.
+shows the tool, the version (marked `(missing)` when it is not installed, or
+`(lazy)` when it is a lazy tool that installs on first use), the config file
+that requests it, and the request as written.
 """#'
+@usage 'after_long_help "\u{1b}[1m\u{1b}[4mDeprecation:\u{1b}[22m\u{1b}[24m\n\nThe `-l` and `--local` flags are deprecated in favor of `--no-global`. mise warns about\nthem from 2027.1.0 and removes them in 2027.7.0."'
 @usage 'flag --truncate help="Truncate long terminal output to fit the available width" negate=--no-truncate default="true"'
 @usage 'flag "-b --backend" help="Only show tools from this backend, such as aqua, cargo, core, or go" var=#true {
         long_help #"""
@@ -9048,7 +9074,9 @@ under aqua. Repeat the flag to show several backends.
         arg <BACKEND>
     }'
 @usage 'flag "-c --current" help="Only show versions the loaded config files request"'
-@usage 'flag "-g --global" help="Only show versions the global config requests" conflicts=--local'
+@usage 'flag "-g --global" help="Only show versions the global config requests" {
+        conflicts "--local" "--no-global" "--project"
+    }'
 @usage 'flag "-i --installed" help="Only show installed versions" {
         long_help #"""
 Only show installed versions
@@ -9064,7 +9092,30 @@ Cannot be combined with --json; use --backend to filter JSON output.
 """#
     }'
 @usage 'flag "-J --json" help="Output in JSON format"'
-@usage 'flag "-l --local" help="Only show versions the local config requests" conflicts=--global'
+@usage 'flag "-l --local" help="Deprecated alias for --no-global" {
+        long_help #"""
+Deprecated alias for --no-global
+
+Removed in mise 2027.7.0.
+"""#
+        conflicts "--global" "--no-global" "--project"
+    }'
+@usage r#'flag --no-global help="Only show versions that non-global config files request" {
+        long_help #"""
+Only show versions that non-global config files request
+
+Includes config files in parent directories and skips the global config, system config, and `MISE_<TOOL>_VERSION` environment variables. See --project for the nearest project's config alone.
+"""#
+        conflicts "--global" "--local" "--project"
+    }'#
+@usage 'flag --project help="Only show versions the nearest project config requests" {
+        long_help #"""
+Only show versions the nearest project config requests
+
+The project is the nearest directory, starting at the current one and moving up, that has a mise config file. Every config file in that directory counts, such as `mise.toml`, `mise.local.toml`, `conf.d` fragments, `.tool-versions` and idiomatic version files. Configs in parent directories and global or system configs do not, nor do `MISE_<TOOL>_VERSION` environment variables. A version that a later file in that directory overrides is not listed, as with --no-global; `mise uninstall --project` still removes it.
+"""#
+        conflicts "--global" "--local" "--no-global" "--monorepo" "--prunable"
+    }'
 @usage 'flag "-m --missing" help="Only show requested versions that are not installed" conflicts=--installed'
 @usage r#'flag "-o --offline" help="Don't fetch information such as outdated versions" hide=#true'#
 @usage 'flag "-p --plugin" hide=#true {
@@ -9076,7 +9127,7 @@ Show requests from every config file mise has seen, not only loaded ones
 
 mise tracks the config files it loads so `mise prune` keeps the versions they use.
 """#
-        conflicts "--current" "--global" "--local" "--prunable"
+        conflicts "--current" "--global" "--local" "--no-global" "--project" "--prunable"
     }'
 @usage r#'flag --monorepo help="Also list tools from every config root in `[monorepo].config_roots`" env=MISE_MONOREPO {
         long_help #"""
@@ -9126,7 +9177,9 @@ export def "mise ls" [
     --global (-g),                                # Only show versions the global config requests
     --installed (-i),                             # Only show installed versions
     --grouped,                                    # List tools in a separate section for each backend
-    --local (-l),                                 # Only show versions the local config requests
+    --local (-l),                                 # Deprecated alias for --no-global
+    --no-global,                                  # Only show versions that non-global config files request
+    --project,                                    # Only show versions the nearest project config requests
     --missing (-m),                               # Only show requested versions that are not installed
     --all-sources,                                # Show requests from every config file mise has seen, not only loaded ones
     --monorepo,                                   # Also list tools from every config root in `[monorepo].config_roots`
@@ -9153,6 +9206,8 @@ export def "mise ls" [
         --installed: $installed
         --grouped: $grouped
         --local: $local
+        --no-global: $no_global
+        --project: $project
         --missing: $missing
         --all-sources: $all_sources
         --monorepo: $monorepo
@@ -10047,7 +10102,7 @@ config request allows. For `node = "20"`, that is the newest 20.x release;
 pass `--bump` to compare against the newest release overall instead. Run
 `mise upgrade` to install the newer versions.
 """#'
-@usage 'after_long_help "\u{1b}[1m\u{1b}[4mDeprecation:\u{1b}[22m\u{1b}[24m\n\nThe `-l` shorthand for `--bump` is deprecated and will be removed in mise 2027.8.5.\nAfter removal, `-l` will become shorthand for `--local`. Use `-b` or `--bump` instead."'
+@usage 'after_long_help "\u{1b}[1m\u{1b}[4mDeprecation:\u{1b}[22m\u{1b}[24m\n\nThe `-l` shorthand for `--bump` is deprecated and will be removed in mise 2027.8.5.\nUse `-b` or `--bump` instead.\n\nThe `--local` flag is deprecated in favor of `--no-global`. mise warns about it from\n2027.1.0 and removes it in 2027.7.0."'
 @usage 'flag "-b --bump" help="Compare against the newest release overall, not only the configured range" {
         long_help #"""
 Compare against the newest release overall, not only the configured range
@@ -10057,12 +10112,13 @@ With `node = "20"` in your config, `mise outdated` reports the newest 20.x relea
     }'
 @usage 'flag "-J --json" help="Output in JSON format"'
 @usage 'flag -l help="Deprecated shorthand for --bump" hide=#true'
-@usage 'flag --inactive help="Also check installed tools that the current config does not request" conflicts=--local {
+@usage 'flag --inactive help="Also check installed tools that the current config does not request" {
         long_help #"""
 Also check installed tools that the current config does not request
 
 By default, `mise outdated` checks only tools that come from the current config.
 """#
+        conflicts "--local" "--no-global"
     }'
 @usage 'flag --global help="Only check tools defined in the global config" {
         long_help #"""
@@ -10070,14 +10126,23 @@ Only check tools defined in the global config
 
 Reports the requests in the global and system config (~/.config/mise/config.toml, /etc/mise/config.toml), even where a project config or a `MISE_<TOOL>_VERSION` environment variable sets its own version of the tool: what `mise upgrade --global` would install.
 """#
-        conflicts "--local" "--inactive"
+        conflicts "--local" "--no-global" "--inactive"
     }'
-@usage 'flag --local help="Only check tools defined in project config files" {
+@usage 'flag --local help="Deprecated alias for --no-global" {
+        long_help #"""
+Deprecated alias for --no-global
+
+Removed in mise 2027.7.0.
+"""#
+        conflicts "--global" "--no-global"
+    }'
+@usage 'flag --no-global help="Only check tools defined in project config files" {
         long_help #"""
 Only check tools defined in project config files
 
 Skips tools defined in the global config (~/.config/mise/config.toml) and tools set through `MISE_<TOOL>_VERSION` environment variables.
 """#
+        conflicts "--global" "--local"
     }'
 @usage 'flag --monorepo help="Placeholder for future monorepo outdated checks; `mise outdated --monorepo` is not implemented yet." hide=#true'
 @usage 'flag --no-header help="Do not print the table header"'
@@ -10114,7 +10179,7 @@ mise outdated --json
   }
 }
 """# help="Print the same information as JSON"'
-@usage 'example "mise outdated --local" help="Skip tools that only the global config requests"'
+@usage 'example "mise outdated --no-global" help="Skip tools that only the global config requests"'
 @usage r#'example "mise outdated --global claude --json" help="Check the global config's request for claude, even inside a project that sets its own"'#
 @usage 'output "json" framing="json" select="--json" {
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise outdated --json\",\n  \"$defs\": {\n    \"source\": {\n      \"oneOf\": [\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \".tool-versions\",\n                \"mise.toml\",\n                \"mise.toml-daemon\",\n                \"idiomatic-version-file\",\n                \"tool-stub\"\n              ]\n            },\n            \"path\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"path\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"enum\": [\n                \"argument\",\n                \"unknown\"\n              ]\n            }\n          },\n          \"required\": [\n            \"type\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"type\": {\n              \"const\": \"environment\"\n            },\n            \"key\": {\n              \"type\": \"string\"\n            },\n            \"value\": {\n              \"type\": \"string\"\n            }\n          },\n          \"required\": [\n            \"type\",\n            \"key\",\n            \"value\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    }\n  },\n  \"type\": \"object\",\n  \"additionalProperties\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"requested\": {\n        \"type\": \"string\"\n      },\n      \"current\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"bump\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"latest\": {\n        \"type\": \"string\"\n      },\n      \"release_url\": {\n        \"type\": \"string\"\n      },\n      \"source\": {\n        \"$ref\": \"#/$defs/source\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"requested\",\n      \"current\",\n      \"bump\",\n      \"latest\",\n      \"source\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
@@ -10133,7 +10198,8 @@ export def "mise outdated" [
     --bump (-b),                             # Compare against the newest release overall, not only the configured range
     --inactive,                              # Also check installed tools that the current config does not request
     --global,                                # Only check tools defined in the global config
-    --local,                                 # Only check tools defined in project config files
+    --local,                                 # Deprecated alias for --no-global
+    --no-global,                             # Only check tools defined in project config files
     --no-header,                             # Do not print the table header
 ]: nothing -> record {
     let text = ^mise outdated --json ...(nus argv [...$tool_version] {
@@ -10150,6 +10216,7 @@ export def "mise outdated" [
         --inactive: $inactive
         --global: $global
         --local: $local
+        --no-global: $no_global
         --no-header: $no_header
     })
     nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise outdated --json\",\"$defs\":{\"source\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\".tool-versions\",\"mise.toml\",\"mise.toml-daemon\",\"idiomatic-version-file\",\"tool-stub\"]},\"path\":{\"type\":\"string\"}},\"required\":[\"type\",\"path\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"enum\":[\"argument\",\"unknown\"]}},\"required\":[\"type\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"type\":{\"const\":\"environment\"},\"key\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"}},\"required\":[\"type\",\"key\",\"value\"],\"additionalProperties\":false}]}},\"type\":\"object\",\"additionalProperties\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"requested\":{\"type\":\"string\"},\"current\":{\"type\":[\"string\",\"null\"]},\"bump\":{\"type\":[\"string\",\"null\"]},\"latest\":{\"type\":\"string\"},\"release_url\":{\"type\":\"string\"},\"source\":{\"$ref\":\"#/$defs/source\"}},\"required\":[\"name\",\"requested\",\"current\",\"bump\",\"latest\",\"source\"],\"additionalProperties\":false}}" { from json }
@@ -11129,11 +11196,11 @@ The experimental artifact cache (a task's `cache` field) has separate `--task-ca
 
 To create a script task, run `mise tasks add --file hello -- echo hello`, then `mise run hello`. See https://mise.jdx.dev/tasks/running-tasks.html
 """#'#
-@usage 'flag --affected help="Run matching tasks only in projects affected by Git changes" {
+@usage 'flag --affected help="Run matching tasks only where Git changes affect them" {
         long_help #"""
-Run matching tasks only in projects affected by Git changes
+Run matching tasks only where Git changes affect them
 
-Counts committed changes between the base and head revisions, plus staged, unstaged, and untracked changes in the working tree when the head revision is the checked-out commit. Requires a monorepo root (`monorepo_root = true`).
+Counts committed changes between the base and head revisions, plus staged, unstaged, and untracked changes in the working tree when the head revision is the checked-out commit. Under a monorepo root (`monorepo_root = true`), runs the tasks in the affected projects. Otherwise runs the tasks whose `sources` or defining config file include a changed file, and the tasks that declare no `sources`.
 """#
     }'
 @usage 'flag --affected-base help="Git base revision for `--affected`" requires=--affected {
@@ -11151,7 +11218,7 @@ Count committed changes between the base and head revisions
 Alone, ignores the working tree. Combines with `--affected-uncommitted` and `--affected-untracked`. With none of the three, every source counts (the working-tree sources only when the head revision is the checked-out commit). Also set by `MISE_AFFECTED_COMMITTED`.
 """#
     }'
-@usage 'flag --affected-explain help="Explain why `--affected` selected each project and task" conflicts=--affected-json requires=--affected'
+@usage 'flag --affected-explain help="Explain why `--affected` selected each project or task" conflicts=--affected-json requires=--affected'
 @usage 'flag --affected-head help="Git head revision for `--affected`" requires=--affected {
         long_help #"""
 Git head revision for `--affected`
@@ -11175,6 +11242,24 @@ Count untracked files that Git does not ignore
 Combines with the other source flags. Alone, ignores committed changes. Needs the head revision to be the current checkout. Also set by `MISE_AFFECTED_UNTRACKED`.
 """#
     }'
+@usage r#'flag --at help="Run the tasks at another git revision, in a temporary worktree" {
+        long_help #"""
+Run the tasks at another git revision, in a temporary worktree
+
+Checks REV out into a detached `git worktree` under mise's temporary directory, with its submodules, and runs the tasks there with that revision's own config and tasks. The worktree is removed afterwards, also when a task fails or is interrupted. Ignored files such as build caches are not there; use `--at-setup` to prepare them.
+
+The config at REV is trusted only if the repository's main checkout is; it is never trusted on its own, by a prompt, or by `--yes`.
+"""#
+        arg <REV>
+    }'#
+@usage r#'flag --at-setup help="Run this shell command in the `--at` worktree before the tasks" requires=--at {
+        long_help #"""
+Run this shell command in the `--at` worktree before the tasks
+
+It runs in the worktree's copy of the directory mise was started from (not a task's `dir`), outside mise's environment, with `MISE_RUN_AT_SOURCE` set to the repository the worktree came from. `--timeout` does not limit it, only the tasks after it.
+"""#
+        arg <CMD>
+    }'#
 @usage 'flag --all help="Open the task picker with tasks from every project in the monorepo" conflicts=--affected'
 @usage 'flag "-c --continue-on-error" help="Continue running tasks even if one fails"'
 @usage 'flag "-C --cd" help="Change to this directory before running the tasks" {
@@ -11199,6 +11284,7 @@ How task output is displayed
 - `replacing` - Stdout is replaced each time, stderr is printed as is
 - `timed` - Only show stdout lines if they are displayed for more than 1 second
 - `keep-order` - Print stdout/stderr by line, prefixed with the task's label, but keep the order of the output
+- `summary` - Print one line for each task that passed, and all of a failed task's output once it ends
 - `quiet` - Deprecated; use `--output interleave --quiet`
 - `silent` - Do not show any output, including the task's stdout and stderr, except errors
 """#
@@ -11211,6 +11297,14 @@ Connect the tasks directly to stdin, stdout, and stderr instead of reading their
 
 Redactions are not applied, and tasks run one at a time. Set the `raw` setting to make this the default.
 """#
+    }'
+@usage 'flag --report-file help="Write a JSON report of every task the run scheduled to this file when the run ends" conflicts=--dry-run env=MISE_TASK_REPORT_FILE {
+        long_help #"""
+Write a JSON report of every task the run scheduled to this file when the run ends
+
+Written on success, failure, Ctrl-C and `--timeout`. Each task gets a status (`passed`, `failed`, `cancelled`, `skipped`, `cached` or `not_run`), its exit code, duration and timestamps. Tasks the run starts do not inherit `MISE_TASK_REPORT_FILE`.
+"""#
+        arg <PATH>
     }'
 @usage 'flag --secrets help="[experimental] Give the named tasks these secrets (comma-separated); their dependencies and subtasks do not get them" var=#true conflicts=--affected {
         long_help #"""
@@ -11315,6 +11409,14 @@ Set `task.run_auto_install = false` to make this the default.
 @usage r#'flag --task-cache-explain help="[experimental] Explain the inputs that produced each task's artifact cache key"'#
 @usage 'flag --task-cache-explain-json help="[experimental] Print cache-key input details as JSON Lines without running tasks (requires `--dry-run`)" conflicts=--task-cache-explain requires=--dry-run'
 @usage 'flag --task-cache-stats help="[experimental] Report artifact cache hits, restored bytes, and time saved" conflicts=--dry-run'
+@usage r#'flag --tag help="Run only the matching tasks that have this tag; repeat to accept any of several" var=#true conflicts=--all {
+        long_help #"""
+Run only the matching tasks that have this tag; repeat to accept any of several
+
+With no task name, selects every task with the tag, as if the task were `**`. The tags come from each task's `tags` property. Dependencies run whatever their tags.
+"""#
+        arg <TAG>
+    }'#
 @usage 'flag --timeout help="Stop the run if it takes longer than this, e.g. 30s or 5m" {
         long_help #"""
 Stop the run if it takes longer than this, e.g. 30s or 5m
@@ -11322,6 +11424,14 @@ Stop the run if it takes longer than this, e.g. 30s or 5m
 Overrides the `task.timeout` setting.
 """#
         arg <TIMEOUT>
+    }'
+@usage 'flag --lock-timeout help="Fail a task that waits longer than this for a lock, e.g. 30s or 5m" {
+        long_help #"""
+Fail a task that waits longer than this for a lock, e.g. 30s or 5m
+
+Overrides the `task.lock_timeout` setting.
+"""#
+        arg <LOCK_TIMEOUT>
     }'
 @usage 'flag --timings help="Show the elapsed time after each task completes" hide=#true {
         alias "--timing" hide=#true
@@ -11339,9 +11449,12 @@ Set `task.timings = true` to show it by default.
 @usage 'example "mise run cmd1 arg1 arg2 ::: cmd2 arg1 arg2" help="Run several tasks, each with its own arguments"'
 @usage 'example "mise run -j 1 lint ::: test" help="Run tasks one at a time"'
 @usage r#'example "mise run 'test:*'" help="Run every task that matches a pattern"'#
+@usage 'example "mise run --tag lint" help="Run every task tagged \"lint\""'
 @usage 'example "mise run //services/api:build" help="Run a task in a monorepo project"'
+@usage 'example "mise run --at main test" help="Run \"test\" as it is on main, in a temporary git worktree"'
 @usage 'example "mise run --secrets DEPLOY_KEY deploy" help="Give \"deploy\" the DEPLOY_KEY secret (experimental); its dependencies do not get it"'
 @usage 'complete dir type=dir'
+@usage 'complete path type=path'
 export def "mise run" [
     --continue-on-error (-c),                                               # Continue running tasks even if one fails
     --cd (-C): path@"nus complete",                                         # Run as if mise were started in DIR
@@ -11359,21 +11472,24 @@ export def "mise run" [
     --raw (-r),                                                             # Connect tasks and install commands directly to the terminal
     --locked,                                                               # Require download URLs from the lockfile when installing
     --silent (-S),                                                          # Suppress all task output and mise non-error messages
-    --affected,                                                             # Run matching tasks only in projects affected by Git changes
+    --affected,                                                             # Run matching tasks only where Git changes affect them
     --affected-base: string,                                                # Git base revision for `--affected`
     --affected-committed,                                                   # Count committed changes between the base and head revisions
-    --affected-explain,                                                     # Explain why `--affected` selected each project and task
+    --affected-explain,                                                     # Explain why `--affected` selected each project or task
     --affected-head: string,                                                # Git head revision for `--affected`
     --affected-json,                                                        # Print the affected projects and tasks as JSON without running tasks
     --affected-uncommitted,                                                 # Count staged and unstaged changes to tracked files
     --affected-untracked,                                                   # Count untracked files that Git does not ignore
+    --at: string,                                                           # Run the tasks at another git revision, in a temporary worktree
+    --at-setup: string,                                                     # Run this shell command in the `--at` worktree before the tasks
     --all,                                                                  # Open the task picker with tasks from every project in the monorepo
+    --report-file: path@"nus complete",                                     # Write a JSON report of every task the run scheduled to this file when the run ends
     --secrets: list<string>@"nus complete",                                 # [experimental] Give the named tasks these secrets (comma-separated); their dependencies and subtasks do not get them
     --secrets-all,                                                          # [experimental] Give the named tasks every secret the project can inject; their dependencies and subtasks do not get them
     --allow-env: list<string>,                                              # Allow a specific env var through (implies `--deny-env` for everything else)
     --allow-net: list<string>,                                              # Allow network access only to HOST (not supported on any platform)
-    --allow-read: list<string>,                                             # Allow reads from a specific path (implies `--deny-read` for everything else)
-    --allow-write: list<string>,                                            # Allow writes to a specific path (implies `--deny-write` for everything else)
+    --allow-read: list<path>@"nus complete",                                # Allow reads from a specific path (implies `--deny-read` for everything else)
+    --allow-write: list<path>@"nus complete",                               # Allow writes to a specific path (implies `--deny-write` for everything else)
     --deny-all,                                                             # Block reads, writes, network, and env vars
     --deny-env,                                                             # Block env var inheritance except PATH, HOME, USER, SHELL, TERM, COLORTERM, and LANG
     --deny-net,                                                             # Block all network access
@@ -11388,7 +11504,9 @@ export def "mise run" [
     --task-cache-explain,                                                   # [experimental] Explain the inputs that produced each task's artifact cache key
     --task-cache-explain-json,                                              # [experimental] Print cache-key input details as JSON Lines without running tasks (requires `--dry-run`)
     --task-cache-stats,                                                     # [experimental] Report artifact cache hits, restored bytes, and time saved
+    --tag: list<string>,                                                    # Run only the matching tasks that have this tag; repeat to accept any of several
     --timeout: string,                                                      # Stop the run if it takes longer than this, e.g. 30s or 5m
+    --lock-timeout: string,                                                 # Fail a task that waits longer than this for a lock, e.g. 30s or 5m
 ]: nothing -> string {
     ^mise run ...(nus argv [] {
         --continue-on-error: $continue_on_error
@@ -11415,7 +11533,10 @@ export def "mise run" [
         --affected-json: $affected_json
         --affected-uncommitted: $affected_uncommitted
         --affected-untracked: $affected_untracked
+        --at: $at
+        --at-setup: $at_setup
         --all: $all
+        --report-file: $report_file
         --secrets: $secrets
         --secrets-all: $secrets_all
         --allow-env: $allow_env
@@ -11436,7 +11557,9 @@ export def "mise run" [
         --task-cache-explain: $task_cache_explain
         --task-cache-explain-json: $task_cache_explain_json
         --task-cache-stats: $task_cache_stats
+        --tag: $tag
         --timeout: $timeout
+        --lock-timeout: $lock_timeout
     })
 }
 
@@ -12248,7 +12371,8 @@ export def "mise settings unset" [
 # Installs the version if needed, then sets `MISE_<TOOL>_VERSION`, such as
 # `MISE_NODE_VERSION`, to the resolved version in the current shell. That
 # overrides config files until you close the shell or run
-# `mise shell --unset <TOOL>`. Requires `mise activate`: the shell function it
+# `mise shell --unset <TOOL>`, or `mise shell --unset --all` to remove every
+# version set this way. Requires `mise activate`: the shell function it
 # defines applies the variable that this command prints.
 @usage 'alias sh'
 @usage 'long_help #"""
@@ -12257,13 +12381,21 @@ Set a tool version for the current shell session
 Installs the version if needed, then sets `MISE_<TOOL>_VERSION`, such as
 `MISE_NODE_VERSION`, to the resolved version in the current shell. That
 overrides config files until you close the shell or run
-`mise shell --unset <TOOL>`. Requires `mise activate`: the shell function it
+`mise shell --unset <TOOL>`, or `mise shell --unset --all` to remove every
+version set this way. Requires `mise activate`: the shell function it
 defines applies the variable that this command prints.
 """#'
 @usage 'flag "-j --jobs" help="Number of jobs to run in parallel (default: the `jobs` setting)" env=MISE_JOBS {
         arg <JOBS>
     }'
 @usage 'flag "-u --unset" help="Remove a version set earlier with `mise shell`"'
+@usage 'flag --all help="With `--unset`, remove every `MISE_<TOOL>_VERSION` in this shell" conflicts=TOOL@VERSION {
+        long_help #"""
+With `--unset`, remove every `MISE_<TOOL>_VERSION` in this shell
+
+This includes any you exported yourself, not only those set by `mise shell`.
+"""#
+    }'
 @usage r#'flag --raw help="Connect the install commands' stdin, stdout, and stderr to the terminal" overrides=--jobs {
         long_help #"""
 Connect the install commands' stdin, stdout, and stderr to the terminal
@@ -12272,13 +12404,14 @@ Implies `--jobs=1`.
 """#
     }'#
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
-@usage 'arg <TOOL@VERSION>… help="Tools to set, such as node@20" var=#true'
+@usage 'arg "[TOOL@VERSION]…" help="Tools to set, such as node@20" required=#false var=#true required_unless=--all'
 @usage 'example #"""
 mise shell node@20
 node -v
 v20.19.5
 """# help="Use node 20 in this shell"'
 @usage 'example "mise shell --unset node" help="Go back to the version the config requests"'
+@usage 'example "mise shell --unset --all" help="Drop every version set with `mise shell` or `MISE_<TOOL>_VERSION`"'
 export def "mise shell" [
     ...tool_version: string@"nus complete",  # Tools to set, such as node@20
     --cd (-C): path@"nus complete",          # Run as if mise were started in DIR
@@ -12291,6 +12424,7 @@ export def "mise shell" [
     --locked,                                # Require download URLs from the lockfile when installing
     --silent,                                # Suppress all task output and mise non-error messages
     --unset (-u),                            # Remove a version set earlier with `mise shell`
+    --all,                                   # With `--unset`, remove every `MISE_<TOOL>_VERSION` in this shell
 ]: nothing -> string {
     ^mise shell ...(nus argv [...$tool_version] {
         --cd: $cd
@@ -12303,6 +12437,7 @@ export def "mise shell" [
         --locked: $locked
         --silent: $silent
         --unset: $unset
+        --all: $all
     })
 }
 
@@ -12376,13 +12511,15 @@ See https://mise.jdx.dev/bootstrap/github-relay.html
 @usage 'flag --global-config-directory hide=#true'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'arg "[DESTINATION]" help="OpenSSH destination or SSH config alias (required)" required=#false'
-@usage 'arg "[COMMAND]…" help="Command to execute after --; omit for an interactive shell" required=#false double_dash=automatic var=#true'
+@usage 'arg "[COMMAND]…" help="Command to execute after --; omit for an interactive shell" required=#false double_dash=automatic var=#true {
+        complete type=command_args
+    }'
 @usage 'example "mise ssh devbox --github-relay-read-only --github-relay-repo you/setup -- git clone https://github.com/you/setup.git" help="Let devbox clone one private repository"'
 @usage 'example "mise ssh devbox --github-relay-read-only --github-relay-all-repos" help="Open a shell that can read every repository your credentials can read"'
 @usage 'example "mise ssh devbox -i ~/.ssh/devbox -p 2222 -o ServerAliveInterval=30 -- uname -a" help="Run a command over plain SSH with an identity file, port, and option"'
 export def "mise ssh" [
     destination?: string,                 # OpenSSH destination or SSH config alias (required)
-    ...command: string,                   # Command to execute after --; omit for an interactive shell
+    ...command: string@"nus complete",    # Command to execute after --; omit for an interactive shell
     --cd (-C): path@"nus complete",       # Run as if mise were started in DIR
     --env_ (-E): list<string>,            # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
     --jobs (-j): string,                  # How many jobs to run in parallel; defaults to the `jobs` setting
@@ -12727,8 +12864,10 @@ export def "mise skills ls" [
 #
 # Writes one symlink per skill into DIR, named after the skill and pointing
 # at the directory of the version that is active here. DIR defaults to the
-# `skills.dir` setting, `.claude/skills`, under the project root: the
-# directory of the nearest mise config. Run it again after `mise use` changes
+# `skills.dir` setting under the project root: the directory of the nearest
+# mise config. Unset, that is `.agents/skills` if it exists, then
+# `.claude/skills` if it exists; with neither, mise creates `.agents/skills`
+# and a `.claude/skills` symlink to it. Run it again after `mise use` changes
 # a version and the links follow, or set `skills.auto_sync` to have mise do
 # that after every install and `mise use`.
 #
@@ -12741,8 +12880,10 @@ Link the active tools' skills where an agent looks for them
 
 Writes one symlink per skill into DIR, named after the skill and pointing
 at the directory of the version that is active here. DIR defaults to the
-`skills.dir` setting, `.claude/skills`, under the project root: the
-directory of the nearest mise config. Run it again after `mise use` changes
+`skills.dir` setting under the project root: the directory of the nearest
+mise config. Unset, that is `.agents/skills` if it exists, then
+`.claude/skills` if it exists; with neither, mise creates `.agents/skills`
+and a `.claude/skills` symlink to it. Run it again after `mise use` changes
 a version and the links follow, or set `skills.auto_sync` to have mise do
 that after every install and `mise use`.
 
@@ -12758,12 +12899,12 @@ reported.
             long_help #"""
 Link into the skills.dir directory under your home directory instead of the project's
 
-With the default skills.dir, that is ~/.claude/skills.
+With no skills.dir set, that follows the same rule as in a project.
 """#
         }'#
 @usage 'flag --prune help="Remove links mise made for skills that are no longer active"'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
-@usage r#'example "mise skills sync" help="Link skills into the project's skills.dir (default .claude/skills)"'#
+@usage r#'example "mise skills sync" help="Link skills into the project's skills.dir (default .agents/skills)"'#
 @usage 'example "mise skills sync --dir .agents/skills --prune" help="Link into .agents/skills and remove links for skills that are no longer active"'
 @usage 'complete dir type=dir'
 export def "mise skills sync" [
@@ -13024,15 +13165,30 @@ Manage tasks
 
 With no subcommand, lists tasks like `mise tasks ls` and accepts the same flags. With a task name, shows that task like `mise tasks info`. To run a task, use `mise run`.
 """#'
-@usage 'flag "-g --global" help="Only show global tasks" overrides=--local'
+@usage 'flag "-g --global" help="Only show global tasks" {
+        overrides "--local" "--no-global"
+    }'
 @usage 'flag "-J --json" help="Output in JSON format"'
-@usage 'flag "-l --local" help="Only show non-global tasks" overrides=--global'
+@usage 'flag "-l --local" help="Deprecated alias for --no-global" {
+        long_help #"""
+Deprecated alias for --no-global
+
+Removed in mise 2027.7.0.
+"""#
+        overrides "--global" "--no-global"
+    }'
+@usage 'flag --no-global help="Only show non-global tasks" {
+        overrides "--global" "--local"
+    }'
 @usage 'flag "-x --extended" help="Show all columns"'
 @usage r#'flag "-a --all" help="Include tasks from every project in the monorepo, not only the current directory's hierarchy"'#
 @usage 'flag --complete help="Display tasks for usage completion" hide=#true'
 @usage 'flag --hidden help="Show hidden tasks"'
 @usage 'flag --name-only help="Print only task names, one per line (for fzf and similar tools)" {
         conflicts "--json" "--extended" "--usage"
+    }'
+@usage 'flag --tag help="Only show tasks that have this tag; repeat to accept any of several" var=#true {
+        arg <TAG>
     }'
 @usage 'flag --no-header help="Do not print the table header" {
         alias "--no-headers" hide=#true
@@ -13076,11 +13232,13 @@ export def "mise tasks" [
     --locked,                                        # Require download URLs from the lockfile when installing
     --silent,                                        # Suppress all task output and mise non-error messages
     --global (-g),                                   # Only show global tasks
-    --local (-l),                                    # Only show non-global tasks
+    --local (-l),                                    # Deprecated alias for --no-global
+    --no-global,                                     # Only show non-global tasks
     --extended (-x),                                 # Show all columns
     --all (-a),                                      # Include tasks from every project in the monorepo, not only the current directory's hierarchy
     --hidden,                                        # Show hidden tasks
     --name-only,                                     # Print only task names, one per line (for fzf and similar tools)
+    --tag: list<string>,                             # Only show tasks that have this tag; repeat to accept any of several
     --no-header,                                     # Do not print the table header
     --sort: string@[name alias description source],  # Column to sort by (default: name)
     --sort-order: string@[asc desc],                 # Sort direction (default: asc)
@@ -13097,10 +13255,12 @@ export def "mise tasks" [
         --silent: $silent
         --global: $global
         --local: $local
+        --no-global: $no_global
         --extended: $extended
         --all: $all
         --hidden: $hidden
         --name-only: $name_only
+        --tag: $tag
         --no-header: $no_header
         --sort: $sort
         --sort-order: $sort_order
@@ -13110,16 +13270,40 @@ export def "mise tasks" [
 
 # Add a task
 #
-# Writes a `[tasks.<name>]` table to the nearest project config file and marks that file as trusted. See https://mise.jdx.dev/configuration.html#target-file-for-write-operations for how the file is chosen.
+# Writes a `[tasks.<name>]` table to the nearest project config file, or to the file `--env`, `--global` or `--path` chooses, and trusts that file's config root so mise loads it. See https://mise.jdx.dev/configuration.html#target-file-for-write-operations for how the file is chosen. In safe mode (`MISE_SAFE=1`) it writes without trusting anything.
+#
+# Pass `--force` to replace a task that already has that name in the file. Replacing one without it is deprecated: mise still replaces the task, warns from 2027.5.0, and refuses from 2028.5.0. Adding exactly the same task again changes nothing. To change some fields of an existing task, use `mise tasks set`.
 #
 # With `--file`, creates an executable script in the project's task directory (for example `mise-tasks/`) instead, and does not change any config file.
 @usage r#'long_help #"""
 Add a task
 
-Writes a `[tasks.<name>]` table to the nearest project config file and marks that file as trusted. See https://mise.jdx.dev/configuration.html#target-file-for-write-operations for how the file is chosen.
+Writes a `[tasks.<name>]` table to the nearest project config file, or to the file `--env`, `--global` or `--path` chooses, and trusts that file's config root so mise loads it. See https://mise.jdx.dev/configuration.html#target-file-for-write-operations for how the file is chosen. In safe mode (`MISE_SAFE=1`) it writes without trusting anything.
+
+Pass `--force` to replace a task that already has that name in the file. Replacing one without it is deprecated: mise still replaces the task, warns from 2027.5.0, and refuses from 2028.5.0. Adding exactly the same task again changes nothing. To change some fields of an existing task, use `mise tasks set`.
 
 With `--file`, creates an executable script in the project's task directory (for example `mise-tasks/`) instead, and does not change any config file.
 """#'#
+@usage 'flag "-f --file" help="Create a file task instead of a TOML task"'
+@usage 'flag "-F --force" help="Replace a task that already has this name in the file"'
+@usage 'flag "-n --dry-run" help="Show what would be written without writing it"'
+@usage 'flag "-J --json" help="Print what was written as JSON"'
+@usage 'flag "-e --env" help="Use mise.<ENV>.toml in the current directory, or .mise.<ENV>.toml if that exists" {
+            long_help #"""
+Use mise.<ENV>.toml in the current directory, or .mise.<ENV>.toml if that exists
+
+`--env local` uses mise.local.toml, which is for tasks you keep to yourself. Not the same as the global -E, which only chooses which config files are loaded.
+"""#
+            overrides "--global" "--path"
+            arg <ENV>
+        }'
+@usage 'flag "-g --global" help="Use the global config file" {
+            overrides "--path" "--env"
+        }'
+@usage 'flag "-p --path" help="Use this config file, or the config file in this directory" {
+            overrides "--global" "--env"
+            arg <PATH>
+        }'
 @usage 'flag "-a --alias" help="Other names for the task" var=#true {
             arg <ALIAS>
         }'
@@ -13129,7 +13313,6 @@ With `--file`, creates an executable script in the project's task directory (for
 @usage 'flag "-D --dir" help="Run the task in a specific directory" {
             arg <DIR>
         }'
-@usage 'flag "-f --file" help="Create a file task instead of a TOML task"'
 @usage 'flag "-H --hide" help="Hide the task from `mise tasks` and completions"'
 @usage 'flag "-q --quiet" help="Do not print the command before running"'
 @usage r#'flag "-r --raw" help="Connect the task directly to the terminal's stdin, stdout, and stderr"'#
@@ -13139,12 +13322,23 @@ With `--file`, creates an executable script in the project's task directory (for
 @usage 'flag "-w --wait-for" help="Wait for these tasks to finish if they are also being run" var=#true {
             arg <TASK>
         }'
+@usage 'flag --confirm help="Ask this question before the task runs, and run it only if the answer is yes" {
+            arg <MESSAGE>
+        }'
 @usage 'flag --depends-post help="Tasks to run after this one" var=#true {
             arg <TASK>
         }'
 @usage 'flag --description help="Description of the task" {
             arg <DESCRIPTION>
         }'
+@usage r#'flag --env-var help="Set an environment variable for the task; repeat for several" var=#true {
+            long_help #"""
+Set an environment variable for the task; repeat for several
+
+Written to the task's `env` table. `--env` chooses the config file instead.
+"""#
+            arg "<KEY=VALUE>"
+        }'#
 @usage 'flag --outputs help="Glob patterns of files this task creates, used to skip it when they are up to date" var=#true {
             arg <GLOB>
         }'
@@ -13155,18 +13349,35 @@ With `--file`, creates an executable script in the project's task directory (for
             arg <SHELL>
         }'
 @usage 'flag --silent help="Do not print the command or its output"'
+@usage r#'flag --tools help="Tool the task needs, such as node@24 or npm:prettier@3; repeat for several" var=#true {
+            long_help #"""
+Tool the task needs, such as node@24 or npm:prettier@3; repeat for several
+
+Written to the task's `tools` table. Without a version, writes `latest`.
+"""#
+            arg <TOOL@VERSION>
+        }'#
+@usage r#'flag --usage help="Usage spec for the task's arguments and flags: https://usage.jdx.dev/spec/" {
+            arg <SPEC>
+        }'#
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'arg <TASK> help="Name of the task to add"'
 @usage 'arg "[-- RUN]…" help="Command to run, given after `--`" required=#false var=#true'
 @usage r#'example "mise tasks add build --description \"Build the app\" --sources 'src/**/*.ts' --outputs 'dist/**' -- npm run build" help="Add a TOML task that is skipped while its outputs are up to date"'#
+@usage 'example "mise tasks add --env local lint --tools node@24 -- npx eslint ." help="Add a personal task to mise.local.toml"'
 @usage 'example "mise tasks add --file lint -- eslint ." help="Create an executable lint script in the task directory"'
 @usage 'example "mise tasks add ci --depends lint --depends test -- echo done" help="Add a task that runs after lint and test"'
+@usage 'example "mise tasks add --json --dry-run deploy --confirm \"Deploy to production?\" -- ./deploy.sh" help="Print the task that would be written, as JSON, without writing it"'
+@usage 'complete path type=path'
+@usage 'output json framing=json select=--json'
 export def "mise tasks add" [
     task: string@"nus complete",                   # Name of the task to add
     ...run: string,                                # Command to run, given after `--`
     --cd (-C): path@"nus complete",                # Run as if mise were started in DIR
     --env_ (-E): list<string>,                     # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --force (-F),                                  # Replace a task that already has this name in the file
     --jobs (-j): string,                           # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                                # Show what would be written without writing it
     --quiet (-q),                                  # Suppress non-error messages
     --shell: string,                               # Run the task in a specific shell
     --verbose (-v): int,                           # Show extra output (use -vv for even more)
@@ -13174,22 +13385,30 @@ export def "mise tasks add" [
     --raw (-r),                                    # Connect tasks and install commands directly to the terminal
     --locked,                                      # Require download URLs from the lockfile when installing
     --silent,                                      # Suppress all task output and mise non-error messages
+    --global (-g),                                 # Use the global config file
+    --usage: string,                               # Usage spec for the task's arguments and flags: https://usage.jdx.dev/spec/
+    --file (-f),                                   # Create a file task instead of a TOML task
+    --path (-p): path@"nus complete",              # Use this config file, or the config file in this directory
     --alias (-a): list<string>@"nus complete",     # Other names for the task
     --depends (-d): list<string>@"nus complete",   # Tasks to run before this one
     --dir (-D): path@"nus complete",               # Run the task in a specific directory
-    --file (-f),                                   # Create a file task instead of a TOML task
     --hide (-H),                                   # Hide the task from `mise tasks` and completions
     --sources (-s): list<string>,                  # Glob patterns of files this task uses as input
     --wait-for (-w): list<string>@"nus complete",  # Wait for these tasks to finish if they are also being run
+    --confirm: string,                             # Ask this question before the task runs, and run it only if the answer is yes
     --depends-post: list<string>@"nus complete",   # Tasks to run after this one
     --description: string,                         # Description of the task
+    --env-var: list<string>,                       # Set an environment variable for the task; repeat for several
     --outputs: list<string>,                       # Glob patterns of files this task creates, used to skip it when they are up to date
     --run-windows: string,                         # Command to run on Windows (TOML tasks only; ignored with `--file`)
-]: nothing -> string {
-    ^mise tasks add ...(nus argv [$task ...$run] {
+    --tools: list<string>@"nus complete",          # Tool the task needs, such as node@24 or npm:prettier@3; repeat for several
+] {
+    ^mise tasks add --json ...(nus argv [$task ...$run] {
         --cd: $cd
         --env: $env_
+        --force: $force
         --jobs: $jobs
+        --dry-run: $dry_run
         --quiet: $quiet
         --shell: $shell
         --verbose: $verbose
@@ -13197,18 +13416,24 @@ export def "mise tasks add" [
         --raw: $raw
         --locked: $locked
         --silent: $silent
+        --global: $global
+        --usage: $usage
+        --file: $file
+        --path: $path
         --alias: $alias
         --depends: $depends
         --dir: $dir
-        --file: $file
         --hide: $hide
         --sources: $sources
         --wait-for: $wait_for
+        --confirm: $confirm
         --depends-post: $depends_post
         --description: $description
+        --env-var: $env_var
         --outputs: $outputs
         --run-windows: $run_windows
-    })
+        --tools: $tools
+    }) | from json
 }
 
 # Show the dependency tree of tasks
@@ -13352,6 +13577,54 @@ export def "mise tasks graph" [
     nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks graph --json\",\"type\":\"object\",\"properties\":{\"projects\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/project\"}}},\"additionalProperties\":false,\"required\":[\"projects\"],\"$defs\":{\"project\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"root\":{\"type\":\"string\"},\"metadata\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}},\"dependencies\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"provenance\":{\"$ref\":\"#/$defs/provenance\"},\"dependency_provenance\":{\"type\":\"object\",\"additionalProperties\":{\"$ref\":\"#/$defs/provenance\"}},\"tasks\":{\"type\":\"object\",\"additionalProperties\":{\"$ref\":\"#/$defs/task\"}}},\"additionalProperties\":false,\"required\":[\"id\",\"root\",\"metadata\",\"dependencies\",\"provenance\",\"dependency_provenance\",\"tasks\"]},\"provenance\":{\"type\":\"object\",\"properties\":{\"provider\":{\"type\":\"string\"},\"source\":{\"type\":\"string\"}},\"additionalProperties\":false},\"task\":{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"source\":{\"type\":\"string\"},\"provenance\":{\"$ref\":\"#/$defs/provenance\"},\"suggestions\":{\"$ref\":\"#/$defs/suggestions\"}},\"additionalProperties\":false,\"required\":[\"command\",\"description\",\"source\",\"provenance\",\"suggestions\"]},\"suggestions\":{\"type\":\"object\",\"properties\":{\"inputs\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"outputs\":{\"type\":[\"array\",\"null\"],\"items\":{\"type\":\"string\"}},\"cache\":{\"type\":[\"boolean\",\"null\"]},\"depends\":{\"type\":[\"array\",\"null\"],\"items\":{\"type\":\"string\"}},\"provenance\":{\"type\":\"object\",\"properties\":{\"inputs\":{\"$ref\":\"#/$defs/provenance\"},\"outputs\":{\"$ref\":\"#/$defs/provenance\"},\"cache\":{\"$ref\":\"#/$defs/provenance\"},\"depends\":{\"$ref\":\"#/$defs/provenance\"}},\"additionalProperties\":false}},\"additionalProperties\":false,\"required\":[\"inputs\",\"outputs\",\"cache\",\"depends\",\"provenance\"]}}}" { from json | update projects.provenance { default null provider } | update projects.provenance { default null source } }
 }
 
+# Show recent task runs and how long they took
+#
+# `mise run` records each task's start time, duration, arguments and result for this project: whether it succeeded, failed, was restored from the artifact cache, skipped, or cancelled. mise keeps the last `task.history_limit` runs of each task (default 20); set `task.history` to `false` to stop recording.
+#
+# `--summary` shows one line per task with its median duration over the runs that executed and succeeded, which is the typical cost of running it.
+@usage r#'long_help #"""
+Show recent task runs and how long they took
+
+`mise run` records each task's start time, duration, arguments and result for this project: whether it succeeded, failed, was restored from the artifact cache, skipped, or cancelled. mise keeps the last `task.history_limit` runs of each task (default 20); set `task.history` to `false` to stop recording.
+
+`--summary` shows one line per task with its median duration over the runs that executed and succeeded, which is the typical cost of running it.
+"""#'#
+@usage 'flag "-s --summary" help="Show one line per task: runs, failures, median and last duration, last status"'
+@usage 'flag "-J --json" help="Output in JSON format"'
+@usage 'flag "-h --help" help="Print help" action=help builtin=#true'
+@usage 'arg "[TASK]" help="Only show runs of this task" required=#false'
+@usage r#'example "mise tasks history" help="List this project's recent task runs"'#
+@usage 'example "mise tasks history test" help="List the recent runs of the test task"'
+@usage r#'example "mise tasks history --summary" help="Show each task's median and last duration"'#
+@usage 'example "mise tasks history --summary --json" help="Get typical durations for scripts and agents"'
+@usage 'output json framing=json select=--json'
+export def "mise tasks history" [
+    task?: string@"nus complete",    # Only show runs of this task
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --summary (-s),                  # Show one line per task: runs, failures, median and last duration, last status
+] {
+    ^mise tasks history --json ...(nus argv [$task] {
+        --cd: $cd
+        --env: $env_
+        --jobs: $jobs
+        --quiet: $quiet
+        --verbose: $verbose
+        --yes: $yes
+        --raw: $raw
+        --locked: $locked
+        --silent: $silent
+        --summary: $summary
+    }) | from json
+}
+
 # Show a task's definition
 #
 # Prints the task's description, source file, dependencies, sources, outputs, run commands, environment, and usage spec. `--json` prints the full definition.
@@ -13391,6 +13664,56 @@ export def "mise tasks info" [
     }) | from json
 }
 
+# Print the output of a task's last run
+#
+# With the `task.logs` setting on (`MISE_TASK_LOGS=1`; it is off by default), mise keeps the combined stdout and stderr of each task's most recent run, after redaction, so output that `replacing`, `timed`, `silent` or a truncated terminal hid can be read without running the task again. Each run replaces the task's previous log, and a log keeps at most its last 4 MiB.
+#
+# mise only logs output it reads: a `raw` or `interactive` task, or an `interleave` task whose output goes straight to the terminal (when nothing needs redacting and neither the artifact cache nor OpenTelemetry reads it), has no log.
+@usage r#'long_help #"""
+Print the output of a task's last run
+
+With the `task.logs` setting on (`MISE_TASK_LOGS=1`; it is off by default), mise keeps the combined stdout and stderr of each task's most recent run, after redaction, so output that `replacing`, `timed`, `silent` or a truncated terminal hid can be read without running the task again. Each run replaces the task's previous log, and a log keeps at most its last 4 MiB.
+
+mise only logs output it reads: a `raw` or `interactive` task, or an `interleave` task whose output goes straight to the terminal (when nothing needs redacting and neither the artifact cache nor OpenTelemetry reads it), has no log.
+"""#'#
+@usage 'flag --path help="Print the path of the log file instead of its contents" {
+            long_help #"""
+Print the path of the log file instead of its contents
+
+The path is printed even when the task has no log yet.
+"""#
+        }'
+@usage 'flag "-h --help" help="Print help" action=help builtin=#true'
+@usage 'arg <TASK> help="Name of the task"'
+@usage 'example "mise tasks log test" help="Print the output of the last run of the test task"'
+@usage 'example "mise tasks log test --path" help="Print where that log is kept"'
+export def "mise tasks log" [
+    task: string@"nus complete",     # Name of the task
+    --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
+    --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,             # How many jobs to run in parallel; defaults to the `jobs` setting
+    --quiet (-q),                    # Suppress non-error messages
+    --verbose (-v): int,             # Show extra output (use -vv for even more)
+    --yes (-y),                      # Answer yes to all confirmation prompts
+    --raw,                           # Connect tasks and install commands directly to the terminal
+    --locked,                        # Require download URLs from the lockfile when installing
+    --silent,                        # Suppress all task output and mise non-error messages
+    --path,                          # Print the path of the log file instead of its contents
+]: nothing -> string {
+    ^mise tasks log ...(nus argv [$task] {
+        --cd: $cd
+        --env: $env_
+        --jobs: $jobs
+        --quiet: $quiet
+        --verbose: $verbose
+        --yes: $yes
+        --raw: $raw
+        --locked: $locked
+        --silent: $silent
+        --path: $path
+    })
+}
+
 # List available tasks
 #
 # Lists tasks from `[tasks]` in your config files and from task directories such as `mise-tasks/`, `.mise-tasks/`, and `.mise/tasks/`, including global tasks in `~/.config/mise/tasks/`. Tasks from parent directories and the global config are included; a project task overrides a global task with the same name. In a monorepo, `--all` also lists tasks from sibling projects.
@@ -13403,15 +13726,31 @@ Lists tasks from `[tasks]` in your config files and from task directories such a
 
 See https://mise.jdx.dev/tasks/task-discovery.html
 """#'
-@usage 'flag "-g --global" help="Only show global tasks" overrides=--local'
+@usage 'after_long_help "\u{1b}[1m\u{1b}[4mDeprecation:\u{1b}[22m\u{1b}[24m\n\nThe `-l` and `--local` flags are deprecated in favor of `--no-global`. mise warns about\nthem from 2027.1.0 and removes them in 2027.7.0."'
+@usage 'flag "-g --global" help="Only show global tasks" {
+            overrides "--local" "--no-global"
+        }'
 @usage 'flag "-J --json" help="Output in JSON format"'
-@usage 'flag "-l --local" help="Only show non-global tasks" overrides=--global'
+@usage 'flag "-l --local" help="Deprecated alias for --no-global" {
+            long_help #"""
+Deprecated alias for --no-global
+
+Removed in mise 2027.7.0.
+"""#
+            overrides "--global" "--no-global"
+        }'
+@usage 'flag --no-global help="Only show non-global tasks" {
+            overrides "--global" "--local"
+        }'
 @usage 'flag "-x --extended" help="Show all columns"'
 @usage r#'flag "-a --all" help="Include tasks from every project in the monorepo, not only the current directory's hierarchy"'#
 @usage 'flag --complete help="Display tasks for usage completion" hide=#true'
 @usage 'flag --hidden help="Show hidden tasks"'
 @usage 'flag --name-only help="Print only task names, one per line (for fzf and similar tools)" {
             conflicts "--json" "--extended" "--usage"
+        }'
+@usage 'flag --tag help="Only show tasks that have this tag; repeat to accept any of several" var=#true {
+            arg <TAG>
         }'
 @usage 'flag --no-header help="Do not print the table header" {
             alias "--no-headers" hide=#true
@@ -13439,6 +13778,7 @@ See https://mise.jdx.dev/tasks/task-discovery.html
 @usage 'example "mise tasks ls" help="List tasks"'
 @usage 'example "mise tasks ls --hidden" help="Include hidden tasks"'
 @usage 'example "mise tasks ls --all" help="List tasks from every monorepo project"'
+@usage 'example "mise tasks ls --tag lint" help="List the tasks tagged \"lint\""'
 @usage 'example "mise tasks ls --name-only | fzf" help="Pick a task name interactively"'
 @usage 'output "json" framing="json" select="--json" {
     schema "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"mise tasks [ls] --json\",\n  \"$defs\": {\n    \"dependency\": {\n      \"oneOf\": [\n        {\n          \"type\": \"string\"\n        },\n        {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          },\n          \"minItems\": 1\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"task\": {\n              \"type\": \"string\"\n            },\n            \"args\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              },\n              \"minItems\": 1\n            },\n            \"env\": {\n              \"type\": \"object\",\n              \"additionalProperties\": {\n                \"type\": \"string\"\n              },\n              \"minProperties\": 1\n            },\n            \"optional\": {\n              \"const\": true\n            }\n          },\n          \"required\": [\n            \"task\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    },\n    \"run\": {\n      \"oneOf\": [\n        {\n          \"type\": \"string\"\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"task\": {\n              \"type\": \"string\"\n            },\n            \"args\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              },\n              \"minItems\": 1\n            },\n            \"env\": {\n              \"type\": \"object\",\n              \"additionalProperties\": {\n                \"type\": \"string\"\n              },\n              \"minProperties\": 1\n            }\n          },\n          \"required\": [\n            \"task\"\n          ],\n          \"additionalProperties\": false\n        },\n        {\n          \"type\": \"object\",\n          \"properties\": {\n            \"tasks\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": \"string\"\n              }\n            }\n          },\n          \"required\": [\n            \"tasks\"\n          ],\n          \"additionalProperties\": false\n        }\n      ]\n    }\n  },\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"aliases\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"description\": {\n        \"type\": \"string\"\n      },\n      \"source\": {\n        \"type\": \"string\"\n      },\n      \"config_sources\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"depends\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"daemons\": {\n        \"oneOf\": [\n          {\n            \"type\": \"boolean\"\n          },\n          {\n            \"type\": \"string\"\n          },\n          {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"type\": \"null\"\n          }\n        ]\n      },\n      \"secrets\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"depends_post\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"wait_for\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/dependency\"\n        }\n      },\n      \"env\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"dir\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"hide\": {\n        \"type\": \"boolean\"\n      },\n      \"global\": {\n        \"type\": \"boolean\"\n      },\n      \"raw\": {\n        \"type\": \"boolean\"\n      },\n      \"interactive\": {\n        \"type\": \"boolean\"\n      },\n      \"sources\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"outputs\": {\n        \"oneOf\": [\n          {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"type\": \"object\",\n            \"properties\": {\n              \"auto\": {\n                \"const\": true\n              }\n            },\n            \"required\": [\n              \"auto\"\n            ],\n            \"additionalProperties\": false\n          }\n        ]\n      },\n      \"shell\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"quiet\": {\n        \"type\": \"boolean\"\n      },\n      \"silent\": {\n        \"oneOf\": [\n          {\n            \"type\": \"boolean\"\n          },\n          {\n            \"enum\": [\n              \"stdout\",\n              \"stderr\"\n            ]\n          }\n        ]\n      },\n      \"tools\": {\n        \"type\": \"object\",\n        \"additionalProperties\": {\n          \"oneOf\": [\n            {\n              \"type\": \"string\"\n            },\n            {\n              \"type\": \"object\",\n              \"properties\": {\n                \"version\": {\n                  \"type\": \"string\"\n                }\n              },\n              \"required\": [\n                \"version\"\n              ],\n              \"additionalProperties\": true\n            }\n          ]\n        }\n      },\n      \"usage\": {\n        \"type\": \"string\"\n      },\n      \"timeout\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"run\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"$ref\": \"#/$defs/run\"\n        }\n      },\n      \"args\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      },\n      \"file\": {\n        \"type\": [\n          \"string\",\n          \"null\"\n        ]\n      },\n      \"tags\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"string\"\n        }\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"aliases\",\n      \"description\",\n      \"source\",\n      \"config_sources\",\n      \"depends\",\n      \"daemons\",\n      \"secrets\",\n      \"depends_post\",\n      \"wait_for\",\n      \"env\",\n      \"dir\",\n      \"hide\",\n      \"global\",\n      \"raw\",\n      \"interactive\",\n      \"sources\",\n      \"outputs\",\n      \"shell\",\n      \"quiet\",\n      \"silent\",\n      \"tools\",\n      \"usage\",\n      \"timeout\",\n      \"run\",\n      \"args\",\n      \"file\"\n    ],\n    \"additionalProperties\": false\n  }\n}\n"
@@ -13454,11 +13794,13 @@ export def "mise tasks ls" [
     --locked,                                        # Require download URLs from the lockfile when installing
     --silent,                                        # Suppress all task output and mise non-error messages
     --global (-g),                                   # Only show global tasks
-    --local (-l),                                    # Only show non-global tasks
+    --local (-l),                                    # Deprecated alias for --no-global
+    --no-global,                                     # Only show non-global tasks
     --extended (-x),                                 # Show all columns
     --all (-a),                                      # Include tasks from every project in the monorepo, not only the current directory's hierarchy
     --hidden,                                        # Show hidden tasks
     --name-only,                                     # Print only task names, one per line (for fzf and similar tools)
+    --tag: list<string>,                             # Only show tasks that have this tag; repeat to accept any of several
     --no-header,                                     # Do not print the table header
     --sort: string@[name alias description source],  # Column to sort by (default: name)
     --sort-order: string@[asc desc],                 # Sort direction (default: asc)
@@ -13475,15 +13817,247 @@ export def "mise tasks ls" [
         --silent: $silent
         --global: $global
         --local: $local
+        --no-global: $no_global
         --extended: $extended
         --all: $all
         --hidden: $hidden
         --name-only: $name_only
+        --tag: $tag
         --no-header: $no_header
         --sort: $sort
         --sort-order: $sort_order
     })
     nus decoded $text "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"title\":\"mise tasks [ls] --json\",\"$defs\":{\"dependency\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1},\"optional\":{\"const\":true}},\"required\":[\"task\"],\"additionalProperties\":false}]},\"run\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\"},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"env\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"},\"minProperties\":1}},\"required\":[\"task\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tasks\"],\"additionalProperties\":false}]}},\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"aliases\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"description\":{\"type\":\"string\"},\"source\":{\"type\":\"string\"},\"config_sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"daemons\":{\"oneOf\":[{\"type\":\"boolean\"},{\"type\":\"string\"},{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"null\"}]},\"secrets\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"depends_post\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"wait_for\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/dependency\"}},\"env\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"dir\":{\"type\":[\"string\",\"null\"]},\"hide\":{\"type\":\"boolean\"},\"global\":{\"type\":\"boolean\"},\"raw\":{\"type\":\"boolean\"},\"interactive\":{\"type\":\"boolean\"},\"sources\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"outputs\":{\"oneOf\":[{\"type\":\"array\",\"items\":{\"type\":\"string\"}},{\"type\":\"object\",\"properties\":{\"auto\":{\"const\":true}},\"required\":[\"auto\"],\"additionalProperties\":false}]},\"shell\":{\"type\":[\"string\",\"null\"]},\"quiet\":{\"type\":\"boolean\"},\"silent\":{\"oneOf\":[{\"type\":\"boolean\"},{\"enum\":[\"stdout\",\"stderr\"]}]},\"tools\":{\"type\":\"object\",\"additionalProperties\":{\"oneOf\":[{\"type\":\"string\"},{\"type\":\"object\",\"properties\":{\"version\":{\"type\":\"string\"}},\"required\":[\"version\"],\"additionalProperties\":true}]}},\"usage\":{\"type\":\"string\"},\"timeout\":{\"type\":[\"string\",\"null\"]},\"run\":{\"type\":\"array\",\"items\":{\"$ref\":\"#/$defs/run\"}},\"args\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"file\":{\"type\":[\"string\",\"null\"]},\"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"name\",\"aliases\",\"description\",\"source\",\"config_sources\",\"depends\",\"daemons\",\"secrets\",\"depends_post\",\"wait_for\",\"env\",\"dir\",\"hide\",\"global\",\"raw\",\"interactive\",\"sources\",\"outputs\",\"shell\",\"quiet\",\"silent\",\"tools\",\"usage\",\"timeout\",\"run\",\"args\",\"file\"],\"additionalProperties\":false}}" { from json | default null tags }
+}
+
+# Remove tasks
+#
+# Removes a TOML task's `[tasks.<name>]` table from the config file that defines it, and deletes a file task's script. Without `--env`, `--global` or `--path`, mise uses the one file that defines each task and fails when several do; `--path` can also name a file task's script. Asks before removing anything unless `--yes` (`MISE_YES=1`) is set, and fails without a terminal to ask on.
+#
+# Other tasks that depend on a removed task are left as they are; `mise tasks validate` reports them.
+@usage 'alias remove'
+@usage r#'long_help #"""
+Remove tasks
+
+Removes a TOML task's `[tasks.<name>]` table from the config file that defines it, and deletes a file task's script. Without `--env`, `--global` or `--path`, mise uses the one file that defines each task and fails when several do; `--path` can also name a file task's script. Asks before removing anything unless `--yes` (`MISE_YES=1`) is set, and fails without a terminal to ask on.
+
+Other tasks that depend on a removed task are left as they are; `mise tasks validate` reports them.
+"""#'#
+@usage 'flag "-n --dry-run" help="Show what would be removed without removing it"'
+@usage 'flag "-J --json" help="Print what was removed as JSON"'
+@usage 'flag "-e --env" help="Use mise.<ENV>.toml in the current directory, or .mise.<ENV>.toml if that exists" {
+            long_help #"""
+Use mise.<ENV>.toml in the current directory, or .mise.<ENV>.toml if that exists
+
+`--env local` uses mise.local.toml, which is for tasks you keep to yourself. Not the same as the global -E, which only chooses which config files are loaded.
+"""#
+            overrides "--global" "--path"
+            arg <ENV>
+        }'
+@usage 'flag "-g --global" help="Use the global config file" {
+            overrides "--path" "--env"
+        }'
+@usage 'flag "-p --path" help="Use this config file, or the config file in this directory" {
+            overrides "--global" "--env"
+            arg <PATH>
+        }'
+@usage 'flag "-h --help" help="Print help" action=help builtin=#true'
+@usage 'arg <TASKS>… help="Tasks to remove" var=#true'
+@usage 'example "mise tasks rm build" help="Remove the build task"'
+@usage 'example "mise tasks rm --env local --yes lint fmt" help="Remove two tasks from mise.local.toml without asking"'
+@usage 'example "mise tasks rm --dry-run --json build" help="Show which file defines build without changing it"'
+@usage 'complete path type=path'
+@usage 'output json framing=json select=--json'
+export def "mise tasks rm" [
+    ...tasks: string,                  # Tasks to remove
+    --cd (-C): path@"nus complete",    # Run as if mise were started in DIR
+    --env_ (-E): list<string>,         # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,               # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                    # Show what would be removed without removing it
+    --quiet (-q),                      # Suppress non-error messages
+    --verbose (-v): int,               # Show extra output (use -vv for even more)
+    --yes (-y),                        # Answer yes to all confirmation prompts
+    --raw,                             # Connect tasks and install commands directly to the terminal
+    --locked,                          # Require download URLs from the lockfile when installing
+    --silent,                          # Suppress all task output and mise non-error messages
+    --global (-g),                     # Use the global config file
+    --path (-p): path@"nus complete",  # Use this config file, or the config file in this directory
+] {
+    ^mise tasks rm --json ...(nus argv [...$tasks] {
+        --cd: $cd
+        --env: $env_
+        --jobs: $jobs
+        --dry-run: $dry_run
+        --quiet: $quiet
+        --verbose: $verbose
+        --yes: $yes
+        --raw: $raw
+        --locked: $locked
+        --silent: $silent
+        --global: $global
+        --path: $path
+    }) | from json
+}
+
+# Change fields of an existing TOML task
+#
+# Updates only the fields given and leaves the rest of the task, and the rest of the file, as they are. A list field such as `--depends` replaces the whole list; `--env-var` and `--tools` add or replace single entries of the task's `env` and `tools` tables. `--unset` removes a field, which is also how a flag such as `hide` goes back to false. A command given after `--` replaces the task's `run`.
+#
+# Without `--env`, `--global` or `--path`, edits the one config file that defines the task, and fails when several do. Like `mise tasks add`, it trusts the file's config root so mise loads it, except in safe mode (`MISE_SAFE=1`). File tasks are scripts: use `mise tasks edit` for them.
+@usage r#'long_help #"""
+Change fields of an existing TOML task
+
+Updates only the fields given and leaves the rest of the task, and the rest of the file, as they are. A list field such as `--depends` replaces the whole list; `--env-var` and `--tools` add or replace single entries of the task's `env` and `tools` tables. `--unset` removes a field, which is also how a flag such as `hide` goes back to false. A command given after `--` replaces the task's `run`.
+
+Without `--env`, `--global` or `--path`, edits the one config file that defines the task, and fails when several do. Like `mise tasks add`, it trusts the file's config root so mise loads it, except in safe mode (`MISE_SAFE=1`). File tasks are scripts: use `mise tasks edit` for them.
+"""#'#
+@usage 'flag "-n --dry-run" help="Show what would be written without writing it"'
+@usage 'flag "-J --json" help="Print what was written as JSON"'
+@usage 'flag "-u --unset" help="Remove this field from the task; repeat for several" var=#true {
+            arg <FIELD>
+        }'
+@usage 'flag "-e --env" help="Use mise.<ENV>.toml in the current directory, or .mise.<ENV>.toml if that exists" {
+            long_help #"""
+Use mise.<ENV>.toml in the current directory, or .mise.<ENV>.toml if that exists
+
+`--env local` uses mise.local.toml, which is for tasks you keep to yourself. Not the same as the global -E, which only chooses which config files are loaded.
+"""#
+            overrides "--global" "--path"
+            arg <ENV>
+        }'
+@usage 'flag "-g --global" help="Use the global config file" {
+            overrides "--path" "--env"
+        }'
+@usage 'flag "-p --path" help="Use this config file, or the config file in this directory" {
+            overrides "--global" "--env"
+            arg <PATH>
+        }'
+@usage 'flag "-a --alias" help="Other names for the task" var=#true {
+            arg <ALIAS>
+        }'
+@usage 'flag "-d --depends" help="Tasks to run before this one" var=#true {
+            arg <TASK>
+        }'
+@usage 'flag "-D --dir" help="Run the task in a specific directory" {
+            arg <DIR>
+        }'
+@usage 'flag "-H --hide" help="Hide the task from `mise tasks` and completions"'
+@usage 'flag "-q --quiet" help="Do not print the command before running"'
+@usage r#'flag "-r --raw" help="Connect the task directly to the terminal's stdin, stdout, and stderr"'#
+@usage 'flag "-s --sources" help="Glob patterns of files this task uses as input" var=#true {
+            arg <GLOB>
+        }'
+@usage 'flag "-w --wait-for" help="Wait for these tasks to finish if they are also being run" var=#true {
+            arg <TASK>
+        }'
+@usage 'flag --confirm help="Ask this question before the task runs, and run it only if the answer is yes" {
+            arg <MESSAGE>
+        }'
+@usage 'flag --depends-post help="Tasks to run after this one" var=#true {
+            arg <TASK>
+        }'
+@usage 'flag --description help="Description of the task" {
+            arg <DESCRIPTION>
+        }'
+@usage r#'flag --env-var help="Set an environment variable for the task; repeat for several" var=#true {
+            long_help #"""
+Set an environment variable for the task; repeat for several
+
+Written to the task's `env` table. `--env` chooses the config file instead.
+"""#
+            arg "<KEY=VALUE>"
+        }'#
+@usage 'flag --outputs help="Glob patterns of files this task creates, used to skip it when they are up to date" var=#true {
+            arg <GLOB>
+        }'
+@usage 'flag --run-windows help="Command to run on Windows (TOML tasks only; ignored with `--file`)" {
+            arg <COMMAND>
+        }'
+@usage 'flag --shell help="Run the task in a specific shell" {
+            arg <SHELL>
+        }'
+@usage 'flag --silent help="Do not print the command or its output"'
+@usage r#'flag --tools help="Tool the task needs, such as node@24 or npm:prettier@3; repeat for several" var=#true {
+            long_help #"""
+Tool the task needs, such as node@24 or npm:prettier@3; repeat for several
+
+Written to the task's `tools` table. Without a version, writes `latest`.
+"""#
+            arg <TOOL@VERSION>
+        }'#
+@usage r#'flag --usage help="Usage spec for the task's arguments and flags: https://usage.jdx.dev/spec/" {
+            arg <SPEC>
+        }'#
+@usage 'flag "-h --help" help="Print help" action=help builtin=#true'
+@usage 'arg <TASK> help="Name of the task to change"'
+@usage 'arg "[-- RUN]…" help="Command to run instead of the current one, given after `--`" required=#false var=#true'
+@usage r#'example "mise tasks set build --description \"Build the app for release\"" help="Change a task's description"'#
+@usage 'example "mise tasks set test --env-var RUST_BACKTRACE=1 --unset quiet" help="Add an environment variable and remove the quiet flag"'
+@usage 'example "mise tasks set --env local lint -- npx eslint --fix ." help="Change the command of a task in mise.local.toml"'
+@usage 'complete path type=path'
+@usage 'output json framing=json select=--json'
+export def "mise tasks set" [
+    task: string@"nus complete",                   # Name of the task to change
+    ...run: string,                                # Command to run instead of the current one, given after `--`
+    --cd (-C): path@"nus complete",                # Run as if mise were started in DIR
+    --env_ (-E): list<string>,                     # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
+    --jobs (-j): string,                           # How many jobs to run in parallel; defaults to the `jobs` setting
+    --dry-run (-n),                                # Show what would be written without writing it
+    --quiet (-q),                                  # Suppress non-error messages
+    --shell: string,                               # Run the task in a specific shell
+    --verbose (-v): int,                           # Show extra output (use -vv for even more)
+    --yes (-y),                                    # Answer yes to all confirmation prompts
+    --raw (-r),                                    # Connect tasks and install commands directly to the terminal
+    --locked,                                      # Require download URLs from the lockfile when installing
+    --silent,                                      # Suppress all task output and mise non-error messages
+    --global (-g),                                 # Use the global config file
+    --usage: string,                               # Usage spec for the task's arguments and flags: https://usage.jdx.dev/spec/
+    --unset (-u): list<string>,                    # Remove this field from the task; repeat for several
+    --path (-p): path@"nus complete",              # Use this config file, or the config file in this directory
+    --alias (-a): list<string>@"nus complete",     # Other names for the task
+    --depends (-d): list<string>@"nus complete",   # Tasks to run before this one
+    --dir (-D): path@"nus complete",               # Run the task in a specific directory
+    --hide (-H),                                   # Hide the task from `mise tasks` and completions
+    --sources (-s): list<string>,                  # Glob patterns of files this task uses as input
+    --wait-for (-w): list<string>@"nus complete",  # Wait for these tasks to finish if they are also being run
+    --confirm: string,                             # Ask this question before the task runs, and run it only if the answer is yes
+    --depends-post: list<string>@"nus complete",   # Tasks to run after this one
+    --description: string,                         # Description of the task
+    --env-var: list<string>,                       # Set an environment variable for the task; repeat for several
+    --outputs: list<string>,                       # Glob patterns of files this task creates, used to skip it when they are up to date
+    --run-windows: string,                         # Command to run on Windows (TOML tasks only; ignored with `--file`)
+    --tools: list<string>@"nus complete",          # Tool the task needs, such as node@24 or npm:prettier@3; repeat for several
+] {
+    ^mise tasks set --json ...(nus argv [$task ...$run] {
+        --cd: $cd
+        --env: $env_
+        --jobs: $jobs
+        --dry-run: $dry_run
+        --quiet: $quiet
+        --shell: $shell
+        --verbose: $verbose
+        --yes: $yes
+        --raw: $raw
+        --locked: $locked
+        --silent: $silent
+        --global: $global
+        --usage: $usage
+        --unset: $unset
+        --path: $path
+        --alias: $alias
+        --depends: $depends
+        --dir: $dir
+        --hide: $hide
+        --sources: $sources
+        --wait-for: $wait_for
+        --confirm: $confirm
+        --depends-post: $depends_post
+        --description: $description
+        --env-var: $env_var
+        --outputs: $outputs
+        --run-windows: $run_windows
+        --tools: $tools
+    }) | from json
 }
 
 # Check task definitions for errors
@@ -14107,15 +14681,31 @@ export def "mise trust" [
 # remove a tool from mise.toml and uninstall it. A tool name or version prefix,
 # such as `node` or `node@22`, must match exactly one installed version unless
 # you pass `--all`.
-@usage 'long_help #"""
+#
+# `--project` removes the installed versions that the project's own config files
+# request. Installs are shared by every project, so other projects that use the
+# same versions have to install them again.
+@usage r#'long_help #"""
 Remove installed tool versions
 
 Removes installed versions but does not edit mise.toml. Use `mise unuse` to
 remove a tool from mise.toml and uninstall it. A tool name or version prefix,
 such as `node` or `node@22`, must match exactly one installed version unless
 you pass `--all`.
-"""#'
+
+`--project` removes the installed versions that the project's own config files
+request. Installs are shared by every project, so other projects that use the
+same versions have to install them again.
+"""#'#
 @usage 'flag "-a --all" help="Remove every installed version of the named tools, or of every tool when none is named"'
+@usage 'flag --project help="Remove the installed versions the nearest project config requests" {
+        long_help #"""
+Remove the installed versions the nearest project config requests
+
+The project is the nearest directory, starting at the current one and moving up, that has a mise config file. Every config file in that directory counts, such as `mise.toml`, `mise.local.toml`, `conf.d` fragments, `.tool-versions` and idiomatic version files. Configs in parent directories and global or system configs do not. Every version those files name is removed, including one that a later file overrides. Lists what it will remove and asks for confirmation unless `--yes` or a dry run is given. Tools set to a `path:` or `system` version are never removed.
+"""#
+        conflicts "--all" INSTALLED_TOOL@VERSION
+    }'
 @usage 'flag "-n --dry-run" help="Show what would change without changing anything"'
 @usage 'flag --dry-run-code help="Like --dry-run, but exit with code 1 if there are tools to uninstall" {
         long_help #"""
@@ -14125,10 +14715,13 @@ Use it in scripts that check whether tools need uninstalling.
 """#
     }'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
-@usage 'arg "[INSTALLED_TOOL@VERSION]…" help="Tools to remove, such as node@22.0.0" required=#false var=#true required_unless=--all'
+@usage 'arg "[INSTALLED_TOOL@VERSION]…" help="Tools to remove, such as node@22.0.0" required=#false var=#true {
+        required_unless "--all" "--project"
+    }'
 @usage 'example "mise uninstall node@22.0.0" help="Uninstall a specific version"'
 @usage 'example "mise uninstall node" help="Uninstall node when exactly one version is installed"'
 @usage 'example "mise uninstall --all node" help="Uninstall every installed version of node"'
+@usage r#'example "mise uninstall --project --dry-run" help="Preview the versions this project's config requests"'#
 export def "mise uninstall" [
     ...installed_tool_version: string@"nus complete",  # Tools to remove, such as node@22.0.0
     --cd (-C): path@"nus complete",                    # Run as if mise were started in DIR
@@ -14142,6 +14735,7 @@ export def "mise uninstall" [
     --locked,                                          # Require download URLs from the lockfile when installing
     --silent,                                          # Suppress all task output and mise non-error messages
     --all (-a),                                        # Remove every installed version of the named tools, or of every tool when none is named
+    --project,                                         # Remove the installed versions the nearest project config requests
     --dry-run-code,                                    # Like --dry-run, but exit with code 1 if there are tools to uninstall
 ]: nothing -> string {
     ^mise uninstall ...(nus argv [...$installed_tool_version] {
@@ -14156,6 +14750,7 @@ export def "mise uninstall" [
         --locked: $locked
         --silent: $silent
         --all: $all
+        --project: $project
         --dry-run-code: $dry_run_code
     })
 }
@@ -14384,7 +14979,7 @@ The version you upgraded from is removed after the `upgrade.prune_after`
 setting's grace period unless a tracked config or tool stub still uses it.
 Pass `--prune` to remove it now or `--no-prune` to keep it.
 """#'#
-@usage 'after_long_help "\u{1b}[1m\u{1b}[4mDeprecation:\u{1b}[22m\u{1b}[24m\n\nThe `-l` shorthand for `--bump` is deprecated and will be removed in mise 2027.8.5.\nAfter removal, `-l` will become shorthand for `--local`. Use `-b` or `--bump` instead."'
+@usage 'after_long_help "\u{1b}[1m\u{1b}[4mDeprecation:\u{1b}[22m\u{1b}[24m\n\nThe `-l` shorthand for `--bump` is deprecated and will be removed in mise 2027.8.5.\nUse `-b` or `--bump` instead.\n\nThe `--local` flag is deprecated in favor of `--no-global`. mise warns about it from\n2027.1.0 and removes it in 2027.7.0."'
 @usage 'flag "-b --bump" help="Upgrade past the configured range to the newest release, and update the config to match" {
         long_help #"""
 Upgrade past the configured range to the newest release, and update the config to match
@@ -14415,21 +15010,32 @@ Like --dry-run, but exit with code 1 if there are outdated tools
 Use it in scripts that check whether tools need upgrading.
 """#
     }'
-@usage 'flag --inactive help="Also upgrade installed tools that the current config does not request" conflicts=--local'
+@usage 'flag --inactive help="Also upgrade installed tools that the current config does not request" {
+        conflicts "--local" "--no-global"
+    }'
 @usage 'flag --global help="Only upgrade tools defined in the global config" {
         long_help #"""
 Only upgrade tools defined in the global config
 
 Upgrades the requests in the global and system config (~/.config/mise/config.toml, /etc/mise/config.toml), even where a project config or a `MISE_<TOOL>_VERSION` environment variable sets its own version of the tool. It runs as if from outside any project, so project config, lockfiles, and `[env]` are neither read nor changed. Tools that update themselves, such as coding agents, run this instead of their own updater; see https://mise.jdx.dev/dev-tools/self-updating-tools.html
 """#
-        conflicts "--local" "--inactive"
+        conflicts "--local" "--no-global" "--inactive"
     }'
-@usage 'flag --local help="Only upgrade tools defined in project config files" {
+@usage 'flag --local help="Deprecated alias for --no-global" {
+        long_help #"""
+Deprecated alias for --no-global
+
+Removed in mise 2027.7.0.
+"""#
+        conflicts "--global" "--no-global"
+    }'
+@usage 'flag --no-global help="Only upgrade tools defined in project config files" {
         long_help #"""
 Only upgrade tools defined in project config files
 
 Skips tools defined in the global config (~/.config/mise/config.toml) and tools set through `MISE_<TOOL>_VERSION` environment variables.
 """#
+        conflicts "--global" "--local"
     }'
 @usage 'flag --minimum-release-age help="Only upgrade to versions released before this date or older than this duration" {
         alias "--before" hide=#true
@@ -14498,7 +15104,8 @@ export def "mise upgrade" [
     --dry-run-code,                                    # Like --dry-run, but exit with code 1 if there are outdated tools
     --inactive,                                        # Also upgrade installed tools that the current config does not request
     --global,                                          # Only upgrade tools defined in the global config
-    --local,                                           # Only upgrade tools defined in project config files
+    --local,                                           # Deprecated alias for --no-global
+    --no-global,                                       # Only upgrade tools defined in project config files
     --minimum-release-age: string,                     # Only upgrade to versions released before this date or older than this duration
     --no-prune,                                        # Do not uninstall the versions that were upgraded away from
     --prune,                                           # Immediately uninstall the versions that were upgraded away from
@@ -14522,6 +15129,7 @@ export def "mise upgrade" [
         --inactive: $inactive
         --global: $global
         --local: $local
+        --no-global: $no_global
         --minimum-release-age: $minimum_release_age
         --no-prune: $no_prune
         --prune: $prune
@@ -14745,12 +15353,18 @@ file sets. `mise vars prompt` asks for the `[vars]` that declare a `prompt`;
 only it and `mise bootstrap --prompt-vars` ever ask.
 See https://mise.jdx.dev/configuration/vars.html#prompt
 """#'#
-@usage 'flag --no-header help="Do not print the table header"'
+@usage 'flag "-J --json" help="Output in JSON format"'
+@usage 'flag --json-extended help="Output in JSON format with sources"'
+@usage 'flag --no-header help="Do not print the table header" {
+        conflicts "--json" "--json-extended"
+    }'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
 @usage 'arg "[NAME[=VALUE]]…" help="Values to save (`NAME=VALUE`) or to print (`NAME`)" required=#false var=#true'
+@usage 'group output "--json" "--json-extended"'
 @usage 'example "mise vars git_name=\"Ada Lovelace\"" help="Save a value on this machine without asking"'
 @usage 'example "mise vars git_name" help="Print the saved value of git_name"'
 @usage 'example "mise vars" help="List every var and its source"'
+@usage 'output json framing=json select=--json'
 export def "mise vars" [
     ...name_value: string,           # Values to save (`NAME=VALUE`) or to print (`NAME`)
     --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
@@ -14762,9 +15376,10 @@ export def "mise vars" [
     --raw,                           # Connect tasks and install commands directly to the terminal
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
+    --json-extended,                 # Output in JSON format with sources
     --no-header,                     # Do not print the table header
-]: nothing -> string {
-    ^mise vars ...(nus argv [...$name_value] {
+] {
+    ^mise vars --json ...(nus argv [...$name_value] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14774,8 +15389,9 @@ export def "mise vars" [
         --raw: $raw
         --locked: $locked
         --silent: $silent
+        --json-extended: $json_extended
         --no-header: $no_header
-    })
+    }) | from json
 }
 
 # List every var, with the file it comes from
@@ -14783,18 +15399,26 @@ export def "mise vars" [
 # Lists the `[vars]` of every config file mise loads here, plus the answers
 # saved on this machine (source: `$MISE_STATE_DIR/vars.toml`). Values hidden
 # with `redact` show as `[redacted]`. A `required` var that is still unset only
-# warns here.
+# warns here. `--json` prints an object of names and values, and
+# `--json-extended` adds each var's source.
 @usage 'alias list'
-@usage 'long_help #"""
+@usage r#'long_help #"""
 List every var, with the file it comes from
 
 Lists the `[vars]` of every config file mise loads here, plus the answers
 saved on this machine (source: `$MISE_STATE_DIR/vars.toml`). Values hidden
 with `redact` show as `[redacted]`. A `required` var that is still unset only
-warns here.
-"""#'
-@usage 'flag --no-header help="Do not print the table header"'
+warns here. `--json` prints an object of names and values, and
+`--json-extended` adds each var's source.
+"""#'#
+@usage 'flag "-J --json" help="Output in JSON format"'
+@usage 'flag --json-extended help="Output in JSON format with sources"'
+@usage 'flag --no-header help="Do not print the table header" {
+            conflicts "--json" "--json-extended"
+        }'
 @usage 'flag "-h --help" help="Print help" action=help builtin=#true'
+@usage 'group output "--json" "--json-extended"'
+@usage 'output json framing=json select=--json'
 export def "mise vars ls" [
     --cd (-C): path@"nus complete",  # Run as if mise were started in DIR
     --env_ (-E): list<string>,       # Load the `mise.<ENV>.toml` config files (same as MISE_ENV)
@@ -14805,9 +15429,10 @@ export def "mise vars ls" [
     --raw,                           # Connect tasks and install commands directly to the terminal
     --locked,                        # Require download URLs from the lockfile when installing
     --silent,                        # Suppress all task output and mise non-error messages
+    --json-extended,                 # Output in JSON format with sources
     --no-header,                     # Do not print the table header
-]: nothing -> string {
-    ^mise vars ls ...(nus argv [] {
+] {
+    ^mise vars ls --json ...(nus argv [] {
         --cd: $cd
         --env: $env_
         --jobs: $jobs
@@ -14817,8 +15442,9 @@ export def "mise vars ls" [
         --raw: $raw
         --locked: $locked
         --silent: $silent
+        --json-extended: $json_extended
         --no-header: $no_header
-    })
+    }) | from json
 }
 
 # Ask for the prompt vars that have no saved answer, or set answers directly
@@ -14980,6 +15606,15 @@ To keep a server or database running alongside your tasks, with readiness checks
         arg <GLOB>
     }'#
 @usage 'flag --skip-deps help="Run and watch only the named tasks, not the tasks they depend on"'
+@usage 'flag --once help="Wait for a change, run the tasks once, and exit with their status" {
+        long_help #"""
+Wait for a change, run the tasks once, and exit with their status
+
+Nothing runs at start: mise waits until one of the watched sources changes, runs the tasks once, and exits with the status of that run. So `--postpone` is implied, and passing it as well changes nothing. To run the tasks now and then once more after a change, use `mise run build && mise watch build --once`.
+
+Use it in scripts and agents that need to block until a file changes. mise exits with 1 if watchexec stops before a change, and with 130 on Ctrl-C. With `--once` mise runs the tasks itself, so the flags that set how watchexec runs them, such as `--restart` and `--clear`, are refused.
+"""#
+    }'
 @usage r#'flag "-w --watch" help="Watch a file or directory" var=#true help_heading=Filtering {
         long_help #"""
 Watch a file or directory
@@ -15082,6 +15717,13 @@ One save can produce several events, and a file can be written in pieces, so wat
         arg <TIMEOUT>
     }'
 @usage 'flag --stdin-quit help="Exit when stdin closes"'
+@usage r#'flag --exit-on-error help="Stop watching when a run fails, and exit with its status" {
+        long_help #"""
+Stop watching when a run fails, and exit with its status
+
+By default watchexec keeps watching whatever the tasks exit with. With this flag the first failed run ends `mise watch`, which then exits with that run's status. `--once` always exits after its run, so this changes nothing there. Needs watchexec 2.5.0 or later.
+"""#
+    }'#
 @usage 'flag --no-vcs-ignore help="Do not apply Git and other version control ignore files" help_heading=Filtering {
         long_help #"""
 Do not apply Git and other version control ignore files
@@ -15531,6 +16173,7 @@ This shows the manual page for Watchexec, if the output is a terminal and the 'm
 @usage 'example "mise watch build --clear" help="Clear the screen before each run"'
 @usage 'example "mise watch serve --watch src --exts rs --restart" help="Start an API server and restart it when Rust files in ./src change"'
 @usage 'example "mise watch test -- --verbose" help="Pass arguments after -- to the task"'
+@usage 'example "mise watch test --once" help="Wait for a source to change, run test once, and exit with its status"'
 @usage 'complete path type=path'
 @usage 'complete directory type=dir'
 export def "mise watch" [
@@ -15549,6 +16192,7 @@ export def "mise watch" [
     --timings,                                                                    # Print how long the command took to run
     --glob (-g): list<string>,                                                    # Globs to watch instead of the tasks' sources
     --skip-deps,                                                                  # Run and watch only the named tasks, not the tasks they depend on
+    --once,                                                                       # Wait for a change, run the tasks once, and exit with their status
     --watch (-w): list<path>@"nus complete",                                      # Watch a file or directory
     --watch-non-recursive (-W): list<path>@"nus complete",                        # Watch a directory without recursing into it
     --watch-file (-F): path@"nus complete",                                       # Read paths to watch from a file, one per line
@@ -15561,6 +16205,7 @@ export def "mise watch" [
     --map-signal: list<string>,                                                   # Translate a signal that watchexec receives into one it sends to the tasks
     --debounce (-d): string,                                                      # How long to wait for more changes before running (default: 50ms)
     --stdin-quit,                                                                 # Exit when stdin closes
+    --exit-on-error,                                                              # Stop watching when a run fails, and exit with its status
     --no-vcs-ignore,                                                              # Do not apply Git and other version control ignore files
     --no-project-ignore,                                                          # Do not apply ignore files in the project, such as `.gitignore` and `.ignore`
     --no-global-ignore,                                                           # Do not apply global ignore files, such as `~/.gitignore` and `~/.config/watchexec/ignore`
@@ -15605,6 +16250,7 @@ export def "mise watch" [
         --timings: $timings
         --glob: $glob
         --skip-deps: $skip_deps
+        --once: $once
         --watch: $watch
         --watch-non-recursive: $watch_non_recursive
         --watch-file: $watch_file
@@ -15617,6 +16263,7 @@ export def "mise watch" [
         --map-signal: $map_signal
         --debounce: $debounce
         --stdin-quit: $stdin_quit
+        --exit-on-error: $exit_on_error
         --no-vcs-ignore: $no_vcs_ignore
         --no-project-ignore: $no_project_ignore
         --no-global-ignore: $no_global_ignore

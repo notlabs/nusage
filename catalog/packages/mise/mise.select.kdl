@@ -220,7 +220,13 @@ cmd skills {
 }
 cmd tasks {
     output json framing=json select=--json
+    cmd add {
+        output json framing=json select=--json
+    }
     cmd graph {
+        output json framing=json select=--json
+    }
+    cmd history {
         output json framing=json select=--json
     }
     cmd info {
@@ -229,12 +235,24 @@ cmd tasks {
     cmd ls {
         output json framing=json select=--json
     }
+    cmd rm {
+        output json framing=json select=--json
+    }
+    cmd set {
+        output json framing=json select=--json
+    }
     cmd validate {
         output json framing=json select=--json
     }
 }
 cmd tool {
     output json framing=json select=--json
+}
+cmd vars {
+    output json framing=json select=--json
+    cmd ls {
+        output json framing=json select=--json
+    }
 }
 cmd version {
     output json framing=json select=--json
