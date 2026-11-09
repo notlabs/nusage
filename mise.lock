@@ -96,6 +96,56 @@ url = "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_windows_
 url_api = "https://api.github.com/repos/cli/cli/releases/assets/679195750"
 provenance = "github-attestations"
 
+[[tools."github:notlabs/nusage"]]
+version = "0.1.1"
+backend = "github:notlabs/nusage"
+specifiers = ["latest"]
+
+[tools."github:notlabs/nusage".options]
+version_prefix = "v"
+
+[tools."github:notlabs/nusage"."platforms.linux-arm64"]
+checksum = "sha256:3d1348fac68fa62135cf06052867820a14cb441d3d90fc5aef22cd04de16a3a9"
+checksum_source = "mise-versions"
+url = "https://github.com/notlabs/nusage/releases/download/v0.1.1/nusage-v0.1.1-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/notlabs/nusage/releases/assets/686653999"
+
+[tools."github:notlabs/nusage"."platforms.linux-arm64-musl"]
+checksum = "sha256:ea3e61b0adb16f0e385d217c61c7aa27b91e0eabd1dc99885a0c1842e5e02135"
+checksum_source = "mise-versions"
+url = "https://github.com/notlabs/nusage/releases/download/v0.1.1/nusage-v0.1.1-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/notlabs/nusage/releases/assets/686658008"
+
+[tools."github:notlabs/nusage"."platforms.linux-x64"]
+checksum = "sha256:04de2e97793ba57295be36f24ef543a673915b198a618936b846439cc01a1172"
+checksum_source = "mise-versions"
+url = "https://github.com/notlabs/nusage/releases/download/v0.1.1/nusage-v0.1.1-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/notlabs/nusage/releases/assets/686647198"
+
+[tools."github:notlabs/nusage"."platforms.linux-x64-musl"]
+checksum = "sha256:6283f3d68a548c4b1bf4d67c371dbcb5824e9b4aa12bc6eef09e5edc63784c45"
+checksum_source = "mise-versions"
+url = "https://github.com/notlabs/nusage/releases/download/v0.1.1/nusage-v0.1.1-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/notlabs/nusage/releases/assets/686650306"
+
+[tools."github:notlabs/nusage"."platforms.macos-arm64"]
+checksum = "sha256:637da027ffb6d696e6ce9c2c113f6c6668e3b7f01dc4b1f1d85aeaaaba020794"
+checksum_source = "mise-versions"
+url = "https://github.com/notlabs/nusage/releases/download/v0.1.1/nusage-v0.1.1-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/notlabs/nusage/releases/assets/686634931"
+
+[tools."github:notlabs/nusage"."platforms.macos-x64"]
+checksum = "sha256:6a7c63120210104897900528ebaaf6e1e8e1aeb954023be9480944a13e9441cc"
+checksum_source = "mise-versions"
+url = "https://github.com/notlabs/nusage/releases/download/v0.1.1/nusage-v0.1.1-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/notlabs/nusage/releases/assets/686637864"
+
+[tools."github:notlabs/nusage"."platforms.windows-x64"]
+checksum = "sha256:c090df0790d2037c6a4dca31382f324fa157ff30cf92974839a06b971abb194f"
+checksum_source = "mise-versions"
+url = "https://github.com/notlabs/nusage/releases/download/v0.1.1/nusage-v0.1.1-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/notlabs/nusage/releases/assets/686672553"
+
 [[tools."http:nutest"]]
 version = "1.2.0"
 backend = "http:nutest"

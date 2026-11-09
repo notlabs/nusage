@@ -53,13 +53,14 @@ A shell that starts with mise's environment already set has it taken out first; 
 Infrastructure entrypoints use explicit relative imports of the committed catalog modules.
 The root includes `share/nusage.toml` for tool pins and the `nu` wrapper.
 Libraries and Nutest suites use relative imports because Nushell parses them without a script prelude; no catalog bootstrap release or `NU_LIB_DIRS` is needed.
-The installed `target/install/bin/nus` is the project tool; `//:build` refreshes it.
+The built `target/install/bin/nus` is on the development PATH; `//:build` refreshes it.
 
 After linking the plugin, `mise tasks ls --all` refuses once while writing the graph; run it again.
 Run `mise run //:build` to install the local binaries, then `mise install --monorepo` for the remaining tools.
 The build runs `cargo build --workspace --locked` once and copies the workspace's binary artifacts from Cargo's JSON messages into `target/install/bin`, including Nushell plugins.
 Mise tracks the Cargo workspace inputs and installed binaries so an unchanged build is skipped.
-Automatic tool installation excludes the local `github:notlabs/nusage` prefix, which Cargo supplies.
+The local binaries are build products on PATH; `[deps.nus]` refreshes them through `//:build`.
+The user-facing `share/nusage.toml` still installs the released tool.
 Run tasks normally:
 
 ```sh

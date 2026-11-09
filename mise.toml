@@ -8,7 +8,6 @@ include = ["share/nusage.toml"]
 dynamic = ["share/nushell/autoload/nus.nu"]
 
 [settings]
-auto_install_disable_tools = ["github:notlabs/nusage"]
 experimental = true
 env_cache = true
 env_cache_ttl = "24h"
@@ -35,7 +34,6 @@ cache = { enabled = true, env = [
 ] }
 
 [tools]
-"github:notlabs/nusage" = "path:{{config_root}}/target/install"
 # Infrastructure uses the committed catalog modules with these binaries.
 # The mise package records no tool version; min_version above gates CLI support.
 gh = "2.103.3"
@@ -45,6 +43,7 @@ docker-compose = "5.6.1"
 
 
 [env]
+_.path = ["{{config_root}}/target/install/bin"]
 _.nusage-graph = {}
 # Keep managed target links inside the discovery boundary; the object store remains shared.
 MBX_TARGET_ROOT = "{{config_root}}/.cache/mbx-targets"
