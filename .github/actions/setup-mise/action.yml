@@ -7,6 +7,16 @@ inputs:
 runs:
   using: composite
   steps:
+    # Runner images ship a Rust of their own (Homebrew's rustup on macOS). Mise gets its own
+    # toolchain homes so every mise process agrees on what is installed, and rustup-init may
+    # install beside the image's rustc.
+    - shell: bash
+      run: |
+        {
+          echo "MISE_RUSTUP_HOME=$RUNNER_TEMP/rustup"
+          echo "MISE_CARGO_HOME=$RUNNER_TEMP/cargo"
+          echo "RUSTUP_INIT_SKIP_PATH_CHECK=yes"
+        } >> "$GITHUB_ENV"
     - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
       with:
         version: ${{ inputs.version }}

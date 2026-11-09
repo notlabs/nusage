@@ -17,12 +17,6 @@ env:
   CI: "true"
   # Tools come from the lockfiles only; nothing is resolved or auto-locked on the runner.
   MISE_LOCKED: "true"
-  # Runner images ship a Rust of their own (Homebrew's rustup on macOS). Mise gets its own
-  # toolchain homes so every mise process agrees on what is installed, and rustup-init may
-  # install beside the image's rustc.
-  MISE_RUSTUP_HOME: ${{ runner.temp }}/rustup
-  MISE_CARGO_HOME: ${{ runner.temp }}/cargo
-  RUSTUP_INIT_SKIP_PATH_CHECK: "yes"
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
   # Keep managed target links inside the discovery boundary; the object store remains shared.
