@@ -3,7 +3,7 @@ description: Link the local graph plugin before loading the project environment
 inputs:
   version:
     description: Mise version matching the catalog baseline
-    default: 2026.10.21
+    default: 2026.11.4
 runs:
   using: composite
   steps:
