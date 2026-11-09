@@ -1,0 +1,4 @@
+-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest
+--reuse
+--pull=false
+--container-options --add-host=host.docker.internal:host-gateway

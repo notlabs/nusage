@@ -68,6 +68,9 @@ mise run '//catalog/...:check'
 mise run //crates/nusage-spec:check
 ```
 
+Run the pipeline locally with `mise run ci` before pushing.
+The first run is cold; reruns reuse the container and its warm tool and Cargo caches.
+
 The environment plugin discovers `//graph/...:provider` tasks, runs them under Nu, and projects their records into ignored crate task fragments and `.mise/conf.d/_projects.toml`.
 A changed project graph is written and the command refuses with `project graph changed; run the command again`; the next command reads it.
 Mise caches the hook's result against provider input records in its env cache. This needs a session key, supplied automatically by `mise activate` and inside `mise exec` and tasks. A bare shell without activation recomputes the graph on every command. Set `MISE_ENV_CACHE=0` to force a recompute; the plugin has no cache of its own. `//graph:check` validates provider JSON Lines against the output contract through `nus validate` after the tool is built.
