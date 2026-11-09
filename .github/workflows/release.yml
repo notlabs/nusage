@@ -23,6 +23,7 @@ concurrency:
 env:
   MBX_DISABLE: "1"
   MISE_TASK_CACHE: "off"
+  MISE_LOCKED: "true"
 
 jobs:
   tag:
