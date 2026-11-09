@@ -4,38 +4,18 @@ inputs:
   version:
     description: Mise version matching the catalog baseline
     default: 2026.11.4
-outputs:
-  cache-key:
-    description: Primary tool cache key to save after the job completes
-    value: ${{ steps.mise-cache.outputs.cache-primary-key }}
-  cache-path:
-    description: Mise data directory containing installed tools and plugins
-    value: ${{ steps.mise-data.outputs.path }}
-  cache-hit:
-    description: Whether the exact tool cache key was restored
-    value: ${{ steps.mise-cache.outputs.cache-hit }}
 runs:
   using: composite
   steps:
-    # Match mise's Linux data-directory resolution before mise itself is available.
-    - id: mise-data
-      shell: bash
-      run: echo "path=${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}" >> "$GITHUB_OUTPUT"
-    - id: mise-cache
-      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
-      with:
-        path: ${{ steps.mise-data.outputs.path }}
-        key: mise-tools-${{ runner.os }}-${{ inputs.version }}-${{ hashFiles('mise.lock', '.mise/mise.lock') }}
-        restore-keys: mise-tools-${{ runner.os }}-${{ inputs.version }}-
+    # Install can load the environment hook, so link the plugin before allowing it.
     - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
       with:
         version: ${{ inputs.version }}
         install: false
-        cache: false
         env: false
         export_path: false
     - shell: bash
-      run: mise plugins link nusage-graph ./graph/plugin
+      run: mise plugins link --force nusage-graph ./graph/plugin
     # Assemble once with the environment hook disabled, then verify normal graph loading.
     - shell: bash
       env:
@@ -46,5 +26,3 @@ runs:
     - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
       with:
         version: ${{ inputs.version }}
-        install: false
-        cache: false

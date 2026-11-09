@@ -35,7 +35,6 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-mise
-        id: setup-mise
       # The acceptance harness creates isolated JJ workspaces from this checkout.
       - run: jj git init --colocate
       # mise's task results, under the runner's temporary directory, from the Actions cache
@@ -104,9 +103,3 @@ jobs:
         with:
           path: ${{ env.MISE_TASK_CACHE_DIR }}
           key: mise-tasks-${{ runner.os }}-${{ github.sha }}
-      # Successful pull requests also save tools, so changed pins can be reused on the branch.
-      - if: ${{ success() && steps.setup-mise.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
-        with:
-          path: ${{ steps.setup-mise.outputs.cache-path }}
-          key: ${{ steps.setup-mise.outputs.cache-key }}
