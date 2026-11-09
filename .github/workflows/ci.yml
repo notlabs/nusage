@@ -57,7 +57,7 @@ jobs:
           save-on-pull-request: true
           clean-target-before-export: true
       - name: Install local binaries
-        run: mise run //:build
+        run: mise run --timings //:build
       # rustc's and clippy's findings as annotations, through mise's task prefix.
       - run: echo "::add-matcher::.github/matchers/rust.json"
       # The base a pull request's affected projects are selected against, and whether Mergiraf's
@@ -84,18 +84,18 @@ jobs:
         run: |
           if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ -n "$AFFECTED_BASE" ]; then
             # The root's checks hold the whole repository, whatever the change.
-            mise run //:check
-            mise run --affected --affected-base "$AFFECTED_BASE" --affected-head HEAD --affected-committed "$NUS_CHECK_TASK"
+            mise run --timings //:check
+            mise run --timings --affected --affected-base "$AFFECTED_BASE" --affected-head HEAD --affected-committed "$NUS_CHECK_TASK"
           else
             # Main is the full validation boundary used by release assembly.
-            mise run "$NUS_CHECK_TASK"
+            mise run --timings "$NUS_CHECK_TASK"
           fi
         env:
           GH_TOKEN: ${{ github.token }}
           AFFECTED_BASE: ${{ steps.mergiraf-changes.outputs.base }}
           NUS_CHECK_TASK: "//...:check"
       - if: steps.mergiraf-changes.outputs.run == 'true'
-        run: mise run //mergiraf:test
+        run: mise run --timings //mergiraf:test
       # A push to main saves mise's task results for later runs. mise stores a task's
       # result only when it succeeded.
       - if: ${{ !cancelled() && github.event_name == 'push' }}
