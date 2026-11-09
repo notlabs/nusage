@@ -8,12 +8,8 @@ if $result.exit_code != 0 { exit $result.exit_code }
 let built = $result.stdout
     | lines
     | each { from json --strict }
-    | where {|message|
-        $message.reason == compiler-artifact
-            and $message.executable? != null
-            and 'bin' in $message.target.kind
-            and $message.package_id in $members
-    }
+    | where {|message| $message.reason == compiler-artifact and $message.executable? != null }
+    | where {|message| 'bin' in $message.target.kind and $message.package_id in $members }
     | get executable
 let bin = $metadata.workspace_root | path join target install bin
 mkdir $bin
