@@ -1,7 +1,0 @@
-[_.nusage.catalog]
-spec = { clap = "spec" }
-version = "0.2.0"
-tool = "jujutsu"
-
-[task_config]
-includes = ["../../tasks/entry.tasks.toml"]

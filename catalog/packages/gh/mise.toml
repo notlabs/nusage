@@ -1,0 +1,47 @@
+[_.nusage.catalog]
+spec = { run = "mise run //catalog/packages/gh:spec-export", probe = "version" }
+version = "0.2.0"
+tool = "gh"
+
+[tools]
+gh = "2.103.3"
+
+[task_config]
+cache = { enabled = true }
+
+[tasks.spec-export]
+dir = "spec"
+run = "nus {{config_root}}/spec.nu"
+
+[tasks.spec-json-fields]
+run = "nus {{config_root}}/spec.nu --json-fields | save --force {{config_root}}/json-fields.json"
+
+[tasks.spec]
+file = "../../mise-tasks/spec.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks.generate]
+file = "../../mise-tasks/generate.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks.check]
+sources = [
+  "**/*",
+  "../../mise-tasks/**/*.nu",
+  "../../lib/**/*.nu",
+  "../../../target/install/bin/nus",
+]
+outputs = []
+file = "../../mise-tasks/check.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks."check:platform"]
+sources = [
+  "**/*",
+  "../../mise-tasks/**/*.nu",
+  "../../lib/**/*.nu",
+  "../../../target/install/bin/nus",
+]
+outputs = []
+file = "../../mise-tasks/check.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."

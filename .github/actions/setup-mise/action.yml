@@ -1,0 +1,28 @@
+name: Set up mise and the project graph
+description: Link the local graph plugin before loading the project environment
+inputs:
+  version:
+    description: Mise version matching the catalog baseline
+    default: 2026.11.4
+runs:
+  using: composite
+  steps:
+    # Install can load the environment hook, so link the plugin before allowing it.
+    - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      with:
+        version: ${{ inputs.version }}
+        install: false
+        env: false
+        export_path: false
+    - shell: bash
+      run: mise plugins link --force nusage-graph ./graph/plugin
+    # Assemble once with the environment hook disabled, then verify normal graph loading.
+    - shell: bash
+      env:
+        NUSAGE_GRAPH_ACTIVE: "1"
+      run: mise --cd "$GITHUB_WORKSPACE" run --force --no-deps --raw //graph:assemble "$GITHUB_WORKSPACE"
+    - shell: bash
+      run: mise tasks ls --all
+    - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      with:
+        version: ${{ inputs.version }}

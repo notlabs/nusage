@@ -1,0 +1,20 @@
+[
+  {
+    "Module": {
+      "Path": "example.test/b",
+      "Dir": "/workspace/b"
+    }
+  },
+  {
+    "Module": {
+      "Path": "example.test/b",
+      "Dir": "/workspace/b"
+    }
+  },
+  {
+    "Module": {
+      "Path": "example.test/external",
+      "Dir": "/cache/external"
+    }
+  }
+]

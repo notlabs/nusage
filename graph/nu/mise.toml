@@ -1,0 +1,3 @@
+[tasks.provider]
+extends = "provider"
+run = 'exec "$NUSAGE_GRAPH_NU" --no-config-file "{{config_root}}/provider.nu" "$usage_root" --discovery "$usage_discovery"'

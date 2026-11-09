@@ -1,0 +1,2 @@
+arg "[root]" default="." help="Repository root to analyze"
+flag "--discovery <file>" required=#true help="Mise discovery JSON supplied by the assembler"

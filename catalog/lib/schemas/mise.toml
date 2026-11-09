@@ -1,0 +1,10 @@
+[_.nusage.project]
+
+[tasks.check]
+description = "Check shared output-schema tooling"
+file = "verify.nu"
+sources = ["**/*.nu", "fixtures/**/*", "../../../target/install/bin/nus"]
+outputs = []
+
+[task_config]
+cache = { enabled = true }

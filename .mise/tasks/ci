@@ -1,0 +1,20 @@
+#!/usr/bin/env nus
+#MISE description="Run CI locally with act; on WSL Docker Desktop, enable Expose daemon and set DOCKER_HOST=tcp://127.0.0.1:2375 in your shell"
+#MISE env={ACTIONS_RUNTIME_URL="http://host.docker.internal:34567/"}
+#USAGE flag "--job <job>" default="check"
+#USAGE flag "--event <event>" default="push"
+
+def main [--job: string = "check", --event: string = "push"] {
+    let servers = [
+        --cache-server-path .cache/act/cache
+        --cache-server-addr 0.0.0.0
+        --cache-server-port 34000
+        --cache-server-external-url http://host.docker.internal:34000
+        --artifact-server-path .cache/act/artifacts
+        --artifact-server-addr 0.0.0.0
+        --artifact-server-port 34567
+    ]
+    mkdir .cache/act/cache .cache/act/artifacts
+    ^act --trust-project-actrc $event --workflows .github/workflows/ci.yml --job $job ...$servers
+    exit $env.LAST_EXIT_CODE
+}

@@ -1,0 +1,13 @@
+[env]
+NUS_CORPUS = { value = "{{ tools['usage-source'].path }}/corpus", tools = true }
+
+[tasks.verify-fixtures]
+file = "fixtures/verify.nu"
+sources = ["fixtures/**/*", "../../target/install/bin/nus"]
+outputs = []
+
+[tasks.check]
+depends = [":test", ":clippy", ":doc", ":verify-fixtures"]
+
+[tasks."check:platform"]
+depends = [":test", ":clippy", ":verify-fixtures"]

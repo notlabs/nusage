@@ -8,15 +8,12 @@
 # `//catalog:pack` wrote. The project's files stay as they will be once the releases exist;
 # only this machine's mise holds the links, and `mise install` treats them as installed. A
 # link goes when its version is uninstalled (`mise uninstall <tool>@<version>`); the release
-# then installs in its place. The builds the links point at are under target/nusage-link,
-# where nus is a link to the checkout's own, so a rebuild reaches the project without
-# linking again.
+# then installs in its place. The binaries point directly to target/install; catalog archives are extracted under catalog/dist/links.
 
-use mise *
 
 let root = $env.MISE_PROJECT_ROOT? | default $env.PWD
 let project = $usage.args.project | path expand
-let links = $root | path join target nusage-link
+let links = $root | path join catalog dist links
 
 const PREFIX = "packslip:github.com/notlabs/nusage/catalog/"
 
@@ -33,23 +30,19 @@ if ($wanted | is-empty) {
 let packed = open ($root | path join catalog dist packages packages.json)
 
 let linked = $wanted | each {|row|
-    let dir = $links | path join ($row.tool | str replace --all --regex '[^A-Za-z0-9.-]+' '-') $row.version
-    rm --recursive --force $dir
-    mkdir $dir
-    if $row.tool == "github:notlabs/nusage" {
-        mkdir ($dir | path join bin)
-        for bin in [nus nu_plugin_nus] {
-            ^ln -s ($root | path join .bin $bin) ($dir | path join bin $bin)
-        }
+    let dir = if $row.tool == "github:notlabs/nusage" {
+        $root | path join target install
     } else {
+        let dir = $links | path join ($row.tool | str replace --all --regex '[^A-Za-z0-9.-]+' '-') $row.version
+        rm --recursive --force $dir
+        mkdir $dir
         let name = $row.tool | str replace $PREFIX ""
         let package = $packed | where name == $name
         if ($package | is-empty) {
-            error make --unspanned {
-                msg: $"($row.tool): no catalog entry `($name)` with a version to pack"
-            }
+            error make --unspanned {msg: $"($row.tool): no catalog entry `($name)` with a version to pack"}
         }
         ^tar --extract --gzip --file ($root | path join catalog $package.0.archive) --directory $dir
+        $dir
     }
     mise link --force $"($row.tool)@($row.version)" $dir
     $"($row.tool)@($row.version)"

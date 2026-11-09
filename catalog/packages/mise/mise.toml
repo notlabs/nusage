@@ -1,0 +1,41 @@
+# The generated module wraps `mise run` for its callers; it names no task of its own.
+[_.nusage.project]
+dynamic = ["mod.nu"]
+
+[_.nusage.catalog]
+spec = { run = "mise usage" }
+switch = { flag = "--json", framing = "json" }
+version = "0.2.0"
+
+[task_config]
+cache = { enabled = true }
+
+[tasks.spec]
+file = "../../mise-tasks/spec.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks.generate]
+file = "../../mise-tasks/generate.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks.check]
+sources = [
+  "**/*",
+  "../../mise-tasks/**/*.nu",
+  "../../lib/**/*.nu",
+  "../../../target/install/bin/nus",
+]
+outputs = []
+file = "../../mise-tasks/check.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."
+
+[tasks."check:platform"]
+sources = [
+  "**/*",
+  "../../mise-tasks/**/*.nu",
+  "../../lib/**/*.nu",
+  "../../../target/install/bin/nus",
+]
+outputs = []
+file = "../../mise-tasks/check.nu"
+env.NUS_CATALOG_ROOT = "{{config_root}}/../.."

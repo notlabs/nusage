@@ -1,11 +1,10 @@
-# nusage
+# nusage: bootstrap with `mise plugins link nusage-graph ./graph/plugin`
 
 Typed Nushell commands from usage-annotated scripts, and typed wrappers from the usage specs of binaries and services.
 The command is `nus`, and so is the shebang, `#!/usr/bin/env nus`. Early development.
 
-- `nusage/`: `nus` and its crates; `nus --help` for the CLI, and each crate's documentation, `cargo doc --workspace --no-deps`, for what it is.
-- `catalog/`: a generated module package per tool under `catalog/lib/`, each released as `packslip:github.com/notlabs/nusage/catalog/<tool>`.
-- `intent/`: where the project is going, as claims checked where they can be.
+- `crates/`: `nus` and its crates; `nus --help` for the CLI, and each crate's documentation, `cargo doc --workspace --no-deps`, for what it is.
+- `catalog/`: a generated module package per tool under `catalog/packages/`, each released as `packslip:github.com/notlabs/nusage/catalog/<tool>`.
 - `mergiraf/`: Mergiraf, the structural merge tool `jj resolve` runs here, built with patches that teach it Nushell.
 
 ## Scripts
@@ -24,12 +23,12 @@ A script's spec is its `#USAGE` header, or the hidden `.<filename>.usage.kdl` be
 `include` paths resolve against that file, and `mount` adds the spec its command prints.
 Type annotations such as `arg (int)"<n>"` are kept from the header and the sidecar, not from included or mounted specs, where the value stays a string.
 
-`nus inspect script.nu | from json` gives the calls the analyzer resolves and its findings without running the script, as `nusage/schemas/inspection.schema.json` describes.
+`nus inspect script.nu | from json` gives the calls the analyzer resolves and its findings without running the script, as `crates/nusage/schemas/inspection.schema.json` describes.
 
 ## Editors
 
 `nus lsp` is Nushell's language server with nusage's view of a script: `$usage` and its type, and each call of another script held to that script's header.
-In a project that includes `nusage/conf.d/nus.toml`, `nu` is `nus nu`, which serves `nus lsp` when asked for `nu --lsp`, so an editor that starts `nu` through mise gets it; that `nus` is the release mise installs, so it needs one that has `nus nu`.
+In a project that includes `share/nusage.toml`, `nu` is `nus nu`, which serves `nus lsp` when asked for `nu --lsp`, so an editor that starts `nu` through mise gets it; that `nus` is the release mise installs, so it needs one that has `nus nu`.
 Elsewhere, after `mise dot apply`, `MISE_ENV=nus-lsp` in the editor's environment does the same, and `MISE_ENV=nus-lsp,nus-kakehashi` adds [kakehashi](https://github.com/atusy/kakehashi), which highlights a script's header as KDL.
 A project with its own `[wrappers.nu]` keeps nusage's server with `command = "nus"` and `args = ["nu"]`.
 
@@ -51,61 +50,43 @@ A shell that starts with mise's environment already set has it taken out first; 
 
 ## Development
 
-Install the tools with `mise install --monorepo`, and run tasks through `mise exec -- mise run`:
+Infrastructure entrypoints use explicit relative imports of the committed catalog modules.
+The root includes `share/nusage.toml` for tool pins and the `nu` wrapper.
+Libraries and Nutest suites use relative imports because Nushell parses them without a script prelude; no catalog bootstrap release or `NU_LIB_DIRS` is needed.
+The built `target/install/bin/nus` is on the development PATH; `//:build` refreshes it.
+
+After linking the plugin, `mise tasks ls --all` refuses once while writing the graph; run it again.
+Run `mise run //:build` to install the local binaries, then `mise install --monorepo` for the remaining tools.
+The build runs `cargo build --workspace --locked` once and copies the workspace's binary artifacts from Cargo's JSON messages into `target/install/bin`, including Nushell plugins.
+Mise tracks the Cargo workspace inputs and installed binaries so an unchanged build is skipped.
+The local binaries are build products on PATH; `[deps.nus]` refreshes them through `//:build`.
+The user-facing `share/nusage.toml` still installs the released tool.
+Run tasks normally:
 
 ```sh
-mise exec -- mise run '//catalog/...:check'
-mise exec -- mise run //nusage/crates/nusage-spec:check
+mise run '//catalog/...:check'
+mise run //crates/nusage-spec:check
 ```
 
-The project graph and the tests' inputs are generated configuration.
-The root's `auto` providers refresh them before `mise exec` and `mise run`, but `mise run` has resolved its tasks by then, so only the next mise process reads what they wrote; `mise exec` makes the inner `mise run` that process.
-A plain `mise run` that finds the graph changed fails at `//:graph-current` rather than run with the old one, and running it again works.
-On a fresh clone a plain `mise run` stops earlier: a task that names a generated input group does not load until the providers have run.
+Run the pipeline locally with `mise run ci` before pushing.
+The first run is cold; reruns reuse the container and its warm tool and Cargo caches.
 
-### The project graph
+The environment plugin discovers `//graph/...:provider` tasks, runs them under Nu, and projects their records into ignored crate task fragments and `.mise/conf.d/_projects.toml`.
+A changed project graph is written and the command refuses with `project graph changed; run the command again`; the next command reads it.
+Mise caches the hook's result against provider input records in its env cache. This needs a session key, supplied automatically by `mise activate` and inside `mise exec` and tasks. A bare shell without activation recomputes the graph on every command. Set `MISE_ENV_CACHE=0` to force a recompute; the plugin has no cache of its own. `//graph:check` validates provider JSON Lines against the output contract through `nus validate` after the tool is built.
 
-Mise discovers config roots one to three directories below the repository root; Cargo and Go projects keep their native IDs and edges.
-A config root that declares `[_.nusage.project]` or `[_.nusage.catalog]` is a project, and so is the repository root, with an ID that names its kind:
-
-| ID | Project |
-| --- | --- |
-| `catalog:<entry>` | A catalog entry: `[_.nusage.catalog]` |
-| `gen:<name>` | A generator an entry's spec comes from: `kind = "gen"` |
-| `fixtures:<name>`, `schemas:<name>` | Data other projects read, depending on nothing: `kind` and `name` |
-| `nu:<name>` | Any other project; `nu:root` is the repository root |
-
-Another config root is no project: `nusage/` only selects its crates' tasks by path.
-Mise drops `^task` dependencies in such a root, so the graph refuses them there.
-
-The providers are in `.mise/graph`: `go-workspace` writes the ignored `go.work`, `go-imports` and `nu-imports` analyze the code into `.cache/graph`, and `project-graph` writes the configuration.
-Each edge it adds keeps its kind and the file and line it comes from, as JSON in the project's `metadata.edges`:
-
-- `declared`: `[_.nusage.project].depends_add`, for what nothing else shows, and `fixtures` when the target is a data project.
-- `spec-generator`: what an entry's spec names: a `mise run` task, `clap`, or `openapi`.
-- `nu-use`, `nu-source`, `nu-path`: Nushell that loads another project's file, or names it in a `path self` constant.
-- `task-call`: a literal `mise run //root:task`, or a `{ task = }` or `{ tasks = [] }` run entry.
-- `task-dir`: a task that runs in another project's directory.
-- `go-import`: an import between Go modules.
-
-A computed `use` or `mise run` target is an error until the owning project lists its file in `[_.nusage.project].dynamic` and declares what it reaches in `depends_add`.
-A generator does not depend on an entry, a data project depends on nothing, and a cycle names the edges that close it.
-
-`mise tasks graph --json` and `mise tasks deps` show the graph; `mise deps install --force project-graph` writes it again.
-Go edges reflect the current build context; refresh `go-imports` after changing build-context environment variables.
-
-The `nus` provider builds `nus`, `nu_plugin_nus` and `openapi-usage` into `.bin` when the Rust sources change: tasks run them from PATH instead of depending on a build, and a cached task that runs `nus` keys its result on `.bin/nus`.
-A tool is no edge, so `--affected` selects the crates' checks for a change to the crates, not those of the projects that run `nus`; CI checks everything on main.
-
-Each crate's check runs its tests, Clippy, documentation checks, and upstream checks; the `nusage` crate's also holds `nus` to the fixtures.
-`//nusage:check` runs every crate's, and `//nusage:build` builds the distributed binaries.
+Each crate's check runs its tests, Clippy and documentation checks, with transitive Cargo inputs; the `nusage` crate's also holds `nus` to the fixtures.
+`mise run //...:check` checks every project; `//:build` installs the distributed binaries.
 
 Mr Boxington manages build targets under the ignored `.cache/mbx-targets` directory.
 The repository's discovery exclusions, `target` among them, keep build artifacts out of the project graph.
 
-Infrastructure tests are co-located `*_test.nu` suites run by Nutest; a config root's suites, and what they load, are its generated `nu-test` input group:
+Infrastructure tests are co-located `*_test.nu` suites run by Nutest; each config root owns its test task and declares its inputs:
 
 ```sh
-mise exec -- mise run //:test
-mise exec -- mise run //catalog:test
+mise run //:test
+mise run //catalog:test
 ```
+
+`//graph:test`, included in the root check, tests the affected-selection matrix in isolated JJ workspaces with independent Git baselines.
+It inspects `--affected-json` and forgets each workspace and removes its temporary directory after success or failure.

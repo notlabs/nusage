@@ -1,0 +1,12 @@
+# The released nusage, with what it runs: `nus nu` and the language server start `nu`, and
+# a generated module's completions run `usage`. nusage's releases are this repository's
+# `v<version>` tags; the catalog's packages and task catalog have tags of their own under
+# `catalog/`.
+[tools]
+"github:notlabs/nusage" = { version = "latest", version_prefix = "v" }
+nu = "0.116.1"
+usage = "7.1.3"
+
+[wrappers.nu]
+command = "nus"
+args = ["nu"]

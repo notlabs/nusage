@@ -1,0 +1,5 @@
+# Fixture edits select these checks without propagating through the Cargo library edges.
+[_.nusage.project]
+
+[tasks.check]
+depends = ["//crates/nusage:test", "//crates/nusage:verify-fixtures"]

@@ -1,44 +1,15 @@
 #!/usr/bin/env nus
-#MISE description="Hold the tree to what `jj fix` writes for it and to what its linters accept"
+#MISE description="Check repository formatting and lint diagnostics"
 #MISE output="interleave"
-use ../lib/actions.nu *
-
-# A Git diff as each file's path and its own part of the diff.
-def files-of []: string -> table<path: string, diff: string> {
-    $in
-    | split row --regex '(?m)^diff --git '
-    | where $it != ""
-    | each {|part|
-        {
-            path: ($part | parse --regex '(?m)^\+\+\+ b/(?<path>.+)$' | get path.0)
-            diff: ($"diff --git ($part)" | str trim --right --char (char nl))
-        }
-    }
-}
+use ../../actions/mod.nu *
 
 mut failed = []
 
-# `jj fix` formats every file of the working copy with the formatters `jj.toml` gives it, and
-# the working copy keeps what it writes: what that changes was not formatted, and a formatter
-# that fails names the file it could not read.
+# Formatting checks do not mutate the working copy or its history.
 group-start formatting
-let before = ^jj log --no-pager --no-graph --revisions @ --template commit_id
-let fixed = ^jj fix --no-pager --quiet --include-unchanged-files --source @ | complete
-print --no-newline $fixed.stderr
-let refused = $fixed.stderr
-| parse --regex 'Fix tool `(?<tool>[^`]+)` exited with non-zero exit code for `(?<file>[^`]+)`'
-for file in $refused {
-    annotate error $"($file.tool) could not format it" --file $file.file
-    $failed = $failed | append $"($file.tool): ($file.file)"
-}
-if $fixed.exit_code != 0 {
-    $failed = $failed | append "jj fix"
-}
-for file in (^jj diff --no-pager --git --from $before --to @ | files-of) {
-    print $file.diff
-    annotate-diff $file.path "not formatted: `jj fix` writes this" $file.diff
-    $failed = $failed | append $"formatting: ($file.path)"
-}
+let formatted = ^cargo fmt --all -- --check | complete
+print --no-newline $formatted.stdout $formatted.stderr
+if $formatted.exit_code != 0 { $failed = $failed | append "cargo fmt" }
 group-end
 
 group-start jactionlint

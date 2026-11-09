@@ -1,0 +1,10 @@
+[_.nusage.project]
+
+[tasks.check]
+description = "Parse the CI annotation library"
+run = "nu --no-config-file --commands 'use ./mod.nu *'"
+sources = ["**/*.nu"]
+outputs = []
+
+[task_config]
+cache = { enabled = true }

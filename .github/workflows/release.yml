@@ -23,6 +23,7 @@ concurrency:
 env:
   MBX_DISABLE: "1"
   MISE_TASK_CACHE: "off"
+  MISE_LOCKED: "true"
 
 jobs:
   tag:
@@ -48,9 +49,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha }}
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
-        with:
-          version: 2026.10.21
+      - uses: ./.github/actions/setup-mise
       - uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c # v0.5.147
         id: release-plz
         with:
@@ -91,7 +90,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASED_TAG: ${{ needs.tag.outputs.tag }}
           SHA: ${{ github.event.workflow_run.head_sha }}
-          # Releases and prereleases alike; another platform is another row.
+          # Releases and prereleases both build the Linux x86_64 target.
           TARGETS: |
             [
               {"target": "x86_64-unknown-linux-gnu", "os": "ubuntu-latest", "build-tool": "cargo"}
@@ -145,10 +144,7 @@ jobs:
         with:
           ref: refs/tags/${{ needs.plan.outputs.tag }}
           persist-credentials: false
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
-        with:
-          version: 2026.10.21
-          cache: false
+      - uses: ./.github/actions/setup-mise
       # A prerelease's version is set in this checkout alone, so the binary reports it.
       - if: needs.plan.outputs.prerelease == 'true'
         env:
@@ -211,17 +207,15 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
-        with:
-          version: 2026.10.21
-          cache: false
+      - uses: ./.github/actions/setup-mise
+      - run: mise run //:build
       - run: mise install --monorepo --locked
       - run: mise exec -- mise run //catalog:pack
       - id: release
         env:
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          mise exec -- nu catalog/tasks/release.nu catalog/dist/packages/packages.json \
+          mise exec -- nu catalog/lib/release.nu catalog/dist/packages/packages.json \
             --repo "$GITHUB_REPOSITORY" --commit "$SOURCE_SHA"
 
   # Sign each released package. This job reads the release and cannot change it.
@@ -309,6 +303,8 @@ jobs:
           version: 2026.10.21
           install: false
           cache: false
+          env: false
+          export_path: false
       # The version catalog/mise.toml declares, and whether it is released already.
       - id: version
         run: |
@@ -324,6 +320,10 @@ jobs:
             echo "tag=$tag"
             echo "released=$released"
           } >> "$GITHUB_OUTPUT"
+      - if: steps.version.outputs.released == 'false'
+        uses: ./.github/actions/setup-mise
+      - if: steps.version.outputs.released == 'false'
+        run: mise run //:build
       - if: steps.version.outputs.released == 'false'
         run: mise install --monorepo --locked
       - if: steps.version.outputs.released == 'false'
