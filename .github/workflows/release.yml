@@ -90,11 +90,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASED_TAG: ${{ needs.tag.outputs.tag }}
           SHA: ${{ github.event.workflow_run.head_sha }}
-          # Releases and prereleases alike; another platform is another row.
+          # Releases and prereleases both build the Linux x86_64 target.
           TARGETS: |
             [
-              {"target": "x86_64-unknown-linux-gnu", "os": "ubuntu-latest", "build-tool": "cargo"},
-              {"target": "aarch64-apple-darwin", "os": "macos-latest", "build-tool": "cargo"}
+              {"target": "x86_64-unknown-linux-gnu", "os": "ubuntu-latest", "build-tool": "cargo"}
             ]
         run: |
           if [ -n "$RELEASED_TAG" ]; then

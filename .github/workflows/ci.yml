@@ -24,11 +24,7 @@ env:
 
 jobs:
   check:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
@@ -83,14 +79,12 @@ jobs:
               echo "run=true" >> "$GITHUB_OUTPUT"
             fi
           fi
-      # Linux runs each project's `check`; macOS its `check:platform`, what differs by platform.
+      # Run each project's checks on Linux.
       - name: Check repository
         run: |
           if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ -n "$AFFECTED_BASE" ]; then
             # The root's checks hold the whole repository, whatever the change.
-            if [ "$RUNNER_OS" = Linux ]; then
-              mise run //:check
-            fi
+            mise run //:check
             mise run --affected --affected-base "$AFFECTED_BASE" --affected-head HEAD --affected-committed "$NUS_CHECK_TASK"
           else
             # Main is the full validation boundary used by release assembly.
@@ -99,7 +93,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           AFFECTED_BASE: ${{ steps.mergiraf-changes.outputs.base }}
-          NUS_CHECK_TASK: ${{ runner.os == 'Linux' && '//...:check' || '//...:check:platform' }}
+          NUS_CHECK_TASK: "//...:check"
       - if: steps.mergiraf-changes.outputs.run == 'true'
         run: mise run //mergiraf:test
       # A push to main saves mise's task results for later runs. mise stores a task's
