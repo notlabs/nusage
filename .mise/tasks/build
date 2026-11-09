@@ -1,4 +1,4 @@
-#!/usr/bin/env -S sh -c 'exec "$(mise which nu)" --no-config-file "$0" "$@"'
+#!/usr/bin/env nus
 #MISE description="Build the workspace and copy its binaries into target/install/bin"
 #MISE sources=["Cargo.toml", "Cargo.lock", ".cargo/**", "rust-toolchain.toml", "crates/**"]
 #MISE outputs=["target/install/bin/*"]

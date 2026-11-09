@@ -1,4 +1,4 @@
-#!/usr/bin/env -S sh -c 'exec "$(mise which nu)" --no-config-file "$0" "$@"'
+#!/usr/bin/env nus
 #MISE description="Run CI locally with act; on WSL Docker Desktop, enable Expose daemon and set DOCKER_HOST=tcp://127.0.0.1:2375 in your shell"
 #MISE env={ACTIONS_RUNTIME_URL="http://host.docker.internal:34567/"}
 #USAGE flag "--job <job>" default="check"
